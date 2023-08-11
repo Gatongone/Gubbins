@@ -1,0 +1,11 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <LangVersion>11</LangVersion>
+        <RootNamespace>Gubbins</RootNamespace>
+        <TargetFrameworks>net7.0;netstandard2.1;net472</TargetFrameworks>
+    </PropertyGroup>
+
+</Project>

@@ -1,0 +1,18 @@
+{
+  "name": "com.gatongone.gubbins",
+  "version": "0.0.1",
+  "license": "MIT",
+  "displayName": "Gubbins",
+  "description": "Unity3D development utilities.",
+  "author": {
+    "name": "Gatongone",
+    "email": "gatongone@gmail.com",
+    "url": "https://www.github.com/gatongone"
+  },
+  "unity": "2020.3",
+  "type": "tools",
+  "keywords": [
+    "Utils"
+  ],
+  "dependencies": {}
+}

@@ -1,0 +1,26 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <LangVersion>11</LangVersion>
+        <RootNamespace>Gubbins</RootNamespace>
+        <TargetFrameworks>net7.0;netstandard2.1;net472</TargetFrameworks>
+    </PropertyGroup>
+    
+    <!--  Unity project dependency build  -->
+    <Target Name="PostBuild" BeforeTargets="PostBuildEvent">
+        <PropertyGroup>
+            <UnitySupportVer>'net472'</UnitySupportVer>
+            <DotNetVer>'$([System.IO.Path]::GetFileNameWithoutExtension('$(OutDir.TrimEnd('\'))'))'</DotNetVer>
+            <UnityOutDir>$(SolutionDir)Gubbins.Unity\Plugins</UnityOutDir>
+        </PropertyGroup>
+        <ItemGroup>
+            <OutputFiles Include="$(OutputPath)$(ProjectName).dll" />
+            <OutputFiles Include="$(OutputPath)$(ProjectName).pdb" Condition="Exists('$(OutputPath)$(ProjectName).pdb')" />
+            <OutputFiles Include="$(OutputPath)$(ProjectName).mdb" Condition="Exists('$(OutputPath)$(ProjectName).mdb')" />
+        </ItemGroup>
+
+        <Copy SourceFiles="@(OutputFiles)" DestinationFolder="$(UnityOutDir)" SkipUnchangedFiles="true" Condition=" $(DotNetVer) == $(UnitySupportVer) " />
+    </Target>
+</Project>

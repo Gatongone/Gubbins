@@ -1,6 +1,7 @@
-# IDE #IDE configs
+#IDE configs
 /.idea
 /.vs
+
 # Build results
 [Dd]ebug
 [Rr]elease

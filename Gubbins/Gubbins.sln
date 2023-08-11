@@ -1,8 +1,8 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gubbins", "Gubbins\Gubbins.csproj", "{56F6C705-6E56-4525-9B5C-692015ACEC12}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gubbins.Core", "Gubbins.Core\Gubbins.Core.csproj", "{ED90D4BE-FCDF-480B-A543-00C5C50E43EE}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gubbins.Console", "Gubbins.Console\Gubbins.Console.csproj", "{6D9BE8A1-1B9C-4597-8C13-2ECC9EF7DE8B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gubbins.Net", "Gubbins.Net\Gubbins.Net.csproj", "{839B2FD5-A3BC-4ECC-8012-C1CCEE37F3CC}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -10,14 +10,13 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{56F6C705-6E56-4525-9B5C-692015ACEC12}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{56F6C705-6E56-4525-9B5C-692015ACEC12}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{56F6C705-6E56-4525-9B5C-692015ACEC12}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{56F6C705-6E56-4525-9B5C-692015ACEC12}.Release|Any CPU.Build.0 = Release|Any CPU
-		{6D9BE8A1-1B9C-4597-8C13-2ECC9EF7DE8B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{6D9BE8A1-1B9C-4597-8C13-2ECC9EF7DE8B}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{6D9BE8A1-1B9C-4597-8C13-2ECC9EF7DE8B}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{6D9BE8A1-1B9C-4597-8C13-2ECC9EF7DE8B}.Release|Any CPU.Build.0 = Release|Any CPU
-		{6D9BE8A1-1B9C-4597-8C13-2ECC9EF7DE8B}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
+		{ED90D4BE-FCDF-480B-A543-00C5C50E43EE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ED90D4BE-FCDF-480B-A543-00C5C50E43EE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ED90D4BE-FCDF-480B-A543-00C5C50E43EE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ED90D4BE-FCDF-480B-A543-00C5C50E43EE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{839B2FD5-A3BC-4ECC-8012-C1CCEE37F3CC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{839B2FD5-A3BC-4ECC-8012-C1CCEE37F3CC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{839B2FD5-A3BC-4ECC-8012-C1CCEE37F3CC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{839B2FD5-A3BC-4ECC-8012-C1CCEE37F3CC}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
