@@ -1,2 +1,2 @@
 # Gubbins
-Game development general tools collection
+Dotnet/Unity3D personal game development general tools collections.
