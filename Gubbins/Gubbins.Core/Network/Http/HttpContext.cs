@@ -12,44 +12,40 @@ public struct HttpContext : IDisposable
     private string? m_Url;
     private volatile bool m_IsDisposed;
     private HttpResponse m_Response;
-    private readonly Dictionary<string, string> m_Headers;
-    private readonly Dictionary<string, object> m_Queries;
+    private readonly HttpMessageCache m_MessageCache;
 
     public string? Body { get; private set; }
     public Version Version { get; private set; } = new(DEFAULT_HTTP_VERSION);
     public HttpMethod Method { get; private set; } = HttpMethod.Undefined;
     public Encoding Encoding { get; private set; } = Encoding.UTF8;
-    public IReadOnlyDictionary<string, string> Headers => m_Headers;
-    public IReadOnlyDictionary<string, object> Queries => m_Queries;
+    public IReadOnlyDictionary<string, string> Headers =>  m_MessageCache.Headers;
+    public IReadOnlyDictionary<string, object> Queries =>  m_MessageCache.Queries;
     public bool IsResponse => Method.Equals(HttpMethod.Undefined);
-    public string? ContentType => m_Headers.TryGetValue("Content-Type", out var type) ? type : null;
+    public string? ContentType =>  m_MessageCache.Headers.TryGetValue("Content-Type", out var type) ? type : null;
+    public bool IsDisposed => m_IsDisposed;
 
     public Uri? Uri
     {
         get
         {
-            var url = m_Queries.Count <= 0
+            var url = m_MessageCache.Queries.Count <= 0
                 ? m_Url
-                : m_Url + "?" + string.Join("&", m_Queries.Select(kv => $"{kv.Key}={kv.Value}"));
+                : m_Url + "?" + string.Join("&",  m_MessageCache.Queries.Select(kv => $"{kv.Key}={kv.Value}"));
             return url != null ? new Uri(url) : null;
         }
     }
 
     public HttpContext()
     {
-        m_Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        m_Headers = InternalSingleton.InstanceOf<InternalObjectPool<Dictionary<string, string>>>().Spawn();
-        m_Queries = InternalSingleton.InstanceOf<InternalObjectPool<Dictionary<string, object>>>().Spawn();
+        m_MessageCache = InternalSingleton.InstanceOf<InternalObjectPool<HttpMessageCache>>().Spawn();
     }
 
-    public void Dispose()
+    public readonly void Dispose()
     {
         if (m_IsDisposed) return;
-        m_Headers.Clear();
-        m_Queries.Clear();
-        InternalSingleton.InstanceOf<InternalObjectPool<Dictionary<string, string>>>().Recycle(m_Headers);
-        InternalSingleton.InstanceOf<InternalObjectPool<Dictionary<string, object>>>().Recycle(m_Queries);
-        m_IsDisposed = true;
+         m_MessageCache.Clear();
+         InternalSingleton.InstanceOf<InternalObjectPool<HttpMessageCache>>().Recycle(m_MessageCache);
+         m_IsDisposed = true;
     }
 
     public static HttpContext CreateFromString(string httpString)
@@ -82,7 +78,7 @@ public struct HttpContext : IDisposable
                 foreach (var param in query.Split('&'))
                 {
                     var kv = param.Split('=');
-                    context.m_Queries[kv[0]] = kv[1];
+                    context. m_MessageCache.Queries[kv[0]] = kv[1];
                 }
             }
         }
@@ -94,7 +90,7 @@ public struct HttpContext : IDisposable
                 break;
 
             var header = Regex.Match(lines[i], @"(.+(?=: )): (.+(?=\s))");
-            context.m_Headers[header.Groups[1].Value] = header.Groups[2].Value;
+            context. m_MessageCache.Headers[header.Groups[1].Value] = header.Groups[2].Value;
         }
 
         // Parse body
@@ -141,13 +137,13 @@ public struct HttpContext : IDisposable
     public HttpContext WithQuery(string name, object value)
     {
         if (value != null)
-            m_Queries.Add(name, value);
+             m_MessageCache.Queries.Add(name, value);
         return this;
     }
 
     public HttpContext WithHeader(string name, string value)
     {
-        m_Headers.Add(name, value);
+         m_MessageCache.Headers.Add(name, value);
         return this;
     }
 
@@ -168,13 +164,13 @@ public struct HttpContext : IDisposable
     {
         if (isProxy)
         {
-            m_Headers.Remove("Connection");
-            m_Headers.Add("Proxy-Connection", connectionType);
+             m_MessageCache.Headers.Remove("Connection");
+             m_MessageCache.Headers.Add("Proxy-Connection", connectionType);
         }
         else
         {
-            m_Headers.Remove("Proxy-Connection");
-            m_Headers.Add("Connection", connectionType);
+             m_MessageCache.Headers.Remove("Proxy-Connection");
+             m_MessageCache.Headers.Add("Connection", connectionType);
         }
 
         return this;
@@ -183,14 +179,26 @@ public struct HttpContext : IDisposable
     public override string ToString()
     {
         var body = Body;
-        var path = m_Headers.ContainsKey("Proxy-Connection") || m_Headers.ContainsKey("proxy-connection") ? m_Url : IsResponse ? string.Empty : " / ";
-        var queryInfo = m_Queries.Count <= 0 ? path : $" /?{string.Join("&", m_Queries.Select(x => $"{x.Key}={x.Value}"))} ";
+        var path =  m_MessageCache.Headers.ContainsKey("Proxy-Connection") ||  m_MessageCache.Headers.ContainsKey("proxy-connection") ? m_Url : IsResponse ? string.Empty : " / ";
+        var queryInfo =  m_MessageCache.Queries.Count <= 0 ? path : $" /?{string.Join("&",  m_MessageCache.Queries.Select(x => $"{x.Key}={x.Value}"))} ";
         var hostInfo = string.IsNullOrEmpty(m_Url) ? string.Empty : $"Host: {Uri.Host}\n";
-        var headerInfo = string.Join("\n", m_Headers.Select(x => $"{x.Key}: {x.Value}"));
+        var headerInfo = string.Join("\n",  m_MessageCache.Headers.Select(x => $"{x.Key}: {x.Value}"));
         var methodInfo = IsResponse ? string.Empty : Method.ToString();
         var bodyInfo = string.IsNullOrEmpty(body) ? string.Empty : $"\n{body}";
         var responseInfo = m_Response.Equals(HttpResponse.None) ? string.Empty : $" {m_Response.Code} {m_Response.Message}";
         return $"{methodInfo}{queryInfo}HTTP/{Version}{responseInfo}\n{hostInfo}{headerInfo}{bodyInfo}";
+    }
+
+    private class HttpMessageCache
+    {
+        public Dictionary<string, string> Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, object> Queries= new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+
+        public void Clear()
+        {
+            Headers.Clear();
+            Queries.Clear();
+        }
     }
 
     private readonly struct HttpResponse : IEquatable<HttpResponse>

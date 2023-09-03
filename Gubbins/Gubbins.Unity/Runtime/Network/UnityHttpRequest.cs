@@ -8,11 +8,14 @@ namespace Gubbins.Network
 {
     public class UnityHttpRequest : IHttpRequest
     {
-        public bool IsClosed { get; private set; }
+        public bool IsDisposed { get; set; }
+        private bool m_IsClosed;
+        private HttpContext m_Context;
         private readonly UnityWebRequest m_Request;
 
         public UnityHttpRequest(HttpContext context)
         {
+            m_Context = context;
             m_Request = new UnityWebRequest(context.Uri) {downloadHandler = new DownloadHandlerBuffer()};
 
             foreach (var header in context.Headers)
@@ -27,16 +30,37 @@ namespace Gubbins.Network
                     m_Request.uploadHandler.contentType = context.ContentType;
                 m_Request.uploadHandler = new UploadHandlerRaw(context.Encoding.GetBytes(context.Body));
             }
-            context.Dispose();
         }
 
         public async Task<HttpResponse> SendAsync()
         {
-            Assert.IsFalse(IsClosed, "The HTTP request is closed, please create a new instance.");
+            Assert.IsFalse(m_IsClosed, "The HTTP request is closed, please create a new instance.");
             var downloadHandler = await m_Request.SendWebRequest();
-            IsClosed = true;
-            return new HttpResponse(downloadHandler.data, m_Request.responseCode);
+            var response = new HttpResponse(downloadHandler.data, m_Request.responseCode);
+            m_IsClosed = true;
+            return response;
         }
+        
+        public void Dispose()
+        {
+            Cleanup();
+            GC.SuppressFinalize(this);
+        }
+
+        private void Cleanup()
+        {
+            if (IsDisposed) return;
+            m_Context.Dispose();
+            m_Request.Dispose();
+            m_IsClosed = true;
+            IsDisposed = true;
+
+        }
+        ~UnityHttpRequest()
+        {
+            Cleanup();
+        }
+
     }
 
     internal readonly struct UnityHttpResult : INotifyCompletion

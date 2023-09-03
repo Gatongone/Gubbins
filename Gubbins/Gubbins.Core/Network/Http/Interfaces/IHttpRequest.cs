@@ -1,7 +1,7 @@
 ﻿namespace Gubbins.Network;
 
-public interface IHttpRequest
+public interface IHttpRequest : IDisposable
 {
-    bool IsClosed { get; }
+    bool IsDisposed { get; }
     Task<HttpResponse> SendAsync();
 }

@@ -1,30 +1,32 @@
-﻿using System.Diagnostics;
+﻿using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Net;
 
 namespace Gubbins.Network;
 
 public class NetHttpRequest : IHttpRequest
 {
-    public bool IsClosed { get; set; }
+    public bool IsDisposed { get; private set; }
+    private HttpResponse m_Response;
+    private readonly HttpContext m_Context;
+
 #if NET6_0_OR_GREATER
     private readonly HttpClient m_Request;
     private readonly HttpRequestMessage m_Message;
 
     public NetHttpRequest(HttpContext context, Uri host = null)
     {
+        m_Context = context;
         var uri = context.Uri;
         Debug.Assert(uri != null);
 
         if (host != null && host != uri)
         {
             context.WithConnection(HttpConnectionType.KeepAlive, true);
-
-            var proxy = new WebProxy(host);
-            var handler = new HttpClientHandler {Proxy = proxy, UseProxy = true};
-            m_Request = new HttpClient(handler);
+            m_Request = HttpClientFactory.Spawn(host);
         }
         else
-            m_Request = new HttpClient();
+            m_Request = HttpClientFactory.Spawn();
 
         m_Message = new HttpRequestMessage(new System.Net.Http.HttpMethod(context.Method), uri)
         {
@@ -47,21 +49,40 @@ public class NetHttpRequest : IHttpRequest
 
     public async Task<HttpResponse> SendAsync()
     {
-        if(IsClosed) throw new InvalidOperationException("The HTTP request is closed, please create a new instance.");
         var responseMsg = await m_Request.SendAsync(m_Message);
-        var response = new HttpResponse(await responseMsg.Content.ReadAsByteArrayAsync(), (long) responseMsg.StatusCode);
-        IsClosed = true;
-        return response;
+        m_Response = new HttpResponse(await responseMsg.Content.ReadAsByteArrayAsync(), (long) responseMsg.StatusCode);
+        return m_Response;
+    }
+
+    private static class HttpClientFactory
+    {
+        private static readonly HttpClient s_SharedClient = new();
+        private static readonly ConcurrentDictionary<Uri, HttpClient> s_ClientMaps = new();
+
+        public static HttpClient Spawn(Uri proxyHost = null)
+        {
+            if (proxyHost == null) return s_SharedClient;
+            
+            if (s_ClientMaps.TryGetValue(proxyHost, out var client))
+                return client;
+            var proxy = new WebProxy(proxyHost);
+            var handler = new HttpClientHandler {Proxy = proxy, UseProxy = true};
+            client = new HttpClient(handler);
+            s_ClientMaps.TryAdd(proxyHost, client);
+            return client;
+
+        }
     }
 #else
     private readonly HttpWebRequest m_Request;
 
-    public NetHttpRequest(HttpContext context, Uri host = null)
+    public NetHttpRequest(HttpContext context, Uri proxyHost = null)
     {
+        m_Context = context;
         m_Request = (HttpWebRequest) WebRequest.Create(context.Uri);
-        if (host != null && host != context.Uri)
+        if (proxyHost != null && proxyHost != context.Uri)
         {
-            m_Request.Proxy = new WebProxy(host);
+            m_Request.Proxy = new WebProxy(proxyHost);
         }
         
         m_Request.Method = context.Method;
@@ -71,25 +92,52 @@ public class NetHttpRequest : IHttpRequest
         {
             m_Request.Headers.Add(header.Key, header.Value);
         }
-
-        // Add body
-        if (!string.IsNullOrEmpty(context.Body))
-        {
-            using var dataStream = new StreamWriter(m_Request.GetRequestStream(), context.Encoding);
-            dataStream.WriteAsync(context.Body);
-            dataStream.Close();
-        }
+        
         context.Dispose();       
     }
 
     public async Task<HttpResponse> SendAsync()
     {
-        if(IsClosed) throw new InvalidOperationException("The HTTP request is closed, please create a new instance.");
+        // Add body
+        if (!string.IsNullOrEmpty(m_Context.Body))
+        {
+            await using var dataStream = new StreamWriter(m_Request.GetRequestStream(), m_Context.Encoding);
+            await dataStream.WriteAsync(m_Context.Body);
+            dataStream.Close();
+        }
+        
         var response = (HttpWebResponse) await m_Request.GetResponseAsync();
         var stream = response.GetResponseStream();
         Debug.Assert(stream != null);
-        IsClosed = true;
-        return new HttpResponse(stream, (long) response.StatusCode);
+        m_Response = new HttpResponse(stream, (long) response.StatusCode);
+        return m_Response;
     }
 #endif
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    private void Dispose(bool disposing)
+    {
+        if (IsDisposed) return;
+        if (disposing)
+        {
+#if NET6_0_OR_GREATER
+            m_Message.Dispose();
+#else
+            m_Request.Dispose();
+#endif
+        }
+        m_Context.Dispose();
+        m_Response.Dispose();
+        IsDisposed = true;
+    }
+
+    ~NetHttpRequest()
+    {
+        Dispose(false);
+    }
 }
