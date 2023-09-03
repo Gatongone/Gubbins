@@ -101,7 +101,7 @@ public class NetHttpRequest : IHttpRequest
         // Add body
         if (!string.IsNullOrEmpty(m_Context.Body))
         {
-            await using var dataStream = new StreamWriter(m_Request.GetRequestStream(), m_Context.Encoding);
+            using var dataStream = new StreamWriter(m_Request.GetRequestStream(), m_Context.Encoding);
             await dataStream.WriteAsync(m_Context.Body);
             dataStream.Close();
         }
@@ -127,8 +127,6 @@ public class NetHttpRequest : IHttpRequest
         {
 #if NET6_0_OR_GREATER
             m_Message.Dispose();
-#else
-            m_Request.Dispose();
 #endif
         }
         m_Context.Dispose();

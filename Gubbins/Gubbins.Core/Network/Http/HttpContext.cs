@@ -40,7 +40,7 @@ public struct HttpContext : IDisposable
         m_MessageCache = InternalSingleton.InstanceOf<InternalObjectPool<HttpMessageCache>>().Spawn();
     }
 
-    public readonly void Dispose()
+    public void Dispose()
     {
         if (m_IsDisposed) return;
          m_MessageCache.Clear();
