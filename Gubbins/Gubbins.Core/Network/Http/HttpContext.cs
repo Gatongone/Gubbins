@@ -191,8 +191,8 @@ public struct HttpContext : IDisposable
 
     private class HttpMessageCache
     {
-        public Dictionary<string, string> Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        public Dictionary<string, object> Queries= new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+        public readonly Dictionary<string, string> Headers = new(StringComparer.OrdinalIgnoreCase);
+        public readonly Dictionary<string, object> Queries= new(StringComparer.OrdinalIgnoreCase);
 
         public void Clear()
         {
@@ -205,7 +205,7 @@ public struct HttpContext : IDisposable
     {
         public readonly long Code;
         public readonly string Message;
-        public static HttpResponse None = new HttpResponse(0, null);
+        public static readonly HttpResponse None = new(0, null);
 
         public HttpResponse(long code, string? message) => (Code, Message) = (code, message);
 
