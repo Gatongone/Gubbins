@@ -52,7 +52,7 @@ public struct HttpContext : IDisposable
     {
         var lines = httpString.Split('\n');
 
-        string?[] requestLine = lines[0].Split(' ');
+        string[] requestLine = lines[0].Split(' ');
         var isResponse = requestLine[0].Contains("HTTP");
 
         var context = new HttpContext();
@@ -60,15 +60,15 @@ public struct HttpContext : IDisposable
         // Parse response
         if (isResponse)
         {
-            context.Version = new Version(Regex.Match(requestLine[0], @"(?<=/).+").ToString());
-            context.m_Response = new HttpResponse(long.Parse(requestLine[1]), requestLine[2]);
+            context.Version = new Version(Regex.Match(requestLine.ElementAtOrDefault(0) ?? string.Empty, @"(?<=/).+").ToString());
+            context.m_Response = new HttpResponse(long.Parse(requestLine.ElementAtOrDefault(1) ?? string.Empty), requestLine[2]);
         }
         // Parse request
         else
         {
-            context.Method = requestLine[0];
-            context.m_Url = requestLine[1];
-            context.Version = new Version(Regex.Match(requestLine[2], @"(?<=/).+").ToString());
+            context.Method = requestLine.ElementAtOrDefault(0);
+            context.m_Url = requestLine.ElementAtOrDefault(1);
+            context.Version = new Version(Regex.Match(requestLine.ElementAtOrDefault(2) ?? string.Empty, @"(?<=/).+").ToString());
 
             // Parse queries
             var urlParts = context.m_Url.Split('?');
