@@ -127,6 +127,7 @@ public struct HttpContext : IDisposable
     {
         if (filePaths.Length <= 0)
             return this;
+        m_Url ??= "/";
         if (m_Url.EndsWith("/"))
             m_Url += $"{string.Join("/", filePaths)}";
         else
@@ -205,9 +206,9 @@ public struct HttpContext : IDisposable
     {
         public readonly long Code;
         public readonly string Message;
-        public static readonly HttpResponse None = new(0, null);
+        public static readonly HttpResponse None = new(0, string.Empty);
 
-        public HttpResponse(long code, string? message) => (Code, Message) = (code, message);
+        public HttpResponse(long code, string message) => (Code, Message) = (code, message);
 
         public bool Equals(HttpResponse other) => Code == other.Code && Message == other.Message;
 
