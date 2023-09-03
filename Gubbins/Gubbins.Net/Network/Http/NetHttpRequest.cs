@@ -8,22 +8,27 @@ public class NetHttpRequest : IHttpRequest
 {
     public bool IsDisposed { get; private set; }
     private HttpResponse m_Response;
-    private readonly HttpContext m_Context;
+    private HttpContext m_Context;
 
 #if NET6_0_OR_GREATER
     private readonly HttpClient m_Request;
     private readonly HttpRequestMessage m_Message;
-
-    public NetHttpRequest(HttpContext context, Uri host = null)
+    
+    /// <summary>
+    /// Create a Http request for .NET program.
+    /// </summary>
+    /// <param name="context">Http info context.</param>
+    /// <param name="proxyHost">Proxy host.</param>
+    public NetHttpRequest(HttpContext context, Uri proxyHost = null)
     {
         m_Context = context;
         var uri = context.Uri;
         Debug.Assert(uri != null);
 
-        if (host != null && host != uri)
+        if (proxyHost != null && proxyHost != uri)
         {
             context.WithConnection(HttpConnectionType.KeepAlive, true);
-            m_Request = HttpClientFactory.Spawn(host);
+            m_Request = HttpClientFactory.Spawn(proxyHost);
         }
         else
             m_Request = HttpClientFactory.Spawn();
@@ -50,10 +55,13 @@ public class NetHttpRequest : IHttpRequest
     public async Task<HttpResponse> SendAsync()
     {
         var responseMsg = await m_Request.SendAsync(m_Message);
-        m_Response = new HttpResponse(await responseMsg.Content.ReadAsByteArrayAsync(), (long) responseMsg.StatusCode);
+        m_Response = new HttpResponse(await responseMsg.Content.ReadAsByteArrayAsync(), (long) responseMsg.StatusCode, responseMsg.ReasonPhrase);
         return m_Response;
     }
-
+    
+    /// <summary>
+    /// Http client reuse.
+    /// </summary>
     private static class HttpClientFactory
     {
         private static readonly HttpClient s_SharedClient = new();
@@ -70,12 +78,16 @@ public class NetHttpRequest : IHttpRequest
             client = new HttpClient(handler);
             s_ClientMaps.TryAdd(proxyHost, client);
             return client;
-
         }
     }
 #else
     private readonly HttpWebRequest m_Request;
-
+    
+/// <summary>
+    /// Create a Http request for .NET program.
+    /// </summary>
+    /// <param name="context">Http info context.</param>
+    /// <param name="proxyHost">Proxy host.</param>
     public NetHttpRequest(HttpContext context, Uri proxyHost = null)
     {
         m_Context = context;
@@ -109,11 +121,14 @@ public class NetHttpRequest : IHttpRequest
         var response = (HttpWebResponse) await m_Request.GetResponseAsync();
         var stream = response.GetResponseStream();
         Debug.Assert(stream != null);
-        m_Response = new HttpResponse(stream, (long) response.StatusCode);
+        m_Response = new HttpResponse(stream, (long) response.StatusCode, response.StatusDescription);
         return m_Response;
     }
 #endif
-
+    
+    /// <summary>
+    /// Dispose request.
+    /// </summary>
     public void Dispose()
     {
         Dispose(true);

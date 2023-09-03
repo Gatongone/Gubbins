@@ -1,6 +1,18 @@
-﻿namespace Gubbins.Network;
+﻿/*
+ * Copyright ©2022 Gatongone
+ * Author: Gatongone
+ * Email: gatongone@gmail.com
+ * Created On: 2023/08/12-01:44:01
+ * Github: https://github.com/Gatongone
+ * Description: Http methods.
+ */
 
-public struct HttpMethod : IEquatable<HttpMethod>
+namespace Gubbins.Network;
+
+/// <summary>
+/// Http Methods.
+/// </summary>
+public readonly struct HttpMethod : IEquatable<HttpMethod>
 {
     private readonly string m_Method;
 

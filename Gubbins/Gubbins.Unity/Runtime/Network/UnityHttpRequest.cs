@@ -36,11 +36,14 @@ namespace Gubbins.Network
         {
             Assert.IsFalse(m_IsClosed, "The HTTP request is closed, please create a new instance.");
             var downloadHandler = await m_Request.SendWebRequest();
-            var response = new HttpResponse(downloadHandler.data, m_Request.responseCode);
+            var response = new HttpResponse(downloadHandler.data, m_Request.responseCode, m_Request.error);
             m_IsClosed = true;
             return response;
         }
         
+        /// <summary>
+        /// Dispose request.
+        /// </summary>
         public void Dispose()
         {
             Cleanup();

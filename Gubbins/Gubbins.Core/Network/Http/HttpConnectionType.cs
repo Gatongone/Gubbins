@@ -1,5 +1,17 @@
-﻿namespace Gubbins.Network;
+﻿/*
+ * Copyright ©2022 Gatongone
+ * Author: Gatongone
+ * Email: gatongone@gmail.com
+ * Created On: 2023/08/17-04:39:52
+ * Github: https://github.com/Gatongone
+ * Description: Http connection type.
+ */
 
+namespace Gubbins.Network;
+
+/// <summary>
+/// Http connection type.
+/// </summary>
 public struct HttpConnectionType : IEquatable<HttpConnectionType>
 {
     private readonly string m_Connection;

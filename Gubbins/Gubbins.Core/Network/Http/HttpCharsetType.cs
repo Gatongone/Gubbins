@@ -1,7 +1,16 @@
-﻿namespace Gubbins.Network;
+﻿/*
+ * Copyright ©2022 Gatongone
+ * Author: Gatongone
+ * Email: gatongone@gmail.com
+ * Created On: 2023/08/12-02:47:48
+ * Github: https://github.com/Gatongone
+ * Description: Http charset.
+ */
+
+namespace Gubbins.Network;
 
 /// <summary>
-/// Character set mime names.
+/// Http character set mime names.
 /// </summary>
 // ReSharper disable All
 public struct HttpCharsetType

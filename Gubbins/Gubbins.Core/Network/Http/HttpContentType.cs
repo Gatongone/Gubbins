@@ -1,4 +1,13 @@
-﻿namespace Gubbins.Network;
+﻿/*
+ * Copyright ©2022 Gatongone
+ * Author: Gatongone
+ * Email: gatongone@gmail.com
+ * Created On: 2023/08/12-01:38:15
+ * Github: https://github.com/Gatongone
+ * Description: Http content type.
+ */
+
+namespace Gubbins.Network;
 
 /// <summary>
 /// Http content types.
