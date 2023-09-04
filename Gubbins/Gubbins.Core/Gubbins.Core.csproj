@@ -7,6 +7,10 @@
         <RootNamespace>Gubbins</RootNamespace>
         <TargetFrameworks>net7.0;netstandard2.1;net472</TargetFrameworks>
     </PropertyGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    </ItemGroup>
     
     <!--  Unity project dependency build  -->
     <Target Name="PostBuild" BeforeTargets="PostBuildEvent">
