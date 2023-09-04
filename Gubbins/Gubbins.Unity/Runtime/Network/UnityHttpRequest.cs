@@ -13,10 +13,10 @@ namespace Gubbins.Network
         private HttpContext m_Context;
         private readonly UnityWebRequest m_Request;
 
-        public UnityHttpRequest(HttpContext context)
+        public UnityHttpRequest(HttpContext context, DownloadHandler downloadHandler = null, UploadHandler uploadHandler = null, CertificateHandler certificateHandler = null)
         {
             m_Context = context;
-            m_Request = new UnityWebRequest(context.Uri) {downloadHandler = new DownloadHandlerBuffer()};
+            m_Request = new UnityWebRequest(context.Uri) {downloadHandler = downloadHandler ?? new DownloadHandlerBuffer()};
 
             foreach (var header in context.Headers)
             {
@@ -24,23 +24,25 @@ namespace Gubbins.Network
                     m_Request.SetRequestHeader(header.Key, header.Value);
             }
 
-            if (!string.IsNullOrEmpty(context.Body))
-            {
-                if (string.IsNullOrEmpty(context.ContentType))
-                    m_Request.uploadHandler.contentType = context.ContentType;
-                m_Request.uploadHandler = new UploadHandlerRaw(context.Encoding.GetBytes(context.Body));
-            }
+            if (certificateHandler != null) m_Request.certificateHandler = certificateHandler;
+
+            if (string.IsNullOrEmpty(context.Body) && uploadHandler == null) return;
+            
+            if (string.IsNullOrEmpty(context.ContentType))
+                m_Request.uploadHandler.contentType = context.ContentType;
+            
+            m_Request.uploadHandler = uploadHandler ?? new UploadHandlerRaw(context.Encoding.GetBytes(context.Body));
         }
 
         public async Task<HttpResponse> SendAsync()
         {
             Assert.IsFalse(m_IsClosed, "The HTTP request is closed, please create a new instance.");
-            var downloadHandler = await m_Request.SendWebRequest();
-            var response = new HttpResponse(downloadHandler.data, m_Request.responseCode, m_Request.error);
+            await m_Request.SendWebRequest();
+            var response = new HttpResponse(m_Request.downloadHandler.data, m_Request.responseCode, m_Request.error);
             m_IsClosed = true;
             return response;
         }
-        
+
         /// <summary>
         /// Dispose request.
         /// </summary>
@@ -57,34 +59,32 @@ namespace Gubbins.Network
             m_Request.Dispose();
             m_IsClosed = true;
             IsDisposed = true;
-
         }
+
         ~UnityHttpRequest()
         {
             Cleanup();
         }
-
     }
 
-    internal readonly struct UnityHttpResult : INotifyCompletion
+#if !UNITY_2023_2_OR_NEWER
+    internal readonly struct UnityHttpRequestAwaiter : INotifyCompletion
     {
-        private readonly UnityWebRequest m_Request;
         private readonly UnityWebRequestAsyncOperation m_Operation;
         internal bool IsCompleted => m_Operation.isDone;
 
-        internal UnityHttpResult(UnityWebRequestAsyncOperation operation)
+        internal UnityHttpRequestAwaiter(UnityWebRequestAsyncOperation operation) => m_Operation = operation;
+
+        internal void GetResult()
         {
-            m_Request = operation.webRequest;
-            m_Operation = operation;
         }
 
-        internal DownloadHandler GetResult() => m_Request.downloadHandler;
         void INotifyCompletion.OnCompleted(Action continuation) => m_Operation.completed += _ => continuation.Invoke();
     }
 
-
     internal static class UnityWebRequestExtensions
     {
-        internal static UnityHttpResult GetAwaiter(this UnityWebRequestAsyncOperation operation) => new(operation);
+        internal static UnityHttpRequestAwaiter GetAwaiter(this UnityWebRequestAsyncOperation operation) => new(operation);
     }
+#endif
 }
