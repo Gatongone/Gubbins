@@ -7,10 +7,9 @@
  * Description: Http info context.
  */
 
+using System.Collections.Concurrent;
 using System.Text;
 using System.Text.RegularExpressions;
-using Gubbins.Structure;
-using Gubbins.Resources;
 
 namespace Gubbins.Network;
 
@@ -20,6 +19,7 @@ namespace Gubbins.Network;
 public struct HttpContext : IDisposable
 {
     private const string DEFAULT_HTTP_VERSION = "1.1";
+    private static readonly ConcurrentQueue<HttpMessageCache> s_CachePool = new();
 
     private string? m_Url;
     private volatile bool m_IsDisposed;
@@ -87,14 +87,17 @@ public struct HttpContext : IDisposable
 
     public HttpContext()
     {
-        m_MessageCache = InternalSingleton.InstanceOf<InternalObjectPool<HttpMessageCache>>().Spawn();
+        if (!s_CachePool.TryDequeue(out m_MessageCache))
+        {
+            m_MessageCache = new HttpMessageCache();
+        }
     }
 
     public void Dispose()
     {
         if (m_IsDisposed) return;
          m_MessageCache.Clear();
-         InternalSingleton.InstanceOf<InternalObjectPool<HttpMessageCache>>().Recycle(m_MessageCache);
+         s_CachePool.Enqueue(m_MessageCache);
          m_IsDisposed = true;
     }
     
