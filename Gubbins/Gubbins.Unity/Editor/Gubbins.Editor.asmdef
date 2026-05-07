@@ -1,8 +1,12 @@
 {
     "name": "Gubbins.Editor",
     "rootNamespace": "Gubbins.Editor",
-    "references": [],
-    "includePlatforms": [],
+    "references": [
+        "GUID:429866d0c55b2a742b18e7f435193f8b"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": true,

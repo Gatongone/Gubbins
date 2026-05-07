@@ -1,13 +1,4 @@
-﻿/*
- * Copyright ©2022 Gatongone
- * Author: Gatongone
- * Email: gatongone@gmail.com
- * Created On: 2023/08/12-01:56:32
- * Github: https://github.com/Gatongone
- * Description: Http response.
- */
-
-using System.Text;
+﻿using System.Text;
 
 namespace Gubbins.Network;
 
@@ -20,12 +11,12 @@ public readonly struct HttpResponse : IDisposable
     /// Response data.
     /// </summary>
     public readonly byte[] Data;
-    
+
     /// <summary>
     /// Http code.
     /// </summary>
     public readonly long Code;
-    
+
     /// <summary>
     /// Http description with code.
     /// </summary>
@@ -35,7 +26,7 @@ public readonly struct HttpResponse : IDisposable
     /// Response stream.
     /// </summary>
     public readonly Stream Stream;
-    
+
     /// <summary>
     /// Create a Http response
     /// </summary>
@@ -47,6 +38,7 @@ public readonly struct HttpResponse : IDisposable
         Data = data;
         Code = code;
         Stream = new MemoryStream(data);
+        Description = description;
     }
 
     /// <summary>
@@ -57,29 +49,31 @@ public readonly struct HttpResponse : IDisposable
     /// <param name="description">Http description with code.</param>
     public HttpResponse(Stream stream, long code, string? description)
     {
+        Data = Array.Empty<byte>();
+        _ = stream.Read(Data);
         Stream = stream;
         Code = code;
         Description = description;
     }
-    
+
     public string GetText(Encoding encoding)
     {
         using var reader = new StreamReader(Stream, encoding);
         return reader.ReadToEnd();
     }
-    
+
     /// <summary>
     /// Get text from data.
     /// </summary>
     /// <returns>Text from data</returns>
     public string GetText() => GetText(Encoding.UTF8);
-    
+
     /// <summary>
     /// Get text from data async.
     /// </summary>
     /// <returns>Text from data.</returns>
     public async Task<string> GetTextAsync() => await GetTextAsync(Encoding.UTF8);
-    
+
     /// <summary>
     /// Get text from data async.
     /// </summary>
@@ -90,7 +84,7 @@ public readonly struct HttpResponse : IDisposable
         using var reader = new StreamReader(Stream, encoding);
         return await reader.ReadToEndAsync();
     }
-    
+
     /// <summary>
     /// Dispose data stream.
     /// </summary>

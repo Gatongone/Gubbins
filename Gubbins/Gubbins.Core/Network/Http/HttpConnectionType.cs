@@ -1,22 +1,12 @@
-﻿/*
- * Copyright ©2022 Gatongone
- * Author: Gatongone
- * Email: gatongone@gmail.com
- * Created On: 2023/08/17-04:39:52
- * Github: https://github.com/Gatongone
- * Description: Http connection type.
- */
-
-namespace Gubbins.Network;
+﻿namespace Gubbins.Network;
 
 /// <summary>
 /// Http connection type.
 /// </summary>
-public struct HttpConnectionType : IEquatable<HttpConnectionType>
+public readonly struct HttpConnectionType(string connectionType) : IEquatable<HttpConnectionType>
 {
-    private readonly string m_Connection;
+    private readonly string m_Connection = connectionType;
 
-    public HttpConnectionType(string connectionType) => m_Connection = connectionType;
     public static implicit operator string(HttpConnectionType connectionType) => connectionType.m_Connection;
     public static implicit operator HttpConnectionType(string connectionType) => new(connectionType);
     public override string ToString() => m_Connection;

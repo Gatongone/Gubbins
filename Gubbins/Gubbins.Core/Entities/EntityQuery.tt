@@ -1,0 +1,28 @@
+﻿<#@ template language="C#" #>
+<#@ import namespace="System.Linq" #>
+namespace Gubbins.Entities;
+
+/// <summary>
+/// Provides methods for getting entity query handles for unmanaged entities.
+/// </summary>
+public static class EntityQueryGetQueryHandleExtensions
+{
+<#
+    for (var i = 1; i <= 16; i++)
+    {
+        var genericTypes = string.Join(", ", from index in Enumerable.Range(1, i) select $"T{index}");
+        var entityQueryHandle = $"EntityQueryHandle<{genericTypes}>";
+        var queryContext = $"EntityQueryContext<{genericTypes}>";
+#>
+
+    /// <summary>
+    /// Get unmanaged <see cref="IEntityQueryHandle{TResult}">EntityQueryHandle</see> entity query handle for the specified entity types.
+    /// </summary>
+    public static <#= entityQueryHandle #> GetQueryHandle<<#= genericTypes #>>(this IEntityQuery query, <#= queryContext #> context)
+    {
+        return new(query.Archetypes, context);
+    }
+<#
+    }
+#>
+}

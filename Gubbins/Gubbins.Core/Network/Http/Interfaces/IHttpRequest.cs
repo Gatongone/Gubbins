@@ -1,13 +1,4 @@
-﻿/*
- * Copyright ©2022 Gatongone
- * Author: Gatongone
- * Email: gatongone@gmail.com
- * Created On: 2023/08/12-01:33:45
- * Github: https://github.com/Gatongone
- * Description: Http request interface.
- */
-
-namespace Gubbins.Network;
+﻿namespace Gubbins.Network;
 
 /// <summary>
 /// Http request.
@@ -19,7 +10,7 @@ public interface IHttpRequest : IDisposable
     /// If true, it should be create a new instance.
     /// </summary>
     bool IsDisposed { get; }
-    
+
     /// <summary>
     /// Send request async.
     /// </summary>

@@ -1,11 +1,19 @@
+// Copyright ©2024 Gatongone
+// Author: Gatongone
+// Email: gatongone@gmail.com
+// Created On: 2023/09/04-08:31:34
+// Github: https://github.com/Gatongone
+
 using System;
-using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
+using JetBrains.Annotations;
+using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.Networking;
 
 namespace Gubbins.Network
 {
+    [PublicAPI]
     public class UnityHttpRequest : IHttpRequest
     {
         public bool IsDisposed { get; set; }
@@ -27,10 +35,10 @@ namespace Gubbins.Network
             if (certificateHandler != null) m_Request.certificateHandler = certificateHandler;
 
             if (string.IsNullOrEmpty(context.Body) && uploadHandler == null) return;
-            
+
             if (string.IsNullOrEmpty(context.ContentType))
                 m_Request.uploadHandler.contentType = context.ContentType;
-            
+
             m_Request.uploadHandler = uploadHandler ?? new UploadHandlerRaw(context.Encoding.GetBytes(context.Body));
         }
 
@@ -65,26 +73,21 @@ namespace Gubbins.Network
         {
             Cleanup();
         }
-    }
-
 #if !UNITY_2023_2_OR_NEWER
-    internal readonly struct UnityHttpRequestAwaiter : INotifyCompletion
-    {
-        private readonly UnityWebRequestAsyncOperation m_Operation;
-        internal bool IsCompleted => m_Operation.isDone;
-
-        internal UnityHttpRequestAwaiter(UnityWebRequestAsyncOperation operation) => m_Operation = operation;
-
-        internal void GetResult()
+        internal readonly struct Awaiter : System.Runtime.CompilerServices.INotifyCompletion
         {
+            private readonly UnityWebRequestAsyncOperation m_Operation;
+            internal bool IsCompleted => m_Operation.isDone;
+            internal Awaiter(UnityWebRequestAsyncOperation operation) => m_Operation = operation;
+            internal void GetResult() { }
+            void System.Runtime.CompilerServices.INotifyCompletion.OnCompleted(Action continuation) => m_Operation.completed += _ => continuation.Invoke();
         }
-
-        void INotifyCompletion.OnCompleted(Action continuation) => m_Operation.completed += _ => continuation.Invoke();
+#endif
     }
-
+#if !UNITY_2023_2_OR_NEWER
     internal static class UnityWebRequestExtensions
     {
-        internal static UnityHttpRequestAwaiter GetAwaiter(this UnityWebRequestAsyncOperation operation) => new(operation);
+        internal static UnityHttpRequest.Awaiter GetAwaiter(this UnityWebRequestAsyncOperation operation) => new(operation);
     }
 #endif
 }

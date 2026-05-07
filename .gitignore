@@ -1,6 +1,8 @@
 #IDE configs
 /.idea
 /.vs
+Gubbins/Gubbins.Generator/.idea
+Gubbins/Gubbins.Unity/Plugins/Generator~/.idea
 
 # Build results
 [Dd]ebug

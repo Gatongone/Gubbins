@@ -2,7 +2,11 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gubbins.Core", "Gubbins.Core\Gubbins.Core.csproj", "{ED90D4BE-FCDF-480B-A543-00C5C50E43EE}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gubbins.Net", "Gubbins.Net\Gubbins.Net.csproj", "{839B2FD5-A3BC-4ECC-8012-C1CCEE37F3CC}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gubbins.Tests", "Gubbins.Tests\Gubbins.Tests.csproj", "{05FB4306-8205-42E1-83A1-5A65CD0C0B70}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gubbins.Generator", "Gubbins.Generator\Gubbins.Generator.csproj", "{D4D1FC33-0811-46CD-BE6F-07777454F653}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gubbins.Unity.Generator", "Gubbins.Unity\Plugins\Generator~\Gubbins.Unity.Generator\Gubbins.Unity.Generator.csproj", "{34548FB6-28E6-4D9B-BFD6-F33093F9010A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -14,9 +18,17 @@ Global
 		{ED90D4BE-FCDF-480B-A543-00C5C50E43EE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{ED90D4BE-FCDF-480B-A543-00C5C50E43EE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{ED90D4BE-FCDF-480B-A543-00C5C50E43EE}.Release|Any CPU.Build.0 = Release|Any CPU
-		{839B2FD5-A3BC-4ECC-8012-C1CCEE37F3CC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{839B2FD5-A3BC-4ECC-8012-C1CCEE37F3CC}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{839B2FD5-A3BC-4ECC-8012-C1CCEE37F3CC}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{839B2FD5-A3BC-4ECC-8012-C1CCEE37F3CC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{05FB4306-8205-42E1-83A1-5A65CD0C0B70}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{05FB4306-8205-42E1-83A1-5A65CD0C0B70}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{05FB4306-8205-42E1-83A1-5A65CD0C0B70}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{05FB4306-8205-42E1-83A1-5A65CD0C0B70}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D4D1FC33-0811-46CD-BE6F-07777454F653}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D4D1FC33-0811-46CD-BE6F-07777454F653}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D4D1FC33-0811-46CD-BE6F-07777454F653}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D4D1FC33-0811-46CD-BE6F-07777454F653}.Release|Any CPU.Build.0 = Release|Any CPU
+		{34548FB6-28E6-4D9B-BFD6-F33093F9010A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{34548FB6-28E6-4D9B-BFD6-F33093F9010A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{34548FB6-28E6-4D9B-BFD6-F33093F9010A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{34548FB6-28E6-4D9B-BFD6-F33093F9010A}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

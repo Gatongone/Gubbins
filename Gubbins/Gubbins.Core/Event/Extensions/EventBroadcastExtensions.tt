@@ -1,0 +1,32 @@
+<#@ template language="C#" #>
+<#@ import namespace="System.Linq" #>
+namespace Gubbins.Message;
+
+/// <summary>
+/// Extensions for <see cref="IEventBroadcastable{TNotification}"/>.
+/// </summary>
+[System.Diagnostics.CodeAnalysis.SuppressMessage("ReSharper", "UnusedType.Global")]
+public static class EventBroadcastExtensions
+{
+    /// <summary>
+    /// <inheritdoc cref="IEventBroadcastable{TNotification}.Broadcast(TNotification)"/>
+    /// </summary>
+    public static void Broadcast(this IEventBroadcastable<Enhance.Unit> publisher)
+        => publisher.Broadcast(new Enhance.Unit());
+<#
+    for (var i = 2; i <= 16; i++)
+    {
+        var genericTypes = string.Join(", ", from index in Enumerable.Range(1, i) select $"TArg{index}");
+        var parameterDefs = string.Join(", ", from index in Enumerable.Range(1, i) select $"TArg{index} arg{index}");
+        var parameters = string.Join(", ", from index in Enumerable.Range(1, i) select $"arg{index}");
+#>
+
+    /// <summary>
+    /// <inheritdoc cref="IEventBroadcastable{TNotification}.Broadcast(TNotification)"/>
+    /// </summary>
+    public static void Broadcast<<#= genericTypes #>>(this IEventBroadcastable<(<#= genericTypes #>)> publisher, <#= parameterDefs #>)
+        => publisher.Broadcast((<#= parameters #>));
+<#
+    }
+#>
+}

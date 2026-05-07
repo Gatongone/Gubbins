@@ -1,0 +1,85 @@
+﻿<#@ template language="C#" #>
+<#@ import namespace="System.Linq" #>
+
+using Gubbins.Enhance;
+
+namespace Gubbins.Entities;
+
+/// <summary>
+/// Query entity with context.
+/// </summary>
+/// <typeparam name="TResult">Query result.</typeparam>
+public interface IEntityQueryHandle<TResult>
+{
+    /// <summary>
+    /// Query entities.
+    /// </summary>
+    /// <typeparam name="TResult">Query result.</typeparam>
+    /// <returns></returns>
+    TResult Query();
+}
+
+<#
+    for (var i = 0; i <= 16; i++)
+    {
+        var genericTypes = i == 0 ? string.Empty : $"<{string.Join(", ", from index in Enumerable.Range(1, i) select $"T{index}")}>";
+        var batches = i == 0 ? "Batch<Entity>" :  $"(Batch<Entity>, {string.Join(", ", from index in Enumerable.Range(1, i) select $"Batch<T{index}>")})";
+        var queryHandle = $"IEntityQueryHandle<EntityQueryResult{genericTypes}>";
+        var pools = $"{string.Join("\n", from index in Enumerable.Range(1, i) select $"        var pool{index} = TraceablePool<List<Snippet<T{index}>>>.Default;")}";
+        var memories = $"{string.Join("\n", from index in Enumerable.Range(1, i) select $"        var memories{index} = pool{index}.Spawn();")}";
+        var tracingHandles = $"{string.Join("\n", from index in Enumerable.Range(0, i + 1) select $"        handles.Add(pool{index});")}";
+        var appendMemories = $"{string.Join("\n", from index in Enumerable.Range(0, i + 1) select $"                archetype.GetComponents(memories{index});")}";
+        var batchBodies = i == 0
+            ? "        result = new Batch<Entity>(memories0);"
+            : "        result.Item1 = new Batch<Entity>(memories0);\n" + string.Join("\n", from index in Enumerable.Range(1, i) select $"        result.Item{index + 1} = new Batch<T{index}>(memories{index});");
+#>
+
+/// <summary>
+/// Query entities with specified components.
+/// </summary>
+public readonly struct EntityQueryHandle<#= genericTypes #>(IReadOnlyList<IArchetype> archetypes, EntityQueryContext<#= genericTypes #> context) : <#= queryHandle #>
+{
+    /// <summary>
+    /// Entity collections.
+    /// </summary>
+    private readonly IReadOnlyList<IArchetype> m_Archetypes = archetypes;
+
+    /// <summary>
+    /// Entity collections.
+    /// </summary>
+    private readonly EntityQueryContext<#= genericTypes #> m_Context = context;
+
+    /// <inheritdoc />
+    public EntityQueryResult<#= genericTypes #> Query()
+    {
+        <#= batches #> result;
+        var pool = TraceablePool<List<ITraceablePool>>.Default;
+
+        var handles = pool.Spawn();
+
+        var pool0 = TraceablePool<List<Snippet<Entity>>>.Default;
+<#= pools #>
+
+        var memories0 = pool0.Spawn();
+<#= memories #>
+
+<#= tracingHandles #>
+
+        for (var index = 0; index < m_Archetypes.Count; index++)
+        {
+            var archetype = m_Archetypes[index];
+            if (archetype.MatchComponents(m_Context.Hash, m_Context.Includes, m_Context.Excludes))
+            {
+<#= appendMemories #>
+                break;
+            }
+        }
+
+<#= batchBodies #>
+
+        return new (pool, result);
+    }
+}
+<#
+    }
+#>

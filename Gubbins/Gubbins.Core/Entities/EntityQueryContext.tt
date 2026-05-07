@@ -1,0 +1,67 @@
+﻿<#@ template language="C#" #>
+<#@ import namespace="System.Linq" #>
+namespace Gubbins.Entities;
+<#
+for (var i = 0; i <= 16; i++)
+{
+    var genericTypes1 = string.Join(", ", from index in Enumerable.Range(1, i) select $"T{index}");
+    var types1 = $"{string.Join(", ", from index in Enumerable.Range(1, i) select $"typeof(T{index})")}";
+    var hashBody1 = i == 0 ? "0" : $"{string.Join(" |", from index in Enumerable.Range(1, i) select $" typeof(T{index}).GetHashCode()")}";
+#>
+
+/// <summary>
+/// Represents an entity query handle.
+/// </summary>
+public readonly struct EntityQueryContext<#= i == 0 ? string.Empty : $"<{genericTypes1}>" #>
+{
+    /// <summary>
+    /// Global components hash.
+    /// </summary>
+    public readonly int Hash;
+    internal readonly Type[] Includes;
+    internal readonly Type[] Excludes;
+    private EntityQueryContext(int hash, Type[] includes, Type[] excludes)
+    {
+        Hash = hash;
+        Includes = includes;
+        Excludes = excludes;
+    }
+    public EntityQueryContext()
+    {
+        Hash = <#= hashBody1 #>;
+        Includes = new Type[]{<#= types1 #>};
+        Excludes = Array.Empty<Type>();
+    }
+<#
+    for (var j = 1; j <= 16; j++)
+    {
+        var genericTypes2 = string.Join(", ", from index in Enumerable.Range(1, j) select $"I{index}");
+        var types2 = $"{string.Join(", ", from index in Enumerable.Range(1, j) select $"typeof(I{index})")}";
+        var hashBody2 = $"{string.Join(" |", from index in Enumerable.Range(1, j) select $" typeof(I{index}).GetHashCode()")}";
+#>
+    /// <summary>
+    /// Includes the specified components.
+    /// </summary>
+    public EntityQueryContext<#= i == 0 ? string.Empty : $"<{genericTypes1}>" #> Include<<#= genericTypes2 #>>() => new (Hash |<#= hashBody2 #>, [<#= string.IsNullOrEmpty(types1) ? types2 : $"{types1}, {types2}" #>], Excludes);
+<#
+    }
+#>
+
+<#
+    for (var j = 1; j <= 16; j++)
+    {
+        var genericTypes2 = string.Join(", ", from index in Enumerable.Range(1, j) select $"E{index}");
+        var types2 = $"{string.Join(", ", from index in Enumerable.Range(1, j) select $"typeof(E{index})")}";
+        var hashBody2 = $"{string.Join(" ^", from index in Enumerable.Range(1, j) select $" typeof(E{index}).GetHashCode()")}";
+#>
+    /// <summary>
+    /// Excludes the specified components.
+    /// </summary>
+    public EntityQueryContext<#= i == 0 ? string.Empty : $"<{genericTypes1}>" #> Exclude<<#= genericTypes2 #>>() => new (Hash |<#= hashBody2 #>, Includes, [<#= types2 #>]);
+<#
+    }
+#>
+}
+<#
+}
+#>

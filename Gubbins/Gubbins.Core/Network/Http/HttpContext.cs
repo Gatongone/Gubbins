@@ -1,20 +1,11 @@
-﻿/*
- * Copyright ©2022 Gatongone
- * Author: Gatongone
- * Email: gatongone@gmail.com
- * Created On: 2023/08/12-21:23:42
- * Github: https://github.com/Gatongone
- * Description: Http info context.
- */
-
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Text;
 using System.Text.RegularExpressions;
 
 namespace Gubbins.Network;
 
 /// <summary>
-/// Context that encapsulates an HTTP context, including request or response information.
+/// ApplicationContext that encapsulates an HTTP context, including request or response information.
 /// </summary>
 public struct HttpContext : IDisposable
 {
@@ -25,52 +16,52 @@ public struct HttpContext : IDisposable
     private volatile bool m_IsDisposed;
     private HttpResponse m_Response;
     private readonly HttpMessageCache m_MessageCache;
-    
+
     /// <summary>
     ///  Gets or sets the body of the HTTP context.
     /// </summary>
     public string? Body { get; private set; }
-    
+
     /// <summary>
     ///  Gets or sets the version of the HTTP context.
     /// </summary>
     public Version Version { get; private set; } = new(DEFAULT_HTTP_VERSION);
-    
+
     /// <summary>
     /// Gets or sets the HTTP method of the HTTP context.
     /// </summary>
     public HttpMethod Method { get; private set; } = HttpMethod.Undefined;
-    
+
     /// <summary>
     /// Gets or sets the encoding of the HTTP context.
     /// </summary>
     public Encoding Encoding { get; private set; } = Encoding.UTF8;
-    
+
     /// <summary>
     ///  Gets or sets the encoding of the HTTP context.
     /// </summary>
-    public IReadOnlyDictionary<string, string> Headers =>  m_MessageCache.Headers;
-    
+    public IReadOnlyDictionary<string, string> Headers => m_MessageCache.Headers;
+
     /// <summary>
     /// Gets the read-only dictionary of queries in the HTTP context.
     /// </summary>
-    public IReadOnlyDictionary<string, object> Queries =>  m_MessageCache.Queries;
-    
+    public IReadOnlyDictionary<string, object> Queries => m_MessageCache.Queries;
+
     /// <summary>
     ///  Gets a value indicating whether the HTTP context represents a response.
     /// </summary>
     public bool IsResponse => Method.Equals(HttpMethod.Undefined);
-    
+
     /// <summary>
     /// Gets the content type of the HTTP context.
     /// </summary>
-    public string? ContentType =>  m_MessageCache.Headers.TryGetValue("Content-Type", out var type) ? type : null;
-    
+    public string? ContentType => m_MessageCache.Headers.GetValueOrDefault("Content-Type");
+
     /// <summary>
-    /// Is the HTTP Context is disposed, if true, the queries and headers will be cleared.
+    /// Is the HTTP ApplicationContext is disposed, if true, the queries and headers will be cleared.
     /// </summary>
     public bool IsDisposed => m_IsDisposed;
-    
+
     /// <summary>
     /// Gets the URI of the HTTP context.
     /// </summary>
@@ -80,7 +71,7 @@ public struct HttpContext : IDisposable
         {
             var url = m_MessageCache.Queries.Count <= 0
                 ? m_Url
-                : m_Url + "?" + string.Join("&",  m_MessageCache.Queries.Select(kv => $"{kv.Key}={kv.Value}"));
+                : m_Url + "?" + string.Join("&", m_MessageCache.Queries.Select(kv => $"{kv.Key}={kv.Value}"));
             return url != null ? new Uri(url) : null;
         }
     }
@@ -96,11 +87,11 @@ public struct HttpContext : IDisposable
     public void Dispose()
     {
         if (m_IsDisposed) return;
-         m_MessageCache.Clear();
-         s_CachePool.Enqueue(m_MessageCache);
-         m_IsDisposed = true;
+        m_MessageCache.Clear();
+        s_CachePool.Enqueue(m_MessageCache);
+        m_IsDisposed = true;
     }
-    
+
     /// <summary>
     /// Creates an HttpContext instance from the provided HTTP string.
     /// </summary>
@@ -118,7 +109,7 @@ public struct HttpContext : IDisposable
         // Parse response
         if (isResponse)
         {
-            context.Version = new Version(Regex.Match(requestLine.ElementAtOrDefault(0) ?? string.Empty, @"(?<=/).+").ToString());
+            context.Version = new Version(Regex.Match(requestLine.ElementAtOrDefault(0) ?? string.Empty, "(?<=/).+").ToString());
             context.m_Response = new HttpResponse(long.Parse(requestLine.ElementAtOrDefault(1) ?? string.Empty), requestLine[2]);
         }
         // Parse request
@@ -126,7 +117,7 @@ public struct HttpContext : IDisposable
         {
             context.Method = requestLine.ElementAtOrDefault(0);
             context.m_Url = requestLine.ElementAtOrDefault(1);
-            context.Version = new Version(Regex.Match(requestLine.ElementAtOrDefault(2) ?? string.Empty, @"(?<=/).+").ToString());
+            context.Version = new Version(Regex.Match(requestLine.ElementAtOrDefault(2) ?? string.Empty, "(?<=/).+").ToString());
 
             // Parse queries
             var urlParts = context.m_Url.Split('?');
@@ -136,7 +127,7 @@ public struct HttpContext : IDisposable
                 foreach (var param in query.Split('&'))
                 {
                     var kv = param.Split('=');
-                    context. m_MessageCache.Queries[kv[0]] = kv[1];
+                    context.m_MessageCache.Queries[kv[0]] = kv[1];
                 }
             }
         }
@@ -148,7 +139,7 @@ public struct HttpContext : IDisposable
                 break;
 
             var header = Regex.Match(lines[i], @"(.+(?=: )): (.+(?=\s))");
-            context. m_MessageCache.Headers[header.Groups[1].Value] = header.Groups[2].Value;
+            context.m_MessageCache.Headers[header.Groups[1].Value] = header.Groups[2].Value;
         }
 
         // Parse body
@@ -165,7 +156,7 @@ public struct HttpContext : IDisposable
 
     public HttpContext WithResponse(long httpCode, string? message)
     {
-        m_Response = new HttpResponse(httpCode, message);
+        m_Response = new HttpResponse(httpCode, message ?? "");
         return this;
     }
 
@@ -175,8 +166,8 @@ public struct HttpContext : IDisposable
         return this;
     }
 
-     /// <summary>
-    /// Sets the URL of the HttpContext.
+    /// <summary>
+    /// Sets the URL.
     /// </summary>
     /// <param name="url">The URL to set.</param>
     /// <returns>The updated HttpContext instance.</returns>
@@ -185,9 +176,9 @@ public struct HttpContext : IDisposable
         m_Url = url;
         return this;
     }
-    
+
     /// <summary>
-    /// Sets the path of the HttpContext.
+    /// Sets the path.
     /// </summary>
     /// <param name="filePaths">The file paths to set.</param>
     /// <returns>The updated HttpContext instance.</returns>
@@ -202,34 +193,34 @@ public struct HttpContext : IDisposable
             m_Url += $"/{string.Join("/", filePaths)}";
         return this;
     }
-    
+
     /// <summary>
-    /// Sets the query of the HttpContext.
+    /// Sets the query.
     /// </summary>
     /// <param name="name">The name of the query.</param>
     /// <param name="value">The value of the query.</param>
     /// <returns>The updated HttpContext instance.</returns>
-    public HttpContext WithQuery(string name, object value)
+    public HttpContext WithQuery(string name, object? value)
     {
         if (value != null)
-             m_MessageCache.Queries.Add(name, value);
+            m_MessageCache.Queries.Add(name, value);
         return this;
     }
 
     /// <summary>
-    /// Sets the header of the HttpContext.
+    /// Sets the header.
     /// </summary>
     /// <param name="name">The name of the header.</param>
     /// <param name="value">The value of the header.</param>
     /// <returns>The updated HttpContext instance.</returns>
     public HttpContext WithHeader(string name, string value)
     {
-         m_MessageCache.Headers.Add(name, value);
+        m_MessageCache.Headers.Add(name, value);
         return this;
     }
 
     /// <summary>
-    /// Sets the HTTP method of the HttpContext.
+    /// Sets the HTTP method.
     /// </summary>
     /// <param name="method">The HTTP method to set.</param>
     /// <returns>The updated HttpContext instance.</returns>
@@ -240,7 +231,7 @@ public struct HttpContext : IDisposable
     }
 
     /// <summary>
-    /// Sets the body and encoding of the HttpContext.
+    /// Sets the body and encoding.
     /// </summary>
     /// <param name="body">The body to set.</param>
     /// <param name="encoding">The encoding to set.</param>
@@ -253,7 +244,7 @@ public struct HttpContext : IDisposable
     }
 
     /// <summary>
-    /// Sets the connection type of the HttpContext.
+    /// Sets the connection type.
     /// </summary>
     /// <param name="connectionType">The connection type to set.</param>
     /// <param name="isProxy">A flag indicating whether the connection is a proxy connection.</param>
@@ -262,29 +253,35 @@ public struct HttpContext : IDisposable
     {
         if (isProxy)
         {
-             m_MessageCache.Headers.Remove("Connection");
-             m_MessageCache.Headers.Add("Proxy-Connection", connectionType);
+            if (!m_MessageCache.Headers.Remove("Connection"))
+            {
+                m_MessageCache.Headers.Remove("connection");
+            }
+            m_MessageCache.Headers.Add("Proxy-Connection", connectionType);
         }
         else
         {
-             m_MessageCache.Headers.Remove("Proxy-Connection");
-             m_MessageCache.Headers.Add("Connection", connectionType);
+            if (!m_MessageCache.Headers.Remove("Proxy-Connection"))
+            {
+                m_MessageCache.Headers.Remove("proxy-connection");
+            }
+            m_MessageCache.Headers.Add("Connection", connectionType);
         }
 
         return this;
     }
-    
+
     /// <summary>
-    /// Returns a string representation of the HttpContext.
+    /// Returns a string representation.
     /// </summary>
-    /// <returns>A string representation of the HttpContext.</returns>
+    /// <returns>A string representation.</returns>
     public override string ToString()
     {
         var body = Body;
-        var path =  m_MessageCache.Headers.ContainsKey("Proxy-Connection") ||  m_MessageCache.Headers.ContainsKey("proxy-connection") ? m_Url : IsResponse ? string.Empty : " / ";
-        var queryInfo =  m_MessageCache.Queries.Count <= 0 ? path : $" /?{string.Join("&",  m_MessageCache.Queries.Select(x => $"{x.Key}={x.Value}"))} ";
-        var hostInfo = string.IsNullOrEmpty(m_Url) ? string.Empty : $"Host: {Uri.Host}\n";
-        var headerInfo = string.Join("\n",  m_MessageCache.Headers.Select(x => $"{x.Key}: {x.Value}"));
+        var path = m_MessageCache.Headers.ContainsKey("Proxy-Connection") || m_MessageCache.Headers.ContainsKey("proxy-connection") ? m_Url : IsResponse ? string.Empty : " / ";
+        var queryInfo = m_MessageCache.Queries.Count <= 0 ? path : $" /?{string.Join("&", m_MessageCache.Queries.Select(x => $"{x.Key}={x.Value}"))} ";
+        var hostInfo = string.IsNullOrEmpty(m_Url) ? string.Empty : $"Host: {Uri!.Host}\n";
+        var headerInfo = string.Join("\n", m_MessageCache.Headers.Select(x => $"{x.Key}: {x.Value}"));
         var methodInfo = IsResponse ? string.Empty : Method.ToString();
         var bodyInfo = string.IsNullOrEmpty(body) ? string.Empty : $"\n{body}";
         var responseInfo = m_Response.Equals(HttpResponse.None) ? string.Empty : $" {m_Response.Code} {m_Response.Message}";
@@ -294,7 +291,7 @@ public struct HttpContext : IDisposable
     private class HttpMessageCache
     {
         public readonly Dictionary<string, string> Headers = new(StringComparer.OrdinalIgnoreCase);
-        public readonly Dictionary<string, object> Queries= new(StringComparer.OrdinalIgnoreCase);
+        public readonly Dictionary<string, object> Queries = new(StringComparer.OrdinalIgnoreCase);
 
         public void Clear()
         {
@@ -303,13 +300,11 @@ public struct HttpContext : IDisposable
         }
     }
 
-    private readonly struct HttpResponse : IEquatable<HttpResponse>
+    private readonly struct HttpResponse(long code, string message) : IEquatable<HttpResponse>
     {
-        public readonly long Code;
-        public readonly string Message;
-        public static readonly HttpResponse None = new(0, string.Empty);
-
-        public HttpResponse(long code, string message) => (Code, Message) = (code, message);
+        public readonly        long         Code    = code;
+        public readonly        string       Message = message;
+        public static readonly HttpResponse None    = new(0, string.Empty);
 
         public bool Equals(HttpResponse other) => Code == other.Code && Message == other.Message;
 

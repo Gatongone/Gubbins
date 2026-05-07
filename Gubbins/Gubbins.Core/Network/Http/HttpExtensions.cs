@@ -1,13 +1,4 @@
-﻿/*
- * Copyright ©2022 Gatongone
- * Author: Gatongone
- * Email: gatongone@gmail.com
- * Created On: 2023/08/12-02:39:39
- * Github: https://github.com/Gatongone
- * Description: HttpContext extensions
- */
-
-using System.Text;
+﻿using System.Text;
 
 namespace Gubbins.Network;
 
@@ -22,7 +13,7 @@ public static class HttpExtensions
     /// <param name="request">The HttpContext instance.</param>
     /// <param name="body">The body content to set.</param>
     /// <returns>The updated HttpContext instance.</returns>
-    public static HttpContext WithBody(this HttpContext request, string body) 
+    public static HttpContext WithBody(this HttpContext request, string body)
         => request.WithBody(body, Encoding.UTF8);
 
     /// <summary>
@@ -33,7 +24,7 @@ public static class HttpExtensions
     /// <returns>The updated HttpContext instance.</returns>
     public static HttpContext WithContent(this HttpContext request, HttpContentType content)
         => request.WithHeader("Content_Type", content);
-    
+
     /// <summary>
     /// Sets the query parameters of the HttpContext using the provided dictionary.
     /// </summary>
@@ -50,7 +41,7 @@ public static class HttpExtensions
 
         return request;
     }
-    
+
     /// <summary>
     /// Sets the query parameters of the HttpContext using the provided dictionary.
     /// </summary>
@@ -67,7 +58,7 @@ public static class HttpExtensions
 
         return request;
     }
-    
+
     /// <summary>
     /// Sets the query parameters of the HttpContext using the provided collection of key-value pairs.
     /// </summary>
@@ -84,7 +75,7 @@ public static class HttpExtensions
 
         return request;
     }
-    
+
     /// <summary>
     /// Sets the query parameters of the HttpContext using the provided collection of key-value pairs.
     /// </summary>
@@ -92,7 +83,7 @@ public static class HttpExtensions
     /// <param name="maps">The collection of key-value pairs containing the query parameters.</param>
     /// <returns>The updated HttpContext instance.</returns>
     public static HttpContext WithQueries(this HttpContext request, params (string Key, object Value)[] maps) => WithQueries(request, (IEnumerable<(string Key, object Value)>) maps);
-    
+
     /// <summary>
     /// Sets the headers of the HttpContext using the provided dictionary.
     /// </summary>
@@ -109,7 +100,7 @@ public static class HttpExtensions
 
         return request;
     }
-    
+
     /// <summary>
     /// Sets the headers of the HttpContext using the provided dictionary.
     /// </summary>
@@ -126,7 +117,7 @@ public static class HttpExtensions
 
         return request;
     }
-    
+
     /// <summary>
     /// Sets the headers of the HttpContext using the provided collection of key-value pairs.
     /// </summary>
@@ -143,7 +134,7 @@ public static class HttpExtensions
 
         return request;
     }
-    
+
     /// <summary>
     /// Sets the headers of the HttpContext using the provided collection of key-value pairs.
     /// </summary>
