@@ -19,7 +19,7 @@ public sealed unsafe class Native
     /// <summary>
     /// Unsafe operation base on different environment.
     /// </summary>
-    internal static UnsafeOperation Operation = new();
+    internal static Memory Operation = new();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static IntPtr Allocate(int size, int align = 8) => Operation.Allocate(size, align);
@@ -164,7 +164,7 @@ public sealed unsafe class Native
     {
         var typeChecker = sourceType.CheckType();
         if (typeChecker.IsInterface || typeChecker.IsAbstract || typeChecker.IsStatic)
-            throw new ArgumentException("Can't Get the valuable member from a abstract or static class.");
+            throw new ArgumentException("Can't get the valuable member from a abstract or static class.");
         return sourceType.GetValuableMember(name);
     }
 

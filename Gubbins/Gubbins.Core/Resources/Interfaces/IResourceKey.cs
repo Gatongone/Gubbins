@@ -1,3 +1,3 @@
 ﻿namespace Gubbins.Resource;
 
-public interface IResourceKey;
+public interface IResourceKey : IEquatable<IResourceKey>;

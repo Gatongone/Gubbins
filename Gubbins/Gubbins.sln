@@ -6,8 +6,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gubbins.Tests", "Gubbins.Te
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gubbins.Generator", "Gubbins.Generator\Gubbins.Generator.csproj", "{D4D1FC33-0811-46CD-BE6F-07777454F653}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gubbins.Unity.Generator", "Gubbins.Unity\Plugins\Generator~\Gubbins.Unity.Generator\Gubbins.Unity.Generator.csproj", "{34548FB6-28E6-4D9B-BFD6-F33093F9010A}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU

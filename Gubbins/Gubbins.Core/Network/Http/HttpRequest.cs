@@ -84,7 +84,7 @@ public class HttpRequest : IHttpRequest
     private readonly HttpWebRequest m_Request;
 
     /// <summary>
-    /// Create a Http request for .NET program.
+    /// Create an Http request for .NET program.
     /// </summary>
     /// <param name="context">Http info context.</param>
     /// <param name="proxyHost">Proxy host.</param>

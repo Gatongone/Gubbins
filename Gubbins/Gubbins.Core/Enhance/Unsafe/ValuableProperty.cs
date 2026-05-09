@@ -10,25 +10,65 @@ namespace Gubbins.Enhance;
 public partial class ValuableMember
 {
     private const string STRUCT_SOURCE_SET_WRAPPER_NAME = $"{nameof(Gubbins)}.{nameof(Enhance)}.{nameof(ValuableMember)}+StructSourceSetWrapper";
-    private const string CLASS_SOURCE_SET_WRAPPER_NAME = $"{nameof(Gubbins)}.{nameof(Enhance)}.{nameof(ValuableMember)}+ClassSourceSetWrapper";
+    private const string CLASS_SOURCE_SET_WRAPPER_NAME  = $"{nameof(Gubbins)}.{nameof(Enhance)}.{nameof(ValuableMember)}+ClassSourceSetWrapper";
     private const string STRUCT_SOURCE_GET_WRAPPER_NAME = $"{nameof(Gubbins)}.{nameof(Enhance)}.{nameof(ValuableMember)}+StructSourceGetWrapper";
-    private const string CLASS_SOURCE_GET_WRAPPER_NAME = $"{nameof(Gubbins)}.{nameof(Enhance)}.{nameof(ValuableMember)}+ClassSourceGetWrapper";
+    private const string CLASS_SOURCE_GET_WRAPPER_NAME  = $"{nameof(Gubbins)}.{nameof(Enhance)}.{nameof(ValuableMember)}+ClassSourceGetWrapper";
 
+    /// <summary>
+    /// A wrapper for the get method of a property when the source type is a class.
+    /// This wrapper is used to handle cases where the source type is a class,
+    /// and we need to manage boxing and unboxing of value types when getting the property value.
+    /// The actual delegate for getting the property value is stored in <see cref="m_GetMethod"/>,
+    /// and this wrapper provides an additional layer to handle the specific call shapes for class sources.
+    /// </summary>
     private readonly object m_StructValueGetWrapper;
+
+    /// <summary>
+    /// The actual delegate that was created from the property's get method.
+    /// This delegate is used to invoke the get method directly when retrieving the property value,
+    /// and the wrapper is used to handle cases where the source type is a class,
+    /// and we need to manage the boxing and unboxing of value types when getting the property value.
+    /// </summary>
     private readonly Delegate m_GetMethod;
 
+    /// <summary>
+    /// A wrapper for the set method of a property when the source type is a struct.
+    /// This wrapper is used to handle cases where the source type is a struct,
+    /// and we need to manage boxing and unboxing of value types when setting the property value.
+    /// The actual delegate for setting the property value is stored in <see cref="m_SetMethod"/>,
+    /// and this wrapper provides an additional layer to handle the specific call shapes for struct sources.
+    /// </summary>
     private readonly object m_StructValueSetWrapper;
+
+    /// <summary>
+    /// The actual delegate that was created from the property's set method.
+    /// This delegate is used to invoke the set method directly when setting the property value,
+    /// and the wrapper is used to handle cases where the source type is a struct,
+    /// and we need to manage boxing and unboxing of value types.
+    /// </summary>
     private readonly Delegate m_SetMethod;
 
+    /// <summary>
+    /// A readonly Type that represents the type of the member. This is used to determine how to read or write the member's value and to provide type information for the member.
+    /// </summary>
     private readonly TypeCode m_TypeCode;
+
+    /// <summary>
+    /// A readonly boolean that indicates whether the member's type is an enum.
+    /// This is determined by checking the IsEnum property of the member's type and is used to handle enum types differently when getting or setting their values, especially in terms of boxing and unboxing.
+    /// </summary>
     private readonly bool m_IsEnum;
 
+    /// <summary>
+    /// Initializes property accessor delegates and source wrappers used by fast get/set paths.
+    /// </summary>
+    /// <param name="propertyInfo">The reflected property metadata.</param>
     internal ValuableMember(PropertyInfo propertyInfo)
     {
         m_StructValueGetWrapper = null!;
         m_StructValueSetWrapper = null!;
-        MemberType = propertyInfo.PropertyType;
-        m_IsField = false;
+        MemberType              = propertyInfo.PropertyType;
+        m_IsField               = false;
         var checker = MemberType.CheckType();
         m_IsValueType = checker.IsValueType;
 
@@ -37,14 +77,19 @@ public partial class ValuableMember
         var getMethod = propertyInfo.GetMethod;
         var setMethod = propertyInfo.SetMethod;
         var propertyChecker = propertyType.CheckType();
-        m_TypeCode  = Type.GetTypeCode(propertyType);
-        m_IsEnum    = propertyChecker.IsEnum;
+        m_TypeCode = Type.GetTypeCode(propertyType);
+        m_IsEnum   = propertyChecker.IsEnum;
 
+        // For properties, we create delegates for the get and set methods, and also create wrapper instances that can handle boxing and unboxing for value types.
+        // This allows us to efficiently get and set property values even when the source type is a struct.
         if (setMethod != null)
         {
             m_SetMethod = propertyInfo.CreateSetDelegate()!;
             if (sourceType != null)
             {
+                // If the source type is a value type, we need to create a wrapper that can handle the boxing and unboxing of the value when setting the property value.
+                // This is necessary because when we have a struct as the source, we need to pass it by reference to the set method,
+                // and if the property type is also a value type, we need to ensure that we are correctly handling the value semantics.
                 var isSourceValueType = sourceType.CheckType().IsValueType;
                 var setWrapperType = isSourceValueType
                     ? Reflection.GetType(STRUCT_SOURCE_SET_WRAPPER_NAME, sourceType, propertyType)
@@ -53,16 +98,22 @@ public partial class ValuableMember
             }
             else
             {
+                // If there is no source type (which can happen for static properties),
+                // we still need to create a wrapper for the set method, but it will be a class source wrapper since there is no struct source to consider.
                 var setWrapperType = Reflection.GetType(CLASS_SOURCE_SET_WRAPPER_NAME, propertyType);
                 m_StructValueSetWrapper = Activator.CreateInstance(setWrapperType!, m_SetMethod);
             }
         }
 
+        // Similarly, for the get method, we create a delegate and a wrapper instance to handle the retrieval of the property value,
+        // especially when dealing with struct sources and value type properties.
         if (getMethod != null)
         {
             m_GetMethod = propertyInfo.CreateGetDelegate()!;
             if (sourceType != null)
             {
+                // Similar to the set method, if the source type is a value type, we need to create a wrapper that can handle
+                // the boxing and unboxing of the value when getting the property value.
                 var isSourceValueType = sourceType.CheckType().IsValueType;
                 var getWrapperType = isSourceValueType
                     ? Reflection.GetType(STRUCT_SOURCE_GET_WRAPPER_NAME, sourceType, propertyType)
@@ -77,10 +128,17 @@ public partial class ValuableMember
         }
     }
 
+    /// <summary>
+    /// Gets a value-type property from a struct source using a strongly typed delegate.
+    /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private TResult GetWithStructSource<TSource, TResult>(ref TSource source) where TSource : struct where TResult : struct
         => ((MethodWithReturnValue.StructMethod<TSource, TResult>) m_GetMethod)(ref source);
 
+    /// <summary>
+    /// Gets a property value from a struct source and returns it as <see cref="object"/>.
+    /// Uses typed fast paths for common primitives and wrapper fallback for other types.
+    /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private object GetWithStructSource<TSource>(ref TSource source) where TSource : struct => m_IsEnum
         ? ((IBoxingGetWrapper<TSource>) m_StructValueGetWrapper).Get(ref source)
@@ -103,12 +161,19 @@ public partial class ValuableMember
             _                 => ((IBoxingGetWrapper<TSource>) m_StructValueGetWrapper).Get(ref source)
         };
 
+    /// <summary>
+    /// Gets a value-type property from a class source using a strongly typed delegate.
+    /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private TResult GetWithClassSource<TSource, TResult>(TSource source) where TSource : class where TResult : struct
     {
         return ((MethodWithReturnValue.ClassMethod<TSource, TResult>) m_GetMethod)(source);
     }
 
+    /// <summary>
+    /// Gets a property value from a class source and returns it as <see cref="object"/>.
+    /// Uses typed fast paths for common primitives and wrapper fallback for other types.
+    /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private object GetWithClassSource<TSource>(TSource source) where TSource : class => m_IsEnum
         ? ((IBoxingGetWrapper<TSource>) m_StructValueGetWrapper).Get(source)
@@ -131,12 +196,19 @@ public partial class ValuableMember
             _                 => ((IBoxingGetWrapper<TSource>) m_StructValueGetWrapper).Get(source)
         };
 
+    /// <summary>
+    /// Sets a value-type property on a struct source using a strongly typed delegate.
+    /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void SetWithStructSource<TSource, TValue>(ref TSource source, ref TValue value) where TSource : struct where TValue : struct
     {
         ((MethodWithoutReturnValue.StructMethod<TSource, TValue>) m_SetMethod)(ref source, value);
     }
 
+    /// <summary>
+    /// Sets a property on a struct source from a boxed value.
+    /// Uses typed fast paths for common primitives and wrapper fallback for other types.
+    /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void SetWithStructSource<TSource>(ref TSource source, object? value) where TSource : struct
     {
@@ -196,12 +268,19 @@ public partial class ValuableMember
         }
     }
 
+    /// <summary>
+    /// Sets a value-type property on a class source using a strongly typed delegate.
+    /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void SetWithClassSource<TSource, TValue>(TSource source, ref TValue value) where TSource : class where TValue : struct
     {
         ((MethodWithoutReturnValue.ClassMethod<TSource, TValue>) m_SetMethod)(source, value);
     }
 
+    /// <summary>
+    /// Sets a property on a class source from a boxed value.
+    /// Uses typed fast paths for common primitives and wrapper fallback for other types.
+    /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void SetWithClassSource<TSource>(TSource source, object? value) where TSource : class
     {
@@ -261,46 +340,95 @@ public partial class ValuableMember
         }
     }
 
+    /// <summary>
+    /// Defines boxed get operations for both by-ref and by-value source call shapes.
+    /// </summary>
     private interface IBoxingGetWrapper<TSource>
     {
+        /// <summary>Gets from a by-ref source.</summary>
         public object Get(ref TSource source);
+
+        /// <summary>Gets from a by-value source.</summary>
         public object Get(TSource source);
     }
 
+    /// <summary>
+    /// Defines unboxed set operations for both by-ref and by-value source call shapes.
+    /// </summary>
     private interface IUnboxingSetWrapper<TSource>
     {
+        /// <summary>Sets on a by-ref source.</summary>
         public void Set(ref TSource source, object? value);
+
+        /// <summary>Sets on a by-value source.</summary>
         public void Set(TSource source, object? value);
     }
 
-    private class ClassSourceSetWrapper<TSource, TResult> : IUnboxingSetWrapper<TSource> where TSource : class
+    /// <summary>
+    /// Wrapper for class-source property setters.
+    /// </summary>
+    private class ClassSourceSetWrapper<TSource, TResult>(Delegate getDel) : IUnboxingSetWrapper<TSource> where TSource : class
     {
-        private readonly MethodWithoutReturnValue.ClassMethod<TSource, TResult> m_GetDel;
-        public ClassSourceSetWrapper(Delegate getDel) => m_GetDel = (MethodWithoutReturnValue.ClassMethod<TSource, TResult>) getDel;
+        /// <summary>
+        /// Strongly typed delegate used to set the property value on a class source.
+        /// </summary>
+        private readonly MethodWithoutReturnValue.ClassMethod<TSource, TResult> m_GetDel = (MethodWithoutReturnValue.ClassMethod<TSource, TResult>) getDel;
 
+        /// <inheritdoc/>
         public void Set(ref TSource source, object? value) => throw new NotImplementedException();
 
+        /// <inheritdoc/>
         public void Set(TSource source, object? value) => m_GetDel(source, (TResult) value!);
     }
 
+    /// <summary>
+    /// Wrapper for struct-source property setters.
+    /// </summary>
     private class StructSourceSetWrapper<TSource, TValue>(Delegate getDel) : IUnboxingSetWrapper<TSource> where TSource : struct
     {
+        /// <summary>
+        /// Strongly typed delegate used to set the property value on a struct source.
+        /// </summary>
         private readonly MethodWithoutReturnValue.StructMethod<TSource, TValue> m_GetDel = (MethodWithoutReturnValue.StructMethod<TSource, TValue>) getDel;
+
+        /// <inheritdoc/>
         public void Set(ref TSource source, object? value) => m_GetDel(ref source, (TValue) value!);
+
+        /// <inheritdoc/>
         public void Set(TSource source, object? value) => throw new NotImplementedException();
     }
 
+    /// <summary>
+    /// Represents a wrapper for the get method of a property when the source type is a class.
+    /// </summary>
     private class ClassSourceGetWrapper<TSource, TResult>(Delegate getDel) : IBoxingGetWrapper<TSource> where TSource : class
     {
+        /// <summary>
+        /// This delegate is used to get the value of the property from the class source type
+        /// </summary>
         private readonly MethodWithReturnValue.ClassMethod<TSource, TResult> m_GetDel = (MethodWithReturnValue.ClassMethod<TSource, TResult>) getDel;
+
+        /// <inheritdoc/>
         public object Get(ref TSource source) => throw new NotImplementedException();
+
+        /// <inheritdoc/>
         public object Get(TSource source) => m_GetDel(source);
     }
 
+    /// <summary>
+    /// Represents a wrapper for the get method of a property when the source type is a struct.
+    /// </summary>
     private class StructSourceGetWrapper<TSource, TResult>(Delegate getDel) : IBoxingGetWrapper<TSource> where TSource : struct
     {
+        /// <summary>
+        /// This delegate is used to get the value of the property from the struct source type.
+        /// </summary>
         private readonly MethodWithReturnValue.StructMethod<TSource, TResult> m_GetDel = (MethodWithReturnValue.StructMethod<TSource, TResult>) getDel;
+
+        /// <inheritdoc/>
         public object Get(ref TSource source) => m_GetDel(ref source);
+
+        /// <inheritdoc/>
         public object Get(TSource source) => throw new NotImplementedException();
     }
 }

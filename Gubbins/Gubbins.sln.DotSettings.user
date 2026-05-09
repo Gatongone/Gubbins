@@ -49,14 +49,14 @@
 	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=ED90D4BE_002DFCDF_002D480B_002DA543_002D00C5C50E43EE_002Fd_003ADomain_002Fd_003AEntity_002Ff_003AEntityQueryHandle_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
 	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=ED90D4BE_002DFCDF_002D480B_002DA543_002D00C5C50E43EE_002Fd_003AEnhance_002Fd_003ACommon_002Ff_003ABatch_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
 	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=ED90D4BE_002DFCDF_002D480B_002DA543_002D00C5C50E43EE_002Fd_003AEntities_002Fd_003AChunk_002Ff_003AChunkOperation_002EForeach_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
-	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=45c7bd2a_002D638e_002D4dc7_002D9eef_002D0bb64bf42193/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" Name="Contains_ExistingItem_ShouldReturnTrue" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
+	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=45c7bd2a_002D638e_002D4dc7_002D9eef_002D0bb64bf42193/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" IsActive="True" Name="Contains_ExistingItem_ShouldReturnTrue" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
   &lt;Not&gt;&#xD;
     &lt;TestAncestor&gt;&#xD;
       &lt;TestId&gt;NUnit3x::05FB4306-8205-42E1-83A1-5A65CD0C0B70::.NETFramework,Version=v4.7.2::Gubbins.Tests.RedBlackTreeTests&lt;/TestId&gt;&#xD;
     &lt;/TestAncestor&gt;&#xD;
   &lt;/Not&gt;&#xD;
 &lt;/SessionState&gt;</s:String>
-	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=a98b70d7_002D722c_002D4b1b_002Da0c5_002Dc744e045b80e/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" IsActive="True" Name="ToUarray_WithStartAndLength_ShouldCreateCorrectSubsetAndDisposeOriginWhenDisposeOriginIsTrue" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
+	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=a98b70d7_002D722c_002D4b1b_002Da0c5_002Dc744e045b80e/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" Name="ToUarray_WithStartAndLength_ShouldCreateCorrectSubsetAndDisposeOriginWhenDisposeOriginIsTrue" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
   &lt;Project Location="E:\Projects\CSharp\Gubbins\Gubbins\Gubbins.Tests" Presentation="&amp;lt;Gubbins.Tests&amp;gt;" /&gt;&#xD;
 &lt;/SessionState&gt;</s:String>
 	

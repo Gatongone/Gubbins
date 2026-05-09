@@ -68,7 +68,7 @@ public class DuckGenerator : ISourceGenerator
                 
                     if (!MatchedCache.TryGetValue(type, out var ducks))
                     {
-                        ducks = new Dictionary<Type, IFactory<IProxy>>();
+                        ducks = new Dictionary<Type, ISpawner<IProxy>>();
                         MatchedCache.TryAdd(type, ducks);
                     }
                     if (!ducks.TryGetValue(typeof({Interface}), out var pool))
@@ -221,7 +221,7 @@ public class DuckGenerator : ISourceGenerator
                 
                     if (!MatchedCache.TryGetValue(type, out var ducks))
                     {
-                        ducks = new Dictionary<Type, IFactory<IProxy>>();
+                        ducks = new Dictionary<Type, ISpawner<IProxy>>();
                         MatchedCache.TryAdd(type, ducks);
                     }
                     if (!ducks.TryGetValue(typeof({Delegate}), out var pool))

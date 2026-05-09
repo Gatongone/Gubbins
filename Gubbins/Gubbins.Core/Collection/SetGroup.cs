@@ -94,11 +94,19 @@ public class SetGroup : ISetGroup
     }
 }
 
+/// <summary>
+/// Union-Find set for arbitrary element keys.
+/// </summary>
+/// <typeparam name="T">Element type.</typeparam>
 public class SetGroup<T> : ISetGroup<T>
 {
     private readonly Dictionary<T, T> m_Parent = new();
     private readonly Dictionary<T, int> m_Rank = new();
 
+    /// <summary>
+    /// Initializes the disjoint-set with each element in its own group.
+    /// </summary>
+    /// <param name="elements">Initial element set.</param>
     public SetGroup(IEnumerable<T> elements)
     {
         foreach (var element in elements)
@@ -108,7 +116,12 @@ public class SetGroup<T> : ISetGroup<T>
         }
     }
 
-    private T FindRoot(T element)
+    /// <summary>
+    /// Finds and returns the root representative of the specified element.
+    /// </summary>
+    /// <param name="element">Element to query.</param>
+    /// <returns>The representative element of the set.</returns>
+    public T FindRoot(T element)
     {
         var root = element;
         while (!EqualityComparer<T>.Default.Equals(m_Parent[root], root))
@@ -121,8 +134,15 @@ public class SetGroup<T> : ISetGroup<T>
         return root;
     }
 
+    /// <summary>
+    /// Determines whether two elements are in the same group.
+    /// </summary>
     public bool InSameGroup(T x, T y) => EqualityComparer<T>.Default.Equals(FindRoot(x), FindRoot(y));
 
+    /// <summary>
+    /// Merges two groups if they are different.
+    /// </summary>
+    /// <returns><see langword="true"/> if merged; otherwise <see langword="false"/>.</returns>
     public bool TryMerge(T left, T right)
     {
         var leftRoot = FindRoot(left);

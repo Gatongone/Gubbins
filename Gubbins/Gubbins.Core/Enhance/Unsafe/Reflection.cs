@@ -6,6 +6,12 @@ namespace Gubbins.Enhance;
 
 internal static class Reflection
 {
+    /// <summary>
+    /// Loads an assembly by its name. This method is used as the assembly resolver callback for type resolution,
+    /// allowing the system to load assemblies on demand when resolving types that may not be currently loaded in the AppDomain.
+    /// </summary>
+    /// <param name="assemblyName">The name of the assembly to load, provided as an AssemblyName object.</param>
+    /// <returns>The loaded Assembly object if the assembly is successfully loaded; otherwise, null if the assembly cannot be found or loaded.</returns>
     internal static Assembly? LoadAssemblyResolver(AssemblyName assemblyName) => Assembly.Load(assemblyName);
 
     /// <summary>
@@ -49,6 +55,7 @@ internal static class Reflection
             pool.Recycle(genericArgs);
             return null;
         }
+
         TryGetType(assembly, typeName, ignoreCase, out result);
         return result;
 
@@ -98,7 +105,8 @@ internal static class Reflection
             return openType.MakeGenericType(argTypes);
         }
 
-        static void ParseGenericArguments(string argsString,  List<string> args)
+        // Parses a string of generic arguments, correctly handling nested generics, and adds each argument to the provided list.
+        static void ParseGenericArguments(string argsString, List<string> args)
         {
             var start = 0;
             var depth = 0;
@@ -135,6 +143,7 @@ internal static class Reflection
             }
         }
 
+        // Maps common system types to their C# alias names for improved type resolution when friendly names are used.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static bool TryGetTypeAlias(string typeName, out string aliasedName)
         {
@@ -217,5 +226,193 @@ internal static class Reflection
         }
 
         return Type.GetType(typeName);
+    }
+}
+
+/// <summary>
+/// Caches reflection metadata and resolved <see cref="ValuableMember"/> instances for fast repeated access.
+/// </summary>
+internal static class ReflectionCache
+{
+    /// <summary>
+    /// Stores per-type checker instances.
+    /// </summary>
+    private static readonly Dictionary<Type, TypeChecker> s_CheckerMaps = new();
+
+    /// <summary>
+    /// Stores cached reflected members by declaring type and member name.
+    /// </summary>
+    private static readonly Dictionary<Type, Dictionary<string, ValuableMember>> s_CacheMaps = new();
+
+    /// <summary>
+    /// Default binding flags used when resolving instance fields and properties.
+    /// </summary>
+    private const BindingFlags DEFAULT_BINDING_FLAGS = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+
+    /// <summary>
+    /// Gets a cached <see cref="TypeChecker"/> for the specified type, creating one if needed.
+    /// </summary>
+    /// <param name="type">The type to inspect.</param>
+    /// <returns>The cached or newly created <see cref="TypeChecker"/>.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static TypeChecker CheckType(this Type type)
+    {
+        if (s_CheckerMaps.TryGetValue(type, out var checker))
+            return checker;
+        checker = new TypeChecker(type);
+        s_CheckerMaps.Add(type, checker);
+        return checker;
+    }
+
+    /// <summary>
+    /// Gets a cached reflected member by name, checking fields first and then properties.
+    /// </summary>
+    /// <param name="type">The declaring type.</param>
+    /// <param name="name">The member name.</param>
+    /// <returns>The cached <see cref="ValuableMember"/>, or <see langword="null"/> if not found.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static ValuableMember? GetValuableMember(this Type type, string name)
+    {
+        var result = GetField(type, name, DEFAULT_BINDING_FLAGS);
+        return result ?? GetProperty(type, name, DEFAULT_BINDING_FLAGS);
+    }
+
+    /// <summary>
+    /// Gets a cached property wrapper for the specified type and name, creating and caching it if necessary.
+    /// </summary>
+    /// <param name="type">The declaring type.</param>
+    /// <param name="name">The property name.</param>
+    /// <param name="flags">The binding flags used for lookup.</param>
+    /// <returns>The cached property wrapper, or <see langword="null"/> if the property does not exist.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static ValuableMember? GetProperty(Type type, string name, BindingFlags flags)
+    {
+        if (!s_CacheMaps.TryGetValue(type, out var memberMaps))
+        {
+            memberMaps = new Dictionary<string, ValuableMember>();
+            s_CacheMaps.Add(type, memberMaps);
+        }
+
+        if (memberMaps.TryGetValue(name, out var unsafeProperty))
+            return unsafeProperty;
+
+        var propertyInfo = type.GetProperty(name, flags);
+        if (propertyInfo == null)
+            return null;
+        unsafeProperty = new ValuableMember(propertyInfo);
+        memberMaps.Add(name, unsafeProperty);
+
+        return unsafeProperty;
+    }
+
+    /// <summary>
+    /// Gets a cached field wrapper for the specified type and name, creating and caching it if necessary.
+    /// </summary>
+    /// <param name="type">The declaring type.</param>
+    /// <param name="name">The field name.</param>
+    /// <param name="flags">The binding flags used for lookup.</param>
+    /// <returns>The cached field wrapper, or <see langword="null"/> if the field does not exist.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static ValuableMember? GetField(Type type, string name, BindingFlags flags)
+    {
+        if (!s_CacheMaps.TryGetValue(type, out var memberMaps))
+        {
+            memberMaps = new Dictionary<string, ValuableMember>();
+            s_CacheMaps.Add(type, memberMaps);
+        }
+
+        if (memberMaps.TryGetValue(name, out var unsafeField))
+            return unsafeField;
+
+        var fieldInfo = type.GetField(name, flags);
+        if (fieldInfo == null)
+            return null;
+        unsafeField = new ValuableMember(fieldInfo);
+        memberMaps.Add(name, unsafeField);
+
+        return unsafeField;
+    }
+}
+
+/// <summary>
+/// Provides helpers for creating strongly typed delegates from reflected property accessors.
+/// </summary>
+public static class ReflectionExtensions
+{
+    /// <summary>
+    /// The open generic type name used for generated <see cref="Func{TResult}"/>-style delegates.
+    /// </summary>
+    private const string SYSTEM_FUNC_NAME = "System.Func";
+
+    /// <summary>
+    /// The open generic type name used for generated <see cref="Action"/>-style delegates.
+    /// </summary>
+    private const string SYSTEM_ACTION_NAME = "System.Action";
+
+    /// <summary>
+    /// Creates a delegate for the property's set accessor.
+    /// </summary>
+    /// <param name="property">The property whose setter should be converted to a delegate.</param>
+    /// <returns>The created delegate, or <see langword="null"/> if no compatible delegate type can be resolved.</returns>
+    public static Delegate? CreateSetDelegate(this PropertyInfo property)
+    {
+        return CreateGetSetDelegate(property.SetMethod);
+    }
+
+    /// <summary>
+    /// Creates a delegate for the property's get accessor.
+    /// </summary>
+    /// <param name="property">The property whose getter should be converted to a delegate.</param>
+    /// <returns>The created delegate, or <see langword="null"/> if no compatible delegate type can be resolved.</returns>
+    public static Delegate? CreateGetDelegate(this PropertyInfo property)
+    {
+        return CreateGetSetDelegate(property.GetMethod);
+    }
+
+    /// <summary>
+    /// Creates a delegate matching the supplied accessor signature, including special handling for
+    /// instance methods declared on struct and class sources.
+    /// </summary>
+    /// <param name="method">The reflected accessor method.</param>
+    /// <returns>The created delegate, or <see langword="null"/> if the delegate type cannot be found.</returns>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="method"/> contains open generic parameters.</exception>
+    private static Delegate? CreateGetSetDelegate(MethodInfo method)
+    {
+        var sourceType = method.DeclaringType;
+
+        if (method.ContainsGenericParameters)
+            throw new ArgumentException("Can't not create delegate from the method with generic parameters.");
+
+        var sourceTypeChecker = sourceType!.CheckType();
+        var isValueType = sourceType is {IsValueType: true};
+        var isVoidReturn = method.ReturnType == typeof(void);
+        var isStatic = sourceTypeChecker.IsStatic || method.IsStatic;
+        var genericTypes = Pool<List<Type>>.Default.Spawn();
+        string typeName;
+
+        //Add source type
+        if (!isStatic)
+        {
+            genericTypes.Add(sourceType!);
+            if (!isValueType)
+                typeName = isVoidReturn ? MethodWithoutReturnValue.CLASS_METHOD_NAME : MethodWithReturnValue.CLASS_METHOD_NAME;
+            else
+                typeName = isVoidReturn ? MethodWithoutReturnValue.STRUCT_METHOD_NAME : MethodWithReturnValue.STRUCT_METHOD_NAME;
+        }
+        else
+        {
+            typeName = isVoidReturn ? SYSTEM_ACTION_NAME : SYSTEM_FUNC_NAME;
+        }
+
+        //Add parameters
+        genericTypes.AddRange(method.GetParameters().Select(static parameter => parameter.ParameterType));
+
+        //Add return
+        if (!isVoidReturn)
+            genericTypes.Add(method.ReturnType);
+
+        var delegateType = Reflection.GetType(typeName, genericTypes.ToArray());
+        Pool<List<Type>>.Default.Recycle(genericTypes);
+        return delegateType != null ? method.CreateDelegate(delegateType) : null;
     }
 }

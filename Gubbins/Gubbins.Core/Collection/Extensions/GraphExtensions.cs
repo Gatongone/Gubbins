@@ -1,270 +1,576 @@
-﻿using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
+using Gubbins.Enhance;
 
 namespace Gubbins.Collection;
 
+/// <summary>
+/// Provides conversion, spanning-forest, and reduction helpers for graph abstractions.
+/// </summary>
 public static class GraphExtensions
 {
-    public static EdgesetArray<TVertex, TWeight> ToEdgesetArray<TVertex, TWeight>(DirectedGraph<TVertex, TWeight> graph) => ToEdgesetArray(graph, true);
-
-    public static EdgesetArray<TVertex, TWeight> ToEdgesetArray<TVertex, TWeight>(UndirectedGraph<TVertex, TWeight> graph) => ToEdgesetArray(graph, false);
-
-    public static EdgesetArray<TVertex, TWeight> ToEdgesetArray<TVertex, TWeight>(IReadOnlyWeightedGraph<TVertex, TWeight> graph, bool isDirected)
+    /// <summary>
+    /// Adds read-only weighted graph conversion helpers.
+    /// </summary>
+    /// <typeparam name="TVertex">Vertex type.</typeparam>
+    /// <typeparam name="TWeight">Edge weight type.</typeparam>
+    /// <param name="graph">Source graph.</param>
+    extension<TVertex, TWeight>(IReadOnlyWeightedGraph<TVertex, TWeight> graph)
     {
-        var vertexes = new List<TVertex>();
-        var adjEdges = new List<EdgesetArray<TVertex, TWeight>.Edge>();
-        switch (graph)
+        /// <summary>
+        /// Converts a weighted graph to an edge-set array representation.
+        /// </summary>
+        /// <param name="isDirected">Whether output should be treated as directed.</param>
+        /// <returns>Edge-set array snapshot of the graph.</returns>
+        public EdgesetArray<TVertex, TWeight> ToEdgesetArray(bool isDirected)
         {
-            case IDirectedWeightedGraph<TVertex, TWeight> directedGraph when isDirected:
+            var vertexes = new List<TVertex>();
+            var adjEdges = new List<EdgesetArray<TVertex, TWeight>.Edge>();
+            switch (graph)
             {
-                foreach (var vertex in graph)
+                case IDirectedWeightedGraph<TVertex, TWeight> directedGraph when isDirected:
                 {
-                    vertexes.Add(vertex);
-                    adjEdges.AddRange(directedGraph.GetAdjacencyOuterEdgesOf(vertex)
-                                                   .Select(adjInfo => new EdgesetArray<TVertex, TWeight>.Edge(vertex, adjInfo.Vertex, adjInfo.Weight, true)));
-                }
+                    foreach (var vertex in graph)
+                    {
+                        vertexes.Add(vertex);
+                        adjEdges.AddRange(directedGraph.GetAdjacencyOuterEdgesOf(vertex)
+                                                       .Select(adjInfo => new EdgesetArray<TVertex, TWeight>.Edge(vertex, adjInfo.Vertex, adjInfo.Weight, true)));
+                    }
 
-                return new EdgesetArray<TVertex, TWeight>(vertexes, adjEdges, true);
-            }
-            case IDirectedGraph<TVertex> directedGraph when isDirected:
-            {
-                foreach (var vertex in graph)
+                    return new EdgesetArray<TVertex, TWeight>(vertexes, adjEdges, true);
+                }
+                case IDirectedGraph<TVertex> directedGraph when isDirected:
                 {
-                    vertexes.Add(vertex);
-                    adjEdges.AddRange(directedGraph.GetAdjacencyOuterVertexesOf(vertex)
-                                                   .Select(adjVertex => new EdgesetArray<TVertex, TWeight>.Edge(vertex, adjVertex, graph.GetWeight(vertex, adjVertex), true)));
-                }
+                    foreach (var vertex in graph)
+                    {
+                        vertexes.Add(vertex);
+                        adjEdges.AddRange(directedGraph.GetAdjacencyOuterVertexesOf(vertex)
+                                                       .Select(adjVertex => new EdgesetArray<TVertex, TWeight>.Edge(vertex, adjVertex, graph.GetWeight(vertex, adjVertex), true)));
+                    }
 
-                return new EdgesetArray<TVertex, TWeight>(vertexes, adjEdges, true);
-            }
-            case IUndirectedWeightedGraph<TVertex, TWeight> undirectedGraph when !isDirected:
-            {
-                foreach (var vertex in graph)
+                    return new EdgesetArray<TVertex, TWeight>(vertexes, adjEdges, true);
+                }
+                case IUndirectedWeightedGraph<TVertex, TWeight> undirectedGraph when !isDirected:
                 {
-                    vertexes.Add(vertex);
-                    adjEdges.AddRange(undirectedGraph.GetAdjacencyEdgesOf(vertex)
-                                                     .Select(adjInfo => new EdgesetArray<TVertex, TWeight>.Edge(vertex, adjInfo.AdjacencyVertex, adjInfo.Weight, false)));
-                }
+                    foreach (var vertex in graph)
+                    {
+                        vertexes.Add(vertex);
+                        adjEdges.AddRange(undirectedGraph.GetAdjacencyEdgesOf(vertex)
+                                                         .Select(adjInfo => new EdgesetArray<TVertex, TWeight>.Edge(vertex, adjInfo.AdjacencyVertex, adjInfo.Weight, false)));
+                    }
 
-                return new EdgesetArray<TVertex, TWeight>(vertexes, adjEdges, false);
-            }
-            case IUndirectedGraph<TVertex> undirectedGraph when !isDirected:
-            {
-                foreach (var vertex in graph)
+                    return new EdgesetArray<TVertex, TWeight>(vertexes, adjEdges, false);
+                }
+                case IUndirectedGraph<TVertex> undirectedGraph when !isDirected:
                 {
-                    vertexes.Add(vertex);
-                    adjEdges.AddRange(undirectedGraph.GetAdjacencyVertexesOf(vertex)
-                                                     .Select(adjVertex => new EdgesetArray<TVertex, TWeight>.Edge(vertex, adjVertex, graph.GetWeight(vertex, adjVertex), false)));
-                }
+                    foreach (var vertex in graph)
+                    {
+                        vertexes.Add(vertex);
+                        adjEdges.AddRange(undirectedGraph.GetAdjacencyVertexesOf(vertex)
+                                                         .Select(adjVertex => new EdgesetArray<TVertex, TWeight>.Edge(vertex, adjVertex, graph.GetWeight(vertex, adjVertex), false)));
+                    }
 
-                return new EdgesetArray<TVertex, TWeight>(vertexes, adjEdges, false);
-            }
-            default:
-            {
-                foreach (var vertex in graph)
+                    return new EdgesetArray<TVertex, TWeight>(vertexes, adjEdges, false);
+                }
+                default:
                 {
-                    vertexes.Add(vertex);
-                    adjEdges.AddRange(graph.Where(endVertex => graph.ContainsEdge(vertex, endVertex))
-                                           .Select(adjVertex => new EdgesetArray<TVertex, TWeight>.Edge(vertex, adjVertex, graph.GetWeight(vertex, adjVertex), isDirected)));
+                    foreach (var vertex in graph)
+                    {
+                        vertexes.Add(vertex);
+                        adjEdges.AddRange(graph.Where(endVertex => graph.ContainsEdge(vertex, endVertex))
+                                               .Select(adjVertex => new EdgesetArray<TVertex, TWeight>.Edge(vertex, adjVertex, graph.GetWeight(vertex, adjVertex), isDirected)));
+                    }
+
+                    return new EdgesetArray<TVertex, TWeight>(vertexes, adjEdges, isDirected);
                 }
-
-                return new EdgesetArray<TVertex, TWeight>(vertexes, adjEdges, isDirected);
-            }
-        }
-    }
-
-    public static EdgesetArray<TVertex> ToEdgesetArray<TVertex>(IReadOnlyGraph<TVertex> graph, bool isDirected)
-    {
-        var vertexes = new List<TVertex>();
-        var adjEdges = new List<EdgesetArray<TVertex>.Edge>();
-        switch (graph)
-        {
-            case IDirectedGraph<TVertex> directedGraph when isDirected:
-            {
-                foreach (var vertex in graph)
-                {
-                    vertexes.Add(vertex);
-                    adjEdges.AddRange(directedGraph.GetAdjacencyOuterVertexesOf(vertex)
-                                                   .Select(adjVertex => new EdgesetArray<TVertex>.Edge(vertex, adjVertex, true)));
-                }
-
-                return new EdgesetArray<TVertex>(vertexes, adjEdges, true);
-            }
-            case IUndirectedGraph<TVertex> undirectedGraph when !isDirected:
-            {
-                foreach (var vertex in graph)
-                {
-                    vertexes.Add(vertex);
-                    adjEdges.AddRange(undirectedGraph.GetAdjacencyVertexesOf(vertex)
-                                                     .Select(adjVertex => new EdgesetArray<TVertex>.Edge(vertex, adjVertex, false)));
-                }
-
-                return new EdgesetArray<TVertex>(vertexes, adjEdges, false);
-            }
-            default:
-            {
-                foreach (var vertex in graph)
-                {
-                    vertexes.Add(vertex);
-                    adjEdges.AddRange(graph.Where(endVertex => graph.ContainsEdge(vertex, endVertex))
-                                           .Select(adjVertex => new EdgesetArray<TVertex>.Edge(vertex, adjVertex, isDirected)));
-                }
-
-                return new EdgesetArray<TVertex>(vertexes, adjEdges, isDirected);
             }
         }
     }
 
     /// <summary>
-    /// Get minimum/maximum spanning tree/forest in raw graph with Kruskal's algorithm.
-    /// It will return a graph with all minimally/extremely connected subgraph in raw graph when the raw graph is not connected.
-    /// It will return a minimum spanning tree when the raw graph is connected.
+    /// Adds read-only unweighted graph conversion helpers.
     /// </summary>
-    /// <param name="graph">Weighted graph.</param>
-    /// <param name="reversed">If false, it would return minimum spanning tree/forest. If true, it would return maximum spanning tree/forest</param>
     /// <typeparam name="TVertex">Vertex type.</typeparam>
-    /// <typeparam name="TWeight">Edge weight.</typeparam>
-    /// <returns>minimum/maximum spanning tree/forest.</returns>
-    public static IReadOnlyWeightedGraph<TVertex, TWeight> Kruskal<TVertex, TWeight>(this IUndirectedWeightedGraph<TVertex, TWeight> graph, bool reversed) where TVertex : notnull
+    /// <param name="graph">Source graph.</param>
+    extension<TVertex>(IReadOnlyGraph<TVertex> graph)
     {
-        var mst = new DirectedGraph<TVertex, TWeight>();
-        var edges = new SortedSet<UndirectedEdge<TVertex, TWeight>>(reversed ? UndirectedEdge<TVertex, TWeight>.Greater : UndirectedEdge<TVertex, TWeight>.Less);
-
-        var vertexes = graph.ToArray();
-        for (var i = 0; i < vertexes.Length; i++)
+        /// <summary>
+        /// Converts an unweighted graph to an edge-set array representation.
+        /// </summary>
+        /// <param name="isDirected">Whether output should be treated as directed.</param>
+        /// <returns>Edge-set array snapshot of the graph.</returns>
+        public EdgesetArray<TVertex> ToEdgesetArray(bool isDirected)
         {
-            for (var j = i + 1; j < vertexes.Length; j++)
+            var vertexes = new List<TVertex>();
+            var adjEdges = new List<EdgesetArray<TVertex>.Edge>();
+            switch (graph)
             {
-                if (!graph.TryGetWeight(vertexes[i], vertexes[j], out var weight)) continue;
-                var edge = new UndirectedEdge<TVertex, TWeight>(vertexes[i], vertexes[j], weight);
-                if (edges.Contains(edge)) continue;
-                edges.Add(edge);
-            }
-        }
-
-        var unionFind = new SetGroup<TVertex>(vertexes);
-        foreach (var edge in edges)
-        {
-            if (!unionFind.TryMerge(edge.Start, edge.End))
-            {
-                mst.AddEdgeWithoutExistentCheck(edge.Start, edge.End, edge.Weight);
-            }
-        }
-
-        return mst;
-    }
-
-    /// <summary>
-    /// Get minimum/maximum spanning tree/forest in raw graph with Kruskal's algorithm.
-    /// It will return a graph with all minimally/extremely strongly connected subgraph in raw graph when the raw graph is not connected.
-    /// It will return a minimum spanning tree when the raw graph is connected.
-    /// </summary>
-    /// <param name="graph">Weighted graph.</param>
-    /// <param name="reversed">If false, it would return minimum spanning tree/forest. If true, it would return maximum spanning tree/forest</param>
-    /// <typeparam name="TVertex">Vertex type.</typeparam>
-    /// <typeparam name="TWeight">Edge weight.</typeparam>
-    /// <returns>minimum/maximum spanning tree/forest.</returns>
-    public static IReadOnlyWeightedGraph<TVertex, TWeight> Kruskal<TVertex, TWeight>(this IDirectedWeightedGraph<TVertex, TWeight> graph, bool reversed = false) where TVertex : notnull
-    {
-        var mst = new DirectedGraph<TVertex, TWeight>();
-        var edges = new SortedSet<DirectedEdge<TVertex, TWeight>>(reversed ? DirectedEdge<TVertex, TWeight>.Greater : DirectedEdge<TVertex, TWeight>.Less);
-        var vertexes = graph.ToArray();
-        for (var i = 0; i < vertexes.Length; i++)
-        {
-            for (var j = i + 1; j < vertexes.Length; j++)
-            {
-                if (!graph.TryGetWeight(vertexes[i], vertexes[j], out var weight)) continue;
-                var edge = new DirectedEdge<TVertex, TWeight>(vertexes[i], vertexes[j], weight);
-                if (!edges.Add(edge)) continue;
-            }
-        }
-
-        var unionFind = new SetGroup<TVertex>(vertexes);
-        foreach (var edge in edges)
-        {
-            if (!unionFind.TryMerge(edge.Start, edge.End))
-            {
-                mst.AddEdgeWithoutExistentCheck(edge.Start, edge.End, edge.Weight);
-            }
-        }
-
-        return mst;
-    }
-
-    /// <summary>
-    /// Get a minimally/extremely connected subgraph in raw graph with Prim's algorithm.
-    /// It may return a minimally/extremely connected subgraph in raw graph when the graph is not connected.
-    /// It will return a minimum spanning tree when the raw graph is connected.
-    /// </summary>
-    /// <param name="graph">Connected graph </param>
-    /// <param name="extremeWeight">Minimum/Maximum weight.</param>
-    /// <typeparam name="TVertex">Vertex type.</typeparam>
-    /// <typeparam name="TWeight">Edge weight.</typeparam>
-    /// <returns>minimally/extremely connected subgraph in raw graph.</returns>
-    public static IReadOnlyWeightedGraph<TVertex, TWeight> Prim<TVertex, TWeight>(this IUndirectedWeightedGraph<TVertex, TWeight> graph, TWeight extremeWeight) where TVertex : notnull
-    {
-        var mst = new UndirectedGraph<TVertex, TWeight>();
-
-        var visited = new HashSet<TVertex>();
-
-        foreach (var vertex in graph)
-        {
-            if (visited.Count == 0)
-            {
-                visited.Add(vertex);
-                continue;
-            }
-
-            var edge = UndirectedEdge<TVertex, TWeight>.Default;
-
-            var adjEdges = graph.GetAdjacencyEdgesOf(vertex);
-
-            // The graph is not a  connected graph. And it's a free vertex.
-            if (adjEdges.Length == 0)
-                continue;
-
-            // Find minimum edge.
-            foreach (var adjEdge in adjEdges)
-            {
-                var weight = adjEdge.Weight;
-                if (!visited.Contains(adjEdge.AdjacencyVertex) && Comparer<TWeight>.Default.Compare(weight, extremeWeight) < 0)
+                case IDirectedGraph<TVertex> directedGraph when isDirected:
                 {
-                    edge = new UndirectedEdge<TVertex, TWeight>(vertex, adjEdge.AdjacencyVertex, weight);
-                    extremeWeight = weight;
+                    foreach (var vertex in graph)
+                    {
+                        vertexes.Add(vertex);
+                        adjEdges.AddRange(directedGraph.GetAdjacencyOuterVertexesOf(vertex)
+                                                       .Select(adjVertex => new EdgesetArray<TVertex>.Edge(vertex, adjVertex, true)));
+                    }
+
+                    return new EdgesetArray<TVertex>(vertexes, adjEdges, true);
+                }
+                case IUndirectedGraph<TVertex> undirectedGraph when !isDirected:
+                {
+                    foreach (var vertex in graph)
+                    {
+                        vertexes.Add(vertex);
+                        adjEdges.AddRange(undirectedGraph.GetAdjacencyVertexesOf(vertex)
+                                                         .Select(adjVertex => new EdgesetArray<TVertex>.Edge(vertex, adjVertex, false)));
+                    }
+
+                    return new EdgesetArray<TVertex>(vertexes, adjEdges, false);
+                }
+                default:
+                {
+                    foreach (var vertex in graph)
+                    {
+                        vertexes.Add(vertex);
+                        adjEdges.AddRange(graph.Where(endVertex => graph.ContainsEdge(vertex, endVertex))
+                                               .Select(adjVertex => new EdgesetArray<TVertex>.Edge(vertex, adjVertex, isDirected)));
+                    }
+
+                    return new EdgesetArray<TVertex>(vertexes, adjEdges, isDirected);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Adds minimum/maximum spanning-forest algorithms for undirected weighted graphs.
+    /// </summary>
+    /// <typeparam name="TVertex">Vertex type.</typeparam>
+    /// <typeparam name="TWeight">Edge weight type.</typeparam>
+    /// <param name="graph">Graph to mutate.</param>
+    extension<TVertex, TWeight>(IUndirectedWeightedGraph<TVertex, TWeight> graph) where TVertex : notnull
+    {
+        /// <summary>
+        /// Applies Kruskal in-place and keeps only the min/max spanning forest edges.
+        /// </summary>
+        /// <param name="reversed"><see langword="false"/> for minimum; <see langword="true"/> for maximum.</param>
+        public void Kruskal(bool reversed = false)
+        {
+            var vertexes = graph.ToArray();
+            var edges = Pool<List<UndirectedEdge<TVertex, TWeight>>>.Default.Spawn();
+            edges.Clear();
+
+            try
+            {
+                for (var i = 0; i < vertexes.Length; i++)
+                {
+                    for (var j = i + 1; j < vertexes.Length; j++)
+                    {
+                        if (graph.TryGetWeight(vertexes[i], vertexes[j], out var weight))
+                            edges.Add(new UndirectedEdge<TVertex, TWeight>(vertexes[i], vertexes[j], weight));
+                    }
+                }
+
+                edges.Sort((x, y) =>
+                {
+                    var c = Comparer<TWeight>.Default.Compare(x.Weight, y.Weight);
+                    return reversed ? -c : c;
+                });
+
+                var uf = new SetGroup<TVertex>(vertexes);
+                var kept = new HashSet<UndirectedEdge<TVertex, TWeight>>();
+                foreach (var e in edges)
+                {
+                    if (uf.TryMerge(e.Start, e.End))
+                        kept.Add(e);
+                }
+
+                for (var i = 0; i < vertexes.Length; i++)
+                {
+                    for (var j = i + 1; j < vertexes.Length; j++)
+                    {
+                        if (!graph.TryGetWeight(vertexes[i], vertexes[j], out var weight)) continue;
+                        var edge = new UndirectedEdge<TVertex, TWeight>(vertexes[i], vertexes[j], weight);
+                        if (!kept.Contains(edge))
+                            graph.RemoveEdge(vertexes[i], vertexes[j]);
+                    }
+                }
+            }
+            finally
+            {
+                edges.Clear();
+                Pool<List<UndirectedEdge<TVertex, TWeight>>>.Default.Recycle(edges);
+            }
+        }
+
+        /// <summary>
+        /// Applies Prim in-place and keeps only the min/max spanning forest edges.
+        /// </summary>
+        /// <param name="reversed"><see langword="false"/> for minimum; <see langword="true"/> for maximum.</param>
+        public void Prim(bool reversed = false)
+        {
+            var vertexes = graph.ToArray();
+            var globalVisited = new HashSet<TVertex>();
+            var kept = new HashSet<UndirectedEdge<TVertex, TWeight>>();
+            var comparer = Comparer<TWeight>.Default;
+
+            foreach (var start in vertexes)
+            {
+                if (!globalVisited.Add(start)) continue;
+
+                var componentVisited = Pool<HashSet<TVertex>>.Default.Spawn();
+                componentVisited.Clear();
+                componentVisited.Add(start);
+
+                try
+                {
+                    while (true)
+                    {
+                        var found = false;
+                        TVertex bestFrom = default!;
+                        TVertex bestTo = default!;
+                        TWeight bestWeight = default!;
+
+                        foreach (var from in componentVisited)
+                        {
+                            foreach (var (to, weight) in graph.GetAdjacencyEdgesOf(from))
+                            {
+                                if (componentVisited.Contains(to)) continue;
+
+                                if (!found)
+                                {
+                                    found      = true;
+                                    bestFrom   = from;
+                                    bestTo     = to;
+                                    bestWeight = weight;
+                                    continue;
+                                }
+
+                                var cmp = comparer.Compare(weight, bestWeight);
+                                if ((!reversed && cmp < 0) || (reversed && cmp > 0))
+                                {
+                                    bestFrom   = from;
+                                    bestTo     = to;
+                                    bestWeight = weight;
+                                }
+                            }
+                        }
+
+                        if (!found) break;
+
+                        componentVisited.Add(bestTo);
+                        globalVisited.Add(bestTo);
+                        kept.Add(new UndirectedEdge<TVertex, TWeight>(bestFrom, bestTo, bestWeight));
+                    }
+                }
+                finally
+                {
+                    componentVisited.Clear();
+                    Pool<HashSet<TVertex>>.Default.Recycle(componentVisited);
                 }
             }
 
-            // Sanity
-            Debug.Assert(edge != null);
-
-            // Add to mst.
-            var value = edge.Value;
-            mst.AddEdgeWithoutExistentCheck(value.Start, value.End, value.Weight);
-
-            // Set visited.
-            visited.Add(value.End);
+            for (var i = 0; i < vertexes.Length; i++)
+            {
+                for (var j = i + 1; j < vertexes.Length; j++)
+                {
+                    if (!graph.TryGetWeight(vertexes[i], vertexes[j], out var weight)) continue;
+                    var edge = new UndirectedEdge<TVertex, TWeight>(vertexes[i], vertexes[j], weight);
+                    if (!kept.Contains(edge))
+                        graph.RemoveEdge(vertexes[i], vertexes[j]);
+                }
+            }
         }
-
-        return mst;
     }
 
+    /// <summary>
+    /// Adds spanning-forest algorithms for undirected unweighted graphs.
+    /// </summary>
+    /// <typeparam name="TVertex">Vertex type.</typeparam>
+    /// <param name="graph">Graph to mutate.</param>
+    extension<TVertex>(IUndirectedGraph<TVertex> graph) where TVertex : notnull
+    {
+        /// <summary>
+        /// Applies Kruskal in-place on an unweighted undirected graph and keeps one spanning forest.
+        /// </summary>
+        public void Kruskal()
+        {
+            var vertexes = graph.ToArray();
+            var uf = new SetGroup<TVertex>(vertexes);
+            var kept = new HashSet<UndirectedEdge<TVertex, Unit>>();
+
+            for (var i = 0; i < vertexes.Length; i++)
+            {
+                for (var j = i + 1; j < vertexes.Length; j++)
+                {
+                    if (!graph.ContainsEdge(vertexes[i], vertexes[j])) continue;
+                    if (uf.TryMerge(vertexes[i], vertexes[j]))
+                        kept.Add(new UndirectedEdge<TVertex, Unit>(vertexes[i], vertexes[j], Unit.Instance));
+                }
+            }
+
+            for (var i = 0; i < vertexes.Length; i++)
+            {
+                for (var j = i + 1; j < vertexes.Length; j++)
+                {
+                    if (!graph.ContainsEdge(vertexes[i], vertexes[j])) continue;
+                    var edge = new UndirectedEdge<TVertex, Unit>(vertexes[i], vertexes[j], Unit.Instance);
+                    if (!kept.Contains(edge))
+                        graph.RemoveEdge(vertexes[i], vertexes[j]);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Applies Prim in-place on an unweighted undirected graph and keeps one spanning forest.
+        /// </summary>
+        public void Prim()
+        {
+            var vertexes = graph.ToArray();
+            var globalVisited = new HashSet<TVertex>();
+            var kept = new HashSet<UndirectedEdge<TVertex, Unit>>();
+
+            foreach (var start in vertexes)
+            {
+                if (!globalVisited.Add(start)) continue;
+
+                var componentVisited = Pool<HashSet<TVertex>>.Default.Spawn();
+                componentVisited.Clear();
+                componentVisited.Add(start);
+
+                try
+                {
+                    while (true)
+                    {
+                        var found = false;
+                        TVertex from = default!;
+                        TVertex to = default!;
+
+                        foreach (var v in componentVisited)
+                        {
+                            foreach (var adj in graph.GetAdjacencyVertexesOf(v))
+                            {
+                                if (componentVisited.Contains(adj)) continue;
+                                from  = v;
+                                to    = adj;
+                                found = true;
+                                break;
+                            }
+
+                            if (found) break;
+                        }
+
+                        if (!found) break;
+
+                        componentVisited.Add(to);
+                        globalVisited.Add(to);
+                        kept.Add(new UndirectedEdge<TVertex, Unit>(from, to, Unit.Instance));
+                    }
+                }
+                finally
+                {
+                    componentVisited.Clear();
+                    Pool<HashSet<TVertex>>.Default.Recycle(componentVisited);
+                }
+            }
+
+            for (var i = 0; i < vertexes.Length; i++)
+            {
+                for (var j = i + 1; j < vertexes.Length; j++)
+                {
+                    if (!graph.ContainsEdge(vertexes[i], vertexes[j])) continue;
+                    var edge = new UndirectedEdge<TVertex, Unit>(vertexes[i], vertexes[j], Unit.Instance);
+                    if (!kept.Contains(edge))
+                        graph.RemoveEdge(vertexes[i], vertexes[j]);
+                }
+            }
+        }
+    }
+
+    /// <param name="graph">The directed graph to reduce.</param>
+    /// <typeparam name="TVertex">Vertex type.</typeparam>
+    /// <typeparam name="TWeight">Edge weight type.</typeparam>
+    extension<TVertex, TWeight>(IDirectedWeightedGraph<TVertex, TWeight> graph) where TVertex : notnull
+    {
+        /// <summary>
+        /// Performs transitive reduction in-place by removing redundant directed edges.
+        /// </summary>
+        public void TransitiveReduction()
+        {
+            var edgesToRemove = new List<(TVertex, TVertex)>();
+
+            foreach (var start in graph)
+            {
+                var directDeps = graph.GetAdjacencyOuterVertexesOf(start);
+                foreach (var end in directDeps)
+                {
+                    if (graph.HasAlternatePath(start, end))
+                        edgesToRemove.Add((start, end));
+                }
+            }
+
+            foreach (var (start, end) in edgesToRemove)
+                graph.RemoveEdge(start, end);
+        }
+
+        /// <summary>
+        /// Determines whether a path from <paramref name="start"/> to <paramref name="target"/> exists
+        /// after excluding the direct edge from <paramref name="start"/> to <paramref name="target"/>.
+        /// </summary>
+        /// <param name="start">Path origin.</param>
+        /// <param name="target">Path destination.</param>
+        /// <returns>
+        /// <see langword="true"/> if an alternate path exists; otherwise, <see langword="false"/>.
+        /// </returns>
+        private bool HasAlternatePath(TVertex start, TVertex target)
+        {
+            var visited = Pool<HashSet<TVertex>>.Default.Spawn();
+            var stack = Pool<Stack<TVertex>>.Default.Spawn();
+            visited.Clear();
+            stack.Clear();
+
+            try
+            {
+                visited.Add(start);
+                stack.Push(start);
+
+                while (stack.Count > 0)
+                {
+                    var current = stack.Pop();
+                    var nexts = graph.GetAdjacencyOuterVertexesOf(current);
+
+                    foreach (var next in nexts)
+                    {
+                        if (EqualityComparer<TVertex>.Default.Equals(current, start) && next.Equals(target))
+                            continue;
+
+                        if (next.Equals(target))
+                            return true;
+
+                        if (visited.Add(next))
+                            stack.Push(next);
+                    }
+                }
+
+                return false;
+            }
+            finally
+            {
+                visited.Clear();
+                stack.Clear();
+                Pool<HashSet<TVertex>>.Default.Recycle(visited);
+                Pool<Stack<TVertex>>.Default.Recycle(stack);
+            }
+        }
+    }
+
+    /// <param name="graph">The directed graph to reduce.</param>
+    /// <typeparam name="TVertex">Vertex type.</typeparam>
+    extension<TVertex>(IDirectedGraph<TVertex> graph) where TVertex : notnull
+    {
+        /// <summary>
+        /// Performs transitive reduction in-place by removing redundant directed edges.
+        /// </summary>
+        public void TransitiveReduction()
+        {
+            var edgesToRemove = new List<(TVertex, TVertex)>();
+
+            foreach (var start in graph)
+            {
+                var directDeps = graph.GetAdjacencyOuterVertexesOf(start);
+                foreach (var end in directDeps)
+                {
+                    if (graph.HasAlternatePath(start, end))
+                        edgesToRemove.Add((start, end));
+                }
+            }
+
+            foreach (var (start, end) in edgesToRemove)
+                graph.RemoveEdge(start, end);
+        }
+
+        /// <summary>
+        /// Determines whether a path from <paramref name="start"/> to <paramref name="target"/> exists
+        /// after excluding the direct edge from <paramref name="start"/> to <paramref name="target"/>.
+        /// </summary>
+        /// <param name="start">Path origin.</param>
+        /// <param name="target">Path destination.</param>
+        /// <returns>
+        /// <see langword="true"/> if an alternate path exists; otherwise, <see langword="false"/>.
+        /// </returns>
+        private bool HasAlternatePath(TVertex start, TVertex target)
+        {
+            var visited = Pool<HashSet<TVertex>>.Default.Spawn();
+            var stack = Pool<Stack<TVertex>>.Default.Spawn();
+            visited.Clear();
+            stack.Clear();
+
+            try
+            {
+                visited.Add(start);
+                stack.Push(start);
+
+                while (stack.Count > 0)
+                {
+                    var current = stack.Pop();
+                    var nexts = graph.GetAdjacencyOuterVertexesOf(current);
+
+                    foreach (var next in nexts)
+                    {
+                        if (EqualityComparer<TVertex>.Default.Equals(current, start) && next.Equals(target))
+                            continue;
+
+                        if (next.Equals(target))
+                            return true;
+
+                        if (visited.Add(next))
+                            stack.Push(next);
+                    }
+                }
+
+                return false;
+            }
+            finally
+            {
+                visited.Clear();
+                stack.Clear();
+                Pool<HashSet<TVertex>>.Default.Recycle(visited);
+                Pool<Stack<TVertex>>.Default.Recycle(stack);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Represents a directed edge identity plus its weight for local algorithms.
+    /// Equality is based on endpoints only.
+    /// </summary>
+    /// <typeparam name="TVertex">Vertex type.</typeparam>
+    /// <typeparam name="TWeight">Weight type.</typeparam>
     private readonly struct DirectedEdge<TVertex, TWeight> : IEquatable<DirectedEdge<TVertex, TWeight>>, IEqualityComparer<DirectedEdge<TVertex, TWeight>>, IComparable<DirectedEdge<TVertex, TWeight>>
     {
+        /// <summary>Edge start vertex.</summary>
         public readonly TVertex Start;
+
+        /// <summary>Edge end vertex.</summary>
         public readonly TVertex End;
+
+        /// <summary>Edge weight.</summary>
         public readonly TWeight Weight;
 
+        /// <summary>Default edge value.</summary>
         [SuppressMessage("ReSharper", "UnusedMember.Local")]
         public static readonly DirectedEdge<TVertex, TWeight>? Default = new DirectedEdge<TVertex, TWeight>(default!, default!, default!);
 
+        /// <summary>Ascending comparer by weight.</summary>
         public static readonly IComparer<DirectedEdge<TVertex, TWeight>> Less = new Comparer(false);
+
+        /// <summary>Descending comparer by weight.</summary>
         public static readonly IComparer<DirectedEdge<TVertex, TWeight>> Greater = new Comparer(true);
 
         internal DirectedEdge(TVertex start, TVertex end, TWeight weight)
         {
-            Start = start;
-            End = end;
+            Start  = start;
+            End    = end;
             Weight = weight;
         }
 
@@ -305,6 +611,9 @@ public static class GraphExtensions
 #endif
         }
 
+        /// <summary>
+        /// Compares directed edges by weight.
+        /// </summary>
         private class Comparer : IComparer<DirectedEdge<TVertex, TWeight>>
         {
             private static readonly Comparer<TWeight> s_DefaultComparer = Comparer<TWeight>.Default;
@@ -317,19 +626,36 @@ public static class GraphExtensions
         }
     }
 
+    /// <summary>
+    /// Represents an undirected edge identity plus its weight for local algorithms.
+    /// Equality is based on endpoints regardless of order.
+    /// </summary>
+    /// <typeparam name="TVertex">Vertex type.</typeparam>
+    /// <typeparam name="TWeight">Weight type.</typeparam>
     private readonly struct UndirectedEdge<TVertex, TWeight> : IEquatable<UndirectedEdge<TVertex, TWeight>>, IEqualityComparer<UndirectedEdge<TVertex, TWeight>>, IComparable<UndirectedEdge<TVertex, TWeight>>
     {
+        /// <summary>One endpoint of the edge.</summary>
         public readonly TVertex Start;
+
+        /// <summary>The other endpoint of the edge.</summary>
         public readonly TVertex End;
+
+        /// <summary>Edge weight.</summary>
         public readonly TWeight Weight;
+
+        /// <summary>Default edge value.</summary>
         public static readonly UndirectedEdge<TVertex, TWeight>? Default = new UndirectedEdge<TVertex, TWeight>(default!, default!, default!);
+
+        /// <summary>Ascending comparer by weight.</summary>
         public static readonly IComparer<UndirectedEdge<TVertex, TWeight>> Less = new Comparer(false);
+
+        /// <summary>Descending comparer by weight.</summary>
         public static readonly IComparer<UndirectedEdge<TVertex, TWeight>> Greater = new Comparer(true);
 
         internal UndirectedEdge(TVertex start, TVertex end, TWeight weight)
         {
-            Start = start;
-            End = end;
+            Start  = start;
+            End    = end;
             Weight = weight;
         }
 
@@ -372,6 +698,9 @@ public static class GraphExtensions
 #endif
         }
 
+        /// <summary>
+        /// Compares undirected edges by weight.
+        /// </summary>
         private class Comparer : IComparer<UndirectedEdge<TVertex, TWeight>>
         {
             private static readonly Comparer<TWeight> s_DefaultComparer = Comparer<TWeight>.Default;

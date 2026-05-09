@@ -1,4 +1,5 @@
-﻿using Gubbins.Enhance;
+﻿
+using Gubbins.Enhance;
 
 namespace Gubbins.Entities;
 
@@ -16,6 +17,7 @@ public interface IEntityQueryHandle<TResult>
     TResult Query();
 }
 
+
 /// <summary>
 /// Query entities with specified components.
 /// </summary>
@@ -27,11 +29,13 @@ public readonly struct EntityQueryHandle(IReadOnlyList<IArchetype> archetypes, E
     private readonly IReadOnlyList<IArchetype> m_Archetypes = archetypes;
 
     /// <summary>
-    /// Entity collections.
+    /// Query context.
     /// </summary>
     private readonly EntityQueryContext m_Context = context;
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Query entities.
+    /// </summary>
     public EntityQueryResult Query()
     {
         Batch<Entity> result;
@@ -59,7 +63,7 @@ public readonly struct EntityQueryHandle(IReadOnlyList<IArchetype> archetypes, E
 
         result = new Batch<Entity>(memories0);
 
-        return new(pool, result);
+        return new (pool, result);
     }
 }
 
@@ -74,11 +78,13 @@ public readonly struct EntityQueryHandle<T1>(IReadOnlyList<IArchetype> archetype
     private readonly IReadOnlyList<IArchetype> m_Archetypes = archetypes;
 
     /// <summary>
-    /// Entity collections.
+    /// Query context.
     /// </summary>
     private readonly EntityQueryContext<T1> m_Context = context;
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Query entities.
+    /// </summary>
     public EntityQueryResult<T1> Query()
     {
         (Batch<Entity>, Batch<T1>) result;
@@ -109,7 +115,7 @@ public readonly struct EntityQueryHandle<T1>(IReadOnlyList<IArchetype> archetype
         result.Item1 = new Batch<Entity>(memories0);
         result.Item2 = new Batch<T1>(memories1);
 
-        return new(pool, result);
+        return new (pool, result);
     }
 }
 
@@ -124,11 +130,13 @@ public readonly struct EntityQueryHandle<T1, T2>(IReadOnlyList<IArchetype> arche
     private readonly IReadOnlyList<IArchetype> m_Archetypes = archetypes;
 
     /// <summary>
-    /// Entity collections.
+    /// Query context.
     /// </summary>
     private readonly EntityQueryContext<T1, T2> m_Context = context;
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Query entities.
+    /// </summary>
     public EntityQueryResult<T1, T2> Query()
     {
         (Batch<Entity>, Batch<T1>, Batch<T2>) result;
@@ -164,7 +172,7 @@ public readonly struct EntityQueryHandle<T1, T2>(IReadOnlyList<IArchetype> arche
         result.Item2 = new Batch<T1>(memories1);
         result.Item3 = new Batch<T2>(memories2);
 
-        return new(pool, result);
+        return new (pool, result);
     }
 }
 
@@ -179,11 +187,13 @@ public readonly struct EntityQueryHandle<T1, T2, T3>(IReadOnlyList<IArchetype> a
     private readonly IReadOnlyList<IArchetype> m_Archetypes = archetypes;
 
     /// <summary>
-    /// Entity collections.
+    /// Query context.
     /// </summary>
     private readonly EntityQueryContext<T1, T2, T3> m_Context = context;
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Query entities.
+    /// </summary>
     public EntityQueryResult<T1, T2, T3> Query()
     {
         (Batch<Entity>, Batch<T1>, Batch<T2>, Batch<T3>) result;
@@ -224,7 +234,7 @@ public readonly struct EntityQueryHandle<T1, T2, T3>(IReadOnlyList<IArchetype> a
         result.Item3 = new Batch<T2>(memories2);
         result.Item4 = new Batch<T3>(memories3);
 
-        return new(pool, result);
+        return new (pool, result);
     }
 }
 
@@ -239,11 +249,13 @@ public readonly struct EntityQueryHandle<T1, T2, T3, T4>(IReadOnlyList<IArchetyp
     private readonly IReadOnlyList<IArchetype> m_Archetypes = archetypes;
 
     /// <summary>
-    /// Entity collections.
+    /// Query context.
     /// </summary>
     private readonly EntityQueryContext<T1, T2, T3, T4> m_Context = context;
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Query entities.
+    /// </summary>
     public EntityQueryResult<T1, T2, T3, T4> Query()
     {
         (Batch<Entity>, Batch<T1>, Batch<T2>, Batch<T3>, Batch<T4>) result;
@@ -289,7 +301,7 @@ public readonly struct EntityQueryHandle<T1, T2, T3, T4>(IReadOnlyList<IArchetyp
         result.Item4 = new Batch<T3>(memories3);
         result.Item5 = new Batch<T4>(memories4);
 
-        return new(pool, result);
+        return new (pool, result);
     }
 }
 
@@ -304,11 +316,13 @@ public readonly struct EntityQueryHandle<T1, T2, T3, T4, T5>(IReadOnlyList<IArch
     private readonly IReadOnlyList<IArchetype> m_Archetypes = archetypes;
 
     /// <summary>
-    /// Entity collections.
+    /// Query context.
     /// </summary>
     private readonly EntityQueryContext<T1, T2, T3, T4, T5> m_Context = context;
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Query entities.
+    /// </summary>
     public EntityQueryResult<T1, T2, T3, T4, T5> Query()
     {
         (Batch<Entity>, Batch<T1>, Batch<T2>, Batch<T3>, Batch<T4>, Batch<T5>) result;
@@ -359,7 +373,7 @@ public readonly struct EntityQueryHandle<T1, T2, T3, T4, T5>(IReadOnlyList<IArch
         result.Item5 = new Batch<T4>(memories4);
         result.Item6 = new Batch<T5>(memories5);
 
-        return new(pool, result);
+        return new (pool, result);
     }
 }
 
@@ -374,11 +388,13 @@ public readonly struct EntityQueryHandle<T1, T2, T3, T4, T5, T6>(IReadOnlyList<I
     private readonly IReadOnlyList<IArchetype> m_Archetypes = archetypes;
 
     /// <summary>
-    /// Entity collections.
+    /// Query context.
     /// </summary>
     private readonly EntityQueryContext<T1, T2, T3, T4, T5, T6> m_Context = context;
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Query entities.
+    /// </summary>
     public EntityQueryResult<T1, T2, T3, T4, T5, T6> Query()
     {
         (Batch<Entity>, Batch<T1>, Batch<T2>, Batch<T3>, Batch<T4>, Batch<T5>, Batch<T6>) result;
@@ -434,7 +450,7 @@ public readonly struct EntityQueryHandle<T1, T2, T3, T4, T5, T6>(IReadOnlyList<I
         result.Item6 = new Batch<T5>(memories5);
         result.Item7 = new Batch<T6>(memories6);
 
-        return new(pool, result);
+        return new (pool, result);
     }
 }
 
@@ -449,11 +465,13 @@ public readonly struct EntityQueryHandle<T1, T2, T3, T4, T5, T6, T7>(IReadOnlyLi
     private readonly IReadOnlyList<IArchetype> m_Archetypes = archetypes;
 
     /// <summary>
-    /// Entity collections.
+    /// Query context.
     /// </summary>
     private readonly EntityQueryContext<T1, T2, T3, T4, T5, T6, T7> m_Context = context;
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Query entities.
+    /// </summary>
     public EntityQueryResult<T1, T2, T3, T4, T5, T6, T7> Query()
     {
         (Batch<Entity>, Batch<T1>, Batch<T2>, Batch<T3>, Batch<T4>, Batch<T5>, Batch<T6>, Batch<T7>) result;
@@ -514,7 +532,7 @@ public readonly struct EntityQueryHandle<T1, T2, T3, T4, T5, T6, T7>(IReadOnlyLi
         result.Item7 = new Batch<T6>(memories6);
         result.Item8 = new Batch<T7>(memories7);
 
-        return new(pool, result);
+        return new (pool, result);
     }
 }
 
@@ -529,11 +547,13 @@ public readonly struct EntityQueryHandle<T1, T2, T3, T4, T5, T6, T7, T8>(IReadOn
     private readonly IReadOnlyList<IArchetype> m_Archetypes = archetypes;
 
     /// <summary>
-    /// Entity collections.
+    /// Query context.
     /// </summary>
     private readonly EntityQueryContext<T1, T2, T3, T4, T5, T6, T7, T8> m_Context = context;
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Query entities.
+    /// </summary>
     public EntityQueryResult<T1, T2, T3, T4, T5, T6, T7, T8> Query()
     {
         (Batch<Entity>, Batch<T1>, Batch<T2>, Batch<T3>, Batch<T4>, Batch<T5>, Batch<T6>, Batch<T7>, Batch<T8>) result;
@@ -599,7 +619,7 @@ public readonly struct EntityQueryHandle<T1, T2, T3, T4, T5, T6, T7, T8>(IReadOn
         result.Item8 = new Batch<T7>(memories7);
         result.Item9 = new Batch<T8>(memories8);
 
-        return new(pool, result);
+        return new (pool, result);
     }
 }
 
@@ -614,11 +634,13 @@ public readonly struct EntityQueryHandle<T1, T2, T3, T4, T5, T6, T7, T8, T9>(IRe
     private readonly IReadOnlyList<IArchetype> m_Archetypes = archetypes;
 
     /// <summary>
-    /// Entity collections.
+    /// Query context.
     /// </summary>
     private readonly EntityQueryContext<T1, T2, T3, T4, T5, T6, T7, T8, T9> m_Context = context;
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Query entities.
+    /// </summary>
     public EntityQueryResult<T1, T2, T3, T4, T5, T6, T7, T8, T9> Query()
     {
         (Batch<Entity>, Batch<T1>, Batch<T2>, Batch<T3>, Batch<T4>, Batch<T5>, Batch<T6>, Batch<T7>, Batch<T8>, Batch<T9>) result;
@@ -678,18 +700,18 @@ public readonly struct EntityQueryHandle<T1, T2, T3, T4, T5, T6, T7, T8, T9>(IRe
             }
         }
 
-        result.Item1  = new Batch<Entity>(memories0);
-        result.Item2  = new Batch<T1>(memories1);
-        result.Item3  = new Batch<T2>(memories2);
-        result.Item4  = new Batch<T3>(memories3);
-        result.Item5  = new Batch<T4>(memories4);
-        result.Item6  = new Batch<T5>(memories5);
-        result.Item7  = new Batch<T6>(memories6);
-        result.Item8  = new Batch<T7>(memories7);
-        result.Item9  = new Batch<T8>(memories8);
+        result.Item1 = new Batch<Entity>(memories0);
+        result.Item2 = new Batch<T1>(memories1);
+        result.Item3 = new Batch<T2>(memories2);
+        result.Item4 = new Batch<T3>(memories3);
+        result.Item5 = new Batch<T4>(memories4);
+        result.Item6 = new Batch<T5>(memories5);
+        result.Item7 = new Batch<T6>(memories6);
+        result.Item8 = new Batch<T7>(memories7);
+        result.Item9 = new Batch<T8>(memories8);
         result.Item10 = new Batch<T9>(memories9);
 
-        return new(pool, result);
+        return new (pool, result);
     }
 }
 
@@ -704,11 +726,13 @@ public readonly struct EntityQueryHandle<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10
     private readonly IReadOnlyList<IArchetype> m_Archetypes = archetypes;
 
     /// <summary>
-    /// Entity collections.
+    /// Query context.
     /// </summary>
     private readonly EntityQueryContext<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> m_Context = context;
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Query entities.
+    /// </summary>
     public EntityQueryResult<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> Query()
     {
         (Batch<Entity>, Batch<T1>, Batch<T2>, Batch<T3>, Batch<T4>, Batch<T5>, Batch<T6>, Batch<T7>, Batch<T8>, Batch<T9>, Batch<T10>) result;
@@ -772,19 +796,19 @@ public readonly struct EntityQueryHandle<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10
             }
         }
 
-        result.Item1  = new Batch<Entity>(memories0);
-        result.Item2  = new Batch<T1>(memories1);
-        result.Item3  = new Batch<T2>(memories2);
-        result.Item4  = new Batch<T3>(memories3);
-        result.Item5  = new Batch<T4>(memories4);
-        result.Item6  = new Batch<T5>(memories5);
-        result.Item7  = new Batch<T6>(memories6);
-        result.Item8  = new Batch<T7>(memories7);
-        result.Item9  = new Batch<T8>(memories8);
+        result.Item1 = new Batch<Entity>(memories0);
+        result.Item2 = new Batch<T1>(memories1);
+        result.Item3 = new Batch<T2>(memories2);
+        result.Item4 = new Batch<T3>(memories3);
+        result.Item5 = new Batch<T4>(memories4);
+        result.Item6 = new Batch<T5>(memories5);
+        result.Item7 = new Batch<T6>(memories6);
+        result.Item8 = new Batch<T7>(memories7);
+        result.Item9 = new Batch<T8>(memories8);
         result.Item10 = new Batch<T9>(memories9);
         result.Item11 = new Batch<T10>(memories10);
 
-        return new(pool, result);
+        return new (pool, result);
     }
 }
 
@@ -799,11 +823,13 @@ public readonly struct EntityQueryHandle<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10
     private readonly IReadOnlyList<IArchetype> m_Archetypes = archetypes;
 
     /// <summary>
-    /// Entity collections.
+    /// Query context.
     /// </summary>
     private readonly EntityQueryContext<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> m_Context = context;
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Query entities.
+    /// </summary>
     public EntityQueryResult<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> Query()
     {
         (Batch<Entity>, Batch<T1>, Batch<T2>, Batch<T3>, Batch<T4>, Batch<T5>, Batch<T6>, Batch<T7>, Batch<T8>, Batch<T9>, Batch<T10>, Batch<T11>) result;
@@ -871,20 +897,20 @@ public readonly struct EntityQueryHandle<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10
             }
         }
 
-        result.Item1  = new Batch<Entity>(memories0);
-        result.Item2  = new Batch<T1>(memories1);
-        result.Item3  = new Batch<T2>(memories2);
-        result.Item4  = new Batch<T3>(memories3);
-        result.Item5  = new Batch<T4>(memories4);
-        result.Item6  = new Batch<T5>(memories5);
-        result.Item7  = new Batch<T6>(memories6);
-        result.Item8  = new Batch<T7>(memories7);
-        result.Item9  = new Batch<T8>(memories8);
+        result.Item1 = new Batch<Entity>(memories0);
+        result.Item2 = new Batch<T1>(memories1);
+        result.Item3 = new Batch<T2>(memories2);
+        result.Item4 = new Batch<T3>(memories3);
+        result.Item5 = new Batch<T4>(memories4);
+        result.Item6 = new Batch<T5>(memories5);
+        result.Item7 = new Batch<T6>(memories6);
+        result.Item8 = new Batch<T7>(memories7);
+        result.Item9 = new Batch<T8>(memories8);
         result.Item10 = new Batch<T9>(memories9);
         result.Item11 = new Batch<T10>(memories10);
         result.Item12 = new Batch<T11>(memories11);
 
-        return new(pool, result);
+        return new (pool, result);
     }
 }
 
@@ -899,11 +925,13 @@ public readonly struct EntityQueryHandle<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10
     private readonly IReadOnlyList<IArchetype> m_Archetypes = archetypes;
 
     /// <summary>
-    /// Entity collections.
+    /// Query context.
     /// </summary>
     private readonly EntityQueryContext<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> m_Context = context;
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Query entities.
+    /// </summary>
     public EntityQueryResult<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> Query()
     {
         (Batch<Entity>, Batch<T1>, Batch<T2>, Batch<T3>, Batch<T4>, Batch<T5>, Batch<T6>, Batch<T7>, Batch<T8>, Batch<T9>, Batch<T10>, Batch<T11>, Batch<T12>) result;
@@ -975,21 +1003,21 @@ public readonly struct EntityQueryHandle<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10
             }
         }
 
-        result.Item1  = new Batch<Entity>(memories0);
-        result.Item2  = new Batch<T1>(memories1);
-        result.Item3  = new Batch<T2>(memories2);
-        result.Item4  = new Batch<T3>(memories3);
-        result.Item5  = new Batch<T4>(memories4);
-        result.Item6  = new Batch<T5>(memories5);
-        result.Item7  = new Batch<T6>(memories6);
-        result.Item8  = new Batch<T7>(memories7);
-        result.Item9  = new Batch<T8>(memories8);
+        result.Item1 = new Batch<Entity>(memories0);
+        result.Item2 = new Batch<T1>(memories1);
+        result.Item3 = new Batch<T2>(memories2);
+        result.Item4 = new Batch<T3>(memories3);
+        result.Item5 = new Batch<T4>(memories4);
+        result.Item6 = new Batch<T5>(memories5);
+        result.Item7 = new Batch<T6>(memories6);
+        result.Item8 = new Batch<T7>(memories7);
+        result.Item9 = new Batch<T8>(memories8);
         result.Item10 = new Batch<T9>(memories9);
         result.Item11 = new Batch<T10>(memories10);
         result.Item12 = new Batch<T11>(memories11);
         result.Item13 = new Batch<T12>(memories12);
 
-        return new(pool, result);
+        return new (pool, result);
     }
 }
 
@@ -1004,11 +1032,13 @@ public readonly struct EntityQueryHandle<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10
     private readonly IReadOnlyList<IArchetype> m_Archetypes = archetypes;
 
     /// <summary>
-    /// Entity collections.
+    /// Query context.
     /// </summary>
     private readonly EntityQueryContext<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> m_Context = context;
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Query entities.
+    /// </summary>
     public EntityQueryResult<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> Query()
     {
         (Batch<Entity>, Batch<T1>, Batch<T2>, Batch<T3>, Batch<T4>, Batch<T5>, Batch<T6>, Batch<T7>, Batch<T8>, Batch<T9>, Batch<T10>, Batch<T11>, Batch<T12>, Batch<T13>) result;
@@ -1084,22 +1114,22 @@ public readonly struct EntityQueryHandle<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10
             }
         }
 
-        result.Item1  = new Batch<Entity>(memories0);
-        result.Item2  = new Batch<T1>(memories1);
-        result.Item3  = new Batch<T2>(memories2);
-        result.Item4  = new Batch<T3>(memories3);
-        result.Item5  = new Batch<T4>(memories4);
-        result.Item6  = new Batch<T5>(memories5);
-        result.Item7  = new Batch<T6>(memories6);
-        result.Item8  = new Batch<T7>(memories7);
-        result.Item9  = new Batch<T8>(memories8);
+        result.Item1 = new Batch<Entity>(memories0);
+        result.Item2 = new Batch<T1>(memories1);
+        result.Item3 = new Batch<T2>(memories2);
+        result.Item4 = new Batch<T3>(memories3);
+        result.Item5 = new Batch<T4>(memories4);
+        result.Item6 = new Batch<T5>(memories5);
+        result.Item7 = new Batch<T6>(memories6);
+        result.Item8 = new Batch<T7>(memories7);
+        result.Item9 = new Batch<T8>(memories8);
         result.Item10 = new Batch<T9>(memories9);
         result.Item11 = new Batch<T10>(memories10);
         result.Item12 = new Batch<T11>(memories11);
         result.Item13 = new Batch<T12>(memories12);
         result.Item14 = new Batch<T13>(memories13);
 
-        return new(pool, result);
+        return new (pool, result);
     }
 }
 
@@ -1114,11 +1144,13 @@ public readonly struct EntityQueryHandle<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10
     private readonly IReadOnlyList<IArchetype> m_Archetypes = archetypes;
 
     /// <summary>
-    /// Entity collections.
+    /// Query context.
     /// </summary>
     private readonly EntityQueryContext<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> m_Context = context;
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Query entities.
+    /// </summary>
     public EntityQueryResult<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> Query()
     {
         (Batch<Entity>, Batch<T1>, Batch<T2>, Batch<T3>, Batch<T4>, Batch<T5>, Batch<T6>, Batch<T7>, Batch<T8>, Batch<T9>, Batch<T10>, Batch<T11>, Batch<T12>, Batch<T13>, Batch<T14>) result;
@@ -1198,15 +1230,15 @@ public readonly struct EntityQueryHandle<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10
             }
         }
 
-        result.Item1  = new Batch<Entity>(memories0);
-        result.Item2  = new Batch<T1>(memories1);
-        result.Item3  = new Batch<T2>(memories2);
-        result.Item4  = new Batch<T3>(memories3);
-        result.Item5  = new Batch<T4>(memories4);
-        result.Item6  = new Batch<T5>(memories5);
-        result.Item7  = new Batch<T6>(memories6);
-        result.Item8  = new Batch<T7>(memories7);
-        result.Item9  = new Batch<T8>(memories8);
+        result.Item1 = new Batch<Entity>(memories0);
+        result.Item2 = new Batch<T1>(memories1);
+        result.Item3 = new Batch<T2>(memories2);
+        result.Item4 = new Batch<T3>(memories3);
+        result.Item5 = new Batch<T4>(memories4);
+        result.Item6 = new Batch<T5>(memories5);
+        result.Item7 = new Batch<T6>(memories6);
+        result.Item8 = new Batch<T7>(memories7);
+        result.Item9 = new Batch<T8>(memories8);
         result.Item10 = new Batch<T9>(memories9);
         result.Item11 = new Batch<T10>(memories10);
         result.Item12 = new Batch<T11>(memories11);
@@ -1214,7 +1246,7 @@ public readonly struct EntityQueryHandle<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10
         result.Item14 = new Batch<T13>(memories13);
         result.Item15 = new Batch<T14>(memories14);
 
-        return new(pool, result);
+        return new (pool, result);
     }
 }
 
@@ -1229,11 +1261,13 @@ public readonly struct EntityQueryHandle<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10
     private readonly IReadOnlyList<IArchetype> m_Archetypes = archetypes;
 
     /// <summary>
-    /// Entity collections.
+    /// Query context.
     /// </summary>
     private readonly EntityQueryContext<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> m_Context = context;
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Query entities.
+    /// </summary>
     public EntityQueryResult<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> Query()
     {
         (Batch<Entity>, Batch<T1>, Batch<T2>, Batch<T3>, Batch<T4>, Batch<T5>, Batch<T6>, Batch<T7>, Batch<T8>, Batch<T9>, Batch<T10>, Batch<T11>, Batch<T12>, Batch<T13>, Batch<T14>, Batch<T15>) result;
@@ -1317,15 +1351,15 @@ public readonly struct EntityQueryHandle<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10
             }
         }
 
-        result.Item1  = new Batch<Entity>(memories0);
-        result.Item2  = new Batch<T1>(memories1);
-        result.Item3  = new Batch<T2>(memories2);
-        result.Item4  = new Batch<T3>(memories3);
-        result.Item5  = new Batch<T4>(memories4);
-        result.Item6  = new Batch<T5>(memories5);
-        result.Item7  = new Batch<T6>(memories6);
-        result.Item8  = new Batch<T7>(memories7);
-        result.Item9  = new Batch<T8>(memories8);
+        result.Item1 = new Batch<Entity>(memories0);
+        result.Item2 = new Batch<T1>(memories1);
+        result.Item3 = new Batch<T2>(memories2);
+        result.Item4 = new Batch<T3>(memories3);
+        result.Item5 = new Batch<T4>(memories4);
+        result.Item6 = new Batch<T5>(memories5);
+        result.Item7 = new Batch<T6>(memories6);
+        result.Item8 = new Batch<T7>(memories7);
+        result.Item9 = new Batch<T8>(memories8);
         result.Item10 = new Batch<T9>(memories9);
         result.Item11 = new Batch<T10>(memories10);
         result.Item12 = new Batch<T11>(memories11);
@@ -1334,7 +1368,7 @@ public readonly struct EntityQueryHandle<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10
         result.Item15 = new Batch<T14>(memories14);
         result.Item16 = new Batch<T15>(memories15);
 
-        return new(pool, result);
+        return new (pool, result);
     }
 }
 
@@ -1349,11 +1383,13 @@ public readonly struct EntityQueryHandle<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10
     private readonly IReadOnlyList<IArchetype> m_Archetypes = archetypes;
 
     /// <summary>
-    /// Entity collections.
+    /// Query context.
     /// </summary>
     private readonly EntityQueryContext<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> m_Context = context;
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Query entities.
+    /// </summary>
     public EntityQueryResult<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> Query()
     {
         (Batch<Entity>, Batch<T1>, Batch<T2>, Batch<T3>, Batch<T4>, Batch<T5>, Batch<T6>, Batch<T7>, Batch<T8>, Batch<T9>, Batch<T10>, Batch<T11>, Batch<T12>, Batch<T13>, Batch<T14>, Batch<T15>, Batch<T16>) result;
@@ -1441,15 +1477,15 @@ public readonly struct EntityQueryHandle<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10
             }
         }
 
-        result.Item1  = new Batch<Entity>(memories0);
-        result.Item2  = new Batch<T1>(memories1);
-        result.Item3  = new Batch<T2>(memories2);
-        result.Item4  = new Batch<T3>(memories3);
-        result.Item5  = new Batch<T4>(memories4);
-        result.Item6  = new Batch<T5>(memories5);
-        result.Item7  = new Batch<T6>(memories6);
-        result.Item8  = new Batch<T7>(memories7);
-        result.Item9  = new Batch<T8>(memories8);
+        result.Item1 = new Batch<Entity>(memories0);
+        result.Item2 = new Batch<T1>(memories1);
+        result.Item3 = new Batch<T2>(memories2);
+        result.Item4 = new Batch<T3>(memories3);
+        result.Item5 = new Batch<T4>(memories4);
+        result.Item6 = new Batch<T5>(memories5);
+        result.Item7 = new Batch<T6>(memories6);
+        result.Item8 = new Batch<T7>(memories7);
+        result.Item9 = new Batch<T8>(memories8);
         result.Item10 = new Batch<T9>(memories9);
         result.Item11 = new Batch<T10>(memories10);
         result.Item12 = new Batch<T11>(memories11);
@@ -1459,6 +1495,6 @@ public readonly struct EntityQueryHandle<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10
         result.Item16 = new Batch<T15>(memories15);
         result.Item17 = new Batch<T16>(memories16);
 
-        return new(pool, result);
+        return new (pool, result);
     }
 }

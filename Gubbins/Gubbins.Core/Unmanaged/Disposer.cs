@@ -1,12 +1,30 @@
 ﻿namespace Gubbins.Unmanaged;
 
-public static class Disposer<T> where T : unmanaged
+/// <summary>
+/// Provides a cached disposal delegate for unmanaged value types that also implement <see cref="IDisposable"/>.
+/// </summary>
+/// <typeparam name="T">The unmanaged target type.</typeparam>
+internal static class Disposer<T> where T : unmanaged
 {
-    public delegate void DisposeFunction(ref T target);
+    /// <summary>
+    /// Represents a disposal function for <typeparamref name="T"/>.
+    /// </summary>
+    /// <param name="target">The target value to dispose.</param>
+    internal delegate void DisposeFunction(ref T target);
 
-    public static readonly DisposeFunction Dispose;
-    public static readonly bool            IsDisposable;
+    /// <summary>
+    /// Gets the cached disposal delegate for <typeparamref name="T"/>, or a no-op when not disposable.
+    /// </summary>
+    internal static readonly DisposeFunction Dispose;
 
+    /// <summary>
+    /// Gets a value indicating whether <typeparamref name="T"/> supports disposal through <see cref="Dispose"/>.
+    /// </summary>
+    internal static readonly bool IsDisposable;
+
+    /// <summary>
+    /// Initializes cached disposal metadata and delegate bindings for <typeparamref name="T"/>.
+    /// </summary>
     static Disposer()
     {
         if (!typeof(T).IsAssignableFrom(typeof(IDisposable)))
@@ -36,5 +54,9 @@ public static class Disposer<T> where T : unmanaged
         IsDisposable = true;
     }
 
+    /// <summary>
+    /// No-op disposal fallback used when <typeparamref name="T"/> does not expose a compatible dispose method.
+    /// </summary>
+    /// <param name="target">The target value.</param>
     private static void DoNothing(ref T target) { }
 }

@@ -62,10 +62,10 @@ internal static class Number
     private const char EXPONENT_SIGN = 'E';
 
     /// <summary>Pre-computed array of positive powers of 10 (1, 10, 100, 1000, 1e4, 1e5, 1e6, ... 1e308)</summary>
-    private static double[] s_PositiveExponents;
+    private static readonly double[] s_PositiveExponents;
 
     /// <summary>Pre-computed array of negative powers of 10 (1, 0.1, 0.01, 0.001, 1e-4, 1e-5, 1e-6, ... 1e-324)</summary>
-    private static double[] s_NegativeExponents;
+    private static readonly double[] s_NegativeExponents;
 
     /// <summary>Maximum digital length for float formatting: 7 + 1 (decimal point)</summary>
     private static readonly int s_MaxFloatDigitalLength = GetIntegerLength(0x7FFFFF) + 1;
@@ -265,7 +265,7 @@ internal static class Number
             {
                 dest[1] =  NEGATIVE_SIGN;
                 dest    += 2;
-                dest    += WriteString((ulong) (-exponent), dest);
+                dest    += WriteString((ulong) -exponent, dest);
             }
         }
 
@@ -399,7 +399,7 @@ internal static class Number
             {
                 dest[1] =  NEGATIVE_SIGN;
                 dest    += 2;
-                dest    += WriteString((ulong) (-exponent), dest);
+                dest    += WriteString((ulong) -exponent, dest);
             }
         }
 

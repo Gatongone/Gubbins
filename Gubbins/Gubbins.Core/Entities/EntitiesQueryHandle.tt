@@ -45,11 +45,13 @@ public readonly struct EntityQueryHandle<#= genericTypes #>(IReadOnlyList<IArche
     private readonly IReadOnlyList<IArchetype> m_Archetypes = archetypes;
 
     /// <summary>
-    /// Entity collections.
+    /// Query context.
     /// </summary>
     private readonly EntityQueryContext<#= genericTypes #> m_Context = context;
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Query entities.
+    /// </summary>
     public EntityQueryResult<#= genericTypes #> Query()
     {
         <#= batches #> result;
