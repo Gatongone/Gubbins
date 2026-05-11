@@ -42,7 +42,7 @@ public readonly struct EntityQueryContext<#= i == 0 ? string.Empty : $"<{generic
     /// <summary>
     /// Includes the specified components.
     /// </summary>
-    public EntityQueryContext<#= i == 0 ? string.Empty : $"<{genericTypes1}>" #> Include<<#= genericTypes2 #>>() => new (Hash |<#= hashBody2 #>, [<#= string.IsNullOrEmpty(types1) ? types2 : $"{types1}, {types2}" #>], Excludes);
+    public EntityQueryContext<#= i == 0 ? string.Empty : $"<{genericTypes1}>" #> Include<<#= genericTypes2 #>>() => new (Hash |<#= hashBody2 #>, [..Includes, <#= types2 #>], Excludes);
 <#
     }
 #>
@@ -57,7 +57,7 @@ public readonly struct EntityQueryContext<#= i == 0 ? string.Empty : $"<{generic
     /// <summary>
     /// Excludes the specified components.
     /// </summary>
-    public EntityQueryContext<#= i == 0 ? string.Empty : $"<{genericTypes1}>" #> Exclude<<#= genericTypes2 #>>() => new (Hash |<#= hashBody2 #>, Includes, [<#= types2 #>]);
+    public EntityQueryContext<#= i == 0 ? string.Empty : $"<{genericTypes1}>" #> Exclude<<#= genericTypes2 #>>() => new (Hash, Includes, [..Excludes, <#= types2 #>]);
 <#
     }
 #>

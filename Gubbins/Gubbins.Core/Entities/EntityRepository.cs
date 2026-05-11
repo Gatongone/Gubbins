@@ -22,7 +22,7 @@ public class EntityRepository : IEntityQuery, IEntityCommand
     public int Count { get; private set; }
 
     /// <inheritdoc />
-    public bool Contains(int index) => m_Entities.Count > index;
+    public bool Contains(int index) => index >= 0 && m_Entities.Count > index && m_Entities[index].Entity.Valid;
 
     /// <inheritdoc />
     public void Update<T>(int index, T component) where T : unmanaged
@@ -104,7 +104,7 @@ public class EntityRepository : IEntityQuery, IEntityCommand
             return record.Entity;
         }
 
-        var entity = new Entity {Index = m_Entities.Count};
+        var entity = new Entity {Index = m_Entities.Count, Valid = true};
         m_Entities.Add(new EntityRecord
         {
             Entity       = entity,
@@ -112,6 +112,7 @@ public class EntityRepository : IEntityQuery, IEntityCommand
             IndexInChunk = chunkInIndex
         });
         chunk.Set(chunkInIndex, entity);
+        Count++;
         return entity;
     }
 
@@ -119,10 +120,27 @@ public class EntityRepository : IEntityQuery, IEntityCommand
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Delete(int index)
     {
-        ref var record = ref m_Entities[index];
-        if (!record.Chunk.Remove(record.IndexInChunk))
+        if (index < 0 || index >= m_Entities.Count)
         {
             return false;
+        }
+
+        ref var record = ref m_Entities[index];
+        if (!record.Entity.Valid)
+        {
+            return false;
+        }
+
+        var indexInChunk = record.IndexInChunk;
+        if (!record.Chunk.Remove(indexInChunk, out var movedEntity, out var movedFromIndex))
+        {
+            return false;
+        }
+
+        if (movedFromIndex >= 0)
+        {
+            ref var movedRecord = ref m_Entities[movedEntity.Index];
+            movedRecord.IndexInChunk = indexInChunk;
         }
 
         m_RemovedIndexes.Enqueue(index);

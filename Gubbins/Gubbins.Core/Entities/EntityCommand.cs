@@ -9,7 +9,6 @@ namespace Gubbins.Entities;
 /// </summary>
 public static class EntityCommandInsertExtensions
 {
-
     /// <summary>
     /// Insert an entity with the specified components.
     /// </summary>
@@ -419,16 +418,16 @@ public static class EntityCommandInsertExtensions
         var rg11 = new Range(rg10.End, rg10.End.Value + size11);
         var types = FixedArrayPool<Type>.Instance.Rent(11);
 
-        types[0] = typeof(T1);
-        types[1] = typeof(T2);
-        types[2] = typeof(T3);
-        types[3] = typeof(T4);
-        types[4] = typeof(T5);
-        types[5] = typeof(T6);
-        types[6] = typeof(T7);
-        types[7] = typeof(T8);
-        types[8] = typeof(T9);
-        types[9] = typeof(T10);
+        types[0]  = typeof(T1);
+        types[1]  = typeof(T2);
+        types[2]  = typeof(T3);
+        types[3]  = typeof(T4);
+        types[4]  = typeof(T5);
+        types[5]  = typeof(T6);
+        types[6]  = typeof(T7);
+        types[7]  = typeof(T8);
+        types[8]  = typeof(T9);
+        types[9]  = typeof(T10);
         types[10] = typeof(T11);
 
         Span<byte> data = stackalloc byte[size1 + size2 + size3 + size4 + size5 + size6 + size7 + size8 + size9 + size10 + size11];
@@ -481,16 +480,16 @@ public static class EntityCommandInsertExtensions
         var rg12 = new Range(rg11.End, rg11.End.Value + size12);
         var types = FixedArrayPool<Type>.Instance.Rent(12);
 
-        types[0] = typeof(T1);
-        types[1] = typeof(T2);
-        types[2] = typeof(T3);
-        types[3] = typeof(T4);
-        types[4] = typeof(T5);
-        types[5] = typeof(T6);
-        types[6] = typeof(T7);
-        types[7] = typeof(T8);
-        types[8] = typeof(T9);
-        types[9] = typeof(T10);
+        types[0]  = typeof(T1);
+        types[1]  = typeof(T2);
+        types[2]  = typeof(T3);
+        types[3]  = typeof(T4);
+        types[4]  = typeof(T5);
+        types[5]  = typeof(T6);
+        types[6]  = typeof(T7);
+        types[7]  = typeof(T8);
+        types[8]  = typeof(T9);
+        types[9]  = typeof(T10);
         types[10] = typeof(T11);
         types[11] = typeof(T12);
 
@@ -547,16 +546,16 @@ public static class EntityCommandInsertExtensions
         var rg13 = new Range(rg12.End, rg12.End.Value + size13);
         var types = FixedArrayPool<Type>.Instance.Rent(13);
 
-        types[0] = typeof(T1);
-        types[1] = typeof(T2);
-        types[2] = typeof(T3);
-        types[3] = typeof(T4);
-        types[4] = typeof(T5);
-        types[5] = typeof(T6);
-        types[6] = typeof(T7);
-        types[7] = typeof(T8);
-        types[8] = typeof(T9);
-        types[9] = typeof(T10);
+        types[0]  = typeof(T1);
+        types[1]  = typeof(T2);
+        types[2]  = typeof(T3);
+        types[3]  = typeof(T4);
+        types[4]  = typeof(T5);
+        types[5]  = typeof(T6);
+        types[6]  = typeof(T7);
+        types[7]  = typeof(T8);
+        types[8]  = typeof(T9);
+        types[9]  = typeof(T10);
         types[10] = typeof(T11);
         types[11] = typeof(T12);
         types[12] = typeof(T13);
@@ -617,16 +616,16 @@ public static class EntityCommandInsertExtensions
         var rg14 = new Range(rg13.End, rg13.End.Value + size14);
         var types = FixedArrayPool<Type>.Instance.Rent(14);
 
-        types[0] = typeof(T1);
-        types[1] = typeof(T2);
-        types[2] = typeof(T3);
-        types[3] = typeof(T4);
-        types[4] = typeof(T5);
-        types[5] = typeof(T6);
-        types[6] = typeof(T7);
-        types[7] = typeof(T8);
-        types[8] = typeof(T9);
-        types[9] = typeof(T10);
+        types[0]  = typeof(T1);
+        types[1]  = typeof(T2);
+        types[2]  = typeof(T3);
+        types[3]  = typeof(T4);
+        types[4]  = typeof(T5);
+        types[5]  = typeof(T6);
+        types[6]  = typeof(T7);
+        types[7]  = typeof(T8);
+        types[8]  = typeof(T9);
+        types[9]  = typeof(T10);
         types[10] = typeof(T11);
         types[11] = typeof(T12);
         types[12] = typeof(T13);
@@ -691,16 +690,16 @@ public static class EntityCommandInsertExtensions
         var rg15 = new Range(rg14.End, rg14.End.Value + size15);
         var types = FixedArrayPool<Type>.Instance.Rent(15);
 
-        types[0] = typeof(T1);
-        types[1] = typeof(T2);
-        types[2] = typeof(T3);
-        types[3] = typeof(T4);
-        types[4] = typeof(T5);
-        types[5] = typeof(T6);
-        types[6] = typeof(T7);
-        types[7] = typeof(T8);
-        types[8] = typeof(T9);
-        types[9] = typeof(T10);
+        types[0]  = typeof(T1);
+        types[1]  = typeof(T2);
+        types[2]  = typeof(T3);
+        types[3]  = typeof(T4);
+        types[4]  = typeof(T5);
+        types[5]  = typeof(T6);
+        types[6]  = typeof(T7);
+        types[7]  = typeof(T8);
+        types[8]  = typeof(T9);
+        types[9]  = typeof(T10);
         types[10] = typeof(T11);
         types[11] = typeof(T12);
         types[12] = typeof(T13);
@@ -769,16 +768,16 @@ public static class EntityCommandInsertExtensions
         var rg16 = new Range(rg15.End, rg15.End.Value + size16);
         var types = FixedArrayPool<Type>.Instance.Rent(16);
 
-        types[0] = typeof(T1);
-        types[1] = typeof(T2);
-        types[2] = typeof(T3);
-        types[3] = typeof(T4);
-        types[4] = typeof(T5);
-        types[5] = typeof(T6);
-        types[6] = typeof(T7);
-        types[7] = typeof(T8);
-        types[8] = typeof(T9);
-        types[9] = typeof(T10);
+        types[0]  = typeof(T1);
+        types[1]  = typeof(T2);
+        types[2]  = typeof(T3);
+        types[3]  = typeof(T4);
+        types[4]  = typeof(T5);
+        types[5]  = typeof(T6);
+        types[6]  = typeof(T7);
+        types[7]  = typeof(T8);
+        types[8]  = typeof(T9);
+        types[9]  = typeof(T10);
         types[10] = typeof(T11);
         types[11] = typeof(T12);
         types[12] = typeof(T13);
@@ -816,7 +815,6 @@ public static class EntityCommandInsertExtensions
 /// </summary>
 public static class EntityCommandUpdateExtensions
 {
-
     /// <summary>
     /// Updates the components data of a specific entity for a given component type.
     /// </summary>

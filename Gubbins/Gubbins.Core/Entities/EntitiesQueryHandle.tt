@@ -9,7 +9,7 @@ namespace Gubbins.Entities;
 /// Query entity with context.
 /// </summary>
 /// <typeparam name="TResult">Query result.</typeparam>
-public interface IEntityQueryHandle<TResult>
+public interface IEntityQueryHandle<out TResult>
 {
     /// <summary>
     /// Query entities.
@@ -20,24 +20,26 @@ public interface IEntityQueryHandle<TResult>
 }
 
 <#
-    for (var i = 0; i <= 16; i++)
+    const int maxArity = 16;
+
+    for (var arity = 0; arity <= maxArity; arity++)
     {
-        var genericTypes = i == 0 ? string.Empty : $"<{string.Join(", ", from index in Enumerable.Range(1, i) select $"T{index}")}>";
-        var batches = i == 0 ? "Batch<Entity>" :  $"(Batch<Entity>, {string.Join(", ", from index in Enumerable.Range(1, i) select $"Batch<T{index}>")})";
-        var queryHandle = $"IEntityQueryHandle<EntityQueryResult{genericTypes}>";
-        var pools = $"{string.Join("\n", from index in Enumerable.Range(1, i) select $"        var pool{index} = TraceablePool<List<Snippet<T{index}>>>.Default;")}";
-        var memories = $"{string.Join("\n", from index in Enumerable.Range(1, i) select $"        var memories{index} = pool{index}.Spawn();")}";
-        var tracingHandles = $"{string.Join("\n", from index in Enumerable.Range(0, i + 1) select $"        handles.Add(pool{index});")}";
-        var appendMemories = $"{string.Join("\n", from index in Enumerable.Range(0, i + 1) select $"                archetype.GetComponents(memories{index});")}";
-        var batchBodies = i == 0
-            ? "        result = new Batch<Entity>(memories0);"
-            : "        result.Item1 = new Batch<Entity>(memories0);\n" + string.Join("\n", from index in Enumerable.Range(1, i) select $"        result.Item{index + 1} = new Batch<T{index}>(memories{index});");
+        var genericSuffix = GetGenericSuffix(arity);
+        var queryHandle = $"IEntityQueryHandle<EntityQueryResult{genericSuffix}>";
+        var contextType = $"EntityQueryContext{genericSuffix}";
+        var resultType = $"EntityQueryResult{genericSuffix}";
+        var batchTypes = GetBatchTupleTypes(arity);
+        var poolDeclarations = BuildPoolDeclarations(arity);
+        var memoryDeclarations = BuildMemoryDeclarations(arity);
+        var handleAdditions = BuildHandleAdditions(arity);
+        var appendMemories = BuildAppendMemories(arity);
+        var resultAssignments = BuildResultAssignments(arity);
 #>
 
 /// <summary>
 /// Query entities with specified components.
 /// </summary>
-public readonly struct EntityQueryHandle<#= genericTypes #>(IReadOnlyList<IArchetype> archetypes, EntityQueryContext<#= genericTypes #> context) : <#= queryHandle #>
+public readonly struct EntityQueryHandle<#= genericSuffix #>(IReadOnlyList<IArchetype> archetypes, <#= contextType #> context) : <#= queryHandle #>
 {
     /// <summary>
     /// Entity collections.
@@ -47,25 +49,25 @@ public readonly struct EntityQueryHandle<#= genericTypes #>(IReadOnlyList<IArche
     /// <summary>
     /// Query context.
     /// </summary>
-    private readonly EntityQueryContext<#= genericTypes #> m_Context = context;
+    private readonly <#= contextType #> m_Context = context;
 
     /// <summary>
     /// Query entities.
     /// </summary>
-    public EntityQueryResult<#= genericTypes #> Query()
+    public <#= resultType #> Query()
     {
-        <#= batches #> result;
+        <#= batchTypes #> result;
         var pool = TraceablePool<List<ITraceablePool>>.Default;
 
         var handles = pool.Spawn();
 
         var pool0 = TraceablePool<List<Snippet<Entity>>>.Default;
-<#= pools #>
+<#= poolDeclarations #>
 
         var memories0 = pool0.Spawn();
-<#= memories #>
+<#= memoryDeclarations #>
 
-<#= tracingHandles #>
+<#= handleAdditions #>
 
         for (var index = 0; index < m_Archetypes.Count; index++)
         {
@@ -73,15 +75,69 @@ public readonly struct EntityQueryHandle<#= genericTypes #>(IReadOnlyList<IArche
             if (archetype.MatchComponents(m_Context.Hash, m_Context.Includes, m_Context.Excludes))
             {
 <#= appendMemories #>
-                break;
             }
         }
 
-<#= batchBodies #>
+<#= resultAssignments #>
 
         return new (pool, result);
     }
 }
 <#
+    }
+#>
+
+<#+
+    private static string GetGenericSuffix(int arity)
+    {
+        if (arity == 0)
+        {
+            return string.Empty;
+        }
+
+        return $"<{string.Join(", ", Enumerable.Range(1, arity).Select(index => $"T{index}"))}>";
+    }
+
+    private static string GetBatchTupleTypes(int arity)
+    {
+        if (arity == 0)
+        {
+            return "Batch<Entity>";
+        }
+
+        return $"(Batch<Entity>, {string.Join(", ", Enumerable.Range(1, arity).Select(index => $"Batch<T{index}>"))})";
+    }
+
+    private static string BuildPoolDeclarations(int arity)
+        => BuildLines(1, arity, index => $"        var pool{index} = TraceablePool<List<Snippet<T{index}>>>.Default;");
+
+    private static string BuildMemoryDeclarations(int arity)
+        => BuildLines(1, arity, index => $"        var memories{index} = pool{index}.Spawn();");
+
+    private static string BuildHandleAdditions(int arity)
+        => BuildLines(0, arity, index => $"        handles.Add(pool{index});");
+
+    private static string BuildAppendMemories(int arity)
+        => BuildLines(0, arity, index => $"                archetype.GetComponents(memories{index});");
+
+    private static string BuildResultAssignments(int arity)
+    {
+        if (arity == 0)
+        {
+            return "        result = new Batch<Entity>(memories0);";
+        }
+
+        return "        result.Item1 = new Batch<Entity>(memories0);\n"
+               + BuildLines(1, arity, index => $"        result.Item{index + 1} = new Batch<T{index}>(memories{index});");
+    }
+
+    private static string BuildLines(int startInclusive, int endInclusive, Func<int, string> lineFactory)
+    {
+        if (endInclusive < startInclusive)
+        {
+            return string.Empty;
+        }
+
+        return string.Join("\n", Enumerable.Range(startInclusive, endInclusive - startInclusive + 1).Select(lineFactory));
     }
 #>

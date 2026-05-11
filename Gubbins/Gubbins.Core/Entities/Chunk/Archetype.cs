@@ -74,7 +74,7 @@ public sealed class Archetype(Type[] componentTypes) : IArchetype
     /// <returns>True if the archetype contains all included components and none of the excluded components; otherwise, false.</returns>
     public bool MatchComponents(int componentHash, Span<Type> included, Span<Type> excluded)
     {
-        if (m_ComponentsInfo.HashCode != (m_ComponentsInfo.HashCode & componentHash))
+        if (componentHash != (m_ComponentsInfo.HashCode & componentHash))
         {
             return false;
         }

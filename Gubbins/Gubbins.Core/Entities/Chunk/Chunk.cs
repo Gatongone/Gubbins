@@ -13,6 +13,11 @@ namespace Gubbins.Entities;
 /// </remarks>
 public sealed class Chunk : IDisposable
 {
+    private const string AddInputTypeCountMismatchMessage = "Input type count does not match chunk components.";
+    private const string AddValueLengthMismatchMessage = "Value length does not match components' size.";
+    private const string AddChunkFullMessage = "Chunk is full.";
+    private const string AddEntityTypeNotAllowedMessage = "Input types must not include Entity.";
+
     /// <summary>
     /// Size of the chunk in bytes.
     /// </summary>
@@ -130,40 +135,61 @@ public sealed class Chunk : IDisposable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public unsafe int Add(Span<byte> value, Span<Type> types)
     {
+        if (types.Length != m_Types.Length - 1)
+        {
+            throw new InvalidOperationException(AddInputTypeCountMismatchMessage);
+        }
+
         // Value can't match chunk layout.
         if (value.Length != m_ComponentsSize)
         {
-            throw new ArgumentOutOfRangeException(nameof(value), "Value length does not match components' size.");
+            throw new ArgumentOutOfRangeException(nameof(value), AddValueLengthMismatchMessage);
         }
 
-        if (IsFull) throw new ArgumentOutOfRangeException(nameof(value), "Chunk is full.");
+        if (IsFull) throw new ArgumentOutOfRangeException(nameof(value), AddChunkFullMessage);
 
         Span<int> typeIndexes = stackalloc int[types.Length];
+        Span<bool> matched = stackalloc bool[m_Types.Length];
 
         // Match all types.
         for (var i = 0; i < typeIndexes.Length; i++)
         {
+            if (types[i] == typeof(Entity))
+            {
+                throw new InvalidOperationException(AddEntityTypeNotAllowedMessage);
+            }
+
             var found = false;
-            for (var j = 0; j < m_Types.Length; j++)
+            for (var j = 1; j < m_Types.Length; j++)
             {
                 if (m_Types[j] != types[i]) continue;
+
+                if (matched[j])
+                {
+                    throw new InvalidOperationException($"Duplicate type '{types[i]}' in input types.");
+                }
+
                 found          = true;
+                matched[j]     = true;
                 typeIndexes[i] = j;
                 break;
             }
             if (!found) throw new InvalidOperationException($"Type '{types[i]}' not found in chunk.");
         }
 
-        // Copy the value to the chunk.
+        // Copy values using input order as source and chunk layout as destination.
+        var sourceOffset = 0;
         for (var i = 0; i < typeIndexes.Length; i++)
         {
             var typeIndex = typeIndexes[i];
-            var data = m_Data.AsSpan()[(m_Indexes[typeIndex] + Count * m_Sizes[typeIndex])..];
-            var range = m_Layout[typeIndex - 1];
-            value[range].CopyTo(data);
+            var size = m_Sizes[typeIndex];
+            var targetOffset = m_Indexes[typeIndex] + Count * size;
+            value.Slice(sourceOffset, size).CopyTo(m_Data.AsSpan(targetOffset, size));
+            sourceOffset += size;
         }
 
         var index = Count++;
+        IsFull = Count >= Capacity;
         return index;
     }
 
@@ -175,26 +201,50 @@ public sealed class Chunk : IDisposable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Remove(int index)
     {
+        return Remove(index, out _, out _);
+    }
+
+    /// <summary>
+    /// Remove entity from the chunk and report the moved entity when compaction occurs.
+    /// </summary>
+    /// <param name="index">Entity index in chunk.</param>
+    /// <param name="movedEntity">Entity moved from tail to <paramref name="index"/>; default when no move happened.</param>
+    /// <param name="movedFromIndex">Original index of <paramref name="movedEntity"/>; -1 when no move happened.</param>
+    /// <returns>True if entity was successfully removed, false otherwise.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal bool Remove(int index, out Entity movedEntity, out int movedFromIndex)
+    {
+        movedEntity = default;
+        movedFromIndex = -1;
+
         // Invalid index.
         if (index < 0 || index >= Count) return false;
 
+        var lastIndex = Count - 1;
         var data = m_Data.AsSpan();
 
         // If removing the last entity, just decrement the count.
-        if (index == Count - 1)
+        if (index == lastIndex)
         {
             Count--;
+            IsFull = Count >= Capacity;
             return true;
         }
 
-        // Else swap the component at the index with the last component and decrement the count.
-        for (var i = 1; i < Count - 1; i++)
+        // Move the last entity's data into the removed slot for all columns (Entity + components).
+        for (var i = 0; i < m_Indexes.Length; i++)
         {
-            var j = m_Indexes[index];
-            (data[j], data[j + Count]) = (data[j + Count], data[j]);
+            var elementSize = m_Sizes[i];
+            var from = m_Indexes[i] + lastIndex * elementSize;
+            var to = m_Indexes[i] + index * elementSize;
+            data.Slice(from, elementSize).CopyTo(data.Slice(to, elementSize));
         }
 
+        movedEntity = Get<Entity>(index);
+        movedFromIndex = lastIndex;
+
         Count--;
+        IsFull = Count >= Capacity;
         return true;
     }
 
@@ -220,6 +270,11 @@ public sealed class Chunk : IDisposable
     /// <exception cref="ArgumentException">Throw when the type is not contained by this chunk.</exception>
     public unsafe ref T Get<T>(int index)
     {
+        if (index < 0 || index >= Count)
+        {
+            throw new ArgumentOutOfRangeException(nameof(index), "Index is out of range.");
+        }
+
         var typeIndex = -1;
         var size = 0;
         for (var i = 0; i < m_Types.Length; i++)
