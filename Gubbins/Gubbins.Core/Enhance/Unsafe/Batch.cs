@@ -1,8 +1,7 @@
 ﻿using System.Collections;
 using System.Runtime.CompilerServices;
-using Gubbins.Enhance;
 
-namespace Gubbins.Entities;
+namespace Gubbins.Enhance;
 
 /// <summary>
 /// Represents a logical sequence of elements stored across multiple contiguous snippets.
