@@ -1,4 +1,6 @@
-﻿namespace Gubbins.Entities.Tests;
+﻿using Gubbins.Enhance;
+
+namespace Gubbins.Entities.Tests;
 
 internal static class EntityBatchTestExtensions
 {
