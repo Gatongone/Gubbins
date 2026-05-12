@@ -6,7 +6,7 @@ public class EntityCommandTests
     private record struct CompA(int Value);
 
     [Test]
-    public void Insert_ShouldSetEntityValidAndIncreaseCount()
+    public void Insert_ShouldSetEntityVersionAndIncreaseCount()
     {
         var repository = new EntityRepository();
 
@@ -16,7 +16,7 @@ public class EntityCommandTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(entity.Valid, Is.True);
+            Assert.That(entity.Version, Is.GreaterThan(0u));
             Assert.That(repository.Count, Is.EqualTo(1));
             Assert.That(repository.Contains(entity.Index), Is.True);
             Assert.That(value, Is.EqualTo(7));
@@ -92,10 +92,106 @@ public class EntityCommandTests
         Assert.Multiple(() =>
         {
             Assert.That(reused.Index, Is.EqualTo(first.Index));
-            Assert.That(reused.Valid, Is.True);
+            Assert.That(reused.Version, Is.GreaterThan(first.Version));
             Assert.That(repository.Count, Is.EqualTo(2));
             Assert.That(repository.Contains(reused.Index), Is.True);
             Assert.That(repository.Contains(second.Index), Is.True);
+        });
+    }
+
+    [Test]
+    public void Update_WithStaleEntityHandle_ShouldThrowInvalidOperationException()
+    {
+        var repository = new EntityRepository();
+        var stale = repository.Insert(new CompA {Value = 1});
+        repository.Delete(stale.Index);
+        repository.Insert(new CompA {Value = 2});
+
+        Assert.Throws<InvalidOperationException>(() => repository.Update(stale, new CompA {Value = 3}));
+    }
+
+    [Test]
+    public void Update_WithCurrentEntityHandle_ShouldUpdateComponent()
+    {
+        var repository = new EntityRepository();
+        var entity = repository.Insert(new CompA {Value = 1});
+
+        repository.Update(entity, new CompA {Value = 9});
+        var record = repository.Get(entity.Index);
+        var value = record.Chunk.Get<CompA>(record.IndexInChunk).Value;
+
+        Assert.That(value, Is.EqualTo(9));
+    }
+
+    [Test]
+    public void Contains_WithStaleAndCurrentEntityHandle_ShouldReflectVersion()
+    {
+        var repository = new EntityRepository();
+        var stale = repository.Insert(new CompA {Value = 1});
+
+        repository.Delete(stale.Index);
+        var current = repository.Insert(new CompA {Value = 2});
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(repository.Contains(stale), Is.False);
+            Assert.That(repository.Contains(current), Is.True);
+            Assert.That(stale.Index, Is.EqualTo(current.Index));
+            Assert.That(current.Version, Is.GreaterThan(stale.Version));
+        });
+    }
+
+    [Test]
+    public void Contains_IndexAndEntity_ShouldDifferForStaleHandleAfterReuse()
+    {
+        var repository = new EntityRepository();
+        var stale = repository.Insert(new CompA {Value = 1});
+
+        repository.Delete(stale.Index);
+        var current = repository.Insert(new CompA {Value = 2});
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(repository.Contains(stale.Index), Is.True);
+            Assert.That(repository.Contains(stale), Is.False);
+            Assert.That(repository.Contains(current), Is.True);
+        });
+    }
+
+    [Test]
+    public void Delete_WithStaleEntityHandle_ShouldReturnFalseAndKeepCount()
+    {
+        var repository = new EntityRepository();
+        var stale = repository.Insert(new CompA {Value = 1});
+
+        repository.Delete(stale.Index);
+        var current = repository.Insert(new CompA {Value = 2});
+        var countBefore = repository.Count;
+
+        var deleted = repository.Delete(stale);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(deleted, Is.False);
+            Assert.That(repository.Count, Is.EqualTo(countBefore));
+            Assert.That(repository.Contains(current), Is.True);
+        });
+    }
+
+    [Test]
+    public void Delete_WithCurrentEntityHandle_ShouldSucceed()
+    {
+        var repository = new EntityRepository();
+        var entity = repository.Insert(new CompA {Value = 1});
+
+        var deleted = repository.Delete(entity);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(deleted, Is.True);
+            Assert.That(repository.Contains(entity), Is.False);
+            Assert.That(repository.Contains(entity.Index), Is.False);
+            Assert.That(repository.Count, Is.EqualTo(0));
         });
     }
 
@@ -172,6 +268,81 @@ public class EntityCommandTests
             Assert.That(repository.Contains(e1.Index), Is.False);
             Assert.That(repository.Contains(e2.Index), Is.False);
             Assert.That(repository.Contains(e3.Index), Is.False);
+        });
+    }
+
+    [Test]
+    public void DeleteAll_WithReusedIndex_ShouldDeleteCurrentGenerationOnlyOnce()
+    {
+        var repository = new EntityRepository();
+        var stale = repository.Insert(new CompA {Value = 1});
+        var survivor = repository.Insert(new CompA {Value = 2});
+
+        repository.Delete(stale.Index);
+        var current = repository.Insert(new CompA {Value = 3});
+
+        Span<int> indexes = [stale.Index, stale.Index];
+        var removed = repository.DeleteAll(indexes);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(stale.Index, Is.EqualTo(current.Index));
+            Assert.That(current.Version, Is.GreaterThan(stale.Version));
+            Assert.That(removed, Is.EqualTo(1));
+            Assert.That(repository.Contains(current), Is.False);
+            Assert.That(repository.Contains(stale.Index), Is.False);
+            Assert.That(repository.Contains(survivor), Is.True);
+            Assert.That(repository.Count, Is.EqualTo(1));
+        });
+    }
+
+    [Test]
+    public void DeleteAll_AfterReuse_WhenReinsertedAgain_ShouldKeepVersionMonotonic()
+    {
+        var repository = new EntityRepository();
+        var first = repository.Insert(new CompA {Value = 1});
+
+        repository.Delete(first.Index);
+        var second = repository.Insert(new CompA {Value = 2});
+
+        Span<int> indexes = [second.Index];
+        var removed = repository.DeleteAll(indexes);
+        var third = repository.Insert(new CompA {Value = 3});
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(removed, Is.EqualTo(1));
+            Assert.That(first.Index, Is.EqualTo(second.Index));
+            Assert.That(second.Index, Is.EqualTo(third.Index));
+            Assert.That(second.Version, Is.GreaterThan(first.Version));
+            Assert.That(third.Version, Is.GreaterThan(second.Version));
+            Assert.That(repository.Contains(third), Is.True);
+        });
+    }
+
+    [Test]
+    public void Delete_StaleThenDeleteAll_ByIndex_ShouldOnlyRemoveCurrentGeneration()
+    {
+        var repository = new EntityRepository();
+        var stale = repository.Insert(new CompA {Value = 1});
+        var survivor = repository.Insert(new CompA {Value = 2});
+
+        repository.Delete(stale.Index);
+        var current = repository.Insert(new CompA {Value = 3});
+
+        var deletedByStaleHandle = repository.Delete(stale);
+        Span<int> indexes = [stale.Index];
+        var removedByDeleteAll = repository.DeleteAll(indexes);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(stale.Index, Is.EqualTo(current.Index));
+            Assert.That(current.Version, Is.GreaterThan(stale.Version));
+            Assert.That(deletedByStaleHandle, Is.False);
+            Assert.That(removedByDeleteAll, Is.EqualTo(1));
+            Assert.That(repository.Contains(current), Is.False);
+            Assert.That(repository.Contains(survivor), Is.True);
+            Assert.That(repository.Count, Is.EqualTo(1));
         });
     }
 

@@ -2,11 +2,22 @@
 <#@ import namespace="System.Linq" #>
 namespace Gubbins.Entities;
 
-/// <summary>
-/// Provides methods for getting entity query handles for unmanaged entities.
-/// </summary>
-public static class EntityQueryGetQueryHandleExtensions
+public static class EntityQueryExtensions
 {
+    extension(IEntityQuery query)
+    {
+        /// <summary>
+        /// Determines whether the specified entity handle is currently alive.
+        /// </summary>
+        public bool Contains(Entity entity)
+        {
+            if (!query.Contains(entity.Index))
+            {
+                return false;
+            }
+
+            return query.Get(entity.Index).Entity.Version == entity.Version;
+        }
 <#
     for (var i = 1; i <= 16; i++)
     {
@@ -15,14 +26,15 @@ public static class EntityQueryGetQueryHandleExtensions
         var queryContext = $"EntityQueryContext<{genericTypes}>";
 #>
 
-    /// <summary>
-    /// Get unmanaged <see cref="IEntityQueryHandle{TResult}">EntityQueryHandle</see> entity query handle for the specified entity types.
-    /// </summary>
-    public static <#= entityQueryHandle #> GetQueryHandle<<#= genericTypes #>>(this IEntityQuery query, <#= queryContext #> context)
-    {
-        return new(query.Archetypes, context);
-    }
+        /// <summary>
+        /// Get unmanaged <see cref="IEntityQueryHandle{TResult}">EntityQueryHandle</see> entity query handle for the specified entity types.
+        /// </summary>
+        public <#= entityQueryHandle #> GetQueryHandle<<#= genericTypes #>>(<#= queryContext #> context)
+        {
+            return new(query.Archetypes, context);
+        }
 <#
     }
 #>
+    }
 }

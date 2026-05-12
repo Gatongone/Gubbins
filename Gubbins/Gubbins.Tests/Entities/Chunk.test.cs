@@ -33,7 +33,7 @@ public class ChunkBehaviorTests
         var types = new[] {typeof(CompA)};
 
         var index = chunk.Add(CreateSingleData(7), types);
-        chunk.Set(index, new Entity {Index = 77, Valid = true});
+        chunk.Set(index, new Entity {Index = 77, Version = 1});
 
         Assert.That(chunk.Get<Entity>(index).Index, Is.EqualTo(77));
     }
@@ -44,13 +44,13 @@ public class ChunkBehaviorTests
         using var chunk = new Chunk([typeof(Entity)]);
 
         var index = chunk.Add(Array.Empty<byte>(), Array.Empty<Type>());
-        chunk.Set(index, new Entity {Index = 9, Valid = true});
+        chunk.Set(index, new Entity {Index = 9, Version = 1});
 
         Assert.Multiple(() =>
         {
             Assert.That(chunk.Count, Is.EqualTo(1));
             Assert.That(chunk.Get<Entity>(index).Index, Is.EqualTo(9));
-            Assert.That(chunk.Get<Entity>(index).Valid, Is.True);
+            Assert.That(chunk.Get<Entity>(index).Version, Is.EqualTo(1u));
         });
     }
 
@@ -193,7 +193,7 @@ public class ChunkBehaviorTests
         var types = new[] {typeof(CompA), typeof(CompB)};
 
         var index = chunk.Add(CreateData(1, 2), types);
-        chunk.Set(index, new Entity {Index = 10, Valid = true});
+        chunk.Set(index, new Entity {Index = 10, Version = 1});
 
         var removed = chunk.Remove(-1, out var movedEntity, out var movedFromIndex);
 
@@ -203,7 +203,7 @@ public class ChunkBehaviorTests
             Assert.That(chunk.Count, Is.EqualTo(1));
             Assert.That(movedFromIndex, Is.EqualTo(-1));
             Assert.That(movedEntity.Index, Is.EqualTo(0));
-            Assert.That(movedEntity.Valid, Is.False);
+            Assert.That(movedEntity.Version, Is.EqualTo(0u));
         });
     }
 
@@ -219,7 +219,7 @@ public class ChunkBehaviorTests
             Assert.That(removed, Is.False);
             Assert.That(chunk.Count, Is.EqualTo(0));
             Assert.That(movedFromIndex, Is.EqualTo(-1));
-            Assert.That(movedEntity.Valid, Is.False);
+            Assert.That(movedEntity.Version, Is.EqualTo(0u));
         });
     }
 
@@ -237,7 +237,7 @@ public class ChunkBehaviorTests
             Assert.That(removed, Is.False);
             Assert.That(chunk.Count, Is.EqualTo(1));
             Assert.That(movedFromIndex, Is.EqualTo(-1));
-            Assert.That(movedEntity.Valid, Is.False);
+            Assert.That(movedEntity.Version, Is.EqualTo(0u));
         });
     }
 
@@ -255,7 +255,7 @@ public class ChunkBehaviorTests
             Assert.That(removed, Is.False);
             Assert.That(chunk.Count, Is.EqualTo(1));
             Assert.That(movedFromIndex, Is.EqualTo(-1));
-            Assert.That(movedEntity.Valid, Is.False);
+            Assert.That(movedEntity.Version, Is.EqualTo(0u));
         });
     }
 
@@ -266,7 +266,7 @@ public class ChunkBehaviorTests
         var types = new[] {typeof(CompA), typeof(CompB)};
 
         var index = chunk.Add(CreateData(1, 2), types);
-        chunk.Set(index, new Entity {Index = 20, Valid = true});
+        chunk.Set(index, new Entity {Index = 20, Version = 1});
 
         var removed = chunk.Remove(index, out var movedEntity, out var movedFromIndex);
 
@@ -276,7 +276,7 @@ public class ChunkBehaviorTests
             Assert.That(chunk.Count, Is.EqualTo(0));
             Assert.That(movedFromIndex, Is.EqualTo(-1));
             Assert.That(movedEntity.Index, Is.EqualTo(0));
-            Assert.That(movedEntity.Valid, Is.False);
+            Assert.That(movedEntity.Version, Is.EqualTo(0u));
         });
     }
 
@@ -295,7 +295,7 @@ public class ChunkBehaviorTests
             Assert.That(removed, Is.True);
             Assert.That(chunk.Count, Is.EqualTo(0));
             Assert.That(movedFromIndex, Is.EqualTo(-1));
-            Assert.That(movedEntity.Valid, Is.False);
+            Assert.That(movedEntity.Version, Is.EqualTo(0u));
         });
     }
 
@@ -309,9 +309,9 @@ public class ChunkBehaviorTests
         var second = chunk.Add(CreateData(2, 22), types);
         var third = chunk.Add(CreateData(3, 33), types);
 
-        chunk.Set(first, new Entity {Index  = 100, Valid = true});
-        chunk.Set(second, new Entity {Index = 200, Valid = true});
-        chunk.Set(third, new Entity {Index  = 300, Valid = true});
+        chunk.Set(first, new Entity {Index  = 100, Version = 1});
+        chunk.Set(second, new Entity {Index = 200, Version = 1});
+        chunk.Set(third, new Entity {Index  = 300, Version = 1});
 
         var removed = chunk.Remove(second, out var movedEntity, out var movedFromIndex);
 

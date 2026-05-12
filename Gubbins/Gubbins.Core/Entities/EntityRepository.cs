@@ -9,6 +9,8 @@ namespace Gubbins.Entities;
 /// </summary>
 public class EntityRepository : IEntityQuery, IEntityCommand
 {
+    private const uint INITIAL_ENTITY_VERSION = 1;
+
     private readonly List<Archetype>           m_Archetypes     = [];
     private readonly ExpandArray<EntityRecord> m_Entities       = [];
     private readonly Queue<int>                m_RemovedIndexes = new();
@@ -22,16 +24,17 @@ public class EntityRepository : IEntityQuery, IEntityCommand
     public int Count { get; private set; }
 
     /// <inheritdoc />
-    public bool Contains(int index) => index >= 0 && m_Entities.Count > index && m_Entities[index].Entity.Valid;
+    public bool Contains(int index) => index >= 0 && m_Entities.Count > index && m_Entities[index].IndexInChunk >= 0;
 
     /// <inheritdoc />
     public void Update<T>(int index, T component) where T : unmanaged
     {
-        ref var record = ref m_Entities[index];
-        if (!record.Entity.Valid)
+        if (!Contains(index))
         {
             throw new InvalidOperationException($"Entity with index {index} is not valid.");
         }
+
+        ref var record = ref m_Entities[index];
         record.Chunk.Set(record.IndexInChunk, component);
     }
 
@@ -90,21 +93,22 @@ public class EntityRepository : IEntityQuery, IEntityCommand
     /// </summary>
     /// <param name="chunk">The chunk where the entity's component data is stored.</param>
     /// <param name="chunkInIndex">The index within the chunk where the entity's data is located.</param>
-    /// <returns>The newly created or reused entity with its index and validity status set appropriately.</returns>
+    /// <returns>The newly created or reused entity with its index and version set appropriately.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private Entity AddEntity(Chunk chunk, int chunkInIndex)
     {
         if (m_RemovedIndexes.TryDequeue(out var removedIndex))
         {
             ref var record = ref m_Entities[removedIndex];
-            record.Entity.Valid = true;
+            record.Entity       = new Entity {Index = removedIndex, Version = record.Entity.Version};
             record.Chunk        = chunk;
             record.IndexInChunk = chunkInIndex;
+            chunk.Set(chunkInIndex, record.Entity);
             Count++;
             return record.Entity;
         }
 
-        var entity = new Entity {Index = m_Entities.Count, Valid = true};
+        var entity = new Entity {Index = m_Entities.Count, Version = INITIAL_ENTITY_VERSION};
         m_Entities.Add(new EntityRecord
         {
             Entity       = entity,
@@ -120,16 +124,12 @@ public class EntityRepository : IEntityQuery, IEntityCommand
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Delete(int index)
     {
-        if (index < 0 || index >= m_Entities.Count)
+        if (!Contains(index))
         {
             return false;
         }
 
         ref var record = ref m_Entities[index];
-        if (!record.Entity.Valid)
-        {
-            return false;
-        }
 
         var indexInChunk = record.IndexInChunk;
         if (!record.Chunk.Remove(indexInChunk, out var movedEntity, out var movedFromIndex))
@@ -144,7 +144,8 @@ public class EntityRepository : IEntityQuery, IEntityCommand
         }
 
         m_RemovedIndexes.Enqueue(index);
-        record.Entity.Valid = false;
+        record.IndexInChunk = -1;
+        record.Entity.Version++;
         Count--;
         return true;
     }
