@@ -256,7 +256,7 @@ internal static class VectorMath
         // Reduce the mantissa to [+2/3, +4/3]
         var vx = Native.BitCast<Vector<double>, Vector<ulong>>(x) - new Vector<ulong>(vOff);
 #if NET7_0_OR_GREATER
-            var n = Vector.ConvertToDouble(Native.ShiftRightArithmetic(Native.BitCast<Vector<ulong>, Vector<long>>(vx), 52));
+        var n = Vector.ConvertToDouble(Native.ShiftRightArithmetic(Native.BitCast<Vector<ulong>, Vector<long>>(vx), 52));
 #else
         var longN = Native.BitCast<Vector<ulong>, Vector<long>>(vx);
         Span<long> spanN = stackalloc long[Vector<long>.Count];
