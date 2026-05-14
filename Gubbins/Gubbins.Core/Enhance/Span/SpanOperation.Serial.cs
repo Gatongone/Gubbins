@@ -1,4 +1,6 @@
-﻿namespace Gubbins.Enhance;
+﻿using System.Numerics;
+
+namespace Gubbins.Enhance;
 
 /// <summary>
 /// Serial span operation.
@@ -716,5 +718,428 @@ internal sealed class SerialDoubleOperations : ISpanRealOperations<double>
         {
             result[index] = Math.Atanh(src[index]);
         }
+    }
+}
+
+internal sealed class SerialVector2Operation : ISpanVectorOperations<Vector2>
+{
+    public bool Supported => true;
+
+    public void Dot(Span<Vector2> left, Span<Vector2> right, Span<Vector2> result)
+    {
+        for (var i = 0; i < result.Length; i++)
+        {
+            var dot = Vector2.Dot(left[i], right[i]);
+            result[i] = new Vector2(dot, dot);
+        }
+    }
+
+    public void Cross(Span<Vector2> left, Span<Vector2> right, Span<Vector2> result)
+    {
+        for (var i = 0; i < result.Length; i++)
+        {
+            var l = left[i];
+            var r = right[i];
+            var cross = l.X * r.Y - l.Y * r.X;
+            result[i] = new Vector2(cross, cross);
+        }
+    }
+
+    public void Normalize(Span<Vector2> src, Span<Vector2> result)
+    {
+        for (var i = 0; i < result.Length; i++)
+        {
+            result[i] = Vector2.Normalize(src[i]);
+        }
+    }
+
+    public void Length(Span<Vector2> src, Span<float> result)
+    {
+        LengthSquared(src, result);
+        for (var i = 0; i < result.Length; i++)
+        {
+            result[i] = MathF.Sqrt(result[i]);
+        }
+    }
+
+    public void LengthSquared(Span<Vector2> src, Span<float> result)
+    {
+        for (var i = 0; i < result.Length; i++)
+        {
+            result[i] = src[i].LengthSquared();
+        }
+    }
+
+    public void Distance(Span<Vector2> left, Span<Vector2> right, Span<float> result)
+    {
+        DistanceSquared(left, right, result);
+        for (var i = 0; i < result.Length; i++)
+        {
+            result[i] = MathF.Sqrt(result[i]);
+        }
+    }
+
+    public void DistanceSquared(Span<Vector2> left, Span<Vector2> right, Span<float> result)
+    {
+        for (var i = 0; i < result.Length; i++)
+        {
+            result[i] = Vector2.DistanceSquared(left[i], right[i]);
+        }
+    }
+
+    public void Angle(Span<Vector2> left, Span<Vector2> right, Span<float> result)
+    {
+        for (var i = 0; i < result.Length; i++)
+        {
+            var l = left[i];
+            var r = right[i];
+            var denominator = l.Length() * r.Length();
+            result[i] = denominator <= 0f ? 0f : MathF.Acos(Math.Clamp(Vector2.Dot(l, r) / denominator, -1f, 1f));
+        }
+    }
+
+    public void Reflect(Span<Vector2> src, Span<Vector2> normal, Span<Vector2> result)
+    {
+        for (var i = 0; i < result.Length; i++)
+        {
+            result[i] = Vector2.Reflect(src[i], normal[i]);
+        }
+    }
+
+    public void Refract(Span<Vector2> src, Span<Vector2> normal, Vector2 eta, Span<Vector2> result)
+    {
+        var etaRatio = eta.X;
+        for (var i = 0; i < result.Length; i++)
+        {
+            result[i] = RefractScalar(src[i], normal[i], etaRatio);
+        }
+    }
+
+    public void FaceForward(Span<Vector2> src, Span<Vector2> normal, Span<float> incident, Span<Vector2> result)
+    {
+        for (var i = 0; i < result.Length; i++)
+        {
+            result[i] = incident[i] < 0f ? src[i] : -src[i];
+        }
+    }
+
+    public void FaceForward(Span<Vector2> src, Span<Vector2> normal, Span<Vector2> result)
+    {
+        for (var i = 0; i < result.Length; i++)
+        {
+            result[i] = Vector2.Dot(normal[i], src[i]) < 0f ? src[i] : -src[i];
+        }
+    }
+
+    public void MoveTowards(Span<Vector2> src, Span<Vector2> target, Span<float> maxDistanceDelta, Span<Vector2> result)
+    {
+        for (var i = 0; i < result.Length; i++)
+        {
+            result[i] = MoveTowardsScalar(src[i], target[i], maxDistanceDelta[i]);
+        }
+    }
+
+    private static Vector2 RefractScalar(Vector2 incident, Vector2 normal, float eta)
+    {
+        var dot = Vector2.Dot(normal, incident);
+        var k = 1f - eta * eta * (1f - dot * dot);
+        return k < 0f ? Vector2.Zero : eta * incident - (eta * dot + MathF.Sqrt(k)) * normal;
+    }
+
+    private static Vector2 MoveTowardsScalar(Vector2 current, Vector2 target, float maxDistanceDelta)
+    {
+        var toTarget = target - current;
+        var distance = toTarget.Length();
+        if (distance <= maxDistanceDelta || distance == 0f)
+        {
+            return target;
+        }
+
+        return current + toTarget / distance * maxDistanceDelta;
+    }
+}
+
+internal sealed class SerialVector3Operation : ISpanVectorOperations<Vector3>
+{
+    public bool Supported => true;
+
+    public void Dot(Span<Vector3> left, Span<Vector3> right, Span<Vector3> result)
+    {
+        for (var i = 0; i < result.Length; i++)
+        {
+            var dot = Vector3.Dot(left[i], right[i]);
+            result[i] = new Vector3(dot, dot, dot);
+        }
+    }
+
+    public void Cross(Span<Vector3> left, Span<Vector3> right, Span<Vector3> result)
+    {
+        for (var i = 0; i < result.Length; i++)
+        {
+            result[i] = Vector3.Cross(left[i], right[i]);
+        }
+    }
+
+    public void Normalize(Span<Vector3> src, Span<Vector3> result)
+    {
+        for (var i = 0; i < result.Length; i++)
+        {
+            result[i] = Vector3.Normalize(src[i]);
+        }
+    }
+
+    public void Length(Span<Vector3> src, Span<float> result)
+    {
+        LengthSquared(src, result);
+        for (var i = 0; i < result.Length; i++)
+        {
+            result[i] = MathF.Sqrt(result[i]);
+        }
+    }
+
+    public void LengthSquared(Span<Vector3> src, Span<float> result)
+    {
+        for (var i = 0; i < result.Length; i++)
+        {
+            result[i] = src[i].LengthSquared();
+        }
+    }
+
+    public void Distance(Span<Vector3> left, Span<Vector3> right, Span<float> result)
+    {
+        DistanceSquared(left, right, result);
+        for (var i = 0; i < result.Length; i++)
+        {
+            result[i] = MathF.Sqrt(result[i]);
+        }
+    }
+
+    public void DistanceSquared(Span<Vector3> left, Span<Vector3> right, Span<float> result)
+    {
+        for (var i = 0; i < result.Length; i++)
+        {
+            result[i] = Vector3.DistanceSquared(left[i], right[i]);
+        }
+    }
+
+    public void Angle(Span<Vector3> left, Span<Vector3> right, Span<float> result)
+    {
+        for (var i = 0; i < result.Length; i++)
+        {
+            var l = left[i];
+            var r = right[i];
+            var denominator = l.Length() * r.Length();
+            result[i] = denominator <= 0f ? 0f : MathF.Acos(Math.Clamp(Vector3.Dot(l, r) / denominator, -1f, 1f));
+        }
+    }
+
+    public void Reflect(Span<Vector3> src, Span<Vector3> normal, Span<Vector3> result)
+    {
+        for (var i = 0; i < result.Length; i++)
+        {
+            result[i] = Vector3.Reflect(src[i], normal[i]);
+        }
+    }
+
+    public void Refract(Span<Vector3> src, Span<Vector3> normal, Vector3 eta, Span<Vector3> result)
+    {
+        var etaRatio = eta.X;
+        for (var i = 0; i < result.Length; i++)
+        {
+            result[i] = RefractScalar(src[i], normal[i], etaRatio);
+        }
+    }
+
+    public void FaceForward(Span<Vector3> src, Span<Vector3> normal, Span<float> incident, Span<Vector3> result)
+    {
+        for (var i = 0; i < result.Length; i++)
+        {
+            result[i] = incident[i] < 0f ? src[i] : -src[i];
+        }
+    }
+
+    public void FaceForward(Span<Vector3> src, Span<Vector3> normal, Span<Vector3> result)
+    {
+        for (var i = 0; i < result.Length; i++)
+        {
+            result[i] = Vector3.Dot(normal[i], src[i]) < 0f ? src[i] : -src[i];
+        }
+    }
+
+    public void MoveTowards(Span<Vector3> src, Span<Vector3> target, Span<float> maxDistanceDelta, Span<Vector3> result)
+    {
+        for (var i = 0; i < result.Length; i++)
+        {
+            result[i] = MoveTowardsScalar(src[i], target[i], maxDistanceDelta[i]);
+        }
+    }
+
+    private static Vector3 RefractScalar(Vector3 incident, Vector3 normal, float eta)
+    {
+        var dot = Vector3.Dot(normal, incident);
+        var k = 1f - eta * eta * (1f - dot * dot);
+        return k < 0f ? Vector3.Zero : eta * incident - (eta * dot + MathF.Sqrt(k)) * normal;
+    }
+
+    private static Vector3 MoveTowardsScalar(Vector3 current, Vector3 target, float maxDistanceDelta)
+    {
+        var toTarget = target - current;
+        var distance = toTarget.Length();
+        if (distance <= maxDistanceDelta || distance == 0f)
+        {
+            return target;
+        }
+
+        return current + toTarget / distance * maxDistanceDelta;
+    }
+}
+
+internal sealed class SerialVector4Operation : ISpanVectorOperations<Vector4>
+{
+    public bool Supported => true;
+
+    public void Dot(Span<Vector4> left, Span<Vector4> right, Span<Vector4> result)
+    {
+        for (var i = 0; i < result.Length; i++)
+        {
+            var dot = Vector4.Dot(left[i], right[i]);
+            result[i] = new Vector4(dot, dot, dot, dot);
+        }
+    }
+
+    public void Cross(Span<Vector4> left, Span<Vector4> right, Span<Vector4> result)
+    {
+        for (var i = 0; i < result.Length; i++)
+        {
+            result[i] = CrossScalar(left[i], right[i]);
+        }
+    }
+
+    public void Normalize(Span<Vector4> src, Span<Vector4> result)
+    {
+        for (var i = 0; i < result.Length; i++)
+        {
+            result[i] = Vector4.Normalize(src[i]);
+        }
+    }
+
+    public void Length(Span<Vector4> src, Span<float> result)
+    {
+        LengthSquared(src, result);
+        for (var i = 0; i < result.Length; i++)
+        {
+            result[i] = MathF.Sqrt(result[i]);
+        }
+    }
+
+    public void LengthSquared(Span<Vector4> src, Span<float> result)
+    {
+        for (var i = 0; i < result.Length; i++)
+        {
+            result[i] = src[i].LengthSquared();
+        }
+    }
+
+    public void Distance(Span<Vector4> left, Span<Vector4> right, Span<float> result)
+    {
+        DistanceSquared(left, right, result);
+        for (var i = 0; i < result.Length; i++)
+        {
+            result[i] = MathF.Sqrt(result[i]);
+        }
+    }
+
+    public void DistanceSquared(Span<Vector4> left, Span<Vector4> right, Span<float> result)
+    {
+        for (var i = 0; i < result.Length; i++)
+        {
+            result[i] = Vector4.DistanceSquared(left[i], right[i]);
+        }
+    }
+
+    public void Angle(Span<Vector4> left, Span<Vector4> right, Span<float> result)
+    {
+        for (var i = 0; i < result.Length; i++)
+        {
+            var l = left[i];
+            var r = right[i];
+            var denominator = l.Length() * r.Length();
+            result[i] = denominator <= 0f ? 0f : MathF.Acos(Math.Clamp(Vector4.Dot(l, r) / denominator, -1f, 1f));
+        }
+    }
+
+    public void Reflect(Span<Vector4> src, Span<Vector4> normal, Span<Vector4> result)
+    {
+        for (var i = 0; i < result.Length; i++)
+        {
+            result[i] = ReflectScalar(src[i], normal[i]);
+        }
+    }
+
+    public void Refract(Span<Vector4> src, Span<Vector4> normal, Vector4 eta, Span<Vector4> result)
+    {
+        var etaRatio = eta.X;
+        for (var i = 0; i < result.Length; i++)
+        {
+            result[i] = RefractScalar(src[i], normal[i], etaRatio);
+        }
+    }
+
+    public void FaceForward(Span<Vector4> src, Span<Vector4> normal, Span<float> incident, Span<Vector4> result)
+    {
+        for (var i = 0; i < result.Length; i++)
+        {
+            result[i] = incident[i] < 0f ? src[i] : -src[i];
+        }
+    }
+
+    public void FaceForward(Span<Vector4> src, Span<Vector4> normal, Span<Vector4> result)
+    {
+        for (var i = 0; i < result.Length; i++)
+        {
+            result[i] = Vector4.Dot(normal[i], src[i]) < 0f ? src[i] : -src[i];
+        }
+    }
+
+    public void MoveTowards(Span<Vector4> src, Span<Vector4> target, Span<float> maxDistanceDelta, Span<Vector4> result)
+    {
+        for (var i = 0; i < result.Length; i++)
+        {
+            result[i] = MoveTowardsScalar(src[i], target[i], maxDistanceDelta[i]);
+        }
+    }
+
+    private static Vector4 CrossScalar(Vector4 left, Vector4 right)
+    {
+        return new Vector4(
+            left.Y * right.Z - left.Z * right.Y,
+            left.Z * right.X - left.X * right.Z,
+            left.X * right.Y - left.Y * right.X,
+            0f);
+    }
+
+    private static Vector4 ReflectScalar(Vector4 src, Vector4 normal)
+    {
+        var dot = Vector4.Dot(src, normal);
+        return src - normal * (2f * dot);
+    }
+
+    private static Vector4 RefractScalar(Vector4 incident, Vector4 normal, float eta)
+    {
+        var dot = Vector4.Dot(normal, incident);
+        var k = 1f - eta * eta * (1f - dot * dot);
+        return k < 0f ? Vector4.Zero : eta * incident - (eta * dot + MathF.Sqrt(k)) * normal;
+    }
+
+    private static Vector4 MoveTowardsScalar(Vector4 current, Vector4 target, float maxDistanceDelta)
+    {
+        var toTarget = target - current;
+        var distance = toTarget.Length();
+        if (distance <= maxDistanceDelta || distance == 0f)
+        {
+            return target;
+        }
+
+        return current + toTarget / distance * maxDistanceDelta;
     }
 }

@@ -165,7 +165,39 @@ public class EntityRepository : IEntityQuery, IEntityCommand
         return removedCount;
     }
 
-    /// <inheritdoc />
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public EntityRecord Get(int index) => m_Entities[index];
+     /// <inheritdoc />
+     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+     public EntityRecord Get(int index) => m_Entities[index];
+
+     /// <summary>
+     /// Deletes the entity if its version matches the currently stored version.
+     /// </summary>
+     public bool Delete(Entity entity)
+     {
+         if (!Contains(entity.Index))
+         {
+             return false;
+         }
+
+         // Check version match
+         if (m_Entities[entity.Index].Entity.Version != entity.Version)
+         {
+             return false;
+         }
+
+         return Delete(entity.Index);
+     }
+
+     /// <summary>
+     /// Updates a single component of the entity if its version matches the currently stored version.
+     /// </summary>
+     public void Update<T1>(Entity entity, T1 component1) where T1 : unmanaged
+     {
+         if (!Contains(entity.Index) || m_Entities[entity.Index].Entity.Version != entity.Version)
+         {
+             throw new InvalidOperationException($"Entity handle is stale or invalid. Expected version {entity.Version} at index {entity.Index}, but found {(Contains(entity.Index) ? m_Entities[entity.Index].Entity.Version : "invalid")}.");
+         }
+
+         Update(entity.Index, component1);
+     }
 }

@@ -1,4 +1,6 @@
-﻿namespace Gubbins.Enhance;
+﻿using System.Numerics;
+
+namespace Gubbins.Enhance;
 
 /// <summary>
 /// Parallel span operation.
@@ -1168,5 +1170,620 @@ internal sealed class ParallelDoubleOperation : ISpanRealOperations<double>
                 Parallel.For(0, result.Length, i => { to[i] = Math.Atanh(from[i]); });
             }
         }
+    }
+}
+
+internal sealed class ParallelVector2Operation : ISpanVectorOperations<Vector2>
+{
+    public bool Supported => true;
+
+    public unsafe void Dot(Span<Vector2> left, Span<Vector2> right, Span<Vector2> result)
+    {
+        fixed (Vector2* pl = left)
+        fixed (Vector2* pr = right)
+        fixed (Vector2* dest = result)
+        {
+            var l = pl;
+            var r = pr;
+            var to = dest;
+            Parallel.For(0, result.Length, i =>
+            {
+                var dot = Vector2.Dot(l[i], r[i]);
+                to[i] = new Vector2(dot, dot);
+            });
+        }
+    }
+
+    public unsafe void Cross(Span<Vector2> left, Span<Vector2> right, Span<Vector2> result)
+    {
+        fixed (Vector2* pl = left)
+        fixed (Vector2* pr = right)
+        fixed (Vector2* dest = result)
+        {
+            var l = pl;
+            var r = pr;
+            var to = dest;
+            Parallel.For(0, result.Length, i =>
+            {
+                var lv = l[i];
+                var rv = r[i];
+                var cross = lv.X * rv.Y - lv.Y * rv.X;
+                to[i] = new Vector2(cross, cross);
+            });
+        }
+    }
+
+    public unsafe void Normalize(Span<Vector2> src, Span<Vector2> result)
+    {
+        fixed (Vector2* ps = src)
+        fixed (Vector2* dest = result)
+        {
+            var s = ps;
+            var to = dest;
+            Parallel.For(0, result.Length, i => to[i] = Vector2.Normalize(s[i]));
+        }
+    }
+
+    public unsafe void Length(Span<Vector2> src, Span<float> result)
+    {
+        LengthSquared(src, result);
+
+        fixed (float* pr = result)
+        {
+            var values = pr;
+            Parallel.For(0, result.Length, i => values[i] = MathF.Sqrt(values[i]));
+        }
+    }
+
+    public unsafe void LengthSquared(Span<Vector2> src, Span<float> result)
+    {
+        fixed (Vector2* ps = src)
+        fixed (float* dest = result)
+        {
+            var s = ps;
+            var to = dest;
+            Parallel.For(0, result.Length, i => to[i] = s[i].LengthSquared());
+        }
+    }
+
+    public unsafe void Distance(Span<Vector2> left, Span<Vector2> right, Span<float> result)
+    {
+        DistanceSquared(left, right, result);
+
+        fixed (float* pr = result)
+        {
+            var values = pr;
+            Parallel.For(0, result.Length, i => values[i] = MathF.Sqrt(values[i]));
+        }
+    }
+
+    public unsafe void DistanceSquared(Span<Vector2> left, Span<Vector2> right, Span<float> result)
+    {
+        fixed (Vector2* pl = left)
+        fixed (Vector2* pr = right)
+        fixed (float* dest = result)
+        {
+            var l = pl;
+            var r = pr;
+            var to = dest;
+            Parallel.For(0, result.Length, i => to[i] = Vector2.DistanceSquared(l[i], r[i]));
+        }
+    }
+
+    public unsafe void Angle(Span<Vector2> left, Span<Vector2> right, Span<float> result)
+    {
+        fixed (Vector2* pl = left)
+        fixed (Vector2* pr = right)
+        fixed (float* dest = result)
+        {
+            var l = pl;
+            var r = pr;
+            var to = dest;
+            Parallel.For(0, result.Length, i =>
+            {
+                var lv = l[i];
+                var rv = r[i];
+                var denominator = lv.Length() * rv.Length();
+                to[i] = denominator <= 0f ? 0f : MathF.Acos(Math.Clamp(Vector2.Dot(lv, rv) / denominator, -1f, 1f));
+            });
+        }
+    }
+
+    public unsafe void Reflect(Span<Vector2> src, Span<Vector2> normal, Span<Vector2> result)
+    {
+        fixed (Vector2* ps = src)
+        fixed (Vector2* pn = normal)
+        fixed (Vector2* dest = result)
+        {
+            var s = ps;
+            var n = pn;
+            var to = dest;
+            Parallel.For(0, result.Length, i => to[i] = Vector2.Reflect(s[i], n[i]));
+        }
+    }
+
+    public unsafe void Refract(Span<Vector2> src, Span<Vector2> normal, Vector2 eta, Span<Vector2> result)
+    {
+        fixed (Vector2* ps = src)
+        fixed (Vector2* pn = normal)
+        fixed (Vector2* dest = result)
+        {
+            var s = ps;
+            var n = pn;
+            var to = dest;
+            var etaRatio = eta.X;
+            Parallel.For(0, result.Length, i => to[i] = RefractScalar(s[i], n[i], etaRatio));
+        }
+    }
+
+    public unsafe void FaceForward(Span<Vector2> src, Span<Vector2> normal, Span<float> incident, Span<Vector2> result)
+    {
+        fixed (Vector2* ps = src)
+        fixed (float* pi = incident)
+        fixed (Vector2* dest = result)
+        {
+            var s = ps;
+            var inc = pi;
+            var to = dest;
+            Parallel.For(0, result.Length, i => to[i] = inc[i] < 0f ? s[i] : -s[i]);
+        }
+    }
+
+    public unsafe void FaceForward(Span<Vector2> src, Span<Vector2> normal, Span<Vector2> result)
+    {
+        fixed (Vector2* ps = src)
+        fixed (Vector2* pn = normal)
+        fixed (Vector2* dest = result)
+        {
+            var s = ps;
+            var n = pn;
+            var to = dest;
+            Parallel.For(0, result.Length, i => to[i] = Vector2.Dot(n[i], s[i]) < 0f ? s[i] : -s[i]);
+        }
+    }
+
+    public unsafe void MoveTowards(Span<Vector2> src, Span<Vector2> target, Span<float> maxDistanceDelta, Span<Vector2> result)
+    {
+        fixed (Vector2* ps = src)
+        fixed (Vector2* pt = target)
+        fixed (float* pd = maxDistanceDelta)
+        fixed (Vector2* dest = result)
+        {
+            var s = ps;
+            var t = pt;
+            var d = pd;
+            var to = dest;
+            Parallel.For(0, result.Length, i => to[i] = MoveTowardsScalar(s[i], t[i], d[i]));
+        }
+    }
+
+    private static Vector2 RefractScalar(Vector2 incident, Vector2 normal, float eta)
+    {
+        var dot = Vector2.Dot(normal, incident);
+        var k = 1f - eta * eta * (1f - dot * dot);
+        return k < 0f ? Vector2.Zero : eta * incident - (eta * dot + MathF.Sqrt(k)) * normal;
+    }
+
+    private static Vector2 MoveTowardsScalar(Vector2 current, Vector2 target, float maxDistanceDelta)
+    {
+        var toTarget = target - current;
+        var distance = toTarget.Length();
+        if (distance <= maxDistanceDelta || distance == 0f)
+        {
+            return target;
+        }
+
+        return current + toTarget / distance * maxDistanceDelta;
+    }
+}
+
+internal sealed class ParallelVector3Operation : ISpanVectorOperations<Vector3>
+{
+    public bool Supported => true;
+
+    public unsafe void Dot(Span<Vector3> left, Span<Vector3> right, Span<Vector3> result)
+    {
+        fixed (Vector3* pl = left)
+        fixed (Vector3* pr = right)
+        fixed (Vector3* dest = result)
+        {
+            var l = pl;
+            var r = pr;
+            var to = dest;
+            Parallel.For(0, result.Length, i =>
+            {
+                var dot = Vector3.Dot(l[i], r[i]);
+                to[i] = new Vector3(dot, dot, dot);
+            });
+        }
+    }
+
+    public unsafe void Cross(Span<Vector3> left, Span<Vector3> right, Span<Vector3> result)
+    {
+        fixed (Vector3* pl = left)
+        fixed (Vector3* pr = right)
+        fixed (Vector3* dest = result)
+        {
+            var l = pl;
+            var r = pr;
+            var to = dest;
+            Parallel.For(0, result.Length, i => to[i] = Vector3.Cross(l[i], r[i]));
+        }
+    }
+
+    public unsafe void Normalize(Span<Vector3> src, Span<Vector3> result)
+    {
+        fixed (Vector3* ps = src)
+        fixed (Vector3* dest = result)
+        {
+            var s = ps;
+            var to = dest;
+            Parallel.For(0, result.Length, i => to[i] = Vector3.Normalize(s[i]));
+        }
+    }
+
+    public unsafe void Length(Span<Vector3> src, Span<float> result)
+    {
+        LengthSquared(src, result);
+
+        fixed (float* pr = result)
+        {
+            var values = pr;
+            Parallel.For(0, result.Length, i => values[i] = MathF.Sqrt(values[i]));
+        }
+    }
+
+    public unsafe void LengthSquared(Span<Vector3> src, Span<float> result)
+    {
+        fixed (Vector3* ps = src)
+        fixed (float* dest = result)
+        {
+            var s = ps;
+            var to = dest;
+            Parallel.For(0, result.Length, i => to[i] = s[i].LengthSquared());
+        }
+    }
+
+    public unsafe void Distance(Span<Vector3> left, Span<Vector3> right, Span<float> result)
+    {
+        DistanceSquared(left, right, result);
+
+        fixed (float* pr = result)
+        {
+            var values = pr;
+            Parallel.For(0, result.Length, i => values[i] = MathF.Sqrt(values[i]));
+        }
+    }
+
+    public unsafe void DistanceSquared(Span<Vector3> left, Span<Vector3> right, Span<float> result)
+    {
+        fixed (Vector3* pl = left)
+        fixed (Vector3* pr = right)
+        fixed (float* dest = result)
+        {
+            var l = pl;
+            var r = pr;
+            var to = dest;
+            Parallel.For(0, result.Length, i => to[i] = Vector3.DistanceSquared(l[i], r[i]));
+        }
+    }
+
+    public unsafe void Angle(Span<Vector3> left, Span<Vector3> right, Span<float> result)
+    {
+        fixed (Vector3* pl = left)
+        fixed (Vector3* pr = right)
+        fixed (float* dest = result)
+        {
+            var l = pl;
+            var r = pr;
+            var to = dest;
+            Parallel.For(0, result.Length, i =>
+            {
+                var lv = l[i];
+                var rv = r[i];
+                var denominator = lv.Length() * rv.Length();
+                to[i] = denominator <= 0f ? 0f : MathF.Acos(Math.Clamp(Vector3.Dot(lv, rv) / denominator, -1f, 1f));
+            });
+        }
+    }
+
+    public unsafe void Reflect(Span<Vector3> src, Span<Vector3> normal, Span<Vector3> result)
+    {
+        fixed (Vector3* ps = src)
+        fixed (Vector3* pn = normal)
+        fixed (Vector3* dest = result)
+        {
+            var s = ps;
+            var n = pn;
+            var to = dest;
+            Parallel.For(0, result.Length, i => to[i] = Vector3.Reflect(s[i], n[i]));
+        }
+    }
+
+    public unsafe void Refract(Span<Vector3> src, Span<Vector3> normal, Vector3 eta, Span<Vector3> result)
+    {
+        fixed (Vector3* ps = src)
+        fixed (Vector3* pn = normal)
+        fixed (Vector3* dest = result)
+        {
+            var s = ps;
+            var n = pn;
+            var to = dest;
+            var etaRatio = eta.X;
+            Parallel.For(0, result.Length, i => to[i] = RefractScalar(s[i], n[i], etaRatio));
+        }
+    }
+
+    public unsafe void FaceForward(Span<Vector3> src, Span<Vector3> normal, Span<float> incident, Span<Vector3> result)
+    {
+        fixed (Vector3* ps = src)
+        fixed (float* pi = incident)
+        fixed (Vector3* dest = result)
+        {
+            var s = ps;
+            var inc = pi;
+            var to = dest;
+            Parallel.For(0, result.Length, i => to[i] = inc[i] < 0f ? s[i] : -s[i]);
+        }
+    }
+
+    public unsafe void FaceForward(Span<Vector3> src, Span<Vector3> normal, Span<Vector3> result)
+    {
+        fixed (Vector3* ps = src)
+        fixed (Vector3* pn = normal)
+        fixed (Vector3* dest = result)
+        {
+            var s = ps;
+            var n = pn;
+            var to = dest;
+            Parallel.For(0, result.Length, i => to[i] = Vector3.Dot(n[i], s[i]) < 0f ? s[i] : -s[i]);
+        }
+    }
+
+    public unsafe void MoveTowards(Span<Vector3> src, Span<Vector3> target, Span<float> maxDistanceDelta, Span<Vector3> result)
+    {
+        fixed (Vector3* ps = src)
+        fixed (Vector3* pt = target)
+        fixed (float* pd = maxDistanceDelta)
+        fixed (Vector3* dest = result)
+        {
+            var s = ps;
+            var t = pt;
+            var d = pd;
+            var to = dest;
+            Parallel.For(0, result.Length, i => to[i] = MoveTowardsScalar(s[i], t[i], d[i]));
+        }
+    }
+
+    private static Vector3 RefractScalar(Vector3 incident, Vector3 normal, float eta)
+    {
+        var dot = Vector3.Dot(normal, incident);
+        var k = 1f - eta * eta * (1f - dot * dot);
+        return k < 0f ? Vector3.Zero : eta * incident - (eta * dot + MathF.Sqrt(k)) * normal;
+    }
+
+    private static Vector3 MoveTowardsScalar(Vector3 current, Vector3 target, float maxDistanceDelta)
+    {
+        var toTarget = target - current;
+        var distance = toTarget.Length();
+        if (distance <= maxDistanceDelta || distance == 0f)
+        {
+            return target;
+        }
+
+        return current + toTarget / distance * maxDistanceDelta;
+    }
+}
+
+internal sealed class ParallelVector4Operation : ISpanVectorOperations<Vector4>
+{
+    public bool Supported => true;
+
+    public unsafe void Dot(Span<Vector4> left, Span<Vector4> right, Span<Vector4> result)
+    {
+        fixed (Vector4* pl = left)
+        fixed (Vector4* pr = right)
+        fixed (Vector4* dest = result)
+        {
+            var l = pl;
+            var r = pr;
+            var to = dest;
+            Parallel.For(0, result.Length, i =>
+            {
+                var dot = Vector4.Dot(l[i], r[i]);
+                to[i] = new Vector4(dot, dot, dot, dot);
+            });
+        }
+    }
+
+    public unsafe void Cross(Span<Vector4> left, Span<Vector4> right, Span<Vector4> result)
+    {
+        fixed (Vector4* pl = left)
+        fixed (Vector4* pr = right)
+        fixed (Vector4* dest = result)
+        {
+            var l = pl;
+            var r = pr;
+            var to = dest;
+            Parallel.For(0, result.Length, i => to[i] = CrossScalar(l[i], r[i]));
+        }
+    }
+
+    public unsafe void Normalize(Span<Vector4> src, Span<Vector4> result)
+    {
+        fixed (Vector4* ps = src)
+        fixed (Vector4* dest = result)
+        {
+            var s = ps;
+            var to = dest;
+            Parallel.For(0, result.Length, i => to[i] = Vector4.Normalize(s[i]));
+        }
+    }
+
+    public unsafe void Length(Span<Vector4> src, Span<float> result)
+    {
+        LengthSquared(src, result);
+
+        fixed (float* pr = result)
+        {
+            var values = pr;
+            Parallel.For(0, result.Length, i => values[i] = MathF.Sqrt(values[i]));
+        }
+    }
+
+    public unsafe void LengthSquared(Span<Vector4> src, Span<float> result)
+    {
+        fixed (Vector4* ps = src)
+        fixed (float* dest = result)
+        {
+            var s = ps;
+            var to = dest;
+            Parallel.For(0, result.Length, i => to[i] = s[i].LengthSquared());
+        }
+    }
+
+    public unsafe void Distance(Span<Vector4> left, Span<Vector4> right, Span<float> result)
+    {
+        DistanceSquared(left, right, result);
+
+        fixed (float* pr = result)
+        {
+            var values = pr;
+            Parallel.For(0, result.Length, i => values[i] = MathF.Sqrt(values[i]));
+        }
+    }
+
+    public unsafe void DistanceSquared(Span<Vector4> left, Span<Vector4> right, Span<float> result)
+    {
+        fixed (Vector4* pl = left)
+        fixed (Vector4* pr = right)
+        fixed (float* dest = result)
+        {
+            var l = pl;
+            var r = pr;
+            var to = dest;
+            Parallel.For(0, result.Length, i => to[i] = Vector4.DistanceSquared(l[i], r[i]));
+        }
+    }
+
+    public unsafe void Angle(Span<Vector4> left, Span<Vector4> right, Span<float> result)
+    {
+        fixed (Vector4* pl = left)
+        fixed (Vector4* pr = right)
+        fixed (float* dest = result)
+        {
+            var l = pl;
+            var r = pr;
+            var to = dest;
+            Parallel.For(0, result.Length, i =>
+            {
+                var lv = l[i];
+                var rv = r[i];
+                var denominator = lv.Length() * rv.Length();
+                to[i] = denominator <= 0f ? 0f : MathF.Acos(Math.Clamp(Vector4.Dot(lv, rv) / denominator, -1f, 1f));
+            });
+        }
+    }
+
+    public unsafe void Reflect(Span<Vector4> src, Span<Vector4> normal, Span<Vector4> result)
+    {
+        fixed (Vector4* ps = src)
+        fixed (Vector4* pn = normal)
+        fixed (Vector4* dest = result)
+        {
+            var s = ps;
+            var n = pn;
+            var to = dest;
+            Parallel.For(0, result.Length, i => to[i] = ReflectScalar(s[i], n[i]));
+        }
+    }
+
+    public unsafe void Refract(Span<Vector4> src, Span<Vector4> normal, Vector4 eta, Span<Vector4> result)
+    {
+        fixed (Vector4* ps = src)
+        fixed (Vector4* pn = normal)
+        fixed (Vector4* dest = result)
+        {
+            var s = ps;
+            var n = pn;
+            var to = dest;
+            var etaRatio = eta.X;
+            Parallel.For(0, result.Length, i => to[i] = RefractScalar(s[i], n[i], etaRatio));
+        }
+    }
+
+    public unsafe void FaceForward(Span<Vector4> src, Span<Vector4> normal, Span<float> incident, Span<Vector4> result)
+    {
+        fixed (Vector4* ps = src)
+        fixed (float* pi = incident)
+        fixed (Vector4* dest = result)
+        {
+            var s = ps;
+            var inc = pi;
+            var to = dest;
+            Parallel.For(0, result.Length, i => to[i] = inc[i] < 0f ? s[i] : -s[i]);
+        }
+    }
+
+    public unsafe void FaceForward(Span<Vector4> src, Span<Vector4> normal, Span<Vector4> result)
+    {
+        fixed (Vector4* ps = src)
+        fixed (Vector4* pn = normal)
+        fixed (Vector4* dest = result)
+        {
+            var s = ps;
+            var n = pn;
+            var to = dest;
+            Parallel.For(0, result.Length, i => to[i] = Vector4.Dot(n[i], s[i]) < 0f ? s[i] : -s[i]);
+        }
+    }
+
+    public unsafe void MoveTowards(Span<Vector4> src, Span<Vector4> target, Span<float> maxDistanceDelta, Span<Vector4> result)
+    {
+        fixed (Vector4* ps = src)
+        fixed (Vector4* pt = target)
+        fixed (float* pd = maxDistanceDelta)
+        fixed (Vector4* dest = result)
+        {
+            var s = ps;
+            var t = pt;
+            var d = pd;
+            var to = dest;
+            Parallel.For(0, result.Length, i => to[i] = MoveTowardsScalar(s[i], t[i], d[i]));
+        }
+    }
+
+    private static Vector4 CrossScalar(Vector4 left, Vector4 right)
+    {
+        return new Vector4(
+            left.Y * right.Z - left.Z * right.Y,
+            left.Z * right.X - left.X * right.Z,
+            left.X * right.Y - left.Y * right.X,
+            0f);
+    }
+
+    private static Vector4 ReflectScalar(Vector4 src, Vector4 normal)
+    {
+        var dot = Vector4.Dot(src, normal);
+        return src - normal * (2f * dot);
+    }
+
+    private static Vector4 RefractScalar(Vector4 incident, Vector4 normal, float eta)
+    {
+        var dot = Vector4.Dot(normal, incident);
+        var k = 1f - eta * eta * (1f - dot * dot);
+        return k < 0f ? Vector4.Zero : eta * incident - (eta * dot + MathF.Sqrt(k)) * normal;
+    }
+
+    private static Vector4 MoveTowardsScalar(Vector4 current, Vector4 target, float maxDistanceDelta)
+    {
+        var toTarget = target - current;
+        var distance = toTarget.Length();
+        if (distance <= maxDistanceDelta || distance == 0f)
+        {
+            return target;
+        }
+
+        return current + toTarget / distance * maxDistanceDelta;
     }
 }

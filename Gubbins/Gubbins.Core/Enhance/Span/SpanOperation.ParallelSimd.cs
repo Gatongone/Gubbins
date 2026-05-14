@@ -343,8 +343,6 @@ internal sealed class ParallelSimdIntOperation : ISpanShiftLeft<int>, ISpanShift
     /// <inheritdoc />
     public bool Supported => Vector.IsHardwareAccelerated;
 
-   
-
     private static readonly int s_VectorSize = Vector<int>.Count;
 
     /// <inheritdoc />
@@ -441,8 +439,6 @@ internal sealed class ParallelSimdLongOperation : ISpanShiftLeft<long>, ISpanShi
 {
     /// <inheritdoc />
     public bool Supported => Vector.IsHardwareAccelerated;
-
-   
 
     private static readonly int s_VectorSize = Vector<long>.Count;
 
@@ -541,8 +537,6 @@ internal sealed class ParallelSimdUintOperation : ISpanShiftLeft<uint>, ISpanShi
     /// <inheritdoc />
     public bool Supported => Vector.IsHardwareAccelerated;
 
-   
-
     private static readonly int s_VectorSize = Vector<uint>.Count;
 
     /// <inheritdoc />
@@ -639,8 +633,6 @@ internal sealed class ParallelSimdUlongOperation : ISpanShiftLeft<ulong>, ISpanS
 {
     /// <inheritdoc />
     public bool Supported => Vector.IsHardwareAccelerated;
-
-   
 
     private static readonly int s_VectorSize = Vector<ulong>.Count;
 
@@ -3143,6 +3135,573 @@ internal sealed class ParallelSimdDoubleOperation : ISpanRealOperations<double>
                     });
                 }
             }
+        }
+    }
+}
+
+internal sealed class ParallelSimdVectorOperation : ISpanVectorOperations<Vector2>
+{
+    public bool Supported => Vector.IsHardwareAccelerated;
+    private static readonly SimdVectorOperation s_Simd = new();
+
+    private enum BinaryVecOp
+    {
+        Dot,
+        Cross,
+        Reflect,
+        FaceForwardNormal
+    }
+
+    private enum UnaryVecOp
+    {
+        Normalize
+    }
+
+    private enum UnaryScalarOp
+    {
+        Length,
+        LengthSquared
+    }
+
+    private enum BinaryScalarOp
+    {
+        Distance,
+        DistanceSquared,
+        Angle
+    }
+
+    private static void ParallelChunks(int length, Action<int, int> body)
+    {
+        if (length <= 0) return;
+        var workers = Math.Min(Environment.ProcessorCount, length);
+        var chunkSize = (length + workers - 1) / workers;
+        Parallel.For(0, workers, worker =>
+        {
+            var start = worker * chunkSize;
+            if (start >= length) return;
+            var end = Math.Min(start + chunkSize, length);
+            body(start, end - start);
+        });
+    }
+
+    private static unsafe void RunBinary(Span<Vector2> left, Span<Vector2> right, Span<Vector2> result, BinaryVecOp op)
+    {
+        fixed (Vector2* pl = left)
+        fixed (Vector2* pr = right)
+        fixed (Vector2* pd = result)
+        {
+            var l = pl;
+            var r = pr;
+            var d = pd;
+            ParallelChunks(result.Length, (start, len) =>
+            {
+                var sl = new Span<Vector2>(l + start, len);
+                var sr = new Span<Vector2>(r + start, len);
+                var sd = new Span<Vector2>(d + start, len);
+                switch (op)
+                {
+                    case BinaryVecOp.Dot:               s_Simd.Dot(sl, sr, sd); break;
+                    case BinaryVecOp.Cross:             s_Simd.Cross(sl, sr, sd); break;
+                    case BinaryVecOp.Reflect:           s_Simd.Reflect(sl, sr, sd); break;
+                    case BinaryVecOp.FaceForwardNormal: s_Simd.FaceForward(sl, sr, sd); break;
+                }
+            });
+        }
+    }
+
+    private static unsafe void RunUnary(Span<Vector2> src, Span<Vector2> result, UnaryVecOp op)
+    {
+        fixed (Vector2* ps = src)
+        fixed (Vector2* pd = result)
+        {
+            var s = ps;
+            var d = pd;
+            ParallelChunks(result.Length, (start, len) =>
+            {
+                var ss = new Span<Vector2>(s + start, len);
+                var sd = new Span<Vector2>(d + start, len);
+                switch (op)
+                {
+                    case UnaryVecOp.Normalize: s_Simd.Normalize(ss, sd); break;
+                }
+            });
+        }
+    }
+
+    private static unsafe void RunUnaryScalar(Span<Vector2> src, Span<float> result, UnaryScalarOp op)
+    {
+        fixed (Vector2* ps = src)
+        fixed (float* pd = result)
+        {
+            var s = ps;
+            var d = pd;
+            ParallelChunks(result.Length, (start, len) =>
+            {
+                var ss = new Span<Vector2>(s + start, len);
+                var sd = new Span<float>(d + start, len);
+                switch (op)
+                {
+                    case UnaryScalarOp.Length:        s_Simd.Length(ss, sd); break;
+                    case UnaryScalarOp.LengthSquared: s_Simd.LengthSquared(ss, sd); break;
+                }
+            });
+        }
+    }
+
+    private static unsafe void RunBinaryScalar(Span<Vector2> left, Span<Vector2> right, Span<float> result, BinaryScalarOp op)
+    {
+        fixed (Vector2* pl = left)
+        fixed (Vector2* pr = right)
+        fixed (float* pd = result)
+        {
+            var l = pl;
+            var r = pr;
+            var d = pd;
+            ParallelChunks(result.Length, (start, len) =>
+            {
+                var sl = new Span<Vector2>(l + start, len);
+                var sr = new Span<Vector2>(r + start, len);
+                var sd = new Span<float>(d + start, len);
+                switch (op)
+                {
+                    case BinaryScalarOp.Distance:        s_Simd.Distance(sl, sr, sd); break;
+                    case BinaryScalarOp.DistanceSquared: s_Simd.DistanceSquared(sl, sr, sd); break;
+                    case BinaryScalarOp.Angle:           s_Simd.Angle(sl, sr, sd); break;
+                }
+            });
+        }
+    }
+
+    public void Dot(Span<Vector2> left, Span<Vector2> right, Span<Vector2> result) => RunBinary(left, right, result, BinaryVecOp.Dot);
+    public void Cross(Span<Vector2> left, Span<Vector2> right, Span<Vector2> result) => RunBinary(left, right, result, BinaryVecOp.Cross);
+    public void Normalize(Span<Vector2> src, Span<Vector2> result) => RunUnary(src, result, UnaryVecOp.Normalize);
+    public void Length(Span<Vector2> src, Span<float> result) => RunUnaryScalar(src, result, UnaryScalarOp.Length);
+    public void LengthSquared(Span<Vector2> src, Span<float> result) => RunUnaryScalar(src, result, UnaryScalarOp.LengthSquared);
+    public void Distance(Span<Vector2> left, Span<Vector2> right, Span<float> result) => RunBinaryScalar(left, right, result, BinaryScalarOp.Distance);
+    public void DistanceSquared(Span<Vector2> left, Span<Vector2> right, Span<float> result) => RunBinaryScalar(left, right, result, BinaryScalarOp.DistanceSquared);
+    public void Angle(Span<Vector2> left, Span<Vector2> right, Span<float> result) => RunBinaryScalar(left, right, result, BinaryScalarOp.Angle);
+    public void Reflect(Span<Vector2> src, Span<Vector2> normal, Span<Vector2> result) => RunBinary(src, normal, result, BinaryVecOp.Reflect);
+
+    public unsafe void Refract(Span<Vector2> src, Span<Vector2> normal, Vector2 eta, Span<Vector2> result)
+    {
+        fixed (Vector2* ps = src)
+        fixed (Vector2* pn = normal)
+        fixed (Vector2* pd = result)
+        {
+            var s = ps;
+            var n = pn;
+            var d = pd;
+            ParallelChunks(result.Length, (start, len) => s_Simd.Refract(new Span<Vector2>(s + start, len), new Span<Vector2>(n + start, len), eta, new Span<Vector2>(d + start, len)));
+        }
+    }
+
+    public unsafe void FaceForward(Span<Vector2> src, Span<Vector2> normal, Span<float> incident, Span<Vector2> result)
+    {
+        fixed (Vector2* ps = src)
+        fixed (Vector2* pn = normal)
+        fixed (float* pi = incident)
+        fixed (Vector2* pd = result)
+        {
+            var s = ps;
+            var n = pn;
+            var i = pi;
+            var d = pd;
+            ParallelChunks(result.Length, (start, len) => s_Simd.FaceForward(new Span<Vector2>(s + start, len), new Span<Vector2>(n + start, len), new Span<float>(i + start, len), new Span<Vector2>(d + start, len)));
+        }
+    }
+
+    public void FaceForward(Span<Vector2> src, Span<Vector2> normal, Span<Vector2> result) => RunBinary(src, normal, result, BinaryVecOp.FaceForwardNormal);
+
+    public unsafe void MoveTowards(Span<Vector2> src, Span<Vector2> target, Span<float> maxDistanceDelta, Span<Vector2> result)
+    {
+        fixed (Vector2* ps = src)
+        fixed (Vector2* pt = target)
+        fixed (float* pm = maxDistanceDelta)
+        fixed (Vector2* pd = result)
+        {
+            var s = ps;
+            var t = pt;
+            var m = pm;
+            var d = pd;
+            ParallelChunks(result.Length, (start, len) => s_Simd.MoveTowards(new Span<Vector2>(s + start, len), new Span<Vector2>(t + start, len), new Span<float>(m + start, len), new Span<Vector2>(d + start, len)));
+        }
+    }
+}
+
+internal sealed class ParallelSimdVector3Operation : ISpanVectorOperations<Vector3>
+{
+    public bool Supported => Vector.IsHardwareAccelerated;
+    private static readonly SimdVector3Operation s_Simd = new();
+
+    private enum BinaryVecOp
+    {
+        Dot,
+        Cross,
+        Reflect,
+        FaceForwardNormal
+    }
+
+    private enum UnaryVecOp
+    {
+        Normalize
+    }
+
+    private enum UnaryScalarOp
+    {
+        Length,
+        LengthSquared
+    }
+
+    private enum BinaryScalarOp
+    {
+        Distance,
+        DistanceSquared,
+        Angle
+    }
+
+    private static void ParallelChunks(int length, Action<int, int> body)
+    {
+        if (length <= 0) return;
+        var workers = Math.Min(Environment.ProcessorCount, length);
+        var chunkSize = (length + workers - 1) / workers;
+        Parallel.For(0, workers, worker =>
+        {
+            var start = worker * chunkSize;
+            if (start >= length) return;
+            var end = Math.Min(start + chunkSize, length);
+            body(start, end - start);
+        });
+    }
+
+    private static unsafe void RunBinary(Span<Vector3> left, Span<Vector3> right, Span<Vector3> result, BinaryVecOp op)
+    {
+        fixed (Vector3* pl = left)
+        fixed (Vector3* pr = right)
+        fixed (Vector3* pd = result)
+        {
+            var l = pl;
+            var r = pr;
+            var d = pd;
+            ParallelChunks(result.Length, (start, len) =>
+            {
+                var sl = new Span<Vector3>(l + start, len);
+                var sr = new Span<Vector3>(r + start, len);
+                var sd = new Span<Vector3>(d + start, len);
+                switch (op)
+                {
+                    case BinaryVecOp.Dot:               s_Simd.Dot(sl, sr, sd); break;
+                    case BinaryVecOp.Cross:             s_Simd.Cross(sl, sr, sd); break;
+                    case BinaryVecOp.Reflect:           s_Simd.Reflect(sl, sr, sd); break;
+                    case BinaryVecOp.FaceForwardNormal: s_Simd.FaceForward(sl, sr, sd); break;
+                }
+            });
+        }
+    }
+
+    private static unsafe void RunUnary(Span<Vector3> src, Span<Vector3> result, UnaryVecOp op)
+    {
+        fixed (Vector3* ps = src)
+        fixed (Vector3* pd = result)
+        {
+            var s = ps;
+            var d = pd;
+            ParallelChunks(result.Length, (start, len) =>
+            {
+                var ss = new Span<Vector3>(s + start, len);
+                var sd = new Span<Vector3>(d + start, len);
+                switch (op)
+                {
+                    case UnaryVecOp.Normalize: s_Simd.Normalize(ss, sd); break;
+                }
+            });
+        }
+    }
+
+    private static unsafe void RunUnaryScalar(Span<Vector3> src, Span<float> result, UnaryScalarOp op)
+    {
+        fixed (Vector3* ps = src)
+        fixed (float* pd = result)
+        {
+            var s = ps;
+            var d = pd;
+            ParallelChunks(result.Length, (start, len) =>
+            {
+                var ss = new Span<Vector3>(s + start, len);
+                var sd = new Span<float>(d + start, len);
+                switch (op)
+                {
+                    case UnaryScalarOp.Length:        s_Simd.Length(ss, sd); break;
+                    case UnaryScalarOp.LengthSquared: s_Simd.LengthSquared(ss, sd); break;
+                }
+            });
+        }
+    }
+
+    private static unsafe void RunBinaryScalar(Span<Vector3> left, Span<Vector3> right, Span<float> result, BinaryScalarOp op)
+    {
+        fixed (Vector3* pl = left)
+        fixed (Vector3* pr = right)
+        fixed (float* pd = result)
+        {
+            var l = pl;
+            var r = pr;
+            var d = pd;
+            ParallelChunks(result.Length, (start, len) =>
+            {
+                var sl = new Span<Vector3>(l + start, len);
+                var sr = new Span<Vector3>(r + start, len);
+                var sd = new Span<float>(d + start, len);
+                switch (op)
+                {
+                    case BinaryScalarOp.Distance:        s_Simd.Distance(sl, sr, sd); break;
+                    case BinaryScalarOp.DistanceSquared: s_Simd.DistanceSquared(sl, sr, sd); break;
+                    case BinaryScalarOp.Angle:           s_Simd.Angle(sl, sr, sd); break;
+                }
+            });
+        }
+    }
+
+    public void Dot(Span<Vector3> left, Span<Vector3> right, Span<Vector3> result) => RunBinary(left, right, result, BinaryVecOp.Dot);
+    public void Cross(Span<Vector3> left, Span<Vector3> right, Span<Vector3> result) => RunBinary(left, right, result, BinaryVecOp.Cross);
+    public void Normalize(Span<Vector3> src, Span<Vector3> result) => RunUnary(src, result, UnaryVecOp.Normalize);
+    public void Length(Span<Vector3> src, Span<float> result) => RunUnaryScalar(src, result, UnaryScalarOp.Length);
+    public void LengthSquared(Span<Vector3> src, Span<float> result) => RunUnaryScalar(src, result, UnaryScalarOp.LengthSquared);
+    public void Distance(Span<Vector3> left, Span<Vector3> right, Span<float> result) => RunBinaryScalar(left, right, result, BinaryScalarOp.Distance);
+    public void DistanceSquared(Span<Vector3> left, Span<Vector3> right, Span<float> result) => RunBinaryScalar(left, right, result, BinaryScalarOp.DistanceSquared);
+    public void Angle(Span<Vector3> left, Span<Vector3> right, Span<float> result) => RunBinaryScalar(left, right, result, BinaryScalarOp.Angle);
+    public void Reflect(Span<Vector3> src, Span<Vector3> normal, Span<Vector3> result) => RunBinary(src, normal, result, BinaryVecOp.Reflect);
+
+    public unsafe void Refract(Span<Vector3> src, Span<Vector3> normal, Vector3 eta, Span<Vector3> result)
+    {
+        fixed (Vector3* ps = src)
+        fixed (Vector3* pn = normal)
+        fixed (Vector3* pd = result)
+        {
+            var s = ps;
+            var n = pn;
+            var d = pd;
+            ParallelChunks(result.Length, (start, len) => s_Simd.Refract(new Span<Vector3>(s + start, len), new Span<Vector3>(n + start, len), eta, new Span<Vector3>(d + start, len)));
+        }
+    }
+
+    public unsafe void FaceForward(Span<Vector3> src, Span<Vector3> normal, Span<float> incident, Span<Vector3> result)
+    {
+        fixed (Vector3* ps = src)
+        fixed (Vector3* pn = normal)
+        fixed (float* pi = incident)
+        fixed (Vector3* pd = result)
+        {
+            var s = ps;
+            var n = pn;
+            var i = pi;
+            var d = pd;
+            ParallelChunks(result.Length, (start, len) => s_Simd.FaceForward(new Span<Vector3>(s + start, len), new Span<Vector3>(n + start, len), new Span<float>(i + start, len), new Span<Vector3>(d + start, len)));
+        }
+    }
+
+    public void FaceForward(Span<Vector3> src, Span<Vector3> normal, Span<Vector3> result) => RunBinary(src, normal, result, BinaryVecOp.FaceForwardNormal);
+
+    public unsafe void MoveTowards(Span<Vector3> src, Span<Vector3> target, Span<float> maxDistanceDelta, Span<Vector3> result)
+    {
+        fixed (Vector3* ps = src)
+        fixed (Vector3* pt = target)
+        fixed (float* pm = maxDistanceDelta)
+        fixed (Vector3* pd = result)
+        {
+            var s = ps;
+            var t = pt;
+            var m = pm;
+            var d = pd;
+            ParallelChunks(result.Length, (start, len) => s_Simd.MoveTowards(new Span<Vector3>(s + start, len), new Span<Vector3>(t + start, len), new Span<float>(m + start, len), new Span<Vector3>(d + start, len)));
+        }
+    }
+}
+
+internal sealed class ParallelSimdVector4Operation : ISpanVectorOperations<Vector4>
+{
+    public bool Supported => Vector.IsHardwareAccelerated;
+    private static readonly SimdVector4Operation s_Simd = new();
+
+    private enum BinaryVecOp
+    {
+        Dot,
+        Cross,
+        Reflect,
+        FaceForwardNormal
+    }
+
+    private enum UnaryVecOp
+    {
+        Normalize
+    }
+
+    private enum UnaryScalarOp
+    {
+        Length,
+        LengthSquared
+    }
+
+    private enum BinaryScalarOp
+    {
+        Distance,
+        DistanceSquared,
+        Angle
+    }
+
+    private static void ParallelChunks(int length, Action<int, int> body)
+    {
+        if (length <= 0) return;
+        var workers = Math.Min(Environment.ProcessorCount, length);
+        var chunkSize = (length + workers - 1) / workers;
+        Parallel.For(0, workers, worker =>
+        {
+            var start = worker * chunkSize;
+            if (start >= length) return;
+            var end = Math.Min(start + chunkSize, length);
+            body(start, end - start);
+        });
+    }
+
+    private static unsafe void RunBinary(Span<Vector4> left, Span<Vector4> right, Span<Vector4> result, BinaryVecOp op)
+    {
+        fixed (Vector4* pl = left)
+        fixed (Vector4* pr = right)
+        fixed (Vector4* pd = result)
+        {
+            var l = pl;
+            var r = pr;
+            var d = pd;
+            ParallelChunks(result.Length, (start, len) =>
+            {
+                var sl = new Span<Vector4>(l + start, len);
+                var sr = new Span<Vector4>(r + start, len);
+                var sd = new Span<Vector4>(d + start, len);
+                switch (op)
+                {
+                    case BinaryVecOp.Dot:               s_Simd.Dot(sl, sr, sd); break;
+                    case BinaryVecOp.Cross:             s_Simd.Cross(sl, sr, sd); break;
+                    case BinaryVecOp.Reflect:           s_Simd.Reflect(sl, sr, sd); break;
+                    case BinaryVecOp.FaceForwardNormal: s_Simd.FaceForward(sl, sr, sd); break;
+                }
+            });
+        }
+    }
+
+    private static unsafe void RunUnary(Span<Vector4> src, Span<Vector4> result, UnaryVecOp op)
+    {
+        fixed (Vector4* ps = src)
+        fixed (Vector4* pd = result)
+        {
+            var s = ps;
+            var d = pd;
+            ParallelChunks(result.Length, (start, len) =>
+            {
+                var ss = new Span<Vector4>(s + start, len);
+                var sd = new Span<Vector4>(d + start, len);
+                switch (op)
+                {
+                    case UnaryVecOp.Normalize: s_Simd.Normalize(ss, sd); break;
+                }
+            });
+        }
+    }
+
+    private static unsafe void RunUnaryScalar(Span<Vector4> src, Span<float> result, UnaryScalarOp op)
+    {
+        fixed (Vector4* ps = src)
+        fixed (float* pd = result)
+        {
+            var s = ps;
+            var d = pd;
+            ParallelChunks(result.Length, (start, len) =>
+            {
+                var ss = new Span<Vector4>(s + start, len);
+                var sd = new Span<float>(d + start, len);
+                switch (op)
+                {
+                    case UnaryScalarOp.Length:        s_Simd.Length(ss, sd); break;
+                    case UnaryScalarOp.LengthSquared: s_Simd.LengthSquared(ss, sd); break;
+                }
+            });
+        }
+    }
+
+    private static unsafe void RunBinaryScalar(Span<Vector4> left, Span<Vector4> right, Span<float> result, BinaryScalarOp op)
+    {
+        fixed (Vector4* pl = left)
+        fixed (Vector4* pr = right)
+        fixed (float* pd = result)
+        {
+            var l = pl;
+            var r = pr;
+            var d = pd;
+            ParallelChunks(result.Length, (start, len) =>
+            {
+                var sl = new Span<Vector4>(l + start, len);
+                var sr = new Span<Vector4>(r + start, len);
+                var sd = new Span<float>(d + start, len);
+                switch (op)
+                {
+                    case BinaryScalarOp.Distance:        s_Simd.Distance(sl, sr, sd); break;
+                    case BinaryScalarOp.DistanceSquared: s_Simd.DistanceSquared(sl, sr, sd); break;
+                    case BinaryScalarOp.Angle:           s_Simd.Angle(sl, sr, sd); break;
+                }
+            });
+        }
+    }
+
+    public void Dot(Span<Vector4> left, Span<Vector4> right, Span<Vector4> result) => RunBinary(left, right, result, BinaryVecOp.Dot);
+    public void Cross(Span<Vector4> left, Span<Vector4> right, Span<Vector4> result) => RunBinary(left, right, result, BinaryVecOp.Cross);
+    public void Normalize(Span<Vector4> src, Span<Vector4> result) => RunUnary(src, result, UnaryVecOp.Normalize);
+    public void Length(Span<Vector4> src, Span<float> result) => RunUnaryScalar(src, result, UnaryScalarOp.Length);
+    public void LengthSquared(Span<Vector4> src, Span<float> result) => RunUnaryScalar(src, result, UnaryScalarOp.LengthSquared);
+    public void Distance(Span<Vector4> left, Span<Vector4> right, Span<float> result) => RunBinaryScalar(left, right, result, BinaryScalarOp.Distance);
+    public void DistanceSquared(Span<Vector4> left, Span<Vector4> right, Span<float> result) => RunBinaryScalar(left, right, result, BinaryScalarOp.DistanceSquared);
+    public void Angle(Span<Vector4> left, Span<Vector4> right, Span<float> result) => RunBinaryScalar(left, right, result, BinaryScalarOp.Angle);
+    public void Reflect(Span<Vector4> src, Span<Vector4> normal, Span<Vector4> result) => RunBinary(src, normal, result, BinaryVecOp.Reflect);
+
+    public unsafe void Refract(Span<Vector4> src, Span<Vector4> normal, Vector4 eta, Span<Vector4> result)
+    {
+        fixed (Vector4* ps = src)
+        fixed (Vector4* pn = normal)
+        fixed (Vector4* pd = result)
+        {
+            var s = ps;
+            var n = pn;
+            var d = pd;
+            ParallelChunks(result.Length, (start, len) => s_Simd.Refract(new Span<Vector4>(s + start, len), new Span<Vector4>(n + start, len), eta, new Span<Vector4>(d + start, len)));
+        }
+    }
+
+    public unsafe void FaceForward(Span<Vector4> src, Span<Vector4> normal, Span<float> incident, Span<Vector4> result)
+    {
+        fixed (Vector4* ps = src)
+        fixed (Vector4* pn = normal)
+        fixed (float* pi = incident)
+        fixed (Vector4* pd = result)
+        {
+            var s = ps;
+            var n = pn;
+            var i = pi;
+            var d = pd;
+            ParallelChunks(result.Length, (start, len) => s_Simd.FaceForward(new Span<Vector4>(s + start, len), new Span<Vector4>(n + start, len), new Span<float>(i + start, len), new Span<Vector4>(d + start, len)));
+        }
+    }
+
+    public void FaceForward(Span<Vector4> src, Span<Vector4> normal, Span<Vector4> result) => RunBinary(src, normal, result, BinaryVecOp.FaceForwardNormal);
+
+    public unsafe void MoveTowards(Span<Vector4> src, Span<Vector4> target, Span<float> maxDistanceDelta, Span<Vector4> result)
+    {
+        fixed (Vector4* ps = src)
+        fixed (Vector4* pt = target)
+        fixed (float* pm = maxDistanceDelta)
+        fixed (Vector4* pd = result)
+        {
+            var s = ps;
+            var t = pt;
+            var m = pm;
+            var d = pd;
+            ParallelChunks(result.Length, (start, len) => s_Simd.MoveTowards(new Span<Vector4>(s + start, len), new Span<Vector4>(t + start, len), new Span<float>(m + start, len), new Span<Vector4>(d + start, len)));
         }
     }
 }
