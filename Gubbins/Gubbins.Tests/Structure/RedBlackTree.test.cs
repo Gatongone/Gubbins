@@ -1,4 +1,4 @@
-﻿namespace Gubbins.Collection.Tests;
+﻿namespace Gubbins.Collections.Tests;
 
 [TestFixture]
 public class RedBlackTreeTests

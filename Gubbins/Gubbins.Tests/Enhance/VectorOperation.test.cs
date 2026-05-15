@@ -1,8 +1,9 @@
 ﻿using System.Numerics;
-using static Gubbins.Enhance.Tests.ParallelVectorTestScalars;
-using static Gubbins.Enhance.Tests.SimdVectorAssertions;
+using Gubbins.Span;
+using static Gubbins.Unsafe.Tests.ParallelVectorTestScalars;
+using static Gubbins.Unsafe.Tests.SimdVectorAssertions;
 
-namespace Gubbins.Enhance.Tests;
+namespace Gubbins.Unsafe.Tests;
 
 public abstract class Vector2OperationTestsBase
 {

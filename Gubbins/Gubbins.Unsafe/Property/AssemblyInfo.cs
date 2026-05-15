@@ -1,0 +1,5 @@
+﻿[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Gubbins.Tests")]
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Gubbins.Span")]
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Gubbins.Spawner")]
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Gubbins.Entities")]
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Gubbins.Context")]

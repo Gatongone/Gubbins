@@ -10,7 +10,7 @@ namespace Gubbins.Generator;
 [Generator]
 public class EventGenerator : ISourceGenerator
 {
-    private const string EVENT_NAMESPACE = "Gubbins.Event";
+    private const string EVENT_NAMESPACE = "Gubbins.Context";
     private const string FILE_NAME       = "EventListener.g.cs";
 
     private const string CODE_BODY_WITH_NAMESPACE =
@@ -18,8 +18,7 @@ public class EventGenerator : ISourceGenerator
         // Generator: {Generator}
         // Created On: {CreateTime}
 
-        using Gubbins.Domain;
-        using Gubbins.Event;
+        using Gubbins.Events;
         using Gubbins.Context;
 
         namespace {Namespace}

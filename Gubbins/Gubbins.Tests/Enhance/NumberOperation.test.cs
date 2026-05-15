@@ -1,4 +1,6 @@
-﻿namespace Gubbins.Enhance.Tests;
+﻿using Gubbins.Span;
+
+namespace Gubbins.Unsafe.Tests;
 
 public abstract class NumberOperationTestsBase<T> where T : struct
 {

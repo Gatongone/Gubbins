@@ -28,7 +28,18 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\Gubbins.Core\Gubbins.Core.csproj" />
+      <ProjectReference Include="..\Gubbins.Generator\Gubbins.Generator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false"/>
+      <ProjectReference Include="..\Gubbins.Collections\Gubbins.Collections.csproj" />
+      <ProjectReference Include="..\Gubbins.Context\Gubbins.Context.csproj" />
+      <ProjectReference Include="..\Gubbins.Enhance\Gubbins.Enhance.csproj" />
+      <ProjectReference Include="..\Gubbins.Events\Gubbins.Events.csproj" />
+      <ProjectReference Include="..\Gubbins.Network\Gubbins.Network.csproj" />
+      <ProjectReference Include="..\Gubbins.Resource\Gubbins.Resource.csproj" />
+      <ProjectReference Include="..\Gubbins.Span\Gubbins.Span.csproj" />
+      <ProjectReference Include="..\Gubbins.Spawner\Gubbins.Spawner.csproj" />
+      <ProjectReference Include="..\Gubbins.Unmanaged\Gubbins.Unmanaged.csproj" />
+      <ProjectReference Include="..\Gubbins.Unsafe\Gubbins.Unsafe.csproj" />
+      <ProjectReference Include="..\Gubbins.Entities\Gubbins.Entities.csproj" />
     </ItemGroup>
 
 </Project>

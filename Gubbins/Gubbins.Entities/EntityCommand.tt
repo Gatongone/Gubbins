@@ -1,0 +1,77 @@
+﻿<#@ template language="C#" #>
+<#@ import namespace="System.Linq" #>
+
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using Gubbins.Spawner;
+using Gubbins.Unsafe;
+
+namespace Gubbins.Entities;
+
+/// <summary>
+/// Provides methods for getting entity query handles for unmanaged entities.
+/// </summary>
+public static class EntityCommandExtensions
+{
+    extension(IEntityCommand command)
+    {
+<#
+    for (var i = 1; i <= 16; i++)
+    {
+        var constraints = string.Join(" ", from index in Enumerable.Range(1, i) select $"where T{index} : unmanaged");
+        var genericTypes = string.Join(", ", from index in Enumerable.Range(1, i) select $"T{index}");
+        var componentArgs = string.Join(", ", from index in Enumerable.Range(1, i) select $"T{index} component{index}");
+        var getSizes = string.Join("\n", from index in Enumerable.Range(1, i) select $"            var size{index} = (int) Native.GetStackSize(typeof(T{index}));");
+        var getRanges = string.Join("\n", from index in Enumerable.Range(1, i) select $"            var rg{index} = {(index == 1 ? "new Range(0, size1);" : $"new Range(rg{index - 1}.End, rg{index - 1}.End.Value + size{index});")}");
+        var setTypes = string.Join("\n", from index in Enumerable.Range(1, i) select $"            types[{index - 1}] = typeof(T{index});");
+        var totalSize = string.Join(" + ", from index in Enumerable.Range(1, i) select $"size{index}");
+        var setData = string.Join("\n", from index in Enumerable.Range(1, i) select $"            MemoryMarshal.Write(data[rg{index}], ref component{index});");
+#>
+        /// <summary>
+        /// Insert an entity with the specified components.
+        /// </summary>
+        public Entity Insert<<#= genericTypes #>>(<#= componentArgs #>) <#= constraints #>
+        {
+<#= getSizes #>
+<#= getRanges #>
+            var types = FixedArrayPool<Type>.Instance.Rent(<#= i #>);
+
+<#= setTypes #>
+
+            Span<byte> data = stackalloc byte[<#= totalSize #>];
+
+<#= setData #>
+
+            var result = command.Insert(data, types);
+            FixedArrayPool<Type>.Instance.Return(types);
+            return result;
+        }
+<#
+}
+#>
+<#
+    for (var i = 1; i <= 16; i++)
+    {
+        var constraints = string.Join(" ", from index in Enumerable.Range(1, i) select $"where T{index} : unmanaged");
+        var genericTypes = string.Join(", ", from index in Enumerable.Range(1, i) select $"T{index}");
+        var componentArgs = string.Join(", ", from index in Enumerable.Range(1, i) select $"T{index} component{index}");
+        var body = string.Join("\n", from index in Enumerable.Range(1, i) select $"            command.Update(entity.Index, component{index});");
+#>
+
+        /// <summary>
+        /// Updates the components data of a specific entity for a given component type.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Update<<#= genericTypes #>>(Entity entity, <#= componentArgs #>) <#= constraints #>
+        {
+<#= body #>
+        }
+<#
+}
+#>
+        /// <summary>
+        /// Deletes the specified entity if its version is still current.
+        /// </summary>
+        public bool Delete(Entity entity) => command.Delete(entity.Index);
+    }
+}

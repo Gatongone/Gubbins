@@ -1,4 +1,4 @@
-﻿using Gubbins.Enhance;
+﻿using Gubbins.Unsafe;
 
 namespace Gubbins.Entities.Tests;
 

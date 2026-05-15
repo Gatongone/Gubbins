@@ -1,0 +1,55 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFrameworks>net9.0;netstandard2.1</TargetFrameworks>
+        <LangVersion>latestmajor</LangVersion>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <None Update="Extensions\EventSubscribeWeaklyExtensions.tt">
+        <Generator>TextTemplatingFileGenerator</Generator>
+        <LastGenOutput>EventSubscribeWeaklyExtensions.cs</LastGenOutput>
+      </None>
+      <None Update="Handlers\WeakActionHandler.tt">
+        <Generator>TextTemplatingFileGenerator</Generator>
+        <LastGenOutput>WeakActionHandler.cs</LastGenOutput>
+      </None>
+      <None Update="Extensions\EventSubscribeExtensions.tt">
+        <Generator>TextTemplatingFileGenerator</Generator>
+        <LastGenOutput>EventSubscribeExtensions.cs</LastGenOutput>
+      </None>
+      <None Update="Extensions\EventBroadcastExtensions.tt">
+        <Generator>TextTemplatingFileGenerator</Generator>
+        <LastGenOutput>EventBroadcastExtensions.cs</LastGenOutput>
+      </None>
+      <None Update="Handlers\ActionEventHandler.tt">
+        <Generator>TextTemplatingFileGenerator</Generator>
+        <LastGenOutput>ActionEventHandler.cs</LastGenOutput>
+      </None>
+    </ItemGroup>
+
+    <ItemGroup>
+      <Compile Update="Handlers\WeakActionHandler.cs">
+        <DependentUpon>WeakActionHandler.tt</DependentUpon>
+      </Compile>
+      <Compile Update="Extensions\EventSubscribeWeaklyExtensions.cs">
+        <DependentUpon>EventSubscribeWeaklyExtensions.tt</DependentUpon>
+      </Compile>
+      <Compile Update="Extensions\EventSubscribeExtensions.cs">
+        <DependentUpon>EventSubscribeExtensions.tt</DependentUpon>
+      </Compile>
+      <Compile Update="Extensions\EventBroadcastExtensions.cs">
+        <DependentUpon>EventBroadcastExtensions.tt</DependentUpon>
+      </Compile>
+      <Compile Update="Handlers\ActionEventHandler.cs">
+        <DependentUpon>ActionEventHandler.tt</DependentUpon>
+      </Compile>
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\Gubbins.Enhance\Gubbins.Enhance.csproj" />
+    </ItemGroup>
+
+</Project>

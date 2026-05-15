@@ -11,7 +11,7 @@ namespace Gubbins.Generator;
 public sealed class SpanOperationsGenerator : ISourceGenerator
 {
     private const string FILE_SUFFIX = "SpanOperations.g.cs";
-    private const string COMPONENT_ATTRIBUTE_NAMESPACE = "Gubbins.Enhance";
+    private const string COMPONENT_ATTRIBUTE_NAMESPACE = "Gubbins.Span";
     private const string COMPONENT_ATTRIBUTE_NAME = "SpanOperationAttribute";
     private const string SPAN_OPERATION_INTERFACE_NAME = "Gubbins.Enhance.ISpanOperation";
 

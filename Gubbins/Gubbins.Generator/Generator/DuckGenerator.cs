@@ -20,7 +20,7 @@ public class DuckGenerator : ISourceGenerator
         using System.Linq;
         using System.Collections.Concurrent;
         using System.Reflection;
-        using Gubbins.Enhance;
+        using Gubbins.Spawner;
        
         namespace Gubbins.Generated
         {

@@ -1,0 +1,147 @@
+<#@ template language="C#" #>
+<#@ import namespace="System.Linq" #>
+using System.Reflection;
+using Gubbins.Enhance;
+
+#pragma warning disable CS1712 // Type parameter has no matching typeparam tag in the XML comment (but other type parameters do)
+
+namespace Gubbins.Events;
+<#
+    for (var i = 0; i < 16; i++)
+    {
+        var genericArgs = string.Empty;
+        var parameterDefinitions = string.Empty;
+        var parameters = string.Empty;
+        var notificationItems = string.Empty;
+        var typeofStrings = string.Empty;
+        if (i > 0)
+        {
+            genericArgs = i == 1 ? "T" : string.Join(", ", from index in Enumerable.Range(1, i) select $"T{index}");
+            parameters = i == 1 ? "param" : string.Join(", ", from index in Enumerable.Range(1, i) select $"param{index}");
+            parameterDefinitions = i == 1 ? "T param" : string.Join(", ", from index in Enumerable.Range(1, i) select $"T{index} param{index}");
+            notificationItems = i == 1 ? "notification.Item" : string.Join(", ", from index in Enumerable.Range(1, i) select $"notification.Item{index}");
+            typeofStrings = i == 1 ? "typeof(T)" : string.Join(", ", from index in Enumerable.Range(1, i) select $"typeof(T{index})");
+        }
+        var parameterNotification = i == 0 ? "Unit" : i == 1 ? "T" : $"({genericArgs})";
+        var action = i == 0 ? "Action" : $"Action<{genericArgs}>";
+        var sourceAction = i == 0 ? "Action<TProvider>" : $"Action<TProvider, {genericArgs}>";
+        var weakEvenHandler = $"WeakActionEventHandler{(i == 0 ? string.Empty : $"<{genericArgs}>")}";
+        var ievenHandler = $"IEventHandler{(i == 0 ? string.Empty : $"<{parameterNotification}>")}";
+        var iweakEvenHandler = $"IWeakEventHandler{(i == 0 ? string.Empty : $"<{parameterNotification}>")}";
+#>
+
+    /// <summary>
+    /// Event handler with System.Action which would reference the event provider by weak.
+    /// </summary>
+    public sealed class <#=weakEvenHandler#> : <#=ievenHandler#>, <#=iweakEvenHandler#>, IEquatable<<#=weakEvenHandler#>>
+    {
+        /// <summary>
+        /// Delegate with instance method provider.
+        /// </summary>
+        private readonly IInvocation m_Invocation;
+
+        /// <summary>
+        /// The owner that control this weak event's lifecycle.
+        /// </summary>
+        private readonly WeakReference<IEquatable<DBNull>> m_Owner;
+
+        /// <summary>
+        /// Raw method of the event provider.
+        /// </summary>
+        private readonly MethodInfo m_Method;
+
+        /// <inheritdoc cref="IWeakEventHandler{TNotification}.IsAlive"/>
+        public bool IsAlive => m_Owner.TryGetTarget(out _);
+
+        /// <summary>
+        /// Create a weak event handler from a System.Action.
+        /// </summary>
+        /// <param name="delegation">Delegation for creating EventHandler.</param>
+        /// <param name="owner">The owner that control this weak event's lifecycle.</param>
+        public WeakActionEventHandler(<#=action#> delegation, IEquatable<DBNull> owner)
+        {
+            m_Owner = new WeakReference<IEquatable<DBNull>>(owner);
+            m_Method = delegation.Method;
+            var invokerType = typeof(ActionInvoker<>).MakeGenericType(<#= i == 0 ? string.Empty : typeofStrings + ", " #>delegation.Target.GetType());
+            m_Invocation = Activator.CreateInstance(invokerType, delegation.Target, delegation) as IInvocation ?? throw new InvalidOperationException($"Failed to create ActionInvoker.");
+        }
+
+<#=  i == 1 ? string.Empty :
+"        /// <inheritdoc cref=\"IWeakEventHandler{TNotification}.TryHandle\"/>\n" +
+$"        public bool TryHandle({parameterNotification} notification) => m_Owner.TryGetTarget(out var owner) && owner != null && m_Invocation.Invoke({notificationItems});" #>
+
+        /// <inheritdoc cref="IWeakEventHandler{TNotification}.TryHandle"/>
+        public bool TryHandle(<#=parameterDefinitions#>) => m_Owner.TryGetTarget(out var owner) && owner != null && m_Invocation.Invoke(<#=parameters#>);
+
+<#= i == 1 ? string.Empty :
+"        /// <inheritdoc cref=\"IEventHandler{TNotification}.Handle\"/>\n" +
+$"        public void Handle({parameterNotification} notification) {{ if (m_Owner.TryGetTarget(out var owner) && owner != null) m_Invocation.Invoke({notificationItems}); }}" #>
+
+        /// <inheritdoc cref="IEventHandler{TNotification}.Handle"/>
+        public void Handle(<#=parameterDefinitions#>) { if (m_Owner.TryGetTarget(out var owner) && owner != null) m_Invocation.Invoke(<#=parameters#>); }
+
+        /// <inheritdoc cref="System.Object.GetHashCode()"/>
+        public override int GetHashCode() => m_Invocation != null! ? m_Invocation.GetHashCode() : 0;
+
+        /// <summary>
+        /// Verify if the target equals to event handler.
+        /// </summary>
+        public static bool operator ==(<#=weakEvenHandler#> left, object right) => !Equals(left, null) && left.Equals(right);
+
+        /// <summary>
+        /// Verify if the target not equals to event handler.
+        /// </summary>
+        public static bool operator !=(<#=weakEvenHandler#> left, object right) => !(left == right);
+
+        /// <summary>
+        /// Verify if the target equals to event handler.
+        /// </summary>
+        public bool Equals(<#=weakEvenHandler#> other) => m_Method == other.m_Method;
+
+        /// <summary>
+        /// Verify if the target equals to event handler.
+        /// </summary>
+        public override bool Equals(object? obj) => obj switch
+        {
+            <#=weakEvenHandler#> other => Equals(other),
+            <#=action#> action => action.Method == m_Method,
+            _ => false
+        };
+
+        private interface IInvocation
+        {
+            bool Invoke(<#= parameterDefinitions #>);
+        }
+
+        private sealed class ActionInvoker<TProvider> : IInvocation where TProvider : class
+        {
+            /// <summary>
+            /// The event provider.
+            /// </summary>
+            private readonly WeakReference<TProvider> m_Provider;
+
+            /// <summary>
+            /// Wrapped action.
+            /// </summary>
+            private readonly <#= sourceAction #> m_Invocation;
+
+            public ActionInvoker(TProvider provider, <#= action #> action)
+            {
+                m_Provider = new WeakReference<TProvider>(provider);
+                m_Invocation = action.Method.CreateDelegate(typeof(<#= sourceAction #>)) as <#= sourceAction #> ?? throw new InvalidOperationException($"Failed to create Action from method '{action.Method.Name}'.");
+            }
+
+            public bool Invoke(<#= parameterDefinitions #>)
+            {
+                if (!m_Provider.TryGetTarget(out var provider))
+                {
+                    return false;
+                }
+                m_Invocation.Invoke(provider<#= i == 0 ? string.Empty : ", " + parameters #>);
+                return true;
+            }
+        }
+    }
+<#
+    }
+#>

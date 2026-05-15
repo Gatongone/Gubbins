@@ -1,6 +1,6 @@
 ﻿using System.Numerics;
 
-namespace Gubbins.Enhance.Tests;
+namespace Gubbins.Unsafe.Tests;
 
 internal static class ParallelVectorTestScalars
 {

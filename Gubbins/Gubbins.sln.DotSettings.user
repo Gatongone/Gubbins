@@ -49,6 +49,7 @@
 	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=ED90D4BE_002DFCDF_002D480B_002DA543_002D00C5C50E43EE_002Fd_003ADomain_002Fd_003AEntity_002Ff_003AEntityQueryHandle_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
 	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=ED90D4BE_002DFCDF_002D480B_002DA543_002D00C5C50E43EE_002Fd_003AEnhance_002Fd_003ACommon_002Ff_003ABatch_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
 	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/FilesAndFoldersToSkip2/=ED90D4BE_002DFCDF_002D480B_002DA543_002D00C5C50E43EE_002Fd_003AEntities_002Fd_003AChunk_002Ff_003AChunkOperation_002EForeach_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
+	<s:String x:Key="/Default/CodeInspection/ExcludedFiles/SourceGeneratedFilesToSkip/=Gubbins_002ECore_005CGubbins_002EGenerator_005CGubbins_002EGenerator_002ESpanOperationsGenerator_005Cglobal_005F_005FGubbins_005FPosition_002ESpanOperations_002Eg_002Ecs/@EntryIndexedValue">ForceIncluded</s:String>
 	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=45c7bd2a_002D638e_002D4dc7_002D9eef_002D0bb64bf42193/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" IsActive="True" Name="Contains_ExistingItem_ShouldReturnTrue" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
   &lt;Not&gt;&#xD;
     &lt;TestAncestor&gt;&#xD;

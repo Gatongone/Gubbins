@@ -1,4 +1,6 @@
-﻿namespace Gubbins.Enhance.Tests;
+﻿using Gubbins.Enhance;
+
+namespace Gubbins.Unsafe.Tests;
 
 [TestFixture]
 public class NewableTests
