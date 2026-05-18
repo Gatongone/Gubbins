@@ -74,7 +74,7 @@ public static class Duck
         if (!s_DuckCache.TryGetValue(typeof(T), out var duck))
         {
             // Get type from generated code.
-            var generatedDuckTypeName = $"Gubbins.Generated.Duck_{typeof(T).FullName.Replace(".", "_").Replace(".", "_").Replace("+", "_").Replace("`", "_")}";
+            var generatedDuckTypeName = $"Gubbins.Generated.Duck_{typeof(T).FullName!.Replace(".", "_").Replace(".", "_").Replace("+", "_").Replace("`", "_")}";
             var duckType = Type.GetType(generatedDuckTypeName, Reflection.LoadAssemblyResolver, Reflection.DomainTypeResolver)!;
             if (duckType == null!)
             {
@@ -82,8 +82,8 @@ public static class Duck
                 return false;
             }
 
-            duck                   = Activator.CreateInstance(duckType);
-            s_DuckCache[typeof(T)] = duck;
+            duck = Activator.CreateInstance(duckType);
+            s_DuckCache[typeof(T)] = duck!;
         }
 
         if (duck == null)

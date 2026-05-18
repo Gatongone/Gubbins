@@ -93,17 +93,18 @@ internal static class Reflection
             ListPool<string>.Default.Recycle(argStrings);
 
             // Construct the open generic type name
-            var openGenericName = $"{baseName}`{argTypes.Length}";
+            var openGenericName = baseName.Contains('`') ? baseName : $"{baseName}`{argTypes.Length}";
 
-            // Get the open generic type using the standard GetTypeEx
-            var openType = Type.GetType(typeName, LoadAssemblyResolver, DomainTypeResolver);
+            // Resolve the open generic definition (e.g. Namespace.Type`2) before closing it.
+            // Type.GetType without assembly qualification can miss project types, so search loaded assemblies first.
+            var openType = DomainTypeResolver(null, openGenericName, false) ?? Type.GetType(openGenericName, LoadAssemblyResolver, DomainTypeResolver);
             if (openType == null)
             {
-                throw new TypeLoadException($"Could not load type '{openGenericName}'");
+                return null;
             }
 
             // Construct the closed generic type
-            return openType.MakeGenericType(argTypes);
+            return argTypes.Any(static t => t == null) ? null : openType.MakeGenericType(argTypes!);
         }
 
         // Parses a string of generic arguments, correctly handling nested generics, and adds each argument to the provided list.

@@ -64,7 +64,19 @@ public class Pool<T> : IPool<T>
     {
         if (instance == null) return;
 
-        if (Duck.Like(instance, out IResetable duckReseter, out var resetable))
+        if (instance is IResetable directReseter)
+        {
+            directReseter.Reset();
+        }
+        else if (instance is IList directList)
+        {
+            directList.Clear();
+        }
+        else if (instance is IDictionary directDictionary)
+        {
+            directDictionary.Clear();
+        }
+        else if (Duck.Like(instance, out IResetable duckReseter, out var resetable))
         {
             duckReseter.Reset();
             resetable.Dispose();
@@ -142,8 +154,10 @@ public class TraceablePool<T> : IPool<T>, ITraceablePool, IEnumerable<T>
     /// <inheritdoc />
     public void Recycle(T instance)
     {
+        if (!m_Tracing.Remove(instance))
+            return;
+
         m_Pool.Recycle(instance);
-        m_Tracing.Remove(instance);
     }
 
     /// <summary>
@@ -166,6 +180,8 @@ public class TraceablePool<T> : IPool<T>, ITraceablePool, IEnumerable<T>
         {
             m_Pool.Recycle(instance);
         }
+
+        m_Tracing.Clear();
     }
 
     /// <summary>

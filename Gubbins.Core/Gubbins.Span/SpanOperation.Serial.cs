@@ -1,4 +1,5 @@
 ﻿using System.Numerics;
+using System.Runtime.CompilerServices;
 
 namespace Gubbins.Span;
 
@@ -117,23 +118,25 @@ internal sealed class SerialIntOperations : ISpanShiftLeft<int>, ISpanShiftRight
     /// <inheritdoc />
     public bool Supported => true;
 
-    /// <inheritdoc/>
-    public void ShiftLeft(Span<int> src, int count, Span<int> result)
+    private delegate int ShiftOp(int value, int count);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static int ShiftLeftScalar(int value, int count) => value << count;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static int ShiftRightScalar(int value, int count) => value >> count;
+
+    private static void RunShift(Span<int> src, int count, Span<int> result, ShiftOp op)
     {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = src[index] << count;
-        }
+        for (var i = 0; i < src.Length; i++)
+            result[i] = op(src[i], count);
     }
 
     /// <inheritdoc/>
-    public void ShiftRight(Span<int> src, int count, Span<int> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = src[index] >> count;
-        }
-    }
+    public void ShiftLeft(Span<int> src, int count, Span<int> result) => RunShift(src, count, result, ShiftLeftScalar);
+
+    /// <inheritdoc/>
+    public void ShiftRight(Span<int> src, int count, Span<int> result) => RunShift(src, count, result, ShiftRightScalar);
 }
 
 /// <summary>
@@ -144,23 +147,25 @@ internal sealed class SerialUintOperations : ISpanShiftLeft<uint>, ISpanShiftRig
     /// <inheritdoc />
     public bool Supported => true;
 
-    /// <inheritdoc/>
-    public void ShiftLeft(Span<uint> src, int count, Span<uint> result)
+    private delegate uint ShiftOp(uint value, int count);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static uint ShiftLeftScalar(uint value, int count) => value << count;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static uint ShiftRightScalar(uint value, int count) => value >> count;
+
+    private static void RunShift(Span<uint> src, int count, Span<uint> result, ShiftOp op)
     {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = src[index] << count;
-        }
+        for (var i = 0; i < src.Length; i++)
+            result[i] = op(src[i], count);
     }
 
     /// <inheritdoc/>
-    public void ShiftRight(Span<uint> src, int count, Span<uint> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = src[index] >> count;
-        }
-    }
+    public void ShiftLeft(Span<uint> src, int count, Span<uint> result) => RunShift(src, count, result, ShiftLeftScalar);
+
+    /// <inheritdoc/>
+    public void ShiftRight(Span<uint> src, int count, Span<uint> result) => RunShift(src, count, result, ShiftRightScalar);
 }
 
 /// <summary>
@@ -171,23 +176,25 @@ internal sealed class SerialLongOperations : ISpanShiftLeft<long>, ISpanShiftRig
     /// <inheritdoc />
     public bool Supported => true;
 
-    /// <inheritdoc/>
-    public void ShiftLeft(Span<long> src, int count, Span<long> result)
+    private delegate long ShiftOp(long value, int count);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static long ShiftLeftScalar(long value, int count) => value << count;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static long ShiftRightScalar(long value, int count) => value >> count;
+
+    private static void RunShift(Span<long> src, int count, Span<long> result, ShiftOp op)
     {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = src[index] << count;
-        }
+        for (var i = 0; i < src.Length; i++)
+            result[i] = op(src[i], count);
     }
 
     /// <inheritdoc/>
-    public void ShiftRight(Span<long> src, int count, Span<long> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = src[index] >> count;
-        }
-    }
+    public void ShiftLeft(Span<long> src, int count, Span<long> result) => RunShift(src, count, result, ShiftLeftScalar);
+
+    /// <inheritdoc/>
+    public void ShiftRight(Span<long> src, int count, Span<long> result) => RunShift(src, count, result, ShiftRightScalar);
 }
 
 /// <summary>
@@ -198,23 +205,25 @@ internal sealed class SerialUlongOperations : ISpanShiftLeft<ulong>, ISpanShiftR
     /// <inheritdoc />
     public bool Supported => true;
 
-    /// <inheritdoc/>
-    public void ShiftLeft(Span<ulong> src, int count, Span<ulong> result)
+    private delegate ulong ShiftOp(ulong value, int count);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static ulong ShiftLeftScalar(ulong value, int count) => value << count;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static ulong ShiftRightScalar(ulong value, int count) => value >> count;
+
+    private static void RunShift(Span<ulong> src, int count, Span<ulong> result, ShiftOp op)
     {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = src[index] << count;
-        }
+        for (var i = 0; i < src.Length; i++)
+            result[i] = op(src[i], count);
     }
 
     /// <inheritdoc/>
-    public void ShiftRight(Span<ulong> src, int count, Span<ulong> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = src[index] >> count;
-        }
-    }
+    public void ShiftLeft(Span<ulong> src, int count, Span<ulong> result) => RunShift(src, count, result, ShiftLeftScalar);
+
+    /// <inheritdoc/>
+    public void ShiftRight(Span<ulong> src, int count, Span<ulong> result) => RunShift(src, count, result, ShiftRightScalar);
 }
 
 /// <summary>
@@ -225,247 +234,125 @@ internal sealed class SerialFloatOperations : ISpanRealOperations<float>
     /// <inheritdoc />
     public bool Supported => true;
 
-    /// <inheritdoc />
-    public void Round(Span<float> src, Span<float> result)
+    private delegate float UnaryOp(float value);
+
+    private static void RunUnary(Span<float> src, Span<float> result, UnaryOp op)
     {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = MathF.Round(src[index]);
-        }
+        for (var i = 0; i < src.Length; i++)
+            result[i] = op(src[i]);
     }
 
     /// <inheritdoc />
-    public void Exp(Span<float> src, Span<float> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = MathF.Exp(src[index]);
-        }
-    }
+    public void Round(Span<float> src, Span<float> result) => RunUnary(src, result, MathF.Round);
 
     /// <inheritdoc />
-    public void Log(Span<float> src, Span<float> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = MathF.Log(src[index]);
-        }
-    }
+    public void Exp(Span<float> src, Span<float> result) => RunUnary(src, result, MathF.Exp);
 
     /// <inheritdoc />
-    public void Truncate(Span<float> src, Span<float> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = MathF.Truncate(src[index]);
-        }
-    }
+    public void Log(Span<float> src, Span<float> result) => RunUnary(src, result, MathF.Log);
 
     /// <inheritdoc />
-    public void Floor(Span<float> src, Span<float> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = MathF.Floor(src[index]);
-        }
-    }
+    public void Truncate(Span<float> src, Span<float> result) => RunUnary(src, result, MathF.Truncate);
 
     /// <inheritdoc />
-    public void Ceiling(Span<float> src, Span<float> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = MathF.Ceiling(src[index]);
-        }
-    }
+    public void Floor(Span<float> src, Span<float> result) => RunUnary(src, result, MathF.Floor);
+
+    /// <inheritdoc />
+    public void Ceiling(Span<float> src, Span<float> result) => RunUnary(src, result, MathF.Ceiling);
 
     /// <inheritdoc/>
-    public void Sqrt(Span<float> src, Span<float> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = MathF.Sqrt(src[index]);
-        }
-    }
+    public void Sqrt(Span<float> src, Span<float> result) => RunUnary(src, result, MathF.Sqrt);
+
+    /// <inheritdoc />
+    public void Sin(Span<float> src, Span<float> result) => RunUnary(src, result, MathF.Sin);
+
+    /// <inheritdoc />
+    public void Cos(Span<float> src, Span<float> result) => RunUnary(src, result, MathF.Cos);
+
+    /// <inheritdoc />
+    public void Tan(Span<float> src, Span<float> result) => RunUnary(src, result, MathF.Tan);
+
+    /// <inheritdoc />
+    public void Sinh(Span<float> src, Span<float> result) => RunUnary(src, result, MathF.Sinh);
+
+    /// <inheritdoc />
+    public void Cosh(Span<float> src, Span<float> result) => RunUnary(src, result, MathF.Cosh);
+
+    /// <inheritdoc />
+    public void Tanh(Span<float> src, Span<float> result) => RunUnary(src, result, MathF.Tanh);
+
+    /// <inheritdoc />
+    public void Asin(Span<float> src, Span<float> result) => RunUnary(src, result, MathF.Asin);
+
+    /// <inheritdoc />
+    public void Acos(Span<float> src, Span<float> result) => RunUnary(src, result, MathF.Acos);
+
+    /// <inheritdoc />
+    public void Atan(Span<float> src, Span<float> result) => RunUnary(src, result, MathF.Atan);
+
+    /// <inheritdoc />
+    public void Asinh(Span<float> src, Span<float> result) => RunUnary(src, result, MathF.Asinh);
+
+    /// <inheritdoc />
+    public void Acosh(Span<float> src, Span<float> result) => RunUnary(src, result, MathF.Acosh);
+
+    /// <inheritdoc />
+    public void Atanh(Span<float> src, Span<float> result) => RunUnary(src, result, MathF.Atanh);
 
     /// <inheritdoc/>
     public void Pow(Span<float> src, float exponent, Span<float> result)
     {
         for (var index = 0; index < src.Length; index++)
-        {
             result[index] = MathF.Pow(src[index], exponent);
-        }
     }
 
     /// <inheritdoc />
     public void Pow(Span<float> src, Span<float> exponent, Span<float> result)
     {
         for (var index = 0; index < src.Length; index++)
-        {
             result[index] = MathF.Pow(src[index], exponent[index]);
-        }
     }
 
     /// <inheritdoc />
     public void Clamp(Span<float> src, Span<float> min, Span<float> max, Span<float> result)
     {
         for (var index = 0; index < src.Length; index++)
-        {
             result[index] = MathF.Min(MathF.Max(src[index], min[index]), max[index]);
-        }
     }
 
     /// <inheritdoc />
     public void Clamp(Span<float> src, float min, float max, Span<float> result)
     {
         for (var index = 0; index < src.Length; index++)
-        {
             result[index] = MathF.Min(MathF.Max(src[index], min), max);
-        }
     }
 
     /// <inheritdoc />
     public void Lerp(Span<float> x, Span<float> y, Span<float> amount, Span<float> result)
     {
         for (var index = 0; index < x.Length; index++)
-        {
             result[index] = x[index] * (1 - amount[index]) + y[index] * amount[index];
-        }
     }
 
     /// <inheritdoc />
     public void Lerp(Span<float> x, float y, Span<float> amount, Span<float> result)
     {
         for (var index = 0; index < x.Length; index++)
-        {
             result[index] = x[index] * (1 - amount[index]) + y * amount[index];
-        }
     }
 
     /// <inheritdoc />
     public void Hypot(Span<float> x, Span<float> y, Span<float> result)
     {
         for (var index = 0; index < x.Length; index++)
-        {
             result[index] = MathF.Sqrt(x[index] * x[index] + y[index] * y[index]);
-        }
     }
 
     /// <inheritdoc />
     public void Hypot(Span<float> x, float y, Span<float> result)
     {
         for (var index = 0; index < x.Length; index++)
-        {
             result[index] = MathF.Sqrt(x[index] * x[index] + y * y);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Sin(Span<float> src, Span<float> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = MathF.Sin(src[index]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Cos(Span<float> src, Span<float> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = MathF.Cos(src[index]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Tan(Span<float> src, Span<float> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = MathF.Tan(src[index]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Sinh(Span<float> src, Span<float> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = MathF.Sinh(src[index]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Cosh(Span<float> src, Span<float> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = MathF.Cosh(src[index]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Tanh(Span<float> src, Span<float> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = MathF.Tanh(src[index]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Asin(Span<float> src, Span<float> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = MathF.Asin(src[index]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Acos(Span<float> src, Span<float> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = MathF.Acos(src[index]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Atan(Span<float> src, Span<float> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = MathF.Atan(src[index]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Asinh(Span<float> src, Span<float> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = MathF.Asinh(src[index]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Acosh(Span<float> src, Span<float> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = MathF.Acosh(src[index]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Atanh(Span<float> src, Span<float> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = MathF.Atanh(src[index]);
-        }
     }
 }
 
@@ -477,247 +364,125 @@ internal sealed class SerialDoubleOperations : ISpanRealOperations<double>
     /// <inheritdoc />
     public bool Supported => true;
 
-    /// <inheritdoc />
-    public void Round(Span<double> src, Span<double> result)
+    private delegate double UnaryOp(double value);
+
+    private static void RunUnary(Span<double> src, Span<double> result, UnaryOp op)
     {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = Math.Round(src[index]);
-        }
+        for (var i = 0; i < src.Length; i++)
+            result[i] = op(src[i]);
     }
 
     /// <inheritdoc />
-    public void Exp(Span<double> src, Span<double> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = Math.Exp(src[index]);
-        }
-    }
+    public void Round(Span<double> src, Span<double> result) => RunUnary(src, result, Math.Round);
 
     /// <inheritdoc />
-    public void Log(Span<double> src, Span<double> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = Math.Log(src[index]);
-        }
-    }
+    public void Exp(Span<double> src, Span<double> result) => RunUnary(src, result, Math.Exp);
 
     /// <inheritdoc />
-    public void Truncate(Span<double> src, Span<double> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = Math.Truncate(src[index]);
-        }
-    }
+    public void Log(Span<double> src, Span<double> result) => RunUnary(src, result, Math.Log);
 
     /// <inheritdoc />
-    public void Floor(Span<double> src, Span<double> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = Math.Floor(src[index]);
-        }
-    }
+    public void Truncate(Span<double> src, Span<double> result) => RunUnary(src, result, Math.Truncate);
 
     /// <inheritdoc />
-    public void Ceiling(Span<double> src, Span<double> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = Math.Ceiling(src[index]);
-        }
-    }
+    public void Floor(Span<double> src, Span<double> result) => RunUnary(src, result, Math.Floor);
+
+    /// <inheritdoc />
+    public void Ceiling(Span<double> src, Span<double> result) => RunUnary(src, result, Math.Ceiling);
 
     /// <inheritdoc/>
-    public void Sqrt(Span<double> src, Span<double> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = Math.Sqrt(src[index]);
-        }
-    }
+    public void Sqrt(Span<double> src, Span<double> result) => RunUnary(src, result, Math.Sqrt);
+
+    /// <inheritdoc />
+    public void Sin(Span<double> src, Span<double> result) => RunUnary(src, result, Math.Sin);
+
+    /// <inheritdoc />
+    public void Cos(Span<double> src, Span<double> result) => RunUnary(src, result, Math.Cos);
+
+    /// <inheritdoc />
+    public void Tan(Span<double> src, Span<double> result) => RunUnary(src, result, Math.Tan);
+
+    /// <inheritdoc />
+    public void Sinh(Span<double> src, Span<double> result) => RunUnary(src, result, Math.Sinh);
+
+    /// <inheritdoc />
+    public void Cosh(Span<double> src, Span<double> result) => RunUnary(src, result, Math.Cosh);
+
+    /// <inheritdoc />
+    public void Tanh(Span<double> src, Span<double> result) => RunUnary(src, result, Math.Tanh);
+
+    /// <inheritdoc />
+    public void Asin(Span<double> src, Span<double> result) => RunUnary(src, result, Math.Asin);
+
+    /// <inheritdoc />
+    public void Acos(Span<double> src, Span<double> result) => RunUnary(src, result, Math.Acos);
+
+    /// <inheritdoc />
+    public void Atan(Span<double> src, Span<double> result) => RunUnary(src, result, Math.Atan);
+
+    /// <inheritdoc />
+    public void Asinh(Span<double> src, Span<double> result) => RunUnary(src, result, Math.Asinh);
+
+    /// <inheritdoc />
+    public void Acosh(Span<double> src, Span<double> result) => RunUnary(src, result, Math.Acosh);
+
+    /// <inheritdoc />
+    public void Atanh(Span<double> src, Span<double> result) => RunUnary(src, result, Math.Atanh);
 
     /// <inheritdoc/>
     public void Pow(Span<double> src, double exponent, Span<double> result)
     {
         for (var index = 0; index < src.Length; index++)
-        {
             result[index] = Math.Pow(src[index], exponent);
-        }
     }
 
     /// <inheritdoc />
     public void Pow(Span<double> src, Span<double> exponent, Span<double> result)
     {
         for (var index = 0; index < src.Length; index++)
-        {
             result[index] = Math.Pow(src[index], exponent[index]);
-        }
     }
 
     /// <inheritdoc />
     public void Clamp(Span<double> src, Span<double> min, Span<double> max, Span<double> result)
     {
         for (var index = 0; index < src.Length; index++)
-        {
             result[index] = Math.Min(Math.Max(src[index], min[index]), max[index]);
-        }
     }
 
     /// <inheritdoc />
     public void Clamp(Span<double> src, double min, double max, Span<double> result)
     {
         for (var index = 0; index < src.Length; index++)
-        {
             result[index] = Math.Min(Math.Max(src[index], min), max);
-        }
     }
 
     /// <inheritdoc />
     public void Lerp(Span<double> x, Span<double> y, Span<double> amount, Span<double> result)
     {
         for (var index = 0; index < x.Length; index++)
-        {
             result[index] = x[index] * (1 - amount[index]) + y[index] * amount[index];
-        }
     }
 
     /// <inheritdoc />
     public void Lerp(Span<double> x, double y, Span<double> amount, Span<double> result)
     {
         for (var index = 0; index < x.Length; index++)
-        {
             result[index] = x[index] * (1 - amount[index]) + y * amount[index];
-        }
     }
 
     /// <inheritdoc />
     public void Hypot(Span<double> x, Span<double> y, Span<double> result)
     {
         for (var index = 0; index < x.Length; index++)
-        {
             result[index] = Math.Sqrt(x[index] * x[index] + y[index] * y[index]);
-        }
     }
 
     /// <inheritdoc />
     public void Hypot(Span<double> x, double y, Span<double> result)
     {
         for (var index = 0; index < x.Length; index++)
-        {
             result[index] = Math.Sqrt(x[index] * x[index] + y * y);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Sin(Span<double> src, Span<double> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = Math.Sin(src[index]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Cos(Span<double> src, Span<double> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = Math.Cos(src[index]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Tan(Span<double> src, Span<double> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = Math.Tan(src[index]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Sinh(Span<double> src, Span<double> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = Math.Sinh(src[index]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Cosh(Span<double> src, Span<double> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = Math.Cosh(src[index]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Tanh(Span<double> src, Span<double> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = Math.Tanh(src[index]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Asin(Span<double> src, Span<double> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = Math.Asin(src[index]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Acos(Span<double> src, Span<double> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = Math.Acos(src[index]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Atan(Span<double> src, Span<double> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = Math.Atan(src[index]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Asinh(Span<double> src, Span<double> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = Math.Asinh(src[index]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Acosh(Span<double> src, Span<double> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = Math.Acosh(src[index]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Atanh(Span<double> src, Span<double> result)
-    {
-        for (var index = 0; index < src.Length; index++)
-        {
-            result[index] = Math.Atanh(src[index]);
-        }
     }
 }
 

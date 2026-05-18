@@ -1,4 +1,5 @@
 ﻿using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace Gubbins.Span;
@@ -13,148 +14,77 @@ internal sealed class SimdNumberOperations<T> : ISpanNumberOperations<T>, ISpanG
 
     private static readonly int s_VectorSize = Vector<T>.Count;
 
-    /// <inheritdoc/>
-    public void Add(Span<T> src, T operand, Span<T> result)
+    private delegate Vector<T> VectorOperandOp(Vector<T> left, Vector<T> right);
+
+    private delegate T ScalarOperandOp(T left, T right);
+
+    private delegate Vector<T> VectorPairOp(Vector<T> left, Vector<T> right);
+
+    private delegate T ScalarPairOp(T left, T right);
+
+    private static void RunOperand(Span<T> src, T operand, Span<T> result, VectorOperandOp vectorOp, ScalarOperandOp scalarOp)
     {
         var i = 0;
         var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
         var vb = new Vector<T>(operand);
+
         for (; i <= length; i += s_VectorSize)
         {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<T>(current);
-            var vr = va + vb;
-            vr.CopyTo(result.Slice(i, s_VectorSize));
+            var va = new Vector<T>(src.Slice(i, s_VectorSize));
+            vectorOp(va, vb).CopyTo(result.Slice(i, s_VectorSize));
         }
 
-        // Calculate remaining.
         for (; i < src.Length; i++)
         {
-            result[i] = Operations<T>.Add(src[i], operand);
+            result[i] = scalarOp(src[i], operand);
         }
     }
 
-    /// <inheritdoc/>
-    public void Subtract(Span<T> src, T operand, Span<T> result)
+    private static void RunPair(Span<T> left, Span<T> right, Span<T> result, VectorPairOp vectorOp, ScalarPairOp scalarOp)
     {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        var vb = new Vector<T>(operand);
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<T>(current);
-            var vr = va - vb;
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remaining.
-        for (; i < src.Length; i++)
-        {
-            src[i] = Operations<T>.Subtract(src[i], operand);
-        }
-    }
-
-    /// <inheritdoc/>
-    public void Multiply(Span<T> src, T operand, Span<T> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        var vb = new Vector<T>(operand);
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<T>(current);
-            var vr = va * vb;
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remaining.
-        for (; i < src.Length; i++)
-        {
-            result[i] = Operations<T>.Multiply(src[i], operand);
-        }
-    }
-
-    /// <inheritdoc/>
-    public void Divide(Span<T> src, T operand, Span<T> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        var vb = new Vector<T>(operand);
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<T>(current);
-            var vr = va / vb;
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remaining.
-        for (; i < src.Length; i++)
-        {
-            result[i] = Operations<T>.Divide(src[i], operand);
-        }
-    }
-
-    /// <inheritdoc/>
-    public void Modulo(Span<T> src, T operand, Span<T> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        var vb = new Vector<T>(operand);
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<T>(current);
-            var vr = va - va / vb * vb;
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remaining.
-        for (; i < src.Length; i++)
-        {
-            result[i] = Operations<T>.Modulo(src[i], operand);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Max(Span<T> left, Span<T> right, Span<T> result)
-    {
-        var i = 0;
-        var length = left.Length - s_VectorSize;
         if (left.Length != right.Length)
         {
             throw new ArgumentException("Left and right spans must have the same length.");
         }
 
-        // SIMD calculation.
+        var i = 0;
+        var length = left.Length - s_VectorSize;
         for (; i <= length; i += s_VectorSize)
         {
             var va = new Vector<T>(left.Slice(i, s_VectorSize));
             var vb = new Vector<T>(right.Slice(i, s_VectorSize));
-            var vr = Vector.Max(va, vb);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
+            vectorOp(va, vb).CopyTo(result.Slice(i, s_VectorSize));
         }
 
-        // Calculate remaining.
         for (; i < left.Length; i++)
         {
-            var l = left[i];
-            var r = right[i];
-            result[i] = Operations<T>.GreaterThan(l, r) ? l : r;
+            result[i] = scalarOp(left[i], right[i]);
         }
     }
+
+    /// <inheritdoc/>
+    public void Add(Span<T> src, T operand, Span<T> result) =>
+        RunOperand(src, operand, result, static (va, vb) => va + vb, Operations<T>.Add);
+
+    /// <inheritdoc/>
+    public void Subtract(Span<T> src, T operand, Span<T> result) =>
+        RunOperand(src, operand, result, static (va, vb) => va - vb, Operations<T>.Subtract);
+
+    /// <inheritdoc/>
+    public void Multiply(Span<T> src, T operand, Span<T> result) =>
+        RunOperand(src, operand, result, static (va, vb) => va * vb, Operations<T>.Multiply);
+
+    /// <inheritdoc/>
+    public void Divide(Span<T> src, T operand, Span<T> result) =>
+        RunOperand(src, operand, result, static (va, vb) => va / vb, Operations<T>.Divide);
+
+    /// <inheritdoc/>
+    public void Modulo(Span<T> src, T operand, Span<T> result) =>
+        RunOperand(src, operand, result, static (va, vb) => va - va / vb * vb, Operations<T>.Modulo);
+
+    /// <inheritdoc />
+    public void Max(Span<T> left, Span<T> right, Span<T> result) =>
+        RunPair(left, right, result, Vector.Max, static (l, r) => Operations<T>.GreaterThan(l, r) ? l : r);
 
     public T GetMax(Span<T> span)
     {
@@ -218,32 +148,8 @@ internal sealed class SimdNumberOperations<T> : ISpanNumberOperations<T>, ISpanG
     }
 
     /// <inheritdoc />
-    public void Min(Span<T> left, Span<T> right, Span<T> result)
-    {
-        var i = 0;
-        var length = left.Length - s_VectorSize;
-        if (left.Length != right.Length)
-        {
-            throw new ArgumentException("Left and right spans must have the same length.");
-        }
-
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var va = new Vector<T>(left.Slice(i, s_VectorSize));
-            var vb = new Vector<T>(right.Slice(i, s_VectorSize));
-            var vr = Vector.Min(va, vb);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remaining.
-        for (; i < left.Length; i++)
-        {
-            var l = left[i];
-            var r = right[i];
-            result[i] = Operations<T>.LessThan(l, r) ? l : r;
-        }
-    }
+    public void Min(Span<T> left, Span<T> right, Span<T> result) =>
+        RunPair(left, right, result, Vector.Min, static (l, r) => Operations<T>.LessThan(l, r) ? l : r);
 
     public T GetMin(Span<T> span)
     {
@@ -310,6 +216,31 @@ internal sealed class SimdNumberOperations<T> : ISpanNumberOperations<T>, ISpanG
 }
 
 #if NET7_0_OR_GREATER
+internal static class SimdShiftRunner<T> where T : unmanaged
+{
+    public delegate Vector<T> VectorShiftOp(Vector<T> value, int count);
+
+    public delegate T ScalarShiftOp(T value, int count);
+
+    private static readonly int s_VectorSize = Vector<T>.Count;
+
+    public static void Run(Span<T> src, int count, Span<T> result, VectorShiftOp vectorOp, ScalarShiftOp scalarOp)
+    {
+        var i = 0;
+        var length = src.Length - s_VectorSize;
+        for (; i <= length; i += s_VectorSize)
+        {
+            var va = new Vector<T>(src.Slice(i, s_VectorSize));
+            vectorOp(va, count).CopyTo(result.Slice(i, s_VectorSize));
+        }
+
+        for (; i < src.Length; i++)
+        {
+            result[i] = scalarOp(src[i], count);
+        }
+    }
+}
+
 /// <summary>
 /// SIMD span operation.
 /// </summary>
@@ -318,53 +249,11 @@ internal sealed class SimdIntOperation : ISpanShiftLeft<int>, ISpanShiftRight<in
     /// <inheritdoc/>
     public bool Supported => Vector.IsHardwareAccelerated;
 
-    private static readonly int s_VectorSize = Vector<int>.Count;
+    public void ShiftLeft(Span<int> src, int count, Span<int> result) =>
+        SimdShiftRunner<int>.Run(src, count, result, Vector.ShiftLeft, static (v, c) => v << c);
 
-    /// <inheritdoc/>
-    public void ShiftLeft(Span<int> src, int count, Span<int> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<int>(current);
-            var vr = Vector.ShiftLeft(va, count);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = src[i] << count;
-        }
-    }
-
-    /// <inheritdoc/>
-    public void ShiftRight(Span<int> src, int count, Span<int> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<int>(current);
-            var vr = Vector.ShiftRightArithmetic(va, count);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = src[i] >> count;
-        }
-    }
+    public void ShiftRight(Span<int> src, int count, Span<int> result) =>
+        SimdShiftRunner<int>.Run(src, count, result, Vector.ShiftRightArithmetic, static (v, c) => v >> c);
 }
 
 /// <summary>
@@ -375,53 +264,11 @@ internal sealed class SimdLongOperation : ISpanShiftLeft<long>, ISpanShiftRight<
     /// <inheritdoc/>
     public bool Supported => Vector.IsHardwareAccelerated;
 
-    private static readonly int s_VectorSize = Vector<int>.Count;
+    public void ShiftLeft(Span<long> src, int count, Span<long> result) =>
+        SimdShiftRunner<long>.Run(src, count, result, Vector.ShiftLeft, static (v, c) => v << c);
 
-    /// <inheritdoc/>
-    public void ShiftLeft(Span<long> src, int count, Span<long> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<long>(current);
-            var vr = Vector.ShiftLeft(va, count);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = src[i] << count;
-        }
-    }
-
-    /// <inheritdoc/>
-    public void ShiftRight(Span<long> src, int count, Span<long> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<long>(current);
-            var vr = Vector.ShiftRightArithmetic(va, count);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = src[i] >> count;
-        }
-    }
+    public void ShiftRight(Span<long> src, int count, Span<long> result) =>
+        SimdShiftRunner<long>.Run(src, count, result, Vector.ShiftRightArithmetic, static (v, c) => v >> c);
 }
 
 /// <summary>
@@ -432,53 +279,11 @@ internal sealed class SimdUintOperation : ISpanShiftLeft<uint>, ISpanShiftRight<
     /// <inheritdoc/>
     public bool Supported => Vector.IsHardwareAccelerated;
 
-    private static readonly int s_VectorSize = Vector<uint>.Count;
+    public void ShiftLeft(Span<uint> src, int count, Span<uint> result) =>
+        SimdShiftRunner<uint>.Run(src, count, result, Vector.ShiftLeft, static (v, c) => v << c);
 
-    /// <inheritdoc/>
-    public void ShiftLeft(Span<uint> src, int count, Span<uint> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<uint>(current);
-            var vr = Vector.ShiftLeft(va, count);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = src[i] << count;
-        }
-    }
-
-    /// <inheritdoc/>
-    public void ShiftRight(Span<uint> src, int count, Span<uint> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<uint>(current);
-            var vr = Vector.ShiftRightLogical(va, count);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = src[i] >> count;
-        }
-    }
+    public void ShiftRight(Span<uint> src, int count, Span<uint> result) =>
+        SimdShiftRunner<uint>.Run(src, count, result, Vector.ShiftRightLogical, static (v, c) => v >> c);
 }
 
 /// <summary>
@@ -489,667 +294,289 @@ internal sealed class SimdUlongOperation : ISpanShiftLeft<ulong>, ISpanShiftRigh
     /// <inheritdoc/>
     public bool Supported => Vector.IsHardwareAccelerated;
 
-    private static readonly int s_VectorSize = Vector<uint>.Count;
+    public void ShiftLeft(Span<ulong> src, int count, Span<ulong> result) =>
+        SimdShiftRunner<ulong>.Run(src, count, result, Vector.ShiftLeft, static (v, c) => v << c);
 
-    /// <inheritdoc/>
-    public void ShiftLeft(Span<ulong> src, int count, Span<ulong> result)
+    public void ShiftRight(Span<ulong> src, int count, Span<ulong> result) =>
+        SimdShiftRunner<ulong>.Run(src, count, result, Vector.ShiftRightLogical, static (v, c) => v >> c);
+}
+#endif
+
+internal static class SimdRealRunner<T> where T : unmanaged
+{
+    public delegate Vector<T> UnaryVectorOp(Vector<T> value);
+
+    public delegate T UnaryScalarOp(T value);
+
+    public delegate Vector<T> BinaryVectorOp(Vector<T> left, Vector<T> right);
+
+    public delegate T BinaryScalarOp(T left, T right);
+
+    public delegate Vector<T> TernaryVectorOp(Vector<T> a, Vector<T> b, Vector<T> c);
+
+    public delegate T TernaryScalarOp(T a, T b, T c);
+
+    private static readonly int s_VectorSize = Vector<T>.Count;
+
+    public static void RunUnary(Span<T> src, Span<T> result, UnaryVectorOp vectorOp, UnaryScalarOp scalarOp)
     {
         var i = 0;
         var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-
         for (; i <= length; i += s_VectorSize)
         {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<ulong>(current);
-            var vr = Vector.ShiftLeft(va, count);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
+            var va = new Vector<T>(src.Slice(i, s_VectorSize));
+            vectorOp(va).CopyTo(result.Slice(i, s_VectorSize));
         }
 
-        // Calculate remain.
         for (; i < src.Length; i++)
         {
-            result[i] = src[i] << count;
+            result[i] = scalarOp(src[i]);
         }
     }
 
-    /// <inheritdoc/>
-    public void ShiftRight(Span<ulong> src, int count, Span<ulong> result)
+    public static void RunBinary(Span<T> left, Span<T> right, Span<T> result, BinaryVectorOp vectorOp, BinaryScalarOp scalarOp)
+    {
+        var i = 0;
+        var length = left.Length - s_VectorSize;
+        for (; i <= length; i += s_VectorSize)
+        {
+            var va = new Vector<T>(left.Slice(i, s_VectorSize));
+            var vb = new Vector<T>(right.Slice(i, s_VectorSize));
+            vectorOp(va, vb).CopyTo(result.Slice(i, s_VectorSize));
+        }
+
+        for (; i < left.Length; i++)
+        {
+            result[i] = scalarOp(left[i], right[i]);
+        }
+    }
+
+    public static void RunBinaryRightScalar(Span<T> left, T right, Span<T> result, BinaryVectorOp vectorOp, BinaryScalarOp scalarOp)
+    {
+        var i = 0;
+        var length = left.Length - s_VectorSize;
+        var vb = new Vector<T>(right);
+        for (; i <= length; i += s_VectorSize)
+        {
+            var va = new Vector<T>(left.Slice(i, s_VectorSize));
+            vectorOp(va, vb).CopyTo(result.Slice(i, s_VectorSize));
+        }
+
+        for (; i < left.Length; i++)
+        {
+            result[i] = scalarOp(left[i], right);
+        }
+    }
+
+    public static void RunTernary(Span<T> a, Span<T> b, Span<T> c, Span<T> result, TernaryVectorOp vectorOp, TernaryScalarOp scalarOp)
+    {
+        var i = 0;
+        var length = a.Length - s_VectorSize;
+        for (; i <= length; i += s_VectorSize)
+        {
+            var va = new Vector<T>(a.Slice(i, s_VectorSize));
+            var vb = new Vector<T>(b.Slice(i, s_VectorSize));
+            var vc = new Vector<T>(c.Slice(i, s_VectorSize));
+            vectorOp(va, vb, vc).CopyTo(result.Slice(i, s_VectorSize));
+        }
+
+        for (; i < a.Length; i++)
+        {
+            result[i] = scalarOp(a[i], b[i], c[i]);
+        }
+    }
+
+    public static void RunTernaryMiddleScalar(Span<T> a, T b, Span<T> c, Span<T> result, TernaryVectorOp vectorOp, TernaryScalarOp scalarOp)
+    {
+        var i = 0;
+        var length = a.Length - s_VectorSize;
+        var vb = new Vector<T>(b);
+        for (; i <= length; i += s_VectorSize)
+        {
+            var va = new Vector<T>(a.Slice(i, s_VectorSize));
+            var vc = new Vector<T>(c.Slice(i, s_VectorSize));
+            vectorOp(va, vb, vc).CopyTo(result.Slice(i, s_VectorSize));
+        }
+
+        for (; i < a.Length; i++)
+        {
+            result[i] = scalarOp(a[i], b, c[i]);
+        }
+    }
+
+    public static void RunUnaryWithTwoScalars(Span<T> src, T b, T c, Span<T> result, TernaryVectorOp vectorOp, TernaryScalarOp scalarOp)
     {
         var i = 0;
         var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-
+        var vb = new Vector<T>(b);
+        var vc = new Vector<T>(c);
         for (; i <= length; i += s_VectorSize)
         {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<ulong>(current);
-            var vr = Vector.ShiftRightLogical(va, count);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
+            var va = new Vector<T>(src.Slice(i, s_VectorSize));
+            vectorOp(va, vb, vc).CopyTo(result.Slice(i, s_VectorSize));
         }
 
-        // Calculate remain.
         for (; i < src.Length; i++)
         {
-            result[i] = src[i] >> count;
+            result[i] = scalarOp(src[i], b, c);
         }
     }
 }
-#endif
+
+internal static class SimdFloatRunner
+{
+    private static readonly int s_VectorSize = Vector<float>.Count;
+
+    public static void ApplySqrt(Span<float> values, int count)
+    {
+        var i = 0;
+        var simdLength = count - count % s_VectorSize;
+        for (; i < simdLength; i += s_VectorSize)
+        {
+            Vector.SquareRoot(new Vector<float>(values.Slice(i, s_VectorSize))).CopyTo(values.Slice(i, s_VectorSize));
+        }
+
+        for (; i < count; i++)
+        {
+            values[i] = MathF.Sqrt(values[i]);
+        }
+    }
+}
+
+internal static class SimdPackedFloatRunner
+{
+    public static void SumGroups(ReadOnlySpan<float> source, Span<float> destination, int groupSize, int groupCount)
+    {
+        for (var group = 0; group < groupCount; group++)
+        {
+            var offset = group * groupSize;
+            var sum = 0f;
+            for (var lane = 0; lane < groupSize; lane++)
+            {
+                sum += source[offset + lane];
+            }
+
+            destination[group] = sum;
+        }
+    }
+
+    public static void ExpandGroups(ReadOnlySpan<float> source, Span<float> destination, int groupSize, int groupCount)
+    {
+        for (var group = 0; group < groupCount; group++)
+        {
+            var value = source[group];
+            var offset = group * groupSize;
+            for (var lane = 0; lane < groupSize; lane++)
+            {
+                destination[offset + lane] = value;
+            }
+        }
+    }
+
+    public static Vector<int> BuildNegativeMask(ReadOnlySpan<float> values, int groupSize, int groupCount)
+    {
+        Span<int> expanded = stackalloc int[Vector<int>.Count];
+        for (var group = 0; group < groupCount; group++)
+        {
+            var maskValue = values[group] < 0f ? -1 : 0;
+            var offset = group * groupSize;
+            for (var lane = 0; lane < groupSize; lane++)
+            {
+                expanded[offset + lane] = maskValue;
+            }
+        }
+
+        return new Vector<int>(expanded);
+    }
+}
 
 /// <summary>
 /// SIMD span operation.
 /// </summary>
 internal sealed class SimdFloatOperation : ISpanRealOperations<float>
 {
-    /// <inheritdoc/>
     public bool Supported => Vector.IsHardwareAccelerated;
 
-    private static readonly int s_VectorSize = Vector<float>.Count;
+    public void Sqrt(Span<float> src, Span<float> result) =>
+        SimdRealRunner<float>.RunUnary(src, result, Vector.SquareRoot, MathF.Sqrt);
 
-    /// <inheritdoc />
-    public void Sqrt(Span<float> src, Span<float> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
+    public void Ceiling(Span<float> src, Span<float> result) =>
+        SimdRealRunner<float>.RunUnary(src, result, VectorMath.Ceiling, MathF.Ceiling);
 
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<float>(current);
-            var vr = Vector.SquareRoot(va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
+    public void Floor(Span<float> src, Span<float> result) =>
+        SimdRealRunner<float>.RunUnary(src, result, VectorMath.Floor, MathF.Floor);
 
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = MathF.Sqrt(src[i]);
-        }
-    }
+    public void Clamp(Span<float> src, Span<float> min, Span<float> max, Span<float> result) =>
+        SimdRealRunner<float>.RunTernary(src, min, max, result, VectorMath.Clamp, static (v, mn, mx) => MathF.Min(MathF.Max(v, mn), mx));
 
-    /// <inheritdoc />
-    public void Ceiling(Span<float> src, Span<float> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
+    public void Clamp(Span<float> src, float min, float max, Span<float> result) =>
+        SimdRealRunner<float>.RunUnaryWithTwoScalars(src, min, max, result, VectorMath.Clamp, static (v, mn, mx) => MathF.Min(MathF.Max(v, mn), mx));
 
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<float>(current);
-            var vr = VectorMath.Ceiling(va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
+    public void Lerp(Span<float> x, Span<float> y, Span<float> amount, Span<float> result) =>
+        SimdRealRunner<float>.RunTernary(x, y, amount, result, VectorMath.Lerp, static (a, b, t) => a * (1 - t) + b * t);
 
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = MathF.Ceiling(src[i]);
-        }
-    }
+    public void Lerp(Span<float> x, float y, Span<float> amount, Span<float> result) =>
+        SimdRealRunner<float>.RunTernaryMiddleScalar(x, y, amount, result, VectorMath.Lerp, static (a, b, t) => a * (1 - t) + b * t);
 
-    /// <inheritdoc />
-    public void Floor(Span<float> src, Span<float> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
+    public void Hypot(Span<float> x, Span<float> y, Span<float> result) =>
+        SimdRealRunner<float>.RunBinary(x, y, result, VectorMath.Hypot, static (a, b) => MathF.Sqrt(a * a * b * b));
 
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<float>(current);
-            var vr = VectorMath.Floor(va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
+    public void Hypot(Span<float> x, float y, Span<float> result) =>
+        SimdRealRunner<float>.RunBinaryRightScalar(x, y, result, VectorMath.Hypot, static (a, b) => MathF.Sqrt(a * a * b * b));
 
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = MathF.Floor(src[i]);
-        }
-    }
+    public void Pow(Span<float> src, float exponent, Span<float> result) =>
+        SimdRealRunner<float>.RunBinaryRightScalar(src, exponent, result, VectorMath.Pow, MathF.Pow);
 
-    /// <inheritdoc />
-    public void Clamp(Span<float> src, Span<float> min, Span<float> max, Span<float> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
+    public void Pow(Span<float> src, Span<float> exponent, Span<float> result) =>
+        SimdRealRunner<float>.RunBinary(src, exponent, result, VectorMath.Pow, MathF.Pow);
 
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var va = new Vector<float>(src.Slice(i, s_VectorSize));
-            var vmin = new Vector<float>(min.Slice(i, s_VectorSize));
-            var vmax = new Vector<float>(max.Slice(i, s_VectorSize));
-            var vr = VectorMath.Clamp(va, vmin, vmax);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
+    public void Round(Span<float> src, Span<float> result) =>
+        SimdRealRunner<float>.RunUnary(src, result, VectorMath.Round, MathF.Round);
 
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = MathF.Min(MathF.Max(src[i], min[i]), max[i]);
-        }
-    }
+    public void Exp(Span<float> src, Span<float> result) =>
+        SimdRealRunner<float>.RunUnary(src, result, VectorMath.Exp, MathF.Exp);
 
-    /// <inheritdoc />
-    public void Clamp(Span<float> src, float min, float max, Span<float> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
+    public void Log(Span<float> src, Span<float> result) =>
+        SimdRealRunner<float>.RunUnary(src, result, VectorMath.Log, MathF.Log);
 
-        // SIMD calculation.
-        var vmin = new Vector<float>(min);
-        var vmax = new Vector<float>(max);
-        for (; i <= length; i += s_VectorSize)
-        {
-            var va = new Vector<float>(src.Slice(i, s_VectorSize));
-            var vr = VectorMath.Clamp(va, vmin, vmax);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
+    public void Truncate(Span<float> src, Span<float> result) =>
+        SimdRealRunner<float>.RunUnary(src, result, VectorMath.Truncate, MathF.Truncate);
 
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = MathF.Min(MathF.Max(src[i], min), max);
-        }
-    }
+    public void Sin(Span<float> src, Span<float> result) =>
+        SimdRealRunner<float>.RunUnary(src, result, VectorMath.Sin, MathF.Sin);
 
-    /// <inheritdoc />
-    public void Lerp(Span<float> x, Span<float> y, Span<float> amount, Span<float> result)
-    {
-        var i = 0;
-        var length = x.Length - s_VectorSize;
+    public void Cos(Span<float> src, Span<float> result) =>
+        SimdRealRunner<float>.RunUnary(src, result, VectorMath.Cos, MathF.Cos);
 
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var vx = new Vector<float>(x.Slice(i, s_VectorSize));
-            var vy = new Vector<float>(y.Slice(i, s_VectorSize));
-            var va = new Vector<float>(amount.Slice(i, s_VectorSize));
-            var vr = VectorMath.Lerp(vx, vy, va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
+    public void Tan(Span<float> src, Span<float> result) =>
+        SimdRealRunner<float>.RunUnary(src, result, VectorMath.Tan, MathF.Tan);
 
-        // Calculate remain.
-        for (; i < x.Length; i++)
-        {
-            result[i] = x[i] * (1 - amount[i]) + y[i] * amount[i];
-        }
-    }
+    public void Sinh(Span<float> src, Span<float> result) =>
+        SimdRealRunner<float>.RunUnary(src, result, VectorMath.Sinh, MathF.Sinh);
 
-    /// <inheritdoc />
-    public void Lerp(Span<float> x, float y, Span<float> amount, Span<float> result)
-    {
-        var i = 0;
-        var length = x.Length - s_VectorSize;
+    public void Cosh(Span<float> src, Span<float> result) =>
+        SimdRealRunner<float>.RunUnary(src, result, VectorMath.Cosh, MathF.Cosh);
 
-        // SIMD calculation.
-        var vy = new Vector<float>(y);
-        for (; i <= length; i += s_VectorSize)
-        {
-            var vx = new Vector<float>(x.Slice(i, s_VectorSize));
-            var va = new Vector<float>(amount.Slice(i, s_VectorSize));
-            var vr = VectorMath.Lerp(vx, vy, va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
+    public void Tanh(Span<float> src, Span<float> result) =>
+        SimdRealRunner<float>.RunUnary(src, result, VectorMath.Tanh, MathF.Tanh);
 
-        // Calculate remain.
-        for (; i < x.Length; i++)
-        {
-            result[i] = x[i] * (1 - amount[i]) + y * amount[i];
-        }
-    }
+    public void Asin(Span<float> src, Span<float> result) =>
+        SimdRealRunner<float>.RunUnary(src, result, VectorMath.Asin, MathF.Asin);
 
-    /// <inheritdoc />
-    public void Hypot(Span<float> x, Span<float> y, Span<float> result)
-    {
-        var i = 0;
-        var length = x.Length - s_VectorSize;
+    public void Acos(Span<float> src, Span<float> result) =>
+        SimdRealRunner<float>.RunUnary(src, result, VectorMath.Acos, MathF.Acos);
 
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var vx = new Vector<float>(x.Slice(i, s_VectorSize));
-            var vy = new Vector<float>(y.Slice(i, s_VectorSize));
-            var vr = VectorMath.Hypot(vx, vy);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
+    public void Atan(Span<float> src, Span<float> result) =>
+        SimdRealRunner<float>.RunUnary(src, result, VectorMath.Atan, MathF.Atan);
 
-        // Calculate remain.
-        for (; i < x.Length; i++)
-        {
-            var doubleX = x[i] * x[i];
-            var doubleY = y[i] * y[i];
-            result[i] = MathF.Sqrt(doubleX * doubleY);
-        }
-    }
+    public void Asinh(Span<float> src, Span<float> result) =>
+        SimdRealRunner<float>.RunUnary(src, result, VectorMath.Asinh, MathF.Asinh);
 
-    /// <inheritdoc />
-    public void Hypot(Span<float> x, float y, Span<float> result)
-    {
-        var i = 0;
-        var length = x.Length - s_VectorSize;
+    public void Acosh(Span<float> src, Span<float> result) =>
+        SimdRealRunner<float>.RunUnary(src, result, VectorMath.Acosh, MathF.Acosh);
 
-        // SIMD calculation.
-        var vy = new Vector<float>(y);
-        for (; i <= length; i += s_VectorSize)
-        {
-            var vx = new Vector<float>(x.Slice(i, s_VectorSize));
-            var vr = VectorMath.Hypot(vx, vy);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        var doubleY = y * y;
-        for (; i < x.Length; i++)
-        {
-            var doubleX = x[i] * x[i];
-            result[i] = MathF.Sqrt(doubleX * doubleY);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Pow(Span<float> src, float exponent, Span<float> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        var vy = new Vector<float>(exponent);
-        for (; i <= length; i += s_VectorSize)
-        {
-            var vx = new Vector<float>(src.Slice(i, s_VectorSize));
-            var vr = VectorMath.Pow(vx, vy);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = MathF.Pow(src[i], exponent);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Pow(Span<float> src, Span<float> exponent, Span<float> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var vx = new Vector<float>(src.Slice(i, s_VectorSize));
-            var vy = new Vector<float>(exponent.Slice(i, s_VectorSize));
-            var vr = VectorMath.Pow(vx, vy);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = MathF.Pow(src[i], exponent[i]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Round(Span<float> src, Span<float> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<float>(current);
-            var vr = VectorMath.Round(va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = MathF.Round(src[i]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Exp(Span<float> src, Span<float> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<float>(current);
-            var vr = VectorMath.Exp(va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = MathF.Exp(src[i]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Log(Span<float> src, Span<float> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<float>(current);
-            var vr = VectorMath.Log(va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = MathF.Log(src[i]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Truncate(Span<float> src, Span<float> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<float>(current);
-            var vr = VectorMath.Truncate(va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = MathF.Truncate(src[i]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Sin(Span<float> src, Span<float> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<float>(current);
-            var vr = VectorMath.Sin(va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = MathF.Sin(src[i]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Cos(Span<float> src, Span<float> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<float>(current);
-            var vr = VectorMath.Cos(va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = MathF.Cos(src[i]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Tan(Span<float> src, Span<float> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<float>(current);
-            var vr = VectorMath.Tan(va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = MathF.Tan(src[i]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Sinh(Span<float> src, Span<float> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<float>(current);
-            var vr = VectorMath.Sinh(va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = MathF.Sinh(src[i]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Cosh(Span<float> src, Span<float> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<float>(current);
-            var vr = VectorMath.Cosh(va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = MathF.Cosh(src[i]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Tanh(Span<float> src, Span<float> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<float>(current);
-            var vr = VectorMath.Tanh(va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = MathF.Tanh(src[i]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Asin(Span<float> src, Span<float> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<float>(current);
-            var vr = VectorMath.Asin(va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = MathF.Asin(src[i]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Acos(Span<float> src, Span<float> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<float>(current);
-            var vr = VectorMath.Acos(va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = MathF.Acos(src[i]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Atan(Span<float> src, Span<float> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<float>(current);
-            var vr = VectorMath.Atan(va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = MathF.Atan(src[i]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Asinh(Span<float> src, Span<float> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<float>(current);
-            var vr = VectorMath.Asinh(va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = MathF.Asinh(src[i]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Acosh(Span<float> src, Span<float> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<float>(current);
-            var vr = VectorMath.Acosh(va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = MathF.Acosh(src[i]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Atanh(Span<float> src, Span<float> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<float>(current);
-            var vr = VectorMath.Atanh(va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = MathF.Atanh(src[i]);
-        }
-    }
+    public void Atanh(Span<float> src, Span<float> result) =>
+        SimdRealRunner<float>.RunUnary(src, result, VectorMath.Atanh, MathF.Atanh);
 }
 
 /// <summary>
@@ -1157,617 +584,93 @@ internal sealed class SimdFloatOperation : ISpanRealOperations<float>
 /// </summary>
 internal sealed class SimdDoubleOperation : ISpanRealOperations<double>
 {
-    /// <inheritdoc/>
     public bool Supported => Vector.IsHardwareAccelerated;
 
-    private static readonly int s_VectorSize = Vector<double>.Count;
+    public void Sqrt(Span<double> src, Span<double> result) =>
+        SimdRealRunner<double>.RunUnary(src, result, Vector.SquareRoot, Math.Sqrt);
 
-    /// <inheritdoc />
-    public void Sqrt(Span<double> src, Span<double> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
+    public void Ceiling(Span<double> src, Span<double> result) =>
+        SimdRealRunner<double>.RunUnary(src, result, VectorMath.Ceiling, Math.Ceiling);
 
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<double>(current);
-            var vr = Vector.SquareRoot(va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
+    public void Floor(Span<double> src, Span<double> result) =>
+        SimdRealRunner<double>.RunUnary(src, result, VectorMath.Floor, Math.Floor);
 
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = Math.Sqrt(src[i]);
-        }
-    }
+    public void Clamp(Span<double> src, Span<double> min, Span<double> max, Span<double> result) =>
+        SimdRealRunner<double>.RunTernary(src, min, max, result, VectorMath.Clamp, Math.Clamp);
 
-    /// <inheritdoc />
-    public void Ceiling(Span<double> src, Span<double> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
+    public void Clamp(Span<double> src, double min, double max, Span<double> result) =>
+        SimdRealRunner<double>.RunUnaryWithTwoScalars(src, min, max, result, VectorMath.Clamp, Math.Clamp);
 
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<double>(current);
-            var vr = VectorMath.Ceiling(va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
+    public void Lerp(Span<double> x, Span<double> y, Span<double> amount, Span<double> result) =>
+        SimdRealRunner<double>.RunTernary(x, y, amount, result, VectorMath.Lerp, static (a, b, t) => a * (1 - t) + b * t);
 
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = Math.Ceiling(src[i]);
-        }
-    }
+    public void Lerp(Span<double> x, double y, Span<double> amount, Span<double> result) =>
+        SimdRealRunner<double>.RunTernaryMiddleScalar(x, y, amount, result, VectorMath.Lerp, static (a, b, t) => a * (1 - t) + b * t);
 
-    /// <inheritdoc />
-    public void Floor(Span<double> src, Span<double> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
+    public void Hypot(Span<double> x, Span<double> y, Span<double> result) =>
+        SimdRealRunner<double>.RunBinary(x, y, result, VectorMath.Hypot, static (a, b) => Math.Sqrt(a * a * b * b));
 
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<double>(current);
-            var vr = VectorMath.Floor(va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
+    public void Hypot(Span<double> x, double y, Span<double> result) =>
+        SimdRealRunner<double>.RunBinaryRightScalar(x, y, result, VectorMath.Hypot, static (a, b) => Math.Sqrt(a * a * b * b));
 
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = Math.Floor(src[i]);
-        }
-    }
+    public void Pow(Span<double> src, double exponent, Span<double> result) =>
+        SimdRealRunner<double>.RunBinaryRightScalar(src, exponent, result, VectorMath.Pow, Math.Pow);
 
-    /// <inheritdoc />
-    public void Clamp(Span<double> src, Span<double> min, Span<double> max, Span<double> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
+    public void Pow(Span<double> src, Span<double> exponent, Span<double> result) =>
+        SimdRealRunner<double>.RunBinary(src, exponent, result, VectorMath.Pow, Math.Pow);
 
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var va = new Vector<double>(src.Slice(i, s_VectorSize));
-            var vmin = new Vector<double>(min.Slice(i, s_VectorSize));
-            var vmax = new Vector<double>(max.Slice(i, s_VectorSize));
-            var vr = VectorMath.Clamp(va, vmin, vmax);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
+    public void Round(Span<double> src, Span<double> result) =>
+        SimdRealRunner<double>.RunUnary(src, result, VectorMath.Round, Math.Round);
 
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = Math.Clamp(src[i], min[i], max[i]);
-        }
-    }
+    public void Exp(Span<double> src, Span<double> result) =>
+        SimdRealRunner<double>.RunUnary(src, result, VectorMath.Exp, Math.Exp);
 
-    /// <inheritdoc />
-    public void Clamp(Span<double> src, double min, double max, Span<double> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
+    public void Log(Span<double> src, Span<double> result) =>
+        SimdRealRunner<double>.RunUnary(src, result, VectorMath.Log, Math.Log);
 
-        // SIMD calculation.
-        var vmin = new Vector<double>(min);
-        var vmax = new Vector<double>(max);
-        for (; i <= length; i += s_VectorSize)
-        {
-            var va = new Vector<double>(src.Slice(i, s_VectorSize));
-            var vr = VectorMath.Clamp(va, vmin, vmax);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
+    public void Truncate(Span<double> src, Span<double> result) =>
+        SimdRealRunner<double>.RunUnary(src, result, VectorMath.Truncate, Math.Truncate);
 
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = Math.Clamp(src[i], min, max);
-        }
-    }
+    public void Sin(Span<double> src, Span<double> result) =>
+        SimdRealRunner<double>.RunUnary(src, result, VectorMath.Sin, Math.Sin);
 
-    /// <inheritdoc />
-    public void Lerp(Span<double> x, Span<double> y, Span<double> amount, Span<double> result)
-    {
-        var i = 0;
-        var length = x.Length - s_VectorSize;
+    public void Cos(Span<double> src, Span<double> result) =>
+        SimdRealRunner<double>.RunUnary(src, result, VectorMath.Cos, Math.Cos);
 
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var vx = new Vector<double>(x.Slice(i, s_VectorSize));
-            var vy = new Vector<double>(y.Slice(i, s_VectorSize));
-            var va = new Vector<double>(amount.Slice(i, s_VectorSize));
-            var vr = VectorMath.Lerp(vx, vy, va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
+    public void Tan(Span<double> src, Span<double> result) =>
+        SimdRealRunner<double>.RunUnary(src, result, VectorMath.Tan, Math.Tan);
 
-        // Calculate remain.
-        for (; i < x.Length; i++)
-        {
-            result[i] = x[i] * (1 - amount[i]) + y[i] * amount[i];
-        }
-    }
+    public void Sinh(Span<double> src, Span<double> result) =>
+        SimdRealRunner<double>.RunUnary(src, result, VectorMath.Sinh, Math.Sinh);
 
-    /// <inheritdoc />
-    public void Lerp(Span<double> x, double y, Span<double> amount, Span<double> result)
-    {
-        var i = 0;
-        var length = x.Length - s_VectorSize;
+    public void Cosh(Span<double> src, Span<double> result) =>
+        SimdRealRunner<double>.RunUnary(src, result, VectorMath.Cosh, Math.Cosh);
 
-        // SIMD calculation.
-        var vy = new Vector<double>(y);
-        for (; i <= length; i += s_VectorSize)
-        {
-            var vx = new Vector<double>(x.Slice(i, s_VectorSize));
-            var va = new Vector<double>(amount.Slice(i, s_VectorSize));
-            var vr = VectorMath.Lerp(vx, vy, va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
+    public void Tanh(Span<double> src, Span<double> result) =>
+        SimdRealRunner<double>.RunUnary(src, result, VectorMath.Tanh, Math.Tanh);
 
-        // Calculate remain.
-        for (; i < x.Length; i++)
-        {
-            result[i] = x[i] * (1 - amount[i]) + y * amount[i];
-        }
-    }
+    public void Asin(Span<double> src, Span<double> result) =>
+        SimdRealRunner<double>.RunUnary(src, result, VectorMath.Asin, Math.Asin);
 
-    /// <inheritdoc />
-    public void Hypot(Span<double> x, Span<double> y, Span<double> result)
-    {
-        var i = 0;
-        var length = x.Length - s_VectorSize;
+    public void Acos(Span<double> src, Span<double> result) =>
+        SimdRealRunner<double>.RunUnary(src, result, VectorMath.Acos, Math.Acos);
 
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var vx = new Vector<double>(x.Slice(i, s_VectorSize));
-            var vy = new Vector<double>(y.Slice(i, s_VectorSize));
-            var vr = VectorMath.Hypot(vx, vy);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
+    public void Atan(Span<double> src, Span<double> result) =>
+        SimdRealRunner<double>.RunUnary(src, result, VectorMath.Atan, Math.Atan);
 
-        // Calculate remain.
-        for (; i < x.Length; i++)
-        {
-            var doubleX = x[i] * x[i];
-            var doubleY = y[i] * y[i];
-            result[i] = Math.Sqrt(doubleX * doubleY);
-        }
-    }
+    public void Asinh(Span<double> src, Span<double> result) =>
+        SimdRealRunner<double>.RunUnary(src, result, VectorMath.Asinh, Math.Asinh);
 
-    /// <inheritdoc />
-    public void Hypot(Span<double> x, double y, Span<double> result)
-    {
-        var i = 0;
-        var length = x.Length - s_VectorSize;
+    public void Acosh(Span<double> src, Span<double> result) =>
+        SimdRealRunner<double>.RunUnary(src, result, VectorMath.Acosh, Math.Acosh);
 
-        // SIMD calculation.
-        var vy = new Vector<double>(y);
-        for (; i <= length; i += s_VectorSize)
-        {
-            var vx = new Vector<double>(x.Slice(i, s_VectorSize));
-            var vr = VectorMath.Hypot(vx, vy);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        var doubleY = y * y;
-        for (; i < x.Length; i++)
-        {
-            var doubleX = x[i] * x[i];
-            result[i] = Math.Sqrt(doubleX * doubleY);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Pow(Span<double> src, double exponent, Span<double> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        var vy = new Vector<double>(exponent);
-        for (; i <= length; i += s_VectorSize)
-        {
-            var vx = new Vector<double>(src.Slice(i, s_VectorSize));
-            var vr = VectorMath.Pow(vx, vy);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = Math.Pow(src[i], exponent);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Pow(Span<double> src, Span<double> exponent, Span<double> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var vx = new Vector<double>(src.Slice(i, s_VectorSize));
-            var vy = new Vector<double>(exponent.Slice(i, s_VectorSize));
-            var vr = VectorMath.Pow(vx, vy);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = Math.Pow(src[i], exponent[i]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Round(Span<double> src, Span<double> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<double>(current);
-            var vr = VectorMath.Round(va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = Math.Round(src[i]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Exp(Span<double> src, Span<double> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<double>(current);
-            var vr = VectorMath.Exp(va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = Math.Exp(src[i]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Log(Span<double> src, Span<double> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<double>(current);
-            var vr = VectorMath.Log(va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = Math.Log(src[i]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Truncate(Span<double> src, Span<double> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<double>(current);
-            var vr = VectorMath.Truncate(va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = Math.Truncate(src[i]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Sin(Span<double> src, Span<double> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<double>(current);
-            var vr = VectorMath.Sin(va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = Math.Sin(src[i]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Cos(Span<double> src, Span<double> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<double>(current);
-            var vr = VectorMath.Cos(va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = Math.Cos(src[i]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Tan(Span<double> src, Span<double> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<double>(current);
-            var vr = VectorMath.Tan(va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = Math.Tan(src[i]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Sinh(Span<double> src, Span<double> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<double>(current);
-            var vr = VectorMath.Sinh(va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = Math.Sinh(src[i]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Cosh(Span<double> src, Span<double> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<double>(current);
-            var vr = VectorMath.Cosh(va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = Math.Cosh(src[i]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Tanh(Span<double> src, Span<double> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<double>(current);
-            var vr = VectorMath.Tanh(va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = Math.Tanh(src[i]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Asin(Span<double> src, Span<double> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<double>(current);
-            var vr = VectorMath.Asin(va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = Math.Asin(src[i]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Acos(Span<double> src, Span<double> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<double>(current);
-            var vr = VectorMath.Acos(va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = Math.Acos(src[i]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Atan(Span<double> src, Span<double> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<double>(current);
-            var vr = VectorMath.Atan(va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = Math.Atan(src[i]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Asinh(Span<double> src, Span<double> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<double>(current);
-            var vr = VectorMath.Asinh(va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = Math.Asinh(src[i]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Acosh(Span<double> src, Span<double> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<double>(current);
-            var vr = VectorMath.Acosh(va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = Math.Acosh(src[i]);
-        }
-    }
-
-    /// <inheritdoc />
-    public void Atanh(Span<double> src, Span<double> result)
-    {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-
-        // SIMD calculation.
-        for (; i <= length; i += s_VectorSize)
-        {
-            var current = src.Slice(i, s_VectorSize);
-            var va = new Vector<double>(current);
-            var vr = VectorMath.Atanh(va);
-            vr.CopyTo(result.Slice(i, s_VectorSize));
-        }
-
-        // Calculate remain.
-        for (; i < src.Length; i++)
-        {
-            result[i] = Math.Atanh(src[i]);
-        }
-    }
+    public void Atanh(Span<double> src, Span<double> result) =>
+        SimdRealRunner<double>.RunUnary(src, result, VectorMath.Atanh, Math.Atanh);
 }
 
 internal sealed class SimdVectorOperation : ISpanVectorOperations<Vector2>
 {
-    private static readonly int s_FloatVectorSize = Vector<float>.Count;
+    private static readonly int s_FloatVectorSize  = Vector<float>.Count;
     private static readonly int s_Vector2BatchSize = Vector<float>.Count / 2;
 
     public bool Supported => Vector.IsHardwareAccelerated;
@@ -1787,7 +690,7 @@ internal sealed class SimdVectorOperation : ISpanVectorOperations<Vector2>
             var va = new Vector<float>(leftValues.Slice(offset, s_FloatVectorSize));
             var vb = new Vector<float>(rightValues.Slice(offset, s_FloatVectorSize));
             (va * vb).CopyTo(productBuffer);
-            SumPairs(productBuffer, dotPairs, s_Vector2BatchSize);
+            SimdPackedFloatRunner.SumGroups(productBuffer, dotPairs, 2, s_Vector2BatchSize);
             WriteReplicatedScalars(dotPairs, result, i, s_Vector2BatchSize);
         }
 
@@ -1822,7 +725,7 @@ internal sealed class SimdVectorOperation : ISpanVectorOperations<Vector2>
                 crossPairs[pair] = leftBuffer[lane] * rightBuffer[lane + 1] - leftBuffer[lane + 1] * rightBuffer[lane];
             }
 
-            ExpandPairs(crossPairs, crossExpanded, s_Vector2BatchSize);
+            SimdPackedFloatRunner.ExpandGroups(crossPairs, crossExpanded, 2, s_Vector2BatchSize);
             new Vector<float>(crossExpanded).CopyTo(resultValues.Slice(offset, s_FloatVectorSize));
         }
 
@@ -1850,14 +753,14 @@ internal sealed class SimdVectorOperation : ISpanVectorOperations<Vector2>
             var offset = i * 2;
             var va = new Vector<float>(srcValues.Slice(offset, s_FloatVectorSize));
             (va * va).CopyTo(squaredBuffer);
-            SumPairs(squaredBuffer, lengths, s_Vector2BatchSize);
+            SimdPackedFloatRunner.SumGroups(squaredBuffer, lengths, 2, s_Vector2BatchSize);
 
             for (var pair = 0; pair < s_Vector2BatchSize; pair++)
             {
                 lengths[pair] = MathF.Sqrt(lengths[pair]);
             }
 
-            ExpandPairs(lengths, expandedLengths, s_Vector2BatchSize);
+            SimdPackedFloatRunner.ExpandGroups(lengths, expandedLengths, 2, s_Vector2BatchSize);
             (va / new Vector<float>(expandedLengths)).CopyTo(resultValues.Slice(offset, s_FloatVectorSize));
         }
 
@@ -1884,13 +787,13 @@ internal sealed class SimdVectorOperation : ISpanVectorOperations<Vector2>
             var vr = new Vector<float>(rightValues.Slice(offset, s_FloatVectorSize));
 
             (vl * vr).CopyTo(pairBuffer);
-            SumPairs(pairBuffer, dotPairs, s_Vector2BatchSize);
+            SimdPackedFloatRunner.SumGroups(pairBuffer, dotPairs, 2, s_Vector2BatchSize);
 
             (vl * vl).CopyTo(pairBuffer);
-            SumPairs(pairBuffer, leftLengths, s_Vector2BatchSize);
+            SimdPackedFloatRunner.SumGroups(pairBuffer, leftLengths, 2, s_Vector2BatchSize);
 
             (vr * vr).CopyTo(pairBuffer);
-            SumPairs(pairBuffer, rightLengths, s_Vector2BatchSize);
+            SimdPackedFloatRunner.SumGroups(pairBuffer, rightLengths, 2, s_Vector2BatchSize);
 
             for (var pair = 0; pair < s_Vector2BatchSize; pair++)
             {
@@ -1934,8 +837,8 @@ internal sealed class SimdVectorOperation : ISpanVectorOperations<Vector2>
             var vs = new Vector<float>(srcValues.Slice(offset, s_FloatVectorSize));
             var vn = new Vector<float>(normalValues.Slice(offset, s_FloatVectorSize));
             (vs * vn).CopyTo(productBuffer);
-            SumPairs(productBuffer, dotPairs, s_Vector2BatchSize);
-            ExpandPairs(dotPairs, expandedDots, s_Vector2BatchSize);
+            SimdPackedFloatRunner.SumGroups(productBuffer, dotPairs, 2, s_Vector2BatchSize);
+            SimdPackedFloatRunner.ExpandGroups(dotPairs, expandedDots, 2, s_Vector2BatchSize);
             (vs - vn * (new Vector<float>(expandedDots) + new Vector<float>(expandedDots))).CopyTo(resultValues.Slice(offset, s_FloatVectorSize));
         }
 
@@ -1968,18 +871,18 @@ internal sealed class SimdVectorOperation : ISpanVectorOperations<Vector2>
             var vs = new Vector<float>(srcValues.Slice(offset, s_FloatVectorSize));
             var vn = new Vector<float>(normalValues.Slice(offset, s_FloatVectorSize));
             (vs * vn).CopyTo(productBuffer);
-            SumPairs(productBuffer, dotPairs, s_Vector2BatchSize);
+            SimdPackedFloatRunner.SumGroups(productBuffer, dotPairs, 2, s_Vector2BatchSize);
 
             for (var pair = 0; pair < s_Vector2BatchSize; pair++)
             {
                 var dot = dotPairs[pair];
                 var k = 1f - etaRatio * etaRatio * (1f - dot * dot);
-                kPairs[pair] = k;
+                kPairs[pair]      = k;
                 factorPairs[pair] = etaRatio * dot + (k < 0f ? 0f : MathF.Sqrt(k));
             }
 
-            ExpandPairs(kPairs, expandedK, s_Vector2BatchSize);
-            ExpandPairs(factorPairs, expandedFactors, s_Vector2BatchSize);
+            SimdPackedFloatRunner.ExpandGroups(kPairs, expandedK, 2, s_Vector2BatchSize);
+            SimdPackedFloatRunner.ExpandGroups(factorPairs, expandedFactors, 2, s_Vector2BatchSize);
 
             var refracted = etaVector * vs - vn * new Vector<float>(expandedFactors);
             var zeroMask = Vector.LessThan(new Vector<float>(expandedK), Vector<float>.Zero);
@@ -2017,15 +920,15 @@ internal sealed class SimdVectorOperation : ISpanVectorOperations<Vector2>
             var vt = new Vector<float>(targetValues.Slice(offset, s_FloatVectorSize));
             var vd = vt - vs;
             (vd * vd).CopyTo(squaredBuffer);
-            SumPairs(squaredBuffer, distances, s_Vector2BatchSize);
+            SimdPackedFloatRunner.SumGroups(squaredBuffer, distances, 2, s_Vector2BatchSize);
 
             for (var pair = 0; pair < s_Vector2BatchSize; pair++)
             {
                 distances[pair] = MathF.Sqrt(distances[pair]);
             }
 
-            ExpandPairs(distances, expandedDistances, s_Vector2BatchSize);
-            ExpandPairs(maxDistanceDelta.Slice(i, s_Vector2BatchSize), expandedMaxDelta, s_Vector2BatchSize);
+            SimdPackedFloatRunner.ExpandGroups(distances, expandedDistances, 2, s_Vector2BatchSize);
+            SimdPackedFloatRunner.ExpandGroups(maxDistanceDelta.Slice(i, s_Vector2BatchSize), expandedMaxDelta, 2, s_Vector2BatchSize);
 
             var vDistance = new Vector<float>(expandedDistances);
             var vMaxDelta = new Vector<float>(expandedMaxDelta);
@@ -2055,18 +958,7 @@ internal sealed class SimdVectorOperation : ISpanVectorOperations<Vector2>
     {
         LengthSquared(src, result);
 
-        var i = 0;
-        var simdLength = src.Length - src.Length % s_FloatVectorSize;
-        for (; i < simdLength; i += s_FloatVectorSize)
-        {
-            var vr = new Vector<float>(result.Slice(i, s_FloatVectorSize));
-            Vector.SquareRoot(vr).CopyTo(result.Slice(i, s_FloatVectorSize));
-        }
-
-        for (; i < src.Length; i++)
-        {
-            result[i] = MathF.Sqrt(result[i]);
-        }
+        SimdFloatRunner.ApplySqrt(result, src.Length);
     }
 
     public void LengthSquared(Span<Vector2> src, Span<float> result)
@@ -2082,10 +974,7 @@ internal sealed class SimdVectorOperation : ISpanVectorOperations<Vector2>
             var va = new Vector<float>(srcValues.Slice(offset, s_FloatVectorSize));
             (va * va).CopyTo(sqrBuffer);
 
-            for (var lane = 0; lane < s_FloatVectorSize; lane += 2)
-            {
-                result[i + lane / 2] = sqrBuffer[lane] + sqrBuffer[lane + 1];
-            }
+            SimdPackedFloatRunner.SumGroups(sqrBuffer, result.Slice(i, s_Vector2BatchSize), 2, s_Vector2BatchSize);
         }
 
         for (; i < src.Length; i++)
@@ -2098,18 +987,7 @@ internal sealed class SimdVectorOperation : ISpanVectorOperations<Vector2>
     {
         DistanceSquared(left, right, result);
 
-        var i = 0;
-        var simdLength = left.Length - left.Length % s_FloatVectorSize;
-        for (; i < simdLength; i += s_FloatVectorSize)
-        {
-            var vr = new Vector<float>(result.Slice(i, s_FloatVectorSize));
-            Vector.SquareRoot(vr).CopyTo(result.Slice(i, s_FloatVectorSize));
-        }
-
-        for (; i < left.Length; i++)
-        {
-            result[i] = MathF.Sqrt(result[i]);
-        }
+        SimdFloatRunner.ApplySqrt(result, left.Length);
     }
 
     public void DistanceSquared(Span<Vector2> left, Span<Vector2> right, Span<float> result)
@@ -2128,10 +1006,7 @@ internal sealed class SimdVectorOperation : ISpanVectorOperations<Vector2>
             var vd = va - vb;
             (vd * vd).CopyTo(sqrBuffer);
 
-            for (var lane = 0; lane < s_FloatVectorSize; lane += 2)
-            {
-                result[i + lane / 2] = sqrBuffer[lane] + sqrBuffer[lane + 1];
-            }
+            SimdPackedFloatRunner.SumGroups(sqrBuffer, result.Slice(i, s_Vector2BatchSize), 2, s_Vector2BatchSize);
         }
 
         for (; i < left.Length; i++)
@@ -2151,7 +1026,7 @@ internal sealed class SimdVectorOperation : ISpanVectorOperations<Vector2>
         for (; i < simdLength; i += s_Vector2BatchSize)
         {
             var offset = i * 2;
-            ExpandPairs(incident.Slice(i, s_Vector2BatchSize), expandedIncident, s_Vector2BatchSize);
+            SimdPackedFloatRunner.ExpandGroups(incident.Slice(i, s_Vector2BatchSize), expandedIncident, 2, s_Vector2BatchSize);
             var vs = new Vector<float>(srcValues.Slice(offset, s_FloatVectorSize));
             var mask = Vector.LessThan(new Vector<float>(expandedIncident), Vector<float>.Zero);
             Vector.ConditionalSelect(mask, vs, -vs).CopyTo(resultValues.Slice(offset, s_FloatVectorSize));
@@ -2180,8 +1055,8 @@ internal sealed class SimdVectorOperation : ISpanVectorOperations<Vector2>
             var vs = new Vector<float>(srcValues.Slice(offset, s_FloatVectorSize));
             var vn = new Vector<float>(normalValues.Slice(offset, s_FloatVectorSize));
             (vs * vn).CopyTo(productBuffer);
-            SumPairs(productBuffer, dotPairs, s_Vector2BatchSize);
-            ExpandPairs(dotPairs, expandedDots, s_Vector2BatchSize);
+            SimdPackedFloatRunner.SumGroups(productBuffer, dotPairs, 2, s_Vector2BatchSize);
+            SimdPackedFloatRunner.ExpandGroups(dotPairs, expandedDots, 2, s_Vector2BatchSize);
             var mask = Vector.LessThan(new Vector<float>(expandedDots), Vector<float>.Zero);
             Vector.ConditionalSelect(mask, vs, -vs).CopyTo(resultValues.Slice(offset, s_FloatVectorSize));
         }
@@ -2189,25 +1064,6 @@ internal sealed class SimdVectorOperation : ISpanVectorOperations<Vector2>
         for (; i < src.Length; i++)
         {
             result[i] = Vector2.Dot(normal[i], src[i]) < 0f ? src[i] : -src[i];
-        }
-    }
-
-    private static void SumPairs(ReadOnlySpan<float> source, Span<float> destination, int pairCount)
-    {
-        for (var pair = 0; pair < pairCount; pair++)
-        {
-            var lane = pair * 2;
-            destination[pair] = source[lane] + source[lane + 1];
-        }
-    }
-
-    private static void ExpandPairs(ReadOnlySpan<float> source, Span<float> destination, int pairCount)
-    {
-        for (var pair = 0; pair < pairCount; pair++)
-        {
-            var lane = pair * 2;
-            destination[lane] = source[pair];
-            destination[lane + 1] = source[pair];
         }
     }
 
@@ -2219,7 +1075,6 @@ internal sealed class SimdVectorOperation : ISpanVectorOperations<Vector2>
             destination[startIndex + pair] = new Vector2(value, value);
         }
     }
-
 }
 
 internal sealed class SimdVector3Operation : ISpanVectorOperations<Vector3>
@@ -2245,8 +1100,8 @@ internal sealed class SimdVector3Operation : ISpanVectorOperations<Vector3>
             Gather(left, i, lx, ly, lz, s_BatchSize);
             Gather(right, i, rx, ry, rz, s_BatchSize);
             (new Vector<float>(lx) * new Vector<float>(rx)
-             + new Vector<float>(ly) * new Vector<float>(ry)
-             + new Vector<float>(lz) * new Vector<float>(rz)).CopyTo(dots);
+                + new Vector<float>(ly) * new Vector<float>(ry)
+                + new Vector<float>(lz) * new Vector<float>(rz)).CopyTo(dots);
             ScatterReplicated(result, i, dots, s_BatchSize);
         }
 
@@ -2435,7 +1290,7 @@ internal sealed class SimdVector3Operation : ISpanVectorOperations<Vector3>
             {
                 var dot = dots[lane];
                 var k = 1f - etaRatio * etaRatio * (1f - dot * dot);
-                ks[lane] = k;
+                ks[lane]      = k;
                 factors[lane] = etaRatio * dot + (k < 0f ? 0f : MathF.Sqrt(k));
             }
 
@@ -2514,17 +1369,7 @@ internal sealed class SimdVector3Operation : ISpanVectorOperations<Vector3>
     {
         LengthSquared(src, result);
 
-        var i = 0;
-        var simdLength = src.Length - src.Length % s_BatchSize;
-        for (; i < simdLength; i += s_BatchSize)
-        {
-            Vector.SquareRoot(new Vector<float>(result.Slice(i, s_BatchSize))).CopyTo(result.Slice(i, s_BatchSize));
-        }
-
-        for (; i < src.Length; i++)
-        {
-            result[i] = MathF.Sqrt(result[i]);
-        }
+        SimdFloatRunner.ApplySqrt(result, src.Length);
     }
 
     public void LengthSquared(Span<Vector3> src, Span<float> result)
@@ -2539,8 +1384,8 @@ internal sealed class SimdVector3Operation : ISpanVectorOperations<Vector3>
         {
             Gather(src, i, x, y, z, s_BatchSize);
             (new Vector<float>(x) * new Vector<float>(x)
-             + new Vector<float>(y) * new Vector<float>(y)
-             + new Vector<float>(z) * new Vector<float>(z)).CopyTo(result.Slice(i, s_BatchSize));
+                + new Vector<float>(y) * new Vector<float>(y)
+                + new Vector<float>(z) * new Vector<float>(z)).CopyTo(result.Slice(i, s_BatchSize));
         }
 
         for (; i < src.Length; i++)
@@ -2553,17 +1398,7 @@ internal sealed class SimdVector3Operation : ISpanVectorOperations<Vector3>
     {
         DistanceSquared(left, right, result);
 
-        var i = 0;
-        var simdLength = left.Length - left.Length % s_BatchSize;
-        for (; i < simdLength; i += s_BatchSize)
-        {
-            Vector.SquareRoot(new Vector<float>(result.Slice(i, s_BatchSize))).CopyTo(result.Slice(i, s_BatchSize));
-        }
-
-        for (; i < left.Length; i++)
-        {
-            result[i] = MathF.Sqrt(result[i]);
-        }
+        SimdFloatRunner.ApplySqrt(result, left.Length);
     }
 
     public void DistanceSquared(Span<Vector3> left, Span<Vector3> right, Span<float> result)
@@ -2636,8 +1471,8 @@ internal sealed class SimdVector3Operation : ISpanVectorOperations<Vector3>
             Gather(src, i, sx, sy, sz, s_BatchSize);
             Gather(normal, i, nx, ny, nz, s_BatchSize);
             (new Vector<float>(sx) * new Vector<float>(nx)
-             + new Vector<float>(sy) * new Vector<float>(ny)
-             + new Vector<float>(sz) * new Vector<float>(nz)).CopyTo(dots);
+                + new Vector<float>(sy) * new Vector<float>(ny)
+                + new Vector<float>(sz) * new Vector<float>(nz)).CopyTo(dots);
 
             var mask = Vector.LessThan(new Vector<float>(dots), Vector<float>.Zero);
             Vector.ConditionalSelect(mask, new Vector<float>(sx), -new Vector<float>(sx)).CopyTo(sx);
@@ -2702,7 +1537,7 @@ internal sealed class SimdVector3Operation : ISpanVectorOperations<Vector3>
 
 internal sealed class SimdVector4Operation : ISpanVectorOperations<Vector4>
 {
-    private static readonly int s_FloatVectorSize = Vector<float>.Count;
+    private static readonly int s_FloatVectorSize  = Vector<float>.Count;
     private static readonly int s_Vector4BatchSize = Vector<float>.Count / 4;
 
     public bool Supported => Vector.IsHardwareAccelerated;
@@ -2720,8 +1555,8 @@ internal sealed class SimdVector4Operation : ISpanVectorOperations<Vector4>
         {
             var offset = i * 4;
             (new Vector<float>(leftValues.Slice(offset, s_FloatVectorSize))
-             * new Vector<float>(rightValues.Slice(offset, s_FloatVectorSize))).CopyTo(productBuffer);
-            SumQuads(productBuffer, dots, s_Vector4BatchSize);
+                * new Vector<float>(rightValues.Slice(offset, s_FloatVectorSize))).CopyTo(productBuffer);
+            SimdPackedFloatRunner.SumGroups(productBuffer, dots, 4, s_Vector4BatchSize);
             WriteReplicatedScalars(dots, result, i, s_Vector4BatchSize);
         }
 
@@ -2755,7 +1590,7 @@ internal sealed class SimdVector4Operation : ISpanVectorOperations<Vector4>
                 var cross = CrossScalar(
                     new Vector4(leftBuffer[quad], leftBuffer[quad + 1], leftBuffer[quad + 2], leftBuffer[quad + 3]),
                     new Vector4(rightBuffer[quad], rightBuffer[quad + 1], rightBuffer[quad + 2], rightBuffer[quad + 3]));
-                crossBuffer[quad] = cross.X;
+                crossBuffer[quad]     = cross.X;
                 crossBuffer[quad + 1] = cross.Y;
                 crossBuffer[quad + 2] = cross.Z;
                 crossBuffer[quad + 3] = cross.W;
@@ -2785,14 +1620,14 @@ internal sealed class SimdVector4Operation : ISpanVectorOperations<Vector4>
             var offset = i * 4;
             var va = new Vector<float>(srcValues.Slice(offset, s_FloatVectorSize));
             (va * va).CopyTo(squaredBuffer);
-            SumQuads(squaredBuffer, lengths, s_Vector4BatchSize);
+            SimdPackedFloatRunner.SumGroups(squaredBuffer, lengths, 4, s_Vector4BatchSize);
 
             for (var lane = 0; lane < s_Vector4BatchSize; lane++)
             {
                 lengths[lane] = MathF.Sqrt(lengths[lane]);
             }
 
-            ExpandQuads(lengths, expandedLengths, s_Vector4BatchSize);
+            SimdPackedFloatRunner.ExpandGroups(lengths, expandedLengths, 4, s_Vector4BatchSize);
             (va / new Vector<float>(expandedLengths)).CopyTo(resultValues.Slice(offset, s_FloatVectorSize));
         }
 
@@ -2819,11 +1654,11 @@ internal sealed class SimdVector4Operation : ISpanVectorOperations<Vector4>
             var vl = new Vector<float>(leftValues.Slice(offset, s_FloatVectorSize));
             var vr = new Vector<float>(rightValues.Slice(offset, s_FloatVectorSize));
             (vl * vr).CopyTo(pairBuffer);
-            SumQuads(pairBuffer, dots, s_Vector4BatchSize);
+            SimdPackedFloatRunner.SumGroups(pairBuffer, dots, 4, s_Vector4BatchSize);
             (vl * vl).CopyTo(pairBuffer);
-            SumQuads(pairBuffer, leftLengths, s_Vector4BatchSize);
+            SimdPackedFloatRunner.SumGroups(pairBuffer, leftLengths, 4, s_Vector4BatchSize);
             (vr * vr).CopyTo(pairBuffer);
-            SumQuads(pairBuffer, rightLengths, s_Vector4BatchSize);
+            SimdPackedFloatRunner.SumGroups(pairBuffer, rightLengths, 4, s_Vector4BatchSize);
 
             for (var lane = 0; lane < s_Vector4BatchSize; lane++)
             {
@@ -2860,9 +1695,9 @@ internal sealed class SimdVector4Operation : ISpanVectorOperations<Vector4>
             var vs = new Vector<float>(srcValues.Slice(offset, s_FloatVectorSize));
             var vn = new Vector<float>(normalValues.Slice(offset, s_FloatVectorSize));
             (vs * vn).CopyTo(productBuffer);
-            SumQuads(productBuffer, dots, s_Vector4BatchSize);
+            SimdPackedFloatRunner.SumGroups(productBuffer, dots, 4, s_Vector4BatchSize);
             for (var lane = 0; lane < s_Vector4BatchSize; lane++) dots[lane] += dots[lane];
-            ExpandQuads(dots, expandedDots, s_Vector4BatchSize);
+            SimdPackedFloatRunner.ExpandGroups(dots, expandedDots, 4, s_Vector4BatchSize);
             (vs - vn * new Vector<float>(expandedDots)).CopyTo(resultValues.Slice(offset, s_FloatVectorSize));
         }
 
@@ -2892,19 +1727,19 @@ internal sealed class SimdVector4Operation : ISpanVectorOperations<Vector4>
             var vs = new Vector<float>(srcValues.Slice(offset, s_FloatVectorSize));
             var vn = new Vector<float>(normalValues.Slice(offset, s_FloatVectorSize));
             (vs * vn).CopyTo(productBuffer);
-            SumQuads(productBuffer, dots, s_Vector4BatchSize);
+            SimdPackedFloatRunner.SumGroups(productBuffer, dots, 4, s_Vector4BatchSize);
 
             for (var lane = 0; lane < s_Vector4BatchSize; lane++)
             {
                 var dot = dots[lane];
                 var k = 1f - etaRatio * etaRatio * (1f - dot * dot);
-                ks[lane] = k;
+                ks[lane]      = k;
                 factors[lane] = etaRatio * dot + (k < 0f ? 0f : MathF.Sqrt(k));
             }
 
-            ExpandQuads(factors, expandedFactors, s_Vector4BatchSize);
+            SimdPackedFloatRunner.ExpandGroups(factors, expandedFactors, 4, s_Vector4BatchSize);
             var refracted = new Vector<float>(etaRatio) * vs - vn * new Vector<float>(expandedFactors);
-            var mask = BuildNegativeMask(ks, s_Vector4BatchSize);
+            var mask = SimdPackedFloatRunner.BuildNegativeMask(ks, 4, s_Vector4BatchSize);
             Vector.ConditionalSelect(mask, Vector<float>.Zero, refracted).CopyTo(resultValues.Slice(offset, s_FloatVectorSize));
         }
 
@@ -2933,10 +1768,10 @@ internal sealed class SimdVector4Operation : ISpanVectorOperations<Vector4>
             var vt = new Vector<float>(targetValues.Slice(offset, s_FloatVectorSize));
             var vd = vt - vs;
             (vd * vd).CopyTo(squaredBuffer);
-            SumQuads(squaredBuffer, distances, s_Vector4BatchSize);
+            SimdPackedFloatRunner.SumGroups(squaredBuffer, distances, 4, s_Vector4BatchSize);
             for (var lane = 0; lane < s_Vector4BatchSize; lane++) distances[lane] = MathF.Sqrt(distances[lane]);
-            ExpandQuads(distances, expandedDistances, s_Vector4BatchSize);
-            ExpandQuads(maxDistanceDelta.Slice(i, s_Vector4BatchSize), expandedMaxDelta, s_Vector4BatchSize);
+            SimdPackedFloatRunner.ExpandGroups(distances, expandedDistances, 4, s_Vector4BatchSize);
+            SimdPackedFloatRunner.ExpandGroups(maxDistanceDelta.Slice(i, s_Vector4BatchSize), expandedMaxDelta, 4, s_Vector4BatchSize);
 
             var vDistance = new Vector<float>(expandedDistances);
             var vMaxDelta = new Vector<float>(expandedMaxDelta);
@@ -2955,17 +1790,7 @@ internal sealed class SimdVector4Operation : ISpanVectorOperations<Vector4>
     {
         LengthSquared(src, result);
 
-        var i = 0;
-        var simdLength = src.Length - src.Length % s_FloatVectorSize;
-        for (; i < simdLength; i += s_FloatVectorSize)
-        {
-            Vector.SquareRoot(new Vector<float>(result.Slice(i, s_FloatVectorSize))).CopyTo(result.Slice(i, s_FloatVectorSize));
-        }
-
-        for (; i < src.Length; i++)
-        {
-            result[i] = MathF.Sqrt(result[i]);
-        }
+        SimdFloatRunner.ApplySqrt(result, src.Length);
     }
 
     public void LengthSquared(Span<Vector4> src, Span<float> result)
@@ -2981,7 +1806,7 @@ internal sealed class SimdVector4Operation : ISpanVectorOperations<Vector4>
             var offset = i * 4;
             var va = new Vector<float>(srcValues.Slice(offset, s_FloatVectorSize));
             (va * va).CopyTo(squaredBuffer);
-            SumQuads(squaredBuffer, lengths, s_Vector4BatchSize);
+            SimdPackedFloatRunner.SumGroups(squaredBuffer, lengths, 4, s_Vector4BatchSize);
             lengths.CopyTo(result.Slice(i, s_Vector4BatchSize));
         }
 
@@ -2995,17 +1820,7 @@ internal sealed class SimdVector4Operation : ISpanVectorOperations<Vector4>
     {
         DistanceSquared(left, right, result);
 
-        var i = 0;
-        var simdLength = left.Length - left.Length % s_FloatVectorSize;
-        for (; i < simdLength; i += s_FloatVectorSize)
-        {
-            Vector.SquareRoot(new Vector<float>(result.Slice(i, s_FloatVectorSize))).CopyTo(result.Slice(i, s_FloatVectorSize));
-        }
-
-        for (; i < left.Length; i++)
-        {
-            result[i] = MathF.Sqrt(result[i]);
-        }
+        SimdFloatRunner.ApplySqrt(result, left.Length);
     }
 
     public void DistanceSquared(Span<Vector4> left, Span<Vector4> right, Span<float> result)
@@ -3022,7 +1837,7 @@ internal sealed class SimdVector4Operation : ISpanVectorOperations<Vector4>
             var offset = i * 4;
             var vd = new Vector<float>(leftValues.Slice(offset, s_FloatVectorSize)) - new Vector<float>(rightValues.Slice(offset, s_FloatVectorSize));
             (vd * vd).CopyTo(squaredBuffer);
-            SumQuads(squaredBuffer, lengths, s_Vector4BatchSize);
+            SimdPackedFloatRunner.SumGroups(squaredBuffer, lengths, 4, s_Vector4BatchSize);
             lengths.CopyTo(result.Slice(i, s_Vector4BatchSize));
         }
 
@@ -3043,7 +1858,7 @@ internal sealed class SimdVector4Operation : ISpanVectorOperations<Vector4>
         for (; i < simdLength; i += s_Vector4BatchSize)
         {
             var offset = i * 4;
-            ExpandQuads(incident.Slice(i, s_Vector4BatchSize), expandedIncident, s_Vector4BatchSize);
+            SimdPackedFloatRunner.ExpandGroups(incident.Slice(i, s_Vector4BatchSize), expandedIncident, 4, s_Vector4BatchSize);
             var vs = new Vector<float>(srcValues.Slice(offset, s_FloatVectorSize));
             var mask = Vector.LessThan(new Vector<float>(expandedIncident), Vector<float>.Zero);
             Vector.ConditionalSelect(mask, vs, -vs).CopyTo(resultValues.Slice(offset, s_FloatVectorSize));
@@ -3069,10 +1884,9 @@ internal sealed class SimdVector4Operation : ISpanVectorOperations<Vector4>
         for (; i < simdLength; i += s_Vector4BatchSize)
         {
             var offset = i * 4;
-            (new Vector<float>(srcValues.Slice(offset, s_FloatVectorSize))
-             * new Vector<float>(normalValues.Slice(offset, s_FloatVectorSize))).CopyTo(productBuffer);
-            SumQuads(productBuffer, dots, s_Vector4BatchSize);
-            ExpandQuads(dots, expandedDots, s_Vector4BatchSize);
+            (new Vector<float>(srcValues.Slice(offset, s_FloatVectorSize)) * new Vector<float>(normalValues.Slice(offset, s_FloatVectorSize))).CopyTo(productBuffer);
+            SimdPackedFloatRunner.SumGroups(productBuffer, dots, 4, s_Vector4BatchSize);
+            SimdPackedFloatRunner.ExpandGroups(dots, expandedDots, 4, s_Vector4BatchSize);
             var mask = Vector.LessThan(new Vector<float>(expandedDots), Vector<float>.Zero);
             var vs = new Vector<float>(srcValues.Slice(offset, s_FloatVectorSize));
             Vector.ConditionalSelect(mask, vs, -vs).CopyTo(resultValues.Slice(offset, s_FloatVectorSize));
@@ -3084,28 +1898,6 @@ internal sealed class SimdVector4Operation : ISpanVectorOperations<Vector4>
         }
     }
 
-    private static void SumQuads(ReadOnlySpan<float> source, Span<float> destination, int quadCount)
-    {
-        for (var lane = 0; lane < quadCount; lane++)
-        {
-            var quad = lane * 4;
-            destination[lane] = source[quad] + source[quad + 1] + source[quad + 2] + source[quad + 3];
-        }
-    }
-
-    private static void ExpandQuads(ReadOnlySpan<float> source, Span<float> destination, int quadCount)
-    {
-        for (var lane = 0; lane < quadCount; lane++)
-        {
-            var quad = lane * 4;
-            var value = source[lane];
-            destination[quad] = value;
-            destination[quad + 1] = value;
-            destination[quad + 2] = value;
-            destination[quad + 3] = value;
-        }
-    }
-
     private static void WriteReplicatedScalars(ReadOnlySpan<float> source, Span<Vector4> destination, int startIndex, int count)
     {
         for (var lane = 0; lane < count; lane++)
@@ -3114,23 +1906,7 @@ internal sealed class SimdVector4Operation : ISpanVectorOperations<Vector4>
             destination[startIndex + lane] = new Vector4(value, value, value, value);
         }
     }
-
-    private static Vector<int> BuildNegativeMask(ReadOnlySpan<float> values, int count)
-    {
-        Span<int> expanded = stackalloc int[s_FloatVectorSize];
-        for (var lane = 0; lane < count; lane++)
-        {
-            var quad = lane * 4;
-            var value = values[lane] < 0f ? -1 : 0;
-            expanded[quad] = value;
-            expanded[quad + 1] = value;
-            expanded[quad + 2] = value;
-            expanded[quad + 3] = value;
-        }
-
-        return new Vector<int>(expanded);
-    }
-
+    
     private static Vector4 CrossScalar(Vector4 left, Vector4 right)
     {
         return new Vector4(

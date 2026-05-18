@@ -1,9 +1,8 @@
 ﻿using System.Numerics;
-using Gubbins.Span;
-using static Gubbins.Unsafe.Tests.ParallelVectorTestScalars;
-using static Gubbins.Unsafe.Tests.SimdVectorAssertions;
+using static Gubbins.Span.Tests.ParallelVectorTestScalars;
+using static Gubbins.Span.Tests.SimdVectorAssertions;
 
-namespace Gubbins.Unsafe.Tests;
+namespace Gubbins.Span.Tests;
 
 public abstract class Vector2OperationTestsBase
 {
@@ -26,7 +25,7 @@ public abstract class Vector2OperationTestsBase
         new(2f, 2f),
         new(1f, 0f)
     ];
-
+ 
     private static Vector2[] CreateNormal() =>
     [
         Vector2.UnitY,
@@ -55,7 +54,7 @@ public abstract class Vector2OperationTestsBase
             expected[i] = new Vector2(dot, dot);
         }
 
-        AssertVector2SpanEqual(expected, result);
+        SimdVectorAssertions.AssertVector2SpanEqual(expected, result);
     }
 
     [Test]
@@ -74,7 +73,7 @@ public abstract class Vector2OperationTestsBase
             expected[i] = new Vector2(cross, cross);
         }
 
-        AssertVector2SpanEqual(expected, result);
+        SimdVectorAssertions.AssertVector2SpanEqual(expected, result);
     }
 
     [Test]
@@ -86,7 +85,7 @@ public abstract class Vector2OperationTestsBase
         op.Normalize(src, result);
 
         var expected = src.Select(static v => Vector2.Normalize(v)).ToArray();
-        AssertVector2SpanEqual(expected, result);
+        SimdVectorAssertions.AssertVector2SpanEqual(expected, result);
     }
 
     [Test]
@@ -99,7 +98,7 @@ public abstract class Vector2OperationTestsBase
         op.Reflect(src, normal, result);
 
         var expected = src.Select((v, i) => Vector2.Reflect(v, normal[i])).ToArray();
-        AssertVector2SpanEqual(expected, result);
+        SimdVectorAssertions.AssertVector2SpanEqual(expected, result);
     }
 
     [Test]
@@ -113,7 +112,7 @@ public abstract class Vector2OperationTestsBase
         op.Refract(src, normal, eta, result);
 
         var expected = src.Select((v, i) => RefractVector2(v, normal[i], eta.X)).ToArray();
-        AssertVector2SpanEqual(expected, result);
+        SimdVectorAssertions.AssertVector2SpanEqual(expected, result);
     }
 
     [Test]
@@ -127,7 +126,7 @@ public abstract class Vector2OperationTestsBase
         op.FaceForward(src, normal, incident, result);
 
         var expected = src.Select((v, i) => incident[i] < 0f ? v : -v).ToArray();
-        AssertVector2SpanEqual(expected, result);
+        SimdVectorAssertions.AssertVector2SpanEqual(expected, result);
     }
 
     [Test]
@@ -140,7 +139,7 @@ public abstract class Vector2OperationTestsBase
         op.FaceForward(src, normal, result);
 
         var expected = src.Select((v, i) => Vector2.Dot(normal[i], v) < 0f ? v : -v).ToArray();
-        AssertVector2SpanEqual(expected, result);
+        SimdVectorAssertions.AssertVector2SpanEqual(expected, result);
     }
 
     [Test]
@@ -154,7 +153,7 @@ public abstract class Vector2OperationTestsBase
         op.MoveTowards(src, other, maxDelta, result);
 
         var expected = src.Select((v, i) => MoveTowardsVector2(v, other[i], maxDelta[i])).ToArray();
-        AssertVector2SpanEqual(expected, result);
+        SimdVectorAssertions.AssertVector2SpanEqual(expected, result);
     }
 
     [Test]
@@ -167,7 +166,7 @@ public abstract class Vector2OperationTestsBase
         op.Angle(src, other, result);
 
         var expected = src.Select((v, i) => AngleVector2(v, other[i])).ToArray();
-        AssertFloatSpanEqual(expected, result);
+        SimdVectorAssertions.AssertFloatSpanEqual(expected, result);
     }
 
     [Test]
@@ -179,7 +178,7 @@ public abstract class Vector2OperationTestsBase
         op.Length(src, result);
 
         var expected = src.Select(static v => v.Length()).ToArray();
-        AssertFloatSpanEqual(expected, result);
+        SimdVectorAssertions.AssertFloatSpanEqual(expected, result);
     }
 
     [Test]
@@ -191,7 +190,7 @@ public abstract class Vector2OperationTestsBase
         op.LengthSquared(src, result);
 
         var expected = src.Select(static v => v.LengthSquared()).ToArray();
-        AssertFloatSpanEqual(expected, result);
+        SimdVectorAssertions.AssertFloatSpanEqual(expected, result);
     }
 
     [Test]
@@ -204,7 +203,7 @@ public abstract class Vector2OperationTestsBase
         op.Distance(src, other, result);
 
         var expected = src.Select((v, i) => Vector2.Distance(v, other[i])).ToArray();
-        AssertFloatSpanEqual(expected, result);
+        SimdVectorAssertions.AssertFloatSpanEqual(expected, result);
     }
 
     [Test]
@@ -217,7 +216,7 @@ public abstract class Vector2OperationTestsBase
         op.DistanceSquared(src, other, result);
 
         var expected = src.Select((v, i) => Vector2.DistanceSquared(v, other[i])).ToArray();
-        AssertFloatSpanEqual(expected, result);
+        SimdVectorAssertions.AssertFloatSpanEqual(expected, result);
     }
 }
 
@@ -267,9 +266,9 @@ public abstract class Vector3OperationTestsBase
         for (var i = 0; i < src.Length; i++)
         {
             var dot = Vector3.Dot(src[i], other[i]);
-            Assert.That(FloatEquals(dot, result[i].X, 1e-5f));
-            Assert.That(FloatEquals(dot, result[i].Y, 1e-5f));
-            Assert.That(FloatEquals(dot, result[i].Z, 1e-5f));
+            Assert.That(SimdVectorAssertions.FloatEquals(dot, result[i].X, 1e-5f));
+            Assert.That(SimdVectorAssertions.FloatEquals(dot, result[i].Y, 1e-5f));
+            Assert.That(SimdVectorAssertions.FloatEquals(dot, result[i].Z, 1e-5f));
         }
     }
 
@@ -283,7 +282,7 @@ public abstract class Vector3OperationTestsBase
         op.Cross(src, other, result);
 
         var expected = src.Select((v, i) => Vector3.Cross(v, other[i])).ToArray();
-        AssertVector3SpanEqual(expected, result);
+        SimdVectorAssertions.AssertVector3SpanEqual(expected, result);
     }
 
     [Test]
@@ -295,7 +294,7 @@ public abstract class Vector3OperationTestsBase
         op.Normalize(src, result);
 
         var expected = src.Select(static v => Vector3.Normalize(v)).ToArray();
-        AssertVector3SpanEqual(expected, result);
+        SimdVectorAssertions.AssertVector3SpanEqual(expected, result);
     }
 
     [Test]
@@ -308,7 +307,7 @@ public abstract class Vector3OperationTestsBase
         op.Reflect(src, normal, result);
 
         var expected = src.Select((v, i) => Vector3.Reflect(v, normal[i])).ToArray();
-        AssertVector3SpanEqual(expected, result);
+        SimdVectorAssertions.AssertVector3SpanEqual(expected, result);
     }
 
     [Test]
@@ -322,7 +321,7 @@ public abstract class Vector3OperationTestsBase
         op.Refract(src, normal, eta, result);
 
         var expected = src.Select((v, i) => RefractVector3(v, normal[i], eta.X)).ToArray();
-        AssertVector3SpanEqual(expected, result);
+        SimdVectorAssertions.AssertVector3SpanEqual(expected, result);
     }
 
     [Test]
@@ -336,7 +335,7 @@ public abstract class Vector3OperationTestsBase
         op.FaceForward(src, normal, incident, result);
 
         var expected = src.Select((v, i) => incident[i] < 0f ? v : -v).ToArray();
-        AssertVector3SpanEqual(expected, result);
+        SimdVectorAssertions.AssertVector3SpanEqual(expected, result);
     }
 
     [Test]
@@ -349,7 +348,7 @@ public abstract class Vector3OperationTestsBase
         op.FaceForward(src, normal, result);
 
         var expected = src.Select((v, i) => Vector3.Dot(normal[i], v) < 0f ? v : -v).ToArray();
-        AssertVector3SpanEqual(expected, result);
+        SimdVectorAssertions.AssertVector3SpanEqual(expected, result);
     }
 
     [Test]
@@ -363,7 +362,7 @@ public abstract class Vector3OperationTestsBase
         op.MoveTowards(src, other, maxDelta, result);
 
         var expected = src.Select((v, i) => MoveTowardsVector3(v, other[i], maxDelta[i])).ToArray();
-        AssertVector3SpanEqual(expected, result);
+        SimdVectorAssertions.AssertVector3SpanEqual(expected, result);
     }
 
     [Test]
@@ -376,7 +375,7 @@ public abstract class Vector3OperationTestsBase
         op.Angle(src, other, result);
 
         var expected = src.Select((v, i) => AngleVector3(v, other[i])).ToArray();
-        AssertFloatSpanEqual(expected, result);
+        SimdVectorAssertions.AssertFloatSpanEqual(expected, result);
     }
 
     [Test]
@@ -388,7 +387,7 @@ public abstract class Vector3OperationTestsBase
         op.Length(src, result);
 
         var expected = src.Select(static v => v.Length()).ToArray();
-        AssertFloatSpanEqual(expected, result);
+        SimdVectorAssertions.AssertFloatSpanEqual(expected, result);
     }
 
     [Test]
@@ -400,7 +399,7 @@ public abstract class Vector3OperationTestsBase
         op.LengthSquared(src, result);
 
         var expected = src.Select(static v => v.LengthSquared()).ToArray();
-        AssertFloatSpanEqual(expected, result);
+        SimdVectorAssertions.AssertFloatSpanEqual(expected, result);
     }
 
     [Test]
@@ -413,7 +412,7 @@ public abstract class Vector3OperationTestsBase
         op.Distance(src, other, result);
 
         var expected = src.Select((v, i) => Vector3.Distance(v, other[i])).ToArray();
-        AssertFloatSpanEqual(expected, result);
+        SimdVectorAssertions.AssertFloatSpanEqual(expected, result);
     }
 
     [Test]
@@ -426,7 +425,7 @@ public abstract class Vector3OperationTestsBase
         op.DistanceSquared(src, other, result);
 
         var expected = src.Select((v, i) => Vector3.DistanceSquared(v, other[i])).ToArray();
-        AssertFloatSpanEqual(expected, result);
+        SimdVectorAssertions.AssertFloatSpanEqual(expected, result);
     }
 }
 
@@ -476,10 +475,10 @@ public abstract class Vector4OperationTestsBase
         for (var i = 0; i < src.Length; i++)
         {
             var dot = Vector4.Dot(src[i], other[i]);
-            Assert.That(FloatEquals(dot, result[i].X, 1e-5f));
-            Assert.That(FloatEquals(dot, result[i].Y, 1e-5f));
-            Assert.That(FloatEquals(dot, result[i].Z, 1e-5f));
-            Assert.That(FloatEquals(dot, result[i].W, 1e-5f));
+            Assert.That(SimdVectorAssertions.FloatEquals(dot, result[i].X, 1e-5f));
+            Assert.That(SimdVectorAssertions.FloatEquals(dot, result[i].Y, 1e-5f));
+            Assert.That(SimdVectorAssertions.FloatEquals(dot, result[i].Z, 1e-5f));
+            Assert.That(SimdVectorAssertions.FloatEquals(dot, result[i].W, 1e-5f));
         }
     }
 
@@ -586,7 +585,7 @@ public abstract class Vector4OperationTestsBase
         op.Angle(src, other, result);
 
         var expected = src.Select((v, i) => AngleVector4(v, other[i])).ToArray();
-        AssertFloatSpanEqual(expected, result);
+        SimdVectorAssertions.AssertFloatSpanEqual(expected, result);
     }
 
     [Test]
@@ -598,7 +597,7 @@ public abstract class Vector4OperationTestsBase
         op.Length(src, result);
 
         var expected = src.Select(static v => v.Length()).ToArray();
-        AssertFloatSpanEqual(expected, result);
+        SimdVectorAssertions.AssertFloatSpanEqual(expected, result);
     }
 
     [Test]
@@ -610,7 +609,7 @@ public abstract class Vector4OperationTestsBase
         op.LengthSquared(src, result);
 
         var expected = src.Select(static v => v.LengthSquared()).ToArray();
-        AssertFloatSpanEqual(expected, result);
+        SimdVectorAssertions.AssertFloatSpanEqual(expected, result);
     }
 
     [Test]
@@ -623,7 +622,7 @@ public abstract class Vector4OperationTestsBase
         op.Distance(src, other, result);
 
         var expected = src.Select((v, i) => Vector4.Distance(v, other[i])).ToArray();
-        AssertFloatSpanEqual(expected, result);
+        SimdVectorAssertions.AssertFloatSpanEqual(expected, result);
     }
 
     [Test]
@@ -636,7 +635,7 @@ public abstract class Vector4OperationTestsBase
         op.DistanceSquared(src, other, result);
 
         var expected = src.Select((v, i) => Vector4.DistanceSquared(v, other[i])).ToArray();
-        AssertFloatSpanEqual(expected, result);
+        SimdVectorAssertions.AssertFloatSpanEqual(expected, result);
     }
 }
 
@@ -645,7 +644,7 @@ public class SimdVectorOperationTests : Vector2OperationTestsBase
 {
     protected override ISpanVectorOperations<Vector2> CreateOperation()
     {
-        var type = typeof(ISpanVectorOperations<Vector2>).Assembly.GetType("Gubbins.Enhance.SimdVectorOperation", throwOnError: true)!;
+        var type = typeof(ISpanVectorOperations<Vector2>).Assembly.GetType("Gubbins.Span.SimdVectorOperation", throwOnError: true)!;
         return (ISpanVectorOperations<Vector2>)Activator.CreateInstance(type, nonPublic: true)!;
     }
 }
@@ -655,7 +654,7 @@ public class SimdVector3OperationTests : Vector3OperationTestsBase
 {
     protected override ISpanVectorOperations<Vector3> CreateOperation()
     {
-        var type = typeof(ISpanVectorOperations<Vector3>).Assembly.GetType("Gubbins.Enhance.SimdVector3Operation", throwOnError: true)!;
+        var type = typeof(ISpanVectorOperations<Vector3>).Assembly.GetType("Gubbins.Span.SimdVector3Operation", throwOnError: true)!;
         return (ISpanVectorOperations<Vector3>)Activator.CreateInstance(type, nonPublic: true)!;
     }
 }
@@ -665,7 +664,7 @@ public class SimdVector4OperationTests : Vector4OperationTestsBase
 {
     protected override ISpanVectorOperations<Vector4> CreateOperation()
     {
-        var type = typeof(ISpanVectorOperations<Vector4>).Assembly.GetType("Gubbins.Enhance.SimdVector4Operation", throwOnError: true)!;
+        var type = typeof(ISpanVectorOperations<Vector4>).Assembly.GetType("Gubbins.Span.SimdVector4Operation", throwOnError: true)!;
         return (ISpanVectorOperations<Vector4>)Activator.CreateInstance(type, nonPublic: true)!;
     }
 }
@@ -675,7 +674,7 @@ public class ParallelVector2OperationTests : Vector2OperationTestsBase
 {
     protected override ISpanVectorOperations<Vector2> CreateOperation()
     {
-        var type = typeof(ISpanVectorOperations<Vector2>).Assembly.GetType("Gubbins.Enhance.ParallelVector2Operation", throwOnError: true)!;
+        var type = typeof(ISpanVectorOperations<Vector2>).Assembly.GetType("Gubbins.Span.ParallelVector2Operation", throwOnError: true)!;
         return (ISpanVectorOperations<Vector2>)Activator.CreateInstance(type, nonPublic: true)!;
     }
 }
@@ -685,7 +684,7 @@ public class ParallelVector3OperationTests : Vector3OperationTestsBase
 {
     protected override ISpanVectorOperations<Vector3> CreateOperation()
     {
-        var type = typeof(ISpanVectorOperations<Vector3>).Assembly.GetType("Gubbins.Enhance.ParallelVector3Operation", throwOnError: true)!;
+        var type = typeof(ISpanVectorOperations<Vector3>).Assembly.GetType("Gubbins.Span.ParallelVector3Operation", throwOnError: true)!;
         return (ISpanVectorOperations<Vector3>)Activator.CreateInstance(type, nonPublic: true)!;
     }
 }
@@ -695,7 +694,7 @@ public class ParallelVector4OperationTests : Vector4OperationTestsBase
 {
     protected override ISpanVectorOperations<Vector4> CreateOperation()
     {
-        var type = typeof(ISpanVectorOperations<Vector4>).Assembly.GetType("Gubbins.Enhance.ParallelVector4Operation", throwOnError: true)!;
+        var type = typeof(ISpanVectorOperations<Vector4>).Assembly.GetType("Gubbins.Span.ParallelVector4Operation", throwOnError: true)!;
         return (ISpanVectorOperations<Vector4>)Activator.CreateInstance(type, nonPublic: true)!;
     }
 }
@@ -705,7 +704,7 @@ public class ParallelSimdVectorOperationTests : Vector2OperationTestsBase
 {
     protected override ISpanVectorOperations<Vector2> CreateOperation()
     {
-        var type = typeof(ISpanVectorOperations<Vector2>).Assembly.GetType("Gubbins.Enhance.ParallelSimdVectorOperation", throwOnError: true)!;
+        var type = typeof(ISpanVectorOperations<Vector2>).Assembly.GetType("Gubbins.Span.ParallelSimdVectorOperation", throwOnError: true)!;
         return (ISpanVectorOperations<Vector2>)Activator.CreateInstance(type, nonPublic: true)!;
     }
 }
@@ -715,7 +714,7 @@ public class ParallelSimdVector3OperationTests : Vector3OperationTestsBase
 {
     protected override ISpanVectorOperations<Vector3> CreateOperation()
     {
-        var type = typeof(ISpanVectorOperations<Vector3>).Assembly.GetType("Gubbins.Enhance.ParallelSimdVector3Operation", throwOnError: true)!;
+        var type = typeof(ISpanVectorOperations<Vector3>).Assembly.GetType("Gubbins.Span.ParallelSimdVector3Operation", throwOnError: true)!;
         return (ISpanVectorOperations<Vector3>)Activator.CreateInstance(type, nonPublic: true)!;
     }
 }
@@ -725,7 +724,7 @@ public class ParallelSimdVector4OperationTests : Vector4OperationTestsBase
 {
     protected override ISpanVectorOperations<Vector4> CreateOperation()
     {
-        var type = typeof(ISpanVectorOperations<Vector4>).Assembly.GetType("Gubbins.Enhance.ParallelSimdVector4Operation", throwOnError: true)!;
+        var type = typeof(ISpanVectorOperations<Vector4>).Assembly.GetType("Gubbins.Span.ParallelSimdVector4Operation", throwOnError: true)!;
         return (ISpanVectorOperations<Vector4>)Activator.CreateInstance(type, nonPublic: true)!;
     }
 }
@@ -735,7 +734,7 @@ public class SerialVector2OperationTests : Vector2OperationTestsBase
 {
     protected override ISpanVectorOperations<Vector2> CreateOperation()
     {
-        var type = typeof(ISpanVectorOperations<Vector2>).Assembly.GetType("Gubbins.Enhance.SerialVector2Operation", throwOnError: true)!;
+        var type = typeof(ISpanVectorOperations<Vector2>).Assembly.GetType("Gubbins.Span.SerialVector2Operation", throwOnError: true)!;
         return (ISpanVectorOperations<Vector2>)Activator.CreateInstance(type, nonPublic: true)!;
     }
 }
@@ -745,7 +744,7 @@ public class SerialVector3OperationTests : Vector3OperationTestsBase
 {
     protected override ISpanVectorOperations<Vector3> CreateOperation()
     {
-        var type = typeof(ISpanVectorOperations<Vector3>).Assembly.GetType("Gubbins.Enhance.SerialVector3Operation", throwOnError: true)!;
+        var type = typeof(ISpanVectorOperations<Vector3>).Assembly.GetType("Gubbins.Span.SerialVector3Operation", throwOnError: true)!;
         return (ISpanVectorOperations<Vector3>)Activator.CreateInstance(type, nonPublic: true)!;
     }
 }
@@ -755,7 +754,7 @@ public class SerialVector4OperationTests : Vector4OperationTestsBase
 {
     protected override ISpanVectorOperations<Vector4> CreateOperation()
     {
-        var type = typeof(ISpanVectorOperations<Vector4>).Assembly.GetType("Gubbins.Enhance.SerialVector4Operation", throwOnError: true)!;
+        var type = typeof(ISpanVectorOperations<Vector4>).Assembly.GetType("Gubbins.Span.SerialVector4Operation", throwOnError: true)!;
         return (ISpanVectorOperations<Vector4>)Activator.CreateInstance(type, nonPublic: true)!;
     }
 }

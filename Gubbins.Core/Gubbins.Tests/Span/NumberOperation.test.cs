@@ -1,6 +1,4 @@
-﻿using Gubbins.Span;
-
-namespace Gubbins.Unsafe.Tests;
+﻿namespace Gubbins.Span.Tests;
 
 public abstract class NumberOperationTestsBase<T> where T : struct
 {
@@ -298,7 +296,7 @@ public class ParallelFloatOperationTests : FloatNumberOperationTestsBase
 {
     protected override ISpanRealOperations<float> CreateOperation()
     {
-        var type = typeof(ISpanRealOperations<float>).Assembly.GetType("Gubbins.Enhance.ParallelFloatOperation", throwOnError: true)!;
+        var type = typeof(ISpanRealOperations<float>).Assembly.GetType("Gubbins.Span.ParallelFloatOperation", throwOnError: true)!;
         return (ISpanRealOperations<float>)Activator.CreateInstance(type, nonPublic: true)!;
     }
 }
@@ -308,7 +306,7 @@ public class ParallelDoubleOperationTests : DoubleNumberOperationTestsBase
 {
     protected override ISpanRealOperations<double> CreateOperation()
     {
-        var type = typeof(ISpanRealOperations<double>).Assembly.GetType("Gubbins.Enhance.ParallelDoubleOperation", throwOnError: true)!;
+        var type = typeof(ISpanRealOperations<double>).Assembly.GetType("Gubbins.Span.ParallelDoubleOperation", throwOnError: true)!;
         return (ISpanRealOperations<double>)Activator.CreateInstance(type, nonPublic: true)!;
     }
 }
@@ -318,7 +316,7 @@ public class SerialFloatOperationTests : FloatNumberOperationTestsBase
 {
     protected override ISpanRealOperations<float> CreateOperation()
     {
-        var type = typeof(ISpanRealOperations<float>).Assembly.GetType("Gubbins.Enhance.SerialFloatOperations", throwOnError: true)!;
+        var type = typeof(ISpanRealOperations<float>).Assembly.GetType("Gubbins.Span.SerialFloatOperations", throwOnError: true)!;
         return (ISpanRealOperations<float>)Activator.CreateInstance(type, nonPublic: true)!;
     }
 }
@@ -328,8 +326,7 @@ public class SerialDoubleOperationTests : DoubleNumberOperationTestsBase
 {
     protected override ISpanRealOperations<double> CreateOperation()
     {
-        var type = typeof(ISpanRealOperations<double>).Assembly.GetType("Gubbins.Enhance.SerialDoubleOperations", throwOnError: true)!;
+        var type = typeof(ISpanRealOperations<double>).Assembly.GetType("Gubbins.Span.SerialDoubleOperations", throwOnError: true)!;
         return (ISpanRealOperations<double>)Activator.CreateInstance(type, nonPublic: true)!;
     }
 }
-
