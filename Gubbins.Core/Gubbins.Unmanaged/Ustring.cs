@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Gubbins.Span;
+using Gubbins.Enhance;
 using Gubbins.Spawner;
 
 namespace Gubbins.Unmanaged;

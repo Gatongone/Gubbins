@@ -12,312 +12,6 @@ public class DuckGenerator : ISourceGenerator
 {
     private const string FILE_NAME = "Duck.g.cs";
 
-    private const string INTERFACE_BODY =
-        """
-        // Generator: {Generator}
-        // Created On: {CreateTime}
-
-        using System.Linq;
-        using System.Collections.Concurrent;
-        using System.Reflection;
-        using Gubbins.Spawner;
-       
-        namespace Gubbins.Generated
-        {
-            /// <summary>
-            /// Auto generated.
-            /// </summary>
-            [global::System.Runtime.CompilerServices.CompilerGenerated]
-            internal class Duck_{DisplayName} : Duck<{Interface}>
-            {
-                /// <summary>
-                /// Check whether the target can be converted to a duck type for <see cref="{Interface}"/> type.
-                /// </summary>
-                [global::System.Runtime.CompilerServices.CompilerGenerated]
-                public override bool Like(object obj, out {Interface} result)
-                {
-                    return Like(obj, out result, out _);
-                }
-
-                /// <summary>
-                /// Check whether the target can be converted to a duck type for <see cref="{Interface}"/> type.
-                /// </summary>
-                [global::System.Runtime.CompilerServices.CompilerGenerated]
-                public override bool Like(object obj, out {Interface} result, out PooledHandle handle)
-                {
-                    if (obj == null)
-                    {
-                        result = null;
-                        handle = default;
-                        return false;
-                    }
-                    if (obj is {Interface} target)
-                    {
-                        result = target;
-                        handle = default;
-                        return true;
-                    }
-                
-                    var type = obj.GetType();
-                    if (UnmatchedCache.TryGetValue(type, out var unmatchedTypes) && unmatchedTypes.Contains(type))
-                    {
-                        result = null;
-                        handle = default;
-                        return false;
-                    }
-                
-                    if (!MatchedCache.TryGetValue(type, out var ducks))
-                    {
-                        ducks = new Dictionary<Type, ISpawner<IProxy>>();
-                        MatchedCache.TryAdd(type, ducks);
-                    }
-                    if (!ducks.TryGetValue(typeof({Interface}), out var pool))
-                    {
-                        pool = Pool<Proxy_{DisplayName}>.Default;
-                        ducks.Add(typeof({Interface}), pool);
-                    }
-                
-                    var pooledObj = pool.Spawn();
-                    if (!pooledObj.TryInit(obj))
-                    {
-                        if (unmatchedTypes == null)
-                        {
-                            unmatchedTypes = [];
-                            UnmatchedCache.TryAdd(type, unmatchedTypes);
-                        }
-                        unmatchedTypes.Add(type);
-                        result = null;
-                        handle = default;
-                        return false;
-                    }
-                    result = ({Interface}) pooledObj;
-                    handle = new PooledHandle((IPool) pool, pooledObj);
-                    return result != null;
-                }
-
-                /// <summary>
-                /// Auto generated.
-                /// </summary>
-                [global::System.Runtime.CompilerServices.CompilerGenerated]
-                private class Proxy_{DisplayName} : IProxy, {Interface}
-                {
-        {Delegates}
-        {Fields}
-                    /// <summary>
-                    /// Auto generated.
-                    /// </summary>
-                    [global::System.Runtime.CompilerServices.CompilerGenerated]
-                    private Type m_Type;
-                
-                    /// <summary>
-                    /// Auto generated.
-                    /// </summary>
-                    [global::System.Runtime.CompilerServices.CompilerGenerated]
-                    private object m_Proxy;
-
-                    /// <inheritdoc />
-                    [global::System.Runtime.CompilerServices.CompilerGenerated]
-                    void IResetable.Reset() => m_Proxy = null;
-
-                    /// <summary>
-                    /// Auto generated.
-                    /// </summary>
-                    [global::System.Runtime.CompilerServices.CompilerGenerated]
-                    private void ClearAllCache()
-                    {
-                        m_Proxy = null;
-                        m_Type = null;
-                        {Reset}
-                    }
-
-                    /// <inheritdoc />
-                    [global::System.Runtime.CompilerServices.CompilerGenerated]
-                    public override bool Equals(object obj)
-                    {
-                        return m_Proxy == null ? false : m_Proxy.Equals(obj);
-                    }
-                
-                    /// <inheritdoc />
-                    [global::System.Runtime.CompilerServices.CompilerGenerated]
-                    public override int GetHashCode()
-                    {
-                        return m_Proxy == null ? 0 : m_Proxy.GetHashCode();
-                    }
-
-                    /// <inheritdoc />
-                    [global::System.Runtime.CompilerServices.CompilerGenerated]
-                    public bool TryInit(object obj)
-                    {
-                        if (obj.GetType() == m_Type)
-                        {
-                            m_Proxy = obj;
-                            return true;
-                        }
-                        ClearAllCache();
-                        m_Proxy = obj;
-                        m_Type = obj.GetType();
-        {MemberInit}
-                        return true;
-                    }
-        {Methods}
-                }
-            }
-        }
-        """;
-
-    private const string DELEGATE_BODY =
-        """
-        // Generator: {Generator}
-        // Created On: {CreateTime}
-        
-        using System.Linq;
-        using System.Collections.Concurrent;
-        using System.Reflection;
-        using Gubbins.Enhance;
-        
-        namespace Gubbins.Generated
-        {
-            /// <summary>
-            /// Auto generated.
-            /// </summary>
-            [global::System.Runtime.CompilerServices.CompilerGenerated]
-            public class Duck_{DisplayName} : Duck<{Delegate}>
-            {
-                /// <summary>
-                /// Check whether the target can be converted to a duck type for <see cref="{Delegate}"/> type.
-                /// </summary>
-                [global::System.Runtime.CompilerServices.CompilerGenerated]
-                public override bool Like(object obj, out {Delegate} result)
-                {
-                    return Like(obj, out result, out _);
-                }
-        
-                /// <summary>
-                /// Check whether the target can be converted to a duck type for <see cref="{Delegate}"/> type.
-                /// </summary>
-                [global::System.Runtime.CompilerServices.CompilerGenerated]
-                public override bool Like(object obj, out {Delegate} result, out PooledHandle handle)
-                {
-                    if (obj == null)
-                    {
-                        result = null;
-                        handle = default;
-                        return false;
-                    }
-                    if (obj is {Delegate} target)
-                    {
-                        result = target;
-                        handle = default;
-                        return true;
-                    }
-                
-                    var type = obj.GetType();
-                    if (UnmatchedCache.TryGetValue(type, out var unmatchedTypes) && unmatchedTypes.Contains(type))
-                    {
-                        result = null;
-                        handle = default;
-                        return false;
-                    }
-                
-                    if (!MatchedCache.TryGetValue(type, out var ducks))
-                    {
-                        ducks = new Dictionary<Type, ISpawner<IProxy>>();
-                        MatchedCache.TryAdd(type, ducks);
-                    }
-                    if (!ducks.TryGetValue(typeof({Delegate}), out var pool))
-                    {
-                        pool = Pool<Proxy_{DisplayName}>.Default;
-                        ducks.Add(typeof({Delegate}), pool);
-                    }
-                
-                    var pooledObj = pool.Spawn();
-                    if (!pooledObj.TryInit(obj))
-                    {
-                        if (unmatchedTypes == null)
-                        {
-                            unmatchedTypes = [];
-                            UnmatchedCache.TryAdd(type, unmatchedTypes);
-                        }
-                        unmatchedTypes.Add(type);
-                        result = null;
-                        handle = default;
-                        return false;
-                    }
-                    result = ((Proxy_{DisplayName}) pooledObj).{MethodName};
-                    handle = new PooledHandle((IPool) pool, pooledObj);
-                    return result != null;
-                }
-
-                /// <summary>
-                /// Auto generated.
-                /// </summary>
-                [global::System.Runtime.CompilerServices.CompilerGenerated]
-                private class Proxy_{DisplayName} : IProxy
-                {
-        {Delegates}
-        {Fields}
-                    /// <summary>
-                    /// Auto generated.
-                    /// </summary>
-                    [global::System.Runtime.CompilerServices.CompilerGenerated]
-                    private Type m_Type;
-
-                    /// <summary>
-                    /// Auto generated.
-                    /// </summary>
-                    [global::System.Runtime.CompilerServices.CompilerGenerated]
-                    private object m_Proxy;
-        
-                    /// <inheritdoc />
-                    [global::System.Runtime.CompilerServices.CompilerGenerated]
-                    void IResetable.Reset() => m_Proxy = null;
-                    
-                    /// <summary>
-                    /// Auto generated.
-                    /// </summary>
-                    [global::System.Runtime.CompilerServices.CompilerGenerated]
-                    private void ClearAllCache()
-                    {
-                        m_Proxy = null;
-                        m_Type = null;
-        {Reset}
-                    }
-        
-                    /// <inheritdoc />
-                    [global::System.Runtime.CompilerServices.CompilerGenerated]
-                    public override bool Equals(object obj)
-                    {
-                        return m_Proxy == null ? false : m_Proxy.Equals(obj);
-                    }
-                
-                    /// <inheritdoc />
-                    [global::System.Runtime.CompilerServices.CompilerGenerated]
-                    public override int GetHashCode()
-                    {
-                        return m_Proxy == null ? 0 : m_Proxy.GetHashCode();
-                    }
-
-                    /// <inheritdoc />
-                    [global::System.Runtime.CompilerServices.CompilerGenerated]
-                    public bool TryInit(object obj)
-                    {
-                        if (obj.GetType() == m_Type)
-                        {
-                            m_Proxy = obj;
-                            return true;
-                        }
-                        ClearAllCache();
-                        m_Proxy = obj;
-                        m_Type = obj.GetType();
-        {MemberInit}
-                        return true;
-                    }
-        {Methods}
-                }
-            }
-        }
-        """;
-
     public void Initialize(GeneratorInitializationContext context) => context.RegisterForSyntaxNotifications(static () => new SyntaxContextReceiver());
 
     public void Execute(GeneratorExecutionContext context)
@@ -339,21 +33,131 @@ public class DuckGenerator : ISourceGenerator
         var members = GetProxyField(method, 0);
         var resets = GetResetBody(method, 0);
 
-        // ReSharper disable InconsistentNaming
-        var body = DELEGATE_BODY.Format
-        (
-            Generator => nameof(DuckGenerator),
-            CreateTime => DateTime.Now.ToString(CultureInfo.InvariantCulture),
-            Delegate => info.FullName,
-            DisplayName => info.DisplayName,
-            Delegates => delegates,
-            Fields => members,
-            Methods => implements,
-            MemberInit => memberInit,
-            Reset => resets,
-            MethodName => method.Name
-        );
-        return body;
+        return $$"""
+        // Generator: {{nameof(DuckGenerator)}}
+        // Created On: {{DateTime.Now.ToString(CultureInfo.InvariantCulture)}}
+
+        using System;
+        using System.Collections.Concurrent;
+        using System.Reflection;
+        using Gubbins.Enhance;
+        using Gubbins.Unsafe;
+
+        namespace Gubbins.Generated
+        {
+            [global::System.Runtime.CompilerServices.CompilerGenerated]
+            public sealed class Duck_{{info.DisplayName}} : Duck<{{info.FullName}}>
+            {
+                [global::System.Runtime.CompilerServices.CompilerGenerated]
+                private static readonly ConcurrentBag<Proxy_{{info.DisplayName}}> s_Pool = new();
+
+                [global::System.Runtime.CompilerServices.CompilerGenerated]
+                private static readonly Recycler s_Recycler = new();
+
+                [global::System.Runtime.CompilerServices.CompilerGenerated]
+                private sealed class Recycler : IDuckProxyRecycler
+                {
+                    public void Recycle(IProxy proxy)
+                    {
+                        s_Pool.Add((Proxy_{{info.DisplayName}})proxy);
+                    }
+                }
+
+                [global::System.Runtime.CompilerServices.CompilerGenerated]
+                public override bool Like(object obj, out {{info.FullName}} result)
+                {
+                    return Like(obj, out result, out _);
+                }
+
+                [global::System.Runtime.CompilerServices.CompilerGenerated]
+                public override bool Like(object obj, out {{info.FullName}} result, out DuckHandle handle)
+                {
+                    if (obj == null)
+                    {
+                        result = null;
+                        handle = default;
+                        return false;
+                    }
+
+                    if (obj is {{info.FullName}} direct)
+                    {
+                        result = direct;
+                        handle = default;
+                        return true;
+                    }
+
+                    if (!s_Pool.TryTake(out var proxy))
+                    {
+                        proxy = new Proxy_{{info.DisplayName}}();
+                    }
+
+                    if (!proxy.TryInit(obj))
+                    {
+                        s_Pool.Add(proxy);
+                        result = null;
+                        handle = default;
+                        return false;
+                    }
+
+                    result = proxy.{{method.Name}};
+                    handle = new DuckHandle(proxy, s_Recycler);
+                    return true;
+                }
+
+                [global::System.Runtime.CompilerServices.CompilerGenerated]
+                private sealed class Proxy_{{info.DisplayName}} : IProxy
+                {
+        {{delegates}}
+        {{members}}
+                    [global::System.Runtime.CompilerServices.CompilerGenerated]
+                    private Type m_Type = null!;
+
+                    [global::System.Runtime.CompilerServices.CompilerGenerated]
+                    private object m_Proxy = null!;
+
+                    [global::System.Runtime.CompilerServices.CompilerGenerated]
+                    void IResetable.Reset() => ClearAllCache();
+
+                    [global::System.Runtime.CompilerServices.CompilerGenerated]
+                    private void ClearAllCache()
+                    {
+                        m_Proxy = null!;
+                        m_Type = null!;
+        {{resets}}
+                    }
+
+                    [global::System.Runtime.CompilerServices.CompilerGenerated]
+                    public override bool Equals(object obj)
+                    {
+                        return m_Proxy == null ? false : m_Proxy.Equals(obj);
+                    }
+
+                    [global::System.Runtime.CompilerServices.CompilerGenerated]
+                    public override int GetHashCode()
+                    {
+                        return m_Proxy == null ? 0 : m_Proxy.GetHashCode();
+                    }
+
+                    [global::System.Runtime.CompilerServices.CompilerGenerated]
+                    public bool TryInit(object obj)
+                    {
+                        if (obj.GetType() == m_Type)
+                        {
+                            m_Proxy = obj;
+                            return true;
+                        }
+
+                        ClearAllCache();
+                        m_Proxy = obj;
+                        m_Type = obj.GetType();
+        {{memberInit}}
+                        return true;
+                    }
+        {{implements}}
+                }
+            }
+        }
+        """;
     }
 
     private static string GenerateInterfaceProxy(FeatureInfo info)
@@ -373,20 +177,132 @@ public class DuckGenerator : ISourceGenerator
             memberInit.AppendLine(GetMemberInitString(method, index));
         }
 
-        // ReSharper disable InconsistentNaming
-        var body = INTERFACE_BODY.Format
-        (
-            Generator => nameof(DuckGenerator),
-            CreateTime => DateTime.Now.ToString(CultureInfo.InvariantCulture),
-            Interface => info.FullName,
-            DisplayName => info.DisplayName,
-            Delegates => delegates.ToString(),
-            Fields => members.ToString(),
-            Methods => implements.ToString(),
-            MemberInit => memberInit.ToString(),
-            Reset => resets.ToString()
-        );
-        return body;
+        return $$"""
+        // Generator: {{nameof(DuckGenerator)}}
+        // Created On: {{DateTime.Now.ToString(CultureInfo.InvariantCulture)}}
+
+        using System;
+        using System.Collections.Concurrent;
+        using System.Reflection;
+        using Gubbins.Enhance;
+        using Gubbins.Unsafe;
+
+        namespace Gubbins.Generated
+        {
+            [global::System.Runtime.CompilerServices.CompilerGenerated]
+            internal sealed class Duck_{{info.DisplayName}} : Duck<{{info.FullName}}>
+            {
+                [global::System.Runtime.CompilerServices.CompilerGenerated]
+                private static readonly ConcurrentBag<Proxy_{{info.DisplayName}}> s_Pool = new();
+
+                [global::System.Runtime.CompilerServices.CompilerGenerated]
+                private static readonly Recycler s_Recycler = new();
+
+                [global::System.Runtime.CompilerServices.CompilerGenerated]
+                private sealed class Recycler : IDuckProxyRecycler
+                {
+                    public void Recycle(IProxy proxy)
+                    {
+                        s_Pool.Add((Proxy_{{info.DisplayName}})proxy);
+                    }
+                }
+
+                [global::System.Runtime.CompilerServices.CompilerGenerated]
+                public override bool Like(object obj, out {{info.FullName}} result)
+                {
+                    return Like(obj, out result, out _);
+                }
+
+                [global::System.Runtime.CompilerServices.CompilerGenerated]
+                public override bool Like(object obj, out {{info.FullName}} result, out DuckHandle handle)
+                {
+                    if (obj == null)
+                    {
+                        result = null;
+                        handle = default;
+                        return false;
+                    }
+
+                    if (obj is {{info.FullName}} direct)
+                    {
+                        result = direct;
+                        handle = default;
+                        return true;
+                    }
+
+                    if (!s_Pool.TryTake(out var proxy))
+                    {
+                        proxy = new Proxy_{{info.DisplayName}}();
+                    }
+
+                    if (!proxy.TryInit(obj))
+                    {
+                        s_Pool.Add(proxy);
+                        result = null;
+                        handle = default;
+                        return false;
+                    }
+
+                    result = proxy;
+                    handle = new DuckHandle(proxy, s_Recycler);
+                    return true;
+                }
+
+                [global::System.Runtime.CompilerServices.CompilerGenerated]
+                private sealed class Proxy_{{info.DisplayName}} : IProxy, {{info.FullName}}
+                {
+        {{delegates}}
+        {{members}}
+                    [global::System.Runtime.CompilerServices.CompilerGenerated]
+                    private Type m_Type = null!;
+
+                    [global::System.Runtime.CompilerServices.CompilerGenerated]
+                    private object m_Proxy = null!;
+
+                    [global::System.Runtime.CompilerServices.CompilerGenerated]
+                    void IResetable.Reset() => ClearAllCache();
+
+
+                    [global::System.Runtime.CompilerServices.CompilerGenerated]
+                    private void ClearAllCache()
+                    {
+                        m_Proxy = null!;
+                        m_Type = null!;
+        {{resets}}
+                    }
+
+                    [global::System.Runtime.CompilerServices.CompilerGenerated]
+                    public override bool Equals(object obj)
+                    {
+                        return m_Proxy == null ? false : m_Proxy.Equals(obj);
+                    }
+
+                    [global::System.Runtime.CompilerServices.CompilerGenerated]
+                    public override int GetHashCode()
+                    {
+                        return m_Proxy == null ? 0 : m_Proxy.GetHashCode();
+                    }
+
+                    [global::System.Runtime.CompilerServices.CompilerGenerated]
+                    public bool TryInit(object obj)
+                    {
+                        if (obj.GetType() == m_Type)
+                        {
+                            m_Proxy = obj;
+                            return true;
+                        }
+
+                        ClearAllCache();
+                        m_Proxy = obj;
+                        m_Type = obj.GetType();
+        {{memberInit}}
+                        return true;
+                    }
+        {{implements}}
+                }
+            }
+        }
+        """;
     }
 
     private static string GetResetBody(MethodInfo method, int index)
@@ -398,42 +314,27 @@ public class DuckGenerator : ISourceGenerator
 
     private static string GetProxyField(MethodInfo method, int index) =>
         method.HasGenericType
-            ? $"""
-                           /// <summary>
-                           /// Auto generated.
-                           /// </summary>
+            ? $$"""
                            [global::System.Runtime.CompilerServices.CompilerGenerated]
-                           private System.Reflection.MethodInfo m_Func{index};
+                           private System.Reflection.MethodInfo m_Func{{index}};
                """
-            : $"""
-                           /// <summary>
-                           /// Auto generated.
-                           /// </summary>
+            : $$"""
                            [global::System.Runtime.CompilerServices.CompilerGenerated]
-                           private Func{index}<object> m_Func{index};
+                           private Func{{index}}<object> m_Func{{index}};
                """;
 
     private static string GetMethodDelegate(MethodInfo method, int index) =>
         method.HasGenericType
-            ? $"""
-                           /// <summary>
-                           /// Auto generated.
-                           /// </summary>
+            ? $$"""
                            [global::System.Runtime.CompilerServices.CompilerGenerated]
-                           private System.Collections.Generic.Dictionary<System.Type, System.Delegate> m_Func{index}Cache = new();
+                           private System.Collections.Generic.Dictionary<System.Type, System.Delegate> m_Func{{index}}Cache = new();
 
-                           /// <summary>
-                           /// Auto generated.
-                           /// </summary>
                            [global::System.Runtime.CompilerServices.CompilerGenerated]
-                           private delegate {method.ReturnType.ToDisplayString()} Func{index}<_T_, {string.Join(", ", method.GenericNames)}>(_T_ _{(method.Args.Length == 0 ? string.Empty : ", " + string.Join(", ", method.Args.Select(static arg => $"{arg.Type.ToDisplayString()} {arg.Name}")))});
+                           private delegate {{method.ReturnType.ToDisplayString()}} Func{{index}}<_T_, {{string.Join(", ", method.GenericNames)}}>(_T_ _{{(method.Args.Length == 0 ? string.Empty : ", " + string.Join(", ", method.Args.Select(static arg => $"{arg.Type.ToDisplayString()} {arg.Name}")))}});
                """
-            : $"""
-                           /// <summary>
-                           /// Auto generated.
-                           /// </summary>
+            : $$"""
                            [global::System.Runtime.CompilerServices.CompilerGenerated]
-                           private delegate {method.ReturnType.ToDisplayString()} Func{index}<T>(T _{(method.Args.Length == 0 ? string.Empty : ", " + string.Join(", ", method.Args.Select(static arg => $"{arg.Type.ToDisplayString()} {arg.Name}")))});
+                           private delegate {{method.ReturnType.ToDisplayString()}} Func{{index}}<T>(T _{{(method.Args.Length == 0 ? string.Empty : ", " + string.Join(", ", method.Args.Select(static arg => $"{arg.Type.ToDisplayString()} {arg.Name}")))}});
                """;
 
     private static string GetMemberInitString(MethodInfo method, int index) =>
@@ -484,10 +385,7 @@ public class DuckGenerator : ISourceGenerator
                """
             : $"                {(method.IsVoidReturn ? string.Empty : "return ")}m_Func{index}.Invoke(m_Proxy{(method.Args.Length == 0 ? string.Empty : ", " + string.Join(",", method.Args.Select(static arg => arg.Name).ToArray()))});";
         return $$"""
-                 
-                             /// <summary>
-                             /// Auto generated.
-                             /// </summary>
+
                              [global::System.Runtime.CompilerServices.CompilerGenerated]
                              public {{method.ReturnType}} {{method.Name}}{{(method.GenericNames.Length == 0 ? string.Empty : $"<{string.Join(", ", method.GenericNames)}>")}}({{string.Join(", ", method.Args.Select(static arg => $"{arg.Type.ToDisplayString()} {arg.Name}"))}}){{(string.IsNullOrEmpty(method.Constraints) ? string.Empty : " " + method.Constraints)}}
                              {
@@ -515,7 +413,7 @@ public class DuckGenerator : ISourceGenerator
                 {
                     IsInterface = false,
                     FullName    = typeSymbol.ToDisplayString(),
-                    DisplayName = typeSymbol.ToDisplayString().Replace(".", "_").Replace("+", "_").Replace("`", "_"), // Safe name
+                    DisplayName = typeSymbol.ToDisplayString().Replace(".", "_").Replace("+", "_").Replace("`", "_"),
                     Methods =
                     [
                         new MethodInfo
@@ -533,7 +431,7 @@ public class DuckGenerator : ISourceGenerator
                 {
                     IsInterface = true,
                     FullName    = typeSymbol.ToDisplayString(),
-                    DisplayName = typeSymbol.ToDisplayString().Replace(".", "_").Replace("+", "_").Replace("`", "_"), // Safe name
+                    DisplayName = typeSymbol.ToDisplayString().Replace(".", "_").Replace("+", "_").Replace("`", "_"),
                     Methods = typeSymbol.GetMethods().Select(m => new MethodInfo
                     {
                         Name           = m.Name,

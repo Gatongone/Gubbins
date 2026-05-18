@@ -10,7 +10,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\Gubbins.Generator\Gubbins.Generator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false"/>
-      <ProjectReference Include="..\Gubbins.Unsafe\Gubbins.Unsafe.csproj" />
+      <ProjectReference Include="..\Gubbins.Enhance\Gubbins.Enhance.csproj" />
     </ItemGroup>
 
 </Project>

@@ -1,7 +1,33 @@
 ﻿using System.Collections.Concurrent;
 using Gubbins.Unsafe;
 
-namespace Gubbins.Spawner;
+namespace Gubbins.Enhance;
+
+/// <summary>
+/// Represents a handle to a duck proxy that can be disposed to recycle resources.
+/// This is the base type used by Duck typing; Spawner can return PooledHandle through polymorphism.
+/// </summary>
+public readonly struct DuckHandle(IProxy proxy, IDuckProxyRecycler recycler) : IDisposable
+{
+    private readonly IProxy?             m_Proxy    = proxy;
+    private readonly IDuckProxyRecycler? m_Recycler = recycler;
+
+    /// <summary>
+    /// Disposes the wrapped resource handle if present.
+    /// </summary>
+    public void Dispose()
+    {
+        if (m_Proxy != null)
+        {
+            m_Recycler?.Recycle(m_Proxy);
+        }
+    }
+}
+
+public interface IDuckProxyRecycler
+{
+    void Recycle(IProxy proxy);
+}
 
 /// <summary>
 /// Proxy for duck.
@@ -9,7 +35,7 @@ namespace Gubbins.Spawner;
 /// <remarks>
 /// This interface should be implemented by source generator.
 /// </remarks>
-public interface IProxy : IResetable
+public interface IProxy
 {
     /// <summary>
     /// Initialize the proxy.
@@ -17,6 +43,11 @@ public interface IProxy : IResetable
     /// <param name="proxy">The object may be the source of duck interface.</param>
     /// <returns>Whether the object can have a duck proxy.</returns>
     bool TryInit(object proxy);
+
+    /// <summary>
+    /// Reset the proxy to its initial state, so that it can be reused for another object.
+    /// </summary>
+    void Reset();
 }
 
 /// <summary>
@@ -54,7 +85,7 @@ public static class Duck
     /// <param name="handle">Handle for the pooled duck proxy. You can dispose it when you don't need to use the proxy(<c>result</c>), so that reduces redundant managed memory allocation.</param>
     /// <typeparam name="T">Interface or delegate type that has <see cref="DuckAttribute"/>.</typeparam>
     /// <returns>Whether the object can have a duck proxy.</returns>
-    public static bool Like<T>(object obj, out T result, out PooledHandle handle) where T : class
+    public static bool Like<T>(object obj, out T result, out DuckHandle handle) where T : class
     {
         result = null!;
         if (obj == null!)
@@ -107,12 +138,17 @@ public abstract class Duck<T>
     /// <summary>
     /// Check whether the type can have a duck proxy for the given interface type.
     /// </summary>
-    protected ConcurrentDictionary<Type, Dictionary<Type, ISpawner<IProxy>>> MatchedCache = new();
+    /// <remarks>
+    /// Stored as object to allow flexibility in implementation and avoid tight coupling to ISpawner.
+    /// Generated implementations will cast and populate this with actual spawner dictionary as needed.
+    /// Type: ConcurrentDictionary{Type, Dictionary{Type, ISpawner{IProxy}}}
+    /// </remarks>
+    protected readonly object MatchedCache = new ConcurrentDictionary<Type, object>();
 
     /// <summary>
     /// Check whether the type can't have a duck proxy for the given interface type.
     /// </summary>
-    protected ConcurrentDictionary<Type, HashSet<Type>> UnmatchedCache = new();
+    protected readonly ConcurrentDictionary<Type, HashSet<Type>> UnmatchedCache = new();
 
     /// <summary>
     /// Check whether <c>obj</c> can have a duck proxy for the given interface type that has <see cref="DuckAttribute"/>.
@@ -129,5 +165,5 @@ public abstract class Duck<T>
     /// <param name="result">Resulting duck proxy if available.</param>
     /// <param name="handle">Handle for the pooled duck proxy. You can dispose it when you don't need to use the proxy(<c>result</c>), so that reduces redundant managed memory allocation.</param>
     /// <returns>Whether the object can have a duck proxy.</returns>
-    public abstract bool Like(object obj, out T result, out PooledHandle handle);
+    public abstract bool Like(object obj, out T result, out DuckHandle handle);
 }

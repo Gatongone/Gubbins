@@ -1,4 +1,4 @@
-﻿using Gubbins.Spawner;
+﻿using Gubbins.Enhance;
 
 namespace Gubbins.Collections;
 

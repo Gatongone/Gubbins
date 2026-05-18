@@ -1,5 +1,6 @@
 ﻿using System.Collections;
 using System.Collections.Concurrent;
+using Gubbins.Enhance;
 
 namespace Gubbins.Spawner;
 
@@ -116,6 +117,22 @@ public class Pool<T> : IPool<T>
 }
 
 /// <summary>
+/// Represents a collection that can be cleared, allowing it to be reused without the need for reinitialization.
+/// </summary>
+/// <remarks>
+/// Duck typing is used to allow any collection type that implements a compatible Clear method to be treated as an IClearable,
+/// enabling flexible and reusable code without the need for explicit interface implementation.
+/// </remarks>
+[Duck]
+file interface IClearable
+{
+    /// <summary>
+    /// Clears the collection, removing all items and resetting it to its initial state, allowing it to be reused without the need for reinitialization.
+    /// </summary>
+    void Clear();
+}
+
+/// <summary>
 /// Wraps <see cref="Pool{T}"/> with tracking of currently spawned instances.
 /// </summary>
 /// <typeparam name="T">The pooled instance type.</typeparam>
@@ -194,13 +211,4 @@ public class TraceablePool<T> : IPool<T>, ITraceablePool, IEnumerable<T>
 
     /// <inheritdoc />
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
-}
-
-[Duck]
-file interface IClearable
-{
-    /// <summary>
-    /// Clears the state of the object, preparing it for reuse.
-    /// </summary>
-    void Clear();
 }

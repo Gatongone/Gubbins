@@ -8,7 +8,6 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\Gubbins.Spawner\Gubbins.Spawner.csproj" />
       <ProjectReference Include="..\Gubbins.Unsafe\Gubbins.Unsafe.csproj" />
     </ItemGroup>
 

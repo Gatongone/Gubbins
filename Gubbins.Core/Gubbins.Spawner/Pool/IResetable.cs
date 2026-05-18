@@ -1,4 +1,6 @@
-﻿namespace Gubbins.Spawner;
+﻿using Gubbins.Enhance;
+
+namespace Gubbins.Spawner;
 
 /// <summary>
 /// Represents an object that can be reset to its initial state, allowing it to be reused without the need for reinitialization.
