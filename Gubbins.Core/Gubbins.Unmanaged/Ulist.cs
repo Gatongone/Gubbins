@@ -176,14 +176,14 @@ public struct Ulist<T> : IList, IList<T>, IReadOnlyList<T>, IDisposable where T 
     IEnumerator<T> IEnumerable<T>.GetEnumerator()
     {
         EnsureNotDisposed();
-        return new SlowEnumerator(m_Array, m_Count);
+        return new ReadOnlyEnumerator(m_Array, m_Count);
     }
 
     /// <inheritdoc />
     IEnumerator IEnumerable.GetEnumerator()
     {
         EnsureNotDisposed();
-        return new SlowEnumerator(m_Array, m_Count);
+        return new ReadOnlyEnumerator(m_Array, m_Count);
     }
 
     /// <inheritdoc />
@@ -864,7 +864,7 @@ public struct Ulist<T> : IList, IList<T>, IReadOnlyList<T>, IDisposable where T 
     /// <summary>
     /// Provides a slower enumerator for the unmanaged array that implements IEnumerator.
     /// </summary>
-    private struct SlowEnumerator : IEnumerator<T>
+    private struct ReadOnlyEnumerator : IEnumerator<T>
     {
         /// <summary>
         /// The underlying unmanaged array being enumerated.
@@ -882,11 +882,11 @@ public struct Ulist<T> : IList, IList<T>, IReadOnlyList<T>, IDisposable where T 
         private int m_Index;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="SlowEnumerator"/> struct.
+        /// Initializes a new instance of the <see cref="ReadOnlyEnumerator"/> struct.
         /// </summary>
         /// <param name="array">The array to enumerate.</param>
         /// <param name="length">The actual count of <see cref="Ulist{T}"/>.</param>
-        public SlowEnumerator(Uarray<T> array, int length)
+        public ReadOnlyEnumerator(Uarray<T> array, int length)
         {
             m_Array  = array;
             m_Index  = -1;
