@@ -13,7 +13,7 @@ namespace Gubbins.Unmanaged;
 /// <typeparam name="T">The reference type to be pooled. Must be a class type that can be pinned in memory for unmanaged access.</typeparam>
 public sealed class Upool<T> : Pool<T> where T : unmanaged
 {
-    public static readonly Upool<T> Default = new();
+    public new static readonly Upool<T> Default = new();
 
     /// <summary>
     /// A thread-safe cache that maintains the association between rented character arrays and their corresponding
@@ -48,12 +48,13 @@ public sealed class Upool<T> : Pool<T> where T : unmanaged
     /// <inheritdoc />
     public override void Recycle(T instance)
     {
-        if (!m_HandleCache.TryGetValue(instance, out var handle))
+        if (m_HandleCache.TryRemove(instance, out var handle))
         {
-            handle                  = GCHandle.Alloc(instance, GCHandleType.Pinned);
-            m_HandleCache[instance] = handle;
+            base.Recycle(instance);
+            if (handle.IsAllocated)
+            {
+                handle.Free();
+            }
         }
-
-        base.Recycle(instance);
     }
 }
