@@ -116,7 +116,7 @@ public class DuckGenerator : ISourceGenerator
                     private object m_Proxy = null!;
 
                     [global::System.Runtime.CompilerServices.CompilerGenerated]
-                    void IResetable.Reset() => ClearAllCache();
+                    void Gubbins.Enhance.IProxy.Reset() => ClearAllCache();
 
                     [global::System.Runtime.CompilerServices.CompilerGenerated]
                     private void ClearAllCache()
@@ -139,7 +139,7 @@ public class DuckGenerator : ISourceGenerator
                     }
 
                     [global::System.Runtime.CompilerServices.CompilerGenerated]
-                    public bool TryInit(object obj)
+                    bool Gubbins.Enhance.IProxy.TryInit(object obj)
                     {
                         if (obj.GetType() == m_Type)
                         {
@@ -235,7 +235,7 @@ public class DuckGenerator : ISourceGenerator
                         proxy = new Proxy_{{info.DisplayName}}();
                     }
 
-                    if (!proxy.TryInit(obj))
+                    if (!((IProxy) proxy).TryInit(obj))
                     {
                         s_Pool.Add(proxy);
                         result = null;
@@ -249,7 +249,7 @@ public class DuckGenerator : ISourceGenerator
                 }
 
                 [global::System.Runtime.CompilerServices.CompilerGenerated]
-                private sealed class Proxy_{{info.DisplayName}} : IProxy, {{info.FullName}}
+                private sealed class Proxy_{{info.DisplayName}} : global::Gubbins.Enhance.IProxy, {{info.FullName}}
                 {
         {{delegates}}
         {{members}}
@@ -260,7 +260,7 @@ public class DuckGenerator : ISourceGenerator
                     private object m_Proxy = null!;
 
                     [global::System.Runtime.CompilerServices.CompilerGenerated]
-                    void IResetable.Reset() => ClearAllCache();
+                    void global::Gubbins.Enhance.IProxy.Reset() => ClearAllCache();
 
 
                     [global::System.Runtime.CompilerServices.CompilerGenerated]
@@ -284,7 +284,7 @@ public class DuckGenerator : ISourceGenerator
                     }
 
                     [global::System.Runtime.CompilerServices.CompilerGenerated]
-                    public bool TryInit(object obj)
+                    bool global::Gubbins.Enhance.IProxy.TryInit(object obj)
                     {
                         if (obj.GetType() == m_Type)
                         {

@@ -124,7 +124,7 @@ public class Pool<T> : IPool<T>
 /// enabling flexible and reusable code without the need for explicit interface implementation.
 /// </remarks>
 [Duck]
-file interface IClearable
+internal interface IClearable
 {
     /// <summary>
     /// Clears the collection, removing all items and resetting it to its initial state, allowing it to be reused without the need for reinitialization.
