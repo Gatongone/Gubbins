@@ -281,21 +281,19 @@ public class ResourceGraph : IEnumerable<IResourceKey>
     private static void MergeSameDependencySetGroups(DirectedGraph<IResourceKey> graph, SetGroup<IResourceKey> uf)
     {
         bool changed;
-        var pool = Pool<HashSet<IResourceKey>>.Default;
         do
         {
             changed = false;
 
             // representative -> merged dependency-set (all mapped to representative)
-            var repDeps = new Dictionary<IResourceKey, HashSet<IResourceKey>>();
+            var repDeps = Pool<Dictionary<IResourceKey, HashSet<IResourceKey>>>.Default.Spawn();
 
             foreach (var vertex in graph)
             {
                 var rep = uf.FindRoot(vertex);
                 if (!repDeps.TryGetValue(rep, out var depsOfRep))
                 {
-                    depsOfRep = pool.Spawn();
-                    depsOfRep.Clear();
+                    depsOfRep = Pool<HashSet<IResourceKey>>.Default.Spawn();
                     repDeps.Add(rep, depsOfRep);
                 }
 
@@ -326,11 +324,11 @@ public class ResourceGraph : IEnumerable<IResourceKey>
                 }
             }
 
-            foreach (var set in repDeps.Values)
+            foreach (var hashSet in repDeps.Values)
             {
-                set.Clear();
-                pool.Recycle(set);
+                Pool<HashSet<IResourceKey>>.Default.Recycle(hashSet);
             }
+            Pool<Dictionary<IResourceKey, HashSet<IResourceKey>>>.Default.Recycle(repDeps);
         } while (changed);
     }
 

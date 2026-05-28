@@ -91,8 +91,9 @@ public class DuckGenerator : ISourceGenerator
                         proxy = new Proxy_{{info.DisplayName}}();
                     }
 
-                    if (!proxy.TryInit(obj))
+                    if (!((IProxy) proxy).TryInit(obj))
                     {
+                        ((IProxy) proxy).Reset();
                         s_Pool.Add(proxy);
                         result = null;
                         handle = default;
@@ -237,6 +238,7 @@ public class DuckGenerator : ISourceGenerator
 
                     if (!((IProxy) proxy).TryInit(obj))
                     {
+                        ((IProxy) proxy).Reset();
                         s_Pool.Add(proxy);
                         result = null;
                         handle = default;

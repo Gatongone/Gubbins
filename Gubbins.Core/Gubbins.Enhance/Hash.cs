@@ -11,12 +11,6 @@ namespace Gubbins.Enhance;
 public static partial class Hash
 {
     /// <summary>
-    /// Thread-safe storage for serialization information associated with objects.
-    /// Lazily initialized to avoid unnecessary memory allocation.
-    /// </summary>
-    private static ConditionalWeakTable<object, SerializationInfo>? s_SerializationInfoTable;
-
-    /// <summary>
     /// The threshold for hash collisions before considering rehashing or resizing operations.
     /// Used to maintain optimal hash table performance by detecting excessive collision scenarios.
     /// </summary>
@@ -188,9 +182,9 @@ public static partial class Hash
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get
         {
-            if (s_SerializationInfoTable == null)
-                Interlocked.CompareExchange(ref s_SerializationInfoTable, new ConditionalWeakTable<object, SerializationInfo>(), null);
-            return s_SerializationInfoTable;
+            if (field == null)
+                Interlocked.CompareExchange(ref field, new ConditionalWeakTable<object, SerializationInfo>(), null);
+            return field;
         }
     }
 }
