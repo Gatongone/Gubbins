@@ -6,7 +6,7 @@ namespace Gubbins.Span;
 /// <summary>
 /// Serial span operation.
 /// </summary>
-internal sealed class SerialNumberOperations<T> : ISpanNumberOperations<T>, ISpanGetMax<T>, ISpanGetMin<T> where T : unmanaged
+internal sealed class SerialNumberOperations<T> : ISpanNumberOperations<T>  where T : unmanaged
 {
     public bool Supported => true;
 
@@ -70,7 +70,7 @@ internal sealed class SerialNumberOperations<T> : ISpanNumberOperations<T>, ISpa
     public T GetMax(Span<T> src)
     {
         var max = src[0];
-        for (var index = 0; index < src.Length; index++)
+        for (var index = 1; index < src.Length; index++)
         {
             var cur = src[index];
             if (Operations<T>.GreaterThan(cur, max))
@@ -97,7 +97,7 @@ internal sealed class SerialNumberOperations<T> : ISpanNumberOperations<T>, ISpa
     public T GetMin(Span<T> src)
     {
         var min = src[0];
-        for (var index = 0; index < src.Length; index++)
+        for (var index = 1; index < src.Length; index++)
         {
             var cur = src[index];
             if (Operations<T>.LessThan(cur, min))

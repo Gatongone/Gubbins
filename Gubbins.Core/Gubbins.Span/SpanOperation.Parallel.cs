@@ -88,6 +88,15 @@ internal sealed class ParallelNumberOperations<T> : ISpanNumberOperations<T> whe
         public PairOp Op;
     }
 
+    private unsafe struct ReduceState
+    {
+        public T*     Src;
+        public int    Length;
+        public int    PartitionCount;
+        public T*     Partials;
+        public PairOp Op;
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static unsafe void ExecuteOperand(int i, OperandState state) =>
         state.To[i] = state.Op(state.From[i], state.Operand);
@@ -95,6 +104,20 @@ internal sealed class ParallelNumberOperations<T> : ISpanNumberOperations<T> whe
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static unsafe void ExecutePair(int i, PairState state) =>
         state.To[i] = state.Op(state.Left[i], state.Right[i]);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static unsafe void ExecuteReduce(int i, ReduceState state)
+    {
+        var start = state.Length * i / state.PartitionCount;
+        var end   = state.Length * (i + 1) / state.PartitionCount;
+        var value = state.Src[start];
+        for (var index = start + 1; index < end; index++)
+        {
+            value = state.Op(value, state.Src[index]);
+        }
+
+        state.Partials[i] = value;
+    }
 
     private static unsafe void RunOperand(Span<T> src, T operand, Span<T> result, OperandOp op)
     {
@@ -115,6 +138,40 @@ internal sealed class ParallelNumberOperations<T> : ISpanNumberOperations<T> whe
             var state = new PairState {Left = lsrc, Right = rsrc, To = dest, Op = op};
             ParallelExecutor.For(result.Length, state, ExecutePair);
         }
+    }
+
+    private static unsafe T Reduce(Span<T> src, PairOp op)
+    {
+        if (src.Length == 0)
+        {
+            throw new ArgumentException("Span must not be empty", nameof(src));
+        }
+
+        var partitionCount = Math.Min(src.Length, Math.Max(1, Environment.ProcessorCount));
+        var partials       = new T[partitionCount];
+
+        fixed (T* ps = src)
+        fixed (T* pp = partials)
+        {
+            var state = new ReduceState
+            {
+                Src            = ps,
+                Length         = src.Length,
+                PartitionCount = partitionCount,
+                Partials       = pp,
+                Op             = op
+            };
+
+            ParallelExecutor.For(partitionCount, state, ExecuteReduce);
+        }
+
+        var result = partials[0];
+        for (var index = 1; index < partials.Length; index++)
+        {
+            result = op(result, partials[index]);
+        }
+
+        return result;
     }
 
     /// <inheritdoc/>
@@ -142,10 +199,19 @@ internal sealed class ParallelNumberOperations<T> : ISpanNumberOperations<T> whe
     public void Max(Span<T> left, Span<T> right, Span<T> result) =>
         RunPair(left, right, result, static (l, r) => Operations<T>.GreaterThan(l, r) ? l : r);
 
+    /// <summary>
+    /// Gets the maximum value from the source span.
+    /// </summary>
+    /// <param name="src">The source span to find the maximum value from.</param>
+    /// <returns>The maximum value found in the source span.</returns>
+    public T GetMax(Span<T> src) => Reduce(src, static (left, right) => Operations<T>.GreaterThan(left, right) ? left : right);
+
     /// <inheritdoc />
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Min(Span<T> left, Span<T> right, Span<T> result) =>
         RunPair(left, right, result, static (l, r) => Operations<T>.LessThan(l, r) ? l : r);
+
+    public T GetMin(Span<T> src) => Reduce(src, static (left, right) => Operations<T>.LessThan(left, right) ? left : right);
 }
 
 internal sealed class ParallelIntOperation : ISpanShiftLeft<int>, ISpanShiftRight<int>

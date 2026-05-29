@@ -420,6 +420,7 @@ internal sealed class ParallelSimdNumberOperations<T> : ISpanNumberOperations<T>
 {
     private static readonly bool                                s_Supported = typeof(T).CheckType().IsNumberType && Vector.IsHardwareAccelerated;
     private static readonly SimdNumberOperations<T>             s_Simd      = new();
+    private static readonly ParallelNumberOperations<T>         s_Parallel  = new();
     private static readonly ParallelSimdSpanRunner.OperandOp<T> s_Add       = s_Simd.Add;
     private static readonly ParallelSimdSpanRunner.OperandOp<T> s_Subtract  = s_Simd.Subtract;
     private static readonly ParallelSimdSpanRunner.OperandOp<T> s_Multiply  = s_Simd.Multiply;
@@ -450,7 +451,13 @@ internal sealed class ParallelSimdNumberOperations<T> : ISpanNumberOperations<T>
     public void Max(Span<T> left, Span<T> right, Span<T> result) => ParallelSimdSpanRunner.RunPair(left, right, result, s_Max);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public T GetMax(Span<T> src) => s_Parallel.GetMax(src);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Min(Span<T> left, Span<T> right, Span<T> result) => ParallelSimdSpanRunner.RunPair(left, right, result, s_Min);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public T GetMin(Span<T> src) => s_Parallel.GetMin(src);
 }
 
 #if NET7_0_OR_GREATER

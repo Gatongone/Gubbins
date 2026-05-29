@@ -14,5 +14,8 @@
   "keywords": [
     "Utils"
   ],
-  "dependencies": {}
+  "dependencies": {
+    "com.unity.mathematics": "1.2.6",
+    "com.unity.burst": "1.8.29"
+  }
 }

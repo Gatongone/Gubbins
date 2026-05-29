@@ -2,7 +2,7 @@
     "name": "Gubbins.Editor",
     "rootNamespace": "Gubbins.Editor",
     "references": [
-        "GUID:429866d0c55b2a742b18e7f435193f8b"
+        "GUID:cd3ce3f81e0cc0c4d868a09411ec9632"
     ],
     "includePlatforms": [
         "Editor"
@@ -11,7 +11,8 @@
     "allowUnsafeCode": false,
     "overrideReferences": true,
     "precompiledReferences": [
-        "Gubbins.Core.dll"
+        "Gubbins.Unsafe.dll",
+        "Gubbins.Enhance.dll"
     ],
     "autoReferenced": true,
     "defineConstraints": [],

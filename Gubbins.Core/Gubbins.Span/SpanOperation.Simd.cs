@@ -7,7 +7,7 @@ namespace Gubbins.Span;
 /// <summary>
 /// SIMD span operation.
 /// </summary>
-internal sealed class SimdNumberOperations<T> : ISpanNumberOperations<T>, ISpanGetMax<T>, ISpanGetMin<T> where T : unmanaged
+internal sealed class SimdNumberOperations<T> : ISpanNumberOperations<T> where T : unmanaged
 {
     /// <inheritdoc/>
     public bool Supported => Vector.IsHardwareAccelerated;
@@ -1906,7 +1906,7 @@ internal sealed class SimdVector4Operation : ISpanVectorOperations<Vector4>
             destination[startIndex + lane] = new Vector4(value, value, value, value);
         }
     }
-    
+
     private static Vector4 CrossScalar(Vector4 left, Vector4 right)
     {
         return new Vector4(

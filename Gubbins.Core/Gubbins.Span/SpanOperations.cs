@@ -92,28 +92,6 @@ public interface ISpanSqrt<T> : ISpanOperation where T : struct
     void Sqrt(Span<T> src, Span<T> result);
 }
 
-public interface ISpanShiftLeft<T> : ISpanOperation where T : struct
-{
-    /// <summary>
-    /// Apply shift left operation to the span.
-    /// </summary>
-    /// <param name="src">Span.</param>
-    /// <param name="count">Shift length.</param>
-    /// <param name="result">Result.</param>
-    void ShiftLeft(Span<T> src, int count, Span<T> result);
-}
-
-public interface ISpanShiftRight<T> : ISpanOperation where T : struct
-{
-    /// <summary>
-    /// Apply shift right operation to the span.
-    /// </summary>
-    /// <param name="src">Span.</param>
-    /// <param name="count">Shift length.</param>
-    /// <param name="result">Result.</param>
-    void ShiftRight(Span<T> src, int count, Span<T> result);
-}
-
 public interface ISpanMax<T> : ISpanOperation where T : struct
 {
     /// <summary>
@@ -123,6 +101,12 @@ public interface ISpanMax<T> : ISpanOperation where T : struct
     /// <param name="right">Span that has the same length with <c>left</c>.</param>
     /// <param name="result">Result.</param>
     void Max(Span<T> left, Span<T> right, Span<T> result);
+
+    /// <summary>
+    /// Get a max element from the span.
+    /// </summary>
+    /// <param name="src">Span.</param>
+    T GetMax(Span<T> src);
 }
 
 public interface ISpanMin<T> : ISpanOperation where T : struct
@@ -134,6 +118,12 @@ public interface ISpanMin<T> : ISpanOperation where T : struct
     /// <param name="right">Span that has the same length with <c>left</c>.</param>
     /// <param name="result">Result.</param>
     void Min(Span<T> left, Span<T> right, Span<T> result);
+
+    /// <summary>
+    /// Get a min element from the span.
+    /// </summary>
+    /// <param name="src">Span.</param>
+    T GetMin(Span<T> src);
 }
 
 public interface ISpanNumberOperations<T> : ISpanAddition<T>, ISpanSubtraction<T>, ISpanMultiply<T>, ISpanDivision<T>, ISpanModulus<T>, ISpanMax<T>, ISpanMin<T> where T : struct;
@@ -514,24 +504,30 @@ public interface ISpanVectorOperations<T> : ISpanDot<T>, ISpanCross<T>, ISpanNor
 
 #endregion
 
-#region Other
+#region Shift
 
-public interface ISpanGetMax<T> : ISpanOperation where T : struct
+public interface ISpanShiftLeft<T> : ISpanOperation where T : struct
 {
     /// <summary>
-    /// Get a max element from the span.
+    /// Apply shift left operation to the span.
     /// </summary>
     /// <param name="src">Span.</param>
-    T GetMax(Span<T> src);
+    /// <param name="count">Shift length.</param>
+    /// <param name="result">Result.</param>
+    void ShiftLeft(Span<T> src, int count, Span<T> result);
 }
 
-public interface ISpanGetMin<T> : ISpanOperation where T : struct
+public interface ISpanShiftRight<T> : ISpanOperation where T : struct
 {
     /// <summary>
-    /// Get a min element from the span.
+    /// Apply shift right operation to the span.
     /// </summary>
     /// <param name="src">Span.</param>
-    T GetMin(Span<T> src);
+    /// <param name="count">Shift length.</param>
+    /// <param name="result">Result.</param>
+    void ShiftRight(Span<T> src, int count, Span<T> result);
 }
+
+public interface ISpanShift<T> : ISpanShiftLeft<T>, ISpanShiftRight<T> where T : struct;
 
 #endregion
