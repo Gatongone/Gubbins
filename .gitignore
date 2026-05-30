@@ -1,6 +1,9 @@
 #IDE configs
+*/*.DotSettings.user
 */.idea
 */.vs
+/.idea
+/.vs
 
 # Build results
 [Dd]ebug
