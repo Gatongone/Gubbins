@@ -5,6 +5,9 @@ using Unity.Mathematics;
 
 namespace Gubbins.Span
 {
+    /// <summary>
+    /// Burst-compiled integer span operation.
+    /// </summary>
     [BurstCompile]
     internal unsafe class BurstIntOperation : ISpanNumberOperation<int>, ISpanShift<int>
     {
@@ -211,6 +214,9 @@ namespace Gubbins.Span
         }
     }
 
+    /// <summary>
+    /// Burst-compiled unsigned integer span operation.
+    /// </summary>
     [BurstCompile]
     internal unsafe class BurstUintOperation : ISpanNumberOperation<uint>, ISpanShift<uint>
     {
@@ -417,6 +423,9 @@ namespace Gubbins.Span
         }
     }
 
+    /// <summary>
+    /// Burst-compiled long integer span operation.
+    /// </summary>
     [BurstCompile]
     internal unsafe class BurstLongOperation : ISpanNumberOperation<long>, ISpanShift<long>
     {
@@ -623,6 +632,9 @@ namespace Gubbins.Span
         }
     }
 
+    /// <summary>
+    /// Burst-compiled unsigned long integer span operation.
+    /// </summary>
     [BurstCompile]
     internal unsafe class BurstUlongOperation : ISpanNumberOperation<ulong>, ISpanShift<ulong>
     {
@@ -829,6 +841,9 @@ namespace Gubbins.Span
         }
     }
 
+    /// <summary>
+    /// Burst-compiled floating-point span operation.
+    /// </summary>
     [BurstCompile]
     internal unsafe class BurstFloatOperation : ISpanNumberOperation<float>, ISpanRealOperation<float>
     {
@@ -1461,6 +1476,9 @@ namespace Gubbins.Span
         }
     }
 
+    /// <summary>
+    /// Burst-compiled double-precision floating-point span operation.
+    /// </summary>
     [BurstCompile]
     internal unsafe class BurstDoubleOperation : ISpanNumberOperation<double>, ISpanRealOperation<double>
     {

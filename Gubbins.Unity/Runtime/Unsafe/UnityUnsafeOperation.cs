@@ -1,9 +1,3 @@
-// Copyright ©2024 Gatongone
-// Author: Gatongone
-// Email: gatongone@gmail.com
-// Created On: 2024/03/23-20:29:33
-// Github: https://github.com/Gatongone
-
 using System;
 using System.Reflection;
 using System.Runtime.CompilerServices;

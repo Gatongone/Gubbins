@@ -9,6 +9,9 @@ using UnityEngine.Device;
 
 namespace Gubbins.Span
 {
+    /// <summary>
+    /// Job-scheduled int span operation.
+    /// </summary>
     internal class JobIntOperation : ISpanNumberOperation<int>, ISpanShift<int>
     {
         private static readonly int s_JobBatchSize = SystemInfo.processorCount;
@@ -336,6 +339,9 @@ namespace Gubbins.Span
         }
     }
 
+    /// <summary>
+    /// Job-scheduled uint span operation.
+    /// </summary>
     internal class JobUintOperation : ISpanNumberOperation<uint>, ISpanShift<uint>
     {
         private static readonly int s_JobBatchSize = SystemInfo.processorCount;
@@ -663,6 +669,9 @@ namespace Gubbins.Span
         }
     }
 
+    /// <summary>
+    /// Job-scheduled long span operation.
+    /// </summary>
     internal class JobLongOperation : ISpanNumberOperation<long>, ISpanShift<long>
     {
         private static readonly int s_JobBatchSize = SystemInfo.processorCount;
@@ -990,6 +999,9 @@ namespace Gubbins.Span
         }
     }
 
+    /// <summary>
+    /// Job-scheduled ulong span operation.
+    /// </summary>
     internal class JobUlongOperation : ISpanNumberOperation<ulong>, ISpanShift<ulong>
     {
         private static readonly int s_JobBatchSize = SystemInfo.processorCount;
@@ -1317,6 +1329,9 @@ namespace Gubbins.Span
         }
     }
 
+    /// <summary>
+    /// Job-scheduled float span operation.
+    /// </summary>
     internal class JobFloatOperation : ISpanNumberOperation<float>, ISpanRealOperation<float>
     {
         private static readonly int s_JobBatchSize = SystemInfo.processorCount;
@@ -2195,6 +2210,9 @@ namespace Gubbins.Span
         }
     }
 
+    /// <summary>
+    /// Job-scheduled double span operation.
+    /// </summary>
     internal class JobDoubleOperation : ISpanNumberOperation<double>, ISpanRealOperation<double>
     {
         private static readonly int s_JobBatchSize = SystemInfo.processorCount;

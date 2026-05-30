@@ -1,10 +1,4 @@
-﻿// Copyright ©2024 Gatongone
-// Author: Gatongone
-// Email: gatongone@gmail.com
-// Created On: 2024/05/26-13:53:06
-// Github: https://github.com/Gatongone
-
-using System;
+﻿using System;
 using Gubbins.Enhance;
 using UnityEngine;
 using UnityEngine.Events;
@@ -15,7 +9,7 @@ namespace Gubbins.Events
     /// Serializable event bus that could set config on inspector.
     /// </summary>
     /// <remarks>
-    /// Basically, it is a <see cref="IEventBus"/> proxy.
+    /// Basically, a <see cref="IEvent"/> proxy.
     /// </remarks>
     [Serializable]
     public class SerializedEvent : MonoBehaviour, IEvent

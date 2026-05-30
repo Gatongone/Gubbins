@@ -10,24 +10,46 @@ using UnityEngine.Jobs;
 
 namespace Gubbins.Entities
 {
+    /// <summary>
+    /// 
+    /// </summary>
     public class EntityAdapter : MonoBehaviour
     {
+        /// <summary>
+        /// Global list of all entity transforms managed by adapters.
+        /// </summary>
         internal static readonly NativeList<TransformAccess> Transforms = new(Allocator.Persistent);
 
-        [SerializeField, ReadOnly]
-        private int m_Index;
+        /// <summary>
+        /// The entity index in the ECS world.
+        /// </summary>
+        [SerializeField, ReadOnly] private int m_Index;
 
-        [SerializeField, ReadOnly]
-        private uint m_Version;
+        /// <summary>
+        /// The entity version for validation.
+        /// </summary>
+        [SerializeField, ReadOnly] private uint m_Version;
 
+        /// <summary>
+        /// Serialized context type for dependency injection.
+        /// </summary>
         [SerializeField, TypeFrom(typeof(IContext), TypeKind.Implementation)]
         private SerializedType m_Context;
 
+        /// <summary>
+        /// Serialized component types for entity construction.
+        /// </summary>
         [SerializeField, TypeFrom(typeof(IComponent), TypeKind.Implementation)]
         private SerializedType[] m_Components;
 
+        /// <summary>
+        /// The resolved context instance for this entity.
+        /// </summary>
         public IContext Context { get; private set; }
 
+        /// <summary>
+        /// Unity Awake callback. Initializes the entity and registers it in the ECS world.
+        /// </summary>
         private void Awake()
         {
             if (m_Context.Type == null)
@@ -42,9 +64,14 @@ namespace Gubbins.Entities
             {
                 throw new ArgumentException("No IEntityCommand registered in the context.");
             }
+
             BuildEntity(cmd);
         }
 
+        /// <summary>
+        /// Builds the entity and synchronizes transform/component data with the ECS world.
+        /// </summary>
+        /// <param name="cmd">The entity command interface for insertion.</param>
         private void BuildEntity(IEntityCommand cmd)
         {
             var trans = new TransformAccess
@@ -68,14 +95,24 @@ namespace Gubbins.Entities
                 {
                     payload.AddReplicate(0, size);
                 }
+
                 types[i] = type;
             }
+
             var entity = cmd.Insert(payload.AsArray().AsSpan(), types.AsSpan());
             payload.Resize(payloadSize, NativeArrayOptions.UninitializedMemory);
-            m_Index = entity.Index;
+            m_Index   = entity.Index;
             m_Version = entity.Version;
         }
 
+        /// <summary>
+        /// Tries to initialize transform-related component data for the entity payload.
+        /// </summary>
+        /// <param name="payload">The payload buffer to write to.</param>
+        /// <param name="trans">The transform access struct.</param>
+        /// <param name="type">The component type.</param>
+        /// <param name="size">The size of the component struct.</param>
+        /// <returns>True if the type was handled and written; otherwise, false.</returns>
         private static unsafe bool TryInitPosition(NativeList<byte> payload, ref TransformAccess trans, Type type, int size)
         {
             if (type == typeof(PositionX))
