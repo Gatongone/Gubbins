@@ -13,7 +13,7 @@ namespace Gubbins.Span
     {
         private static readonly int s_JobBatchSize = SystemInfo.processorCount;
 
-        public bool Supported => true;
+        public virtual bool Supported => JobsUtility.JobWorkerCount > 0;
 
         [BurstCompile]
         private struct AddJob : IJobParallelFor
@@ -340,7 +340,7 @@ namespace Gubbins.Span
     {
         private static readonly int s_JobBatchSize = SystemInfo.processorCount;
 
-        public bool Supported => JobsUtility.JobWorkerCount > 0;
+        public virtual bool Supported => JobsUtility.JobWorkerCount > 0;
 
         [BurstCompile]
         private struct AddJob : IJobParallelFor
@@ -667,7 +667,7 @@ namespace Gubbins.Span
     {
         private static readonly int s_JobBatchSize = SystemInfo.processorCount;
 
-        public bool Supported => JobsUtility.JobWorkerCount > 0;
+        public virtual bool Supported => JobsUtility.JobWorkerCount > 0;
 
         [BurstCompile]
         private struct AddJob : IJobParallelFor
@@ -994,7 +994,7 @@ namespace Gubbins.Span
     {
         private static readonly int s_JobBatchSize = SystemInfo.processorCount;
 
-        public bool Supported => JobsUtility.JobWorkerCount > 0;
+        public virtual bool Supported => JobsUtility.JobWorkerCount > 0;
 
         [BurstCompile]
         private struct AddJob : IJobParallelFor
@@ -1321,7 +1321,7 @@ namespace Gubbins.Span
     {
         private static readonly int s_JobBatchSize = SystemInfo.processorCount;
 
-        public bool Supported => JobsUtility.JobWorkerCount > 0;
+        public virtual bool Supported => JobsUtility.JobWorkerCount > 0;
 
         [BurstCompile]
         private struct AddJob : IJobParallelFor
@@ -2199,7 +2199,7 @@ namespace Gubbins.Span
     {
         private static readonly int s_JobBatchSize = SystemInfo.processorCount;
 
-        public bool Supported => JobsUtility.JobWorkerCount > 0;
+        public virtual bool Supported => JobsUtility.JobWorkerCount > 0;
 
         [BurstCompile]
         private struct AddJob : IJobParallelFor

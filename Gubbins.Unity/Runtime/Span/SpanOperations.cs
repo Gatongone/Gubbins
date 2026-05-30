@@ -16,7 +16,6 @@
             SpanOperations.RegisterSpanOperation(new BurstFloatOperation(), SpanOperationMask.Simd);
             SpanOperations.RegisterSpanOperation(new BurstDoubleOperation(), SpanOperationMask.Simd);
 
-
             SpanOperations.RegisterSpanOperation(new JobIntOperation(), SpanOperationMask.Parallel);
             SpanOperations.RegisterSpanOperation(new JobUintOperation(), SpanOperationMask.Parallel);
             SpanOperations.RegisterSpanOperation(new JobLongOperation(), SpanOperationMask.Parallel);
@@ -24,12 +23,12 @@
             SpanOperations.RegisterSpanOperation(new JobFloatOperation(), SpanOperationMask.Parallel);
             SpanOperations.RegisterSpanOperation(new JobDoubleOperation(), SpanOperationMask.Parallel);
 
-            SpanOperations.RegisterSpanOperation(new JobIntOperation(), SpanOperationMask.Parallel | SpanOperationMask.Simd);
-            SpanOperations.RegisterSpanOperation(new JobUintOperation(), SpanOperationMask.Parallel | SpanOperationMask.Simd);
-            SpanOperations.RegisterSpanOperation(new JobLongOperation(), SpanOperationMask.Parallel | SpanOperationMask.Simd);
-            SpanOperations.RegisterSpanOperation(new JobUlongOperation(), SpanOperationMask.Parallel | SpanOperationMask.Simd);
-            SpanOperations.RegisterSpanOperation(new JobFloatOperation(), SpanOperationMask.Parallel | SpanOperationMask.Simd);
-            SpanOperations.RegisterSpanOperation(new JobDoubleOperation(), SpanOperationMask.Parallel | SpanOperationMask.Simd);
+            SpanOperations.RegisterSpanOperation(new BurstJobIntOperation(), SpanOperationMask.Parallel | SpanOperationMask.Simd);
+            SpanOperations.RegisterSpanOperation(new BurstJobUintOperation(), SpanOperationMask.Parallel | SpanOperationMask.Simd);
+            SpanOperations.RegisterSpanOperation(new BurstJobLongOperation(), SpanOperationMask.Parallel | SpanOperationMask.Simd);
+            SpanOperations.RegisterSpanOperation(new BurstJobUlongOperation(), SpanOperationMask.Parallel | SpanOperationMask.Simd);
+            SpanOperations.RegisterSpanOperation(new BurstJobFloatOperation(), SpanOperationMask.Parallel | SpanOperationMask.Simd);
+            SpanOperations.RegisterSpanOperation(new BurstJobDoubleOperation(), SpanOperationMask.Parallel | SpanOperationMask.Simd);
         }
     }
 }
