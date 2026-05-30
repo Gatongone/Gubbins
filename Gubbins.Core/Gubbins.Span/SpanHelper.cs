@@ -37,9 +37,50 @@ internal static class VectorExtensions
 }
 #endif
 
-
 internal static class VectorMath
 {
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Vector<TTo> As<TFrom, TTo>(this Vector<TFrom> vector) where TFrom : struct where TTo : struct
+    {
+#if NET_6_0_OR_GREATER
+        return vector.As<TFrom, TTo>();
+#else
+        return Native.Cast<Vector<TFrom>, Vector<TTo>>(ref vector);
+#endif
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static Vector<T> Modulo<T>(Vector<T> a, Vector<T> b) where T : struct
+    {
+        if (typeof(T) == typeof(float))
+        {
+            var floatA = As<T, float>(a);
+            var floatB = As<T, float>(b);
+            var quotient = floatA / floatB;
+            var truncated = Vector.ConditionalSelect(
+                Vector.GreaterThanOrEqual(quotient, Vector<float>.Zero),
+                Floor(quotient),
+                Ceiling(quotient)
+            );
+            return (floatA - truncated * floatB).As<float, T>();
+        }
+
+        if(typeof(T) == typeof(double))
+        {
+            var doubleA = a.As<T, double>();
+            var doubleB = b.As<T, double>();
+            var quotient = doubleA / doubleB;
+            var truncated = Vector.ConditionalSelect(
+                Vector.GreaterThanOrEqual(quotient, Vector<double>.Zero),
+                Floor(quotient),
+                Ceiling(quotient)
+            );
+            return (doubleA - truncated * doubleB).As<double, T>();
+        }
+
+        return a - a / b * b;
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static unsafe Vector<float> Log(Vector<float> x)
     {
@@ -537,7 +578,6 @@ internal static class VectorMath
 #if NET9_0_OR_GREATER
         return Vector.Round(va);
 #else
-
         // This represents the boundary at which point we can only represent whole integers
         const float integerBoundary = 8388608.0f; // 2^23
         var vb = new Vector<float>(integerBoundary);
@@ -563,7 +603,6 @@ internal static class VectorMath
 #if NET9_0_OR_GREATER
         return Vector.Round(va);
 #else
-
         // This represents the boundary at which point we can only represent whole integers
         const double integerBoundary = 4503599627370496.0; // 2^52
         var vb = new Vector<double>(integerBoundary);

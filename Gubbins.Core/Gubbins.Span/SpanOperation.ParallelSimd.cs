@@ -1,7 +1,7 @@
 ﻿using System.Numerics;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
-using Gubbins.Unsafe;
 
 namespace Gubbins.Span;
 
@@ -120,6 +120,10 @@ internal static class ParallelSimdSpanRunner
     public delegate void TernaryProjectOp<TIn, TOther, TOut>(Span<TIn> a, Span<TIn> b, Span<TOther> c, Span<TOut> result)
         where TIn : unmanaged where TOther : unmanaged where TOut : unmanaged;
 
+    public delegate T SimdReduceOp<T>(Span<T> span) where T : unmanaged;
+
+    public delegate bool CompareOp<T>(T left, T right) where T : unmanaged;
+
     private unsafe struct OperandState<T> where T : unmanaged
     {
         public T*           Src;
@@ -222,6 +226,14 @@ internal static class ParallelSimdSpanRunner
         public PairProjectOp<TIn, TOut> Op;
     }
 
+    private unsafe struct ReduceState<T> where T : unmanaged
+    {
+        public T*              Src;
+        public int             ChunkSize;
+        public T*              Partials;
+        public SimdReduceOp<T> Reduce;
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static unsafe void ExecuteOperandChunk<T>(int start, int len, OperandState<T> state) where T : unmanaged =>
         state.Op(new Span<T>(state.Src + start, len), state.Operand, new Span<T>(state.Dst + start, len));
@@ -272,6 +284,49 @@ internal static class ParallelSimdSpanRunner
     private static unsafe void ExecutePairProjectChunk<TIn, TOut>(int start, int len, PairProjectState<TIn, TOut> state)
         where TIn : unmanaged where TOut : unmanaged =>
         state.Op(new Span<TIn>(state.Left + start, len), new Span<TIn>(state.Right + start, len), new Span<TOut>(state.Dst + start, len));
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static unsafe void ExecuteReduceChunk<T>(int start, int len, ReduceState<T> state) where T : unmanaged
+    {
+        var index = start / state.ChunkSize;
+        state.Partials[index] = state.Reduce(new Span<T>(state.Src + start, len));
+    }
+
+    public static unsafe T RunReduce<T>(Span<T> src, SimdReduceOp<T> reduceOp, CompareOp<T> compareOp) where T : unmanaged
+    {
+        if (src.Length == 0)
+        {
+            throw new ArgumentException("Span must not be empty", nameof(src));
+        }
+
+        var workers = Math.Min(Environment.ProcessorCount, src.Length);
+        var chunkSize = (src.Length + workers - 1) / workers;
+        var partials = ArrayPool<T>.Shared.Rent(workers);
+        try
+        {
+            fixed (T* ps = src)
+            fixed (T* pp = partials)
+            {
+                var state = new ReduceState<T> {Src = ps, ChunkSize = chunkSize, Partials = pp, Reduce = reduceOp};
+                ParallelSimdExecutor.ParallelChunks(src.Length, state, ExecuteReduceChunk);
+            }
+
+            var result = partials[0];
+            for (var index = 1; index < workers; index++)
+            {
+                if (compareOp(partials[index], result))
+                {
+                    result = partials[index];
+                }
+            }
+
+            return result;
+        }
+        finally
+        {
+            ArrayPool<T>.Shared.Return(partials);
+        }
+    }
 
     public static unsafe void RunOperand<T>(Span<T> src, T operand, Span<T> result, OperandOp<T> op) where T : unmanaged
     {
@@ -416,18 +471,21 @@ internal static class ParallelSimdSpanRunner
 /// <summary>
 /// Parallel SIMD span operation.
 /// </summary>
-internal sealed class ParallelSimdNumberOperations<T> : ISpanNumberOperations<T> where T : unmanaged
+internal sealed class ParallelSimdNumberOperation<T> : ISpanNumberOperation<T> where T : unmanaged
 {
-    private static readonly bool                                s_Supported = typeof(T).CheckType().IsNumberType && Vector.IsHardwareAccelerated;
-    private static readonly SimdNumberOperations<T>             s_Simd      = new();
-    private static readonly ParallelNumberOperations<T>         s_Parallel  = new();
-    private static readonly ParallelSimdSpanRunner.OperandOp<T> s_Add       = s_Simd.Add;
-    private static readonly ParallelSimdSpanRunner.OperandOp<T> s_Subtract  = s_Simd.Subtract;
-    private static readonly ParallelSimdSpanRunner.OperandOp<T> s_Multiply  = s_Simd.Multiply;
-    private static readonly ParallelSimdSpanRunner.OperandOp<T> s_Divide    = s_Simd.Divide;
-    private static readonly ParallelSimdSpanRunner.OperandOp<T> s_Modulo    = s_Simd.Modulo;
-    private static readonly ParallelSimdSpanRunner.PairOp<T>    s_Max       = s_Simd.Max;
-    private static readonly ParallelSimdSpanRunner.PairOp<T>    s_Min       = s_Simd.Min;
+    private static readonly bool                                   s_Supported = Environment.ProcessorCount > 1 && Vector.IsHardwareAccelerated;
+    private static readonly SimdNumberOperation<T>                 s_Simd      = new();
+    private static readonly ParallelSimdSpanRunner.OperandOp<T>    s_Add       = s_Simd.Add;
+    private static readonly ParallelSimdSpanRunner.OperandOp<T>    s_Subtract  = s_Simd.Subtract;
+    private static readonly ParallelSimdSpanRunner.OperandOp<T>    s_Multiply  = s_Simd.Multiply;
+    private static readonly ParallelSimdSpanRunner.OperandOp<T>    s_Divide    = s_Simd.Divide;
+    private static readonly ParallelSimdSpanRunner.OperandOp<T>    s_Modulo    = s_Simd.Modulo;
+    private static readonly ParallelSimdSpanRunner.PairOp<T>       s_Max       = s_Simd.Max;
+    private static readonly ParallelSimdSpanRunner.PairOp<T>       s_Min       = s_Simd.Min;
+    private static readonly ParallelSimdSpanRunner.SimdReduceOp<T> s_GetMax    = s_Simd.GetMax;
+    private static readonly ParallelSimdSpanRunner.SimdReduceOp<T> s_GetMin    = s_Simd.GetMin;
+    private static readonly ParallelSimdSpanRunner.CompareOp<T>    s_Greater   = Operations<T>.GreaterThan;
+    private static readonly ParallelSimdSpanRunner.CompareOp<T>    s_Less      = Operations<T>.LessThan;
 
     /// <inheritdoc />
     public bool Supported => s_Supported;
@@ -451,22 +509,23 @@ internal sealed class ParallelSimdNumberOperations<T> : ISpanNumberOperations<T>
     public void Max(Span<T> left, Span<T> right, Span<T> result) => ParallelSimdSpanRunner.RunPair(left, right, result, s_Max);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public T GetMax(Span<T> src) => s_Parallel.GetMax(src);
+    public T GetMax(Span<T> src) => ParallelSimdSpanRunner.RunReduce(src, s_GetMax, s_Greater);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Min(Span<T> left, Span<T> right, Span<T> result) => ParallelSimdSpanRunner.RunPair(left, right, result, s_Min);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public T GetMin(Span<T> src) => s_Parallel.GetMin(src);
+    public T GetMin(Span<T> src) => ParallelSimdSpanRunner.RunReduce(src, s_GetMin, s_Less);
 }
 
 #if NET7_0_OR_GREATER
 /// <summary>
 /// Parallel SIMD span operation.
 /// </summary>
-internal sealed class ParallelSimdIntOperation : ISpanShiftLeft<int>, ISpanShiftRight<int>
+internal sealed class ParallelSimdIntOperation : ISpanShift<int>
 {
-    public bool Supported => Vector.IsHardwareAccelerated;
+    private static readonly bool s_Supported = Environment.ProcessorCount > 1 && Vector.IsHardwareAccelerated;
+    public bool Supported => s_Supported;
     private static readonly SimdIntOperation                    s_Simd       = new();
     private static readonly ParallelSimdSpanRunner.ShiftOp<int> s_ShiftLeft  = s_Simd.ShiftLeft;
     private static readonly ParallelSimdSpanRunner.ShiftOp<int> s_ShiftRight = s_Simd.ShiftRight;
@@ -481,9 +540,10 @@ internal sealed class ParallelSimdIntOperation : ISpanShiftLeft<int>, ISpanShift
 /// <summary>
 /// Parallel SIMD span operation.
 /// </summary>
-internal sealed class ParallelSimdLongOperation : ISpanShiftLeft<long>, ISpanShiftRight<long>
+internal sealed class ParallelSimdLongOperation : ISpanShift<long>
 {
-    public bool Supported => Vector.IsHardwareAccelerated;
+    private static readonly bool s_Supported = Environment.ProcessorCount > 1 && Vector.IsHardwareAccelerated;
+    public bool Supported => s_Supported;
     private static readonly SimdLongOperation                    s_Simd       = new();
     private static readonly ParallelSimdSpanRunner.ShiftOp<long> s_ShiftLeft  = s_Simd.ShiftLeft;
     private static readonly ParallelSimdSpanRunner.ShiftOp<long> s_ShiftRight = s_Simd.ShiftRight;
@@ -498,9 +558,10 @@ internal sealed class ParallelSimdLongOperation : ISpanShiftLeft<long>, ISpanShi
 /// <summary>
 /// Parallel SIMD span operation.
 /// </summary>
-internal sealed class ParallelSimdUintOperation : ISpanShiftLeft<uint>, ISpanShiftRight<uint>
+internal sealed class ParallelSimdUintOperation : ISpanShift<uint>
 {
-    public bool Supported => Vector.IsHardwareAccelerated;
+    private static readonly bool s_Supported = Environment.ProcessorCount > 1 && Vector.IsHardwareAccelerated;
+    public bool Supported => s_Supported;
     private static readonly SimdUintOperation                    s_Simd       = new();
     private static readonly ParallelSimdSpanRunner.ShiftOp<uint> s_ShiftLeft  = s_Simd.ShiftLeft;
     private static readonly ParallelSimdSpanRunner.ShiftOp<uint> s_ShiftRight = s_Simd.ShiftRight;
@@ -515,9 +576,10 @@ internal sealed class ParallelSimdUintOperation : ISpanShiftLeft<uint>, ISpanShi
 /// <summary>
 /// Parallel SIMD span operation.
 /// </summary>
-internal sealed class ParallelSimdUlongOperation : ISpanShiftLeft<ulong>, ISpanShiftRight<ulong>
+internal sealed class ParallelSimdUlongOperation : ISpanShift<ulong>
 {
-    public bool Supported => Vector.IsHardwareAccelerated;
+    private static readonly bool s_Supported = Environment.ProcessorCount > 1 && Vector.IsHardwareAccelerated;
+    public bool Supported => s_Supported;
     private static readonly SimdUlongOperation                    s_Simd       = new();
     private static readonly ParallelSimdSpanRunner.ShiftOp<ulong> s_ShiftLeft  = s_Simd.ShiftLeft;
     private static readonly ParallelSimdSpanRunner.ShiftOp<ulong> s_ShiftRight = s_Simd.ShiftRight;
@@ -530,9 +592,10 @@ internal sealed class ParallelSimdUlongOperation : ISpanShiftLeft<ulong>, ISpanS
 }
 #endif
 
-internal sealed class ParallelSimdFloatOperation : ISpanRealOperations<float>
+internal sealed class ParallelSimdFloatOperation : ISpanRealOperation<float>
 {
-    public bool Supported => Vector.IsHardwareAccelerated;
+    private static readonly bool s_Supported = Environment.ProcessorCount > 1 && Vector.IsHardwareAccelerated;
+    public bool Supported => s_Supported;
     private static readonly SimdFloatOperation                                s_Simd             = new();
     private static readonly ParallelSimdSpanRunner.TernaryOp<float>           s_Clamp            = s_Simd.Clamp;
     private static readonly ParallelSimdSpanRunner.SpanTwoScalarOp<float>     s_ClampScalar      = s_Simd.Clamp;
@@ -607,9 +670,10 @@ internal sealed class ParallelSimdFloatOperation : ISpanRealOperations<float>
     public void Atanh(Span<float> src, Span<float> result) => ParallelSimdSpanRunner.RunUnary(src, result, s_Atanh);
 }
 
-internal sealed class ParallelSimdDoubleOperation : ISpanRealOperations<double>
+internal sealed class ParallelSimdDoubleOperation : ISpanRealOperation<double>
 {
-    public bool Supported => Vector.IsHardwareAccelerated;
+    private static readonly bool s_Supported = Environment.ProcessorCount > 1 && Vector.IsHardwareAccelerated;
+    public bool Supported => s_Supported;
     private static readonly SimdDoubleOperation                                s_Simd             = new();
     private static readonly ParallelSimdSpanRunner.TernaryOp<double>           s_Clamp            = s_Simd.Clamp;
     private static readonly ParallelSimdSpanRunner.SpanTwoScalarOp<double>     s_ClampScalar      = s_Simd.Clamp;
@@ -684,10 +748,11 @@ internal sealed class ParallelSimdDoubleOperation : ISpanRealOperations<double>
     public void Atanh(Span<double> src, Span<double> result) => ParallelSimdSpanRunner.RunUnary(src, result, s_Atanh);
 }
 
-internal sealed class ParallelSimdVectorOperation : ISpanVectorOperations<Vector2>
+internal sealed class ParallelSimdVector2Operation : ISpanVectorOperation<Vector2>
 {
-    public bool Supported => Vector.IsHardwareAccelerated;
-    private static readonly SimdVectorOperation                                              s_Simd                = new();
+    private static readonly bool s_Supported = Environment.ProcessorCount > 1 && Vector.IsHardwareAccelerated;
+    public bool Supported => s_Supported;
+    private static readonly SimdVector2Operation                                             s_Simd                = new();
     private static readonly ParallelSimdSpanRunner.PairOp<Vector2>                           s_Dot                 = s_Simd.Dot;
     private static readonly ParallelSimdSpanRunner.PairOp<Vector2>                           s_Cross               = s_Simd.Cross;
     private static readonly ParallelSimdSpanRunner.UnaryOp<Vector2>                          s_Normalize           = s_Simd.Normalize;
@@ -717,9 +782,10 @@ internal sealed class ParallelSimdVectorOperation : ISpanVectorOperations<Vector
     public void MoveTowards(Span<Vector2> src, Span<Vector2> target, Span<float> maxDistanceDelta, Span<Vector2> result) => ParallelSimdSpanRunner.RunTernaryProject(src, target, maxDistanceDelta, result, s_MoveTowards);
 }
 
-internal sealed class ParallelSimdVector3Operation : ISpanVectorOperations<Vector3>
+internal sealed class ParallelSimdVector3Operation : ISpanVectorOperation<Vector3>
 {
-    public bool Supported => Vector.IsHardwareAccelerated;
+    private static readonly bool s_Supported = Environment.ProcessorCount > 1 && Vector.IsHardwareAccelerated;
+    public bool Supported => s_Supported;
     private static readonly SimdVector3Operation                                             s_Simd                = new();
     private static readonly ParallelSimdSpanRunner.PairOp<Vector3>                           s_Dot                 = s_Simd.Dot;
     private static readonly ParallelSimdSpanRunner.PairOp<Vector3>                           s_Cross               = s_Simd.Cross;
@@ -750,9 +816,10 @@ internal sealed class ParallelSimdVector3Operation : ISpanVectorOperations<Vecto
     public void MoveTowards(Span<Vector3> src, Span<Vector3> target, Span<float> maxDistanceDelta, Span<Vector3> result) => ParallelSimdSpanRunner.RunTernaryProject(src, target, maxDistanceDelta, result, s_MoveTowards);
 }
 
-internal sealed class ParallelSimdVector4Operation : ISpanVectorOperations<Vector4>
+internal sealed class ParallelSimdVector4Operation : ISpanVectorOperation<Vector4>
 {
-    public bool Supported => Vector.IsHardwareAccelerated;
+    private static readonly bool s_Supported = Environment.ProcessorCount > 1 && Vector.IsHardwareAccelerated;
+    public bool Supported => s_Supported;
     private static readonly SimdVector4Operation                                             s_Simd                = new();
     private static readonly ParallelSimdSpanRunner.PairOp<Vector4>                           s_Dot                 = s_Simd.Dot;
     private static readonly ParallelSimdSpanRunner.PairOp<Vector4>                           s_Cross               = s_Simd.Cross;

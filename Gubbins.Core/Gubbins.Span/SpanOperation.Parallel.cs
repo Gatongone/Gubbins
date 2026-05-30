@@ -1,4 +1,5 @@
-﻿using System.Numerics;
+﻿using System.Buffers;
+using System.Numerics;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using Gubbins.Unsafe;
@@ -60,12 +61,198 @@ internal static class ParallelExecutor
     }
 }
 
+internal static class ParallelSpanRunner
+{
+    public delegate TResult UnaryOp<in TIn, out TResult>(TIn value);
+
+    public delegate TResult BinaryOp<in TLeft, in TRight, out TResult>(TLeft left, TRight right);
+
+    public delegate TResult BinaryScalarOp<in TLeft, in TRight, in TScalar, out TResult>(TLeft left, TRight right, TScalar scalar);
+
+    public delegate TResult TernaryOp<in T1, in T2, in T3, out TResult>(T1 a, T2 b, T3 c);
+
+    private unsafe struct UnaryState<T> where T : unmanaged
+    {
+        public T*            Src;
+        public T*            Dst;
+        public UnaryOp<T, T> Op;
+    }
+
+    private unsafe struct ProjectState<TIn, TOut>
+        where TIn : unmanaged
+        where TOut : unmanaged
+    {
+        public TIn*               Src;
+        public TOut*              Dst;
+        public UnaryOp<TIn, TOut> Op;
+    }
+
+    private unsafe struct InPlaceState<T> where T : unmanaged
+    {
+        public T*            Data;
+        public UnaryOp<T, T> Op;
+    }
+
+    private unsafe struct BinaryState<TLeft, TRight, TResult>
+        where TLeft : unmanaged
+        where TRight : unmanaged
+        where TResult : unmanaged
+    {
+        public TLeft*                           Left;
+        public TRight*                          Right;
+        public TResult*                         Dst;
+        public BinaryOp<TLeft, TRight, TResult> Op;
+    }
+
+    private unsafe struct TernaryState<T1, T2, T3, TResult>
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
+        where TResult : unmanaged
+    {
+        public T1*                            A;
+        public T2*                            B;
+        public T3*                            C;
+        public TResult*                       Dst;
+        public TernaryOp<T1, T2, T3, TResult> Op;
+    }
+
+    private unsafe struct BinaryScalarState<TLeft, TRight, TScalar, TResult>
+        where TLeft : unmanaged
+        where TRight : unmanaged
+        where TResult : unmanaged
+    {
+        public TLeft*                                          Left;
+        public TRight*                                         Right;
+        public TScalar                                         Scalar;
+        public TResult*                                        Dst;
+        public BinaryScalarOp<TLeft, TRight, TScalar, TResult> Op;
+    }
+
+    private static unsafe void ExecuteUnary<T>(int i, UnaryState<T> state) where T : unmanaged =>
+        state.Dst[i] = state.Op(state.Src[i]);
+
+    private static unsafe void ExecuteProject<TIn, TOut>(int i, ProjectState<TIn, TOut> state)
+        where TIn : unmanaged
+        where TOut : unmanaged =>
+        state.Dst[i] = state.Op(state.Src[i]);
+
+    private static unsafe void ExecuteInPlace<T>(int i, InPlaceState<T> state) where T : unmanaged =>
+        state.Data[i] = state.Op(state.Data[i]);
+
+    private static unsafe void ExecuteBinary<TLeft, TRight, TResult>(int i, BinaryState<TLeft, TRight, TResult> state)
+        where TLeft : unmanaged
+        where TRight : unmanaged
+        where TResult : unmanaged =>
+        state.Dst[i] = state.Op(state.Left[i], state.Right[i]);
+
+    private static unsafe void ExecuteTernary<T1, T2, T3, TResult>(int i, TernaryState<T1, T2, T3, TResult> state)
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
+        where TResult : unmanaged =>
+        state.Dst[i] = state.Op(state.A[i], state.B[i], state.C[i]);
+
+    private static unsafe void ExecuteBinaryScalar<TLeft, TRight, TScalar, TResult>(int i, BinaryScalarState<TLeft, TRight, TScalar, TResult> state)
+        where TLeft : unmanaged
+        where TRight : unmanaged
+        where TResult : unmanaged =>
+        state.Dst[i] = state.Op(state.Left[i], state.Right[i], state.Scalar);
+
+    public static unsafe void RunUnary<T>(Span<T> src, Span<T> result, UnaryOp<T, T> op) where T : unmanaged
+    {
+        fixed (T* ps = src)
+        fixed (T* pd = result)
+        {
+            var state = new UnaryState<T> {Src = ps, Dst = pd, Op = op};
+            ParallelExecutor.For(result.Length, state, ExecuteUnary);
+        }
+    }
+
+    public static unsafe void RunProject<TIn, TOut>(Span<TIn> src, Span<TOut> result, UnaryOp<TIn, TOut> op)
+        where TIn : unmanaged
+        where TOut : unmanaged
+    {
+        fixed (TIn* ps = src)
+        fixed (TOut* pd = result)
+        {
+            var state = new ProjectState<TIn, TOut> {Src = ps, Dst = pd, Op = op};
+            ParallelExecutor.For(result.Length, state, ExecuteProject);
+        }
+    }
+
+    public static unsafe void RunInPlace<T>(Span<T> span, UnaryOp<T, T> op) where T : unmanaged
+    {
+        fixed (T* p = span)
+        {
+            var state = new InPlaceState<T> {Data = p, Op = op};
+            ParallelExecutor.For(span.Length, state, ExecuteInPlace);
+        }
+    }
+
+    public static unsafe void RunBinary<TLeft, TRight, TResult>(Span<TLeft> left, Span<TRight> right, Span<TResult> result, BinaryOp<TLeft, TRight, TResult> op)
+        where TLeft : unmanaged
+        where TRight : unmanaged
+        where TResult : unmanaged
+    {
+        fixed (TLeft* pl = left)
+        fixed (TRight* pr = right)
+        fixed (TResult* pd = result)
+        {
+            var state = new BinaryState<TLeft, TRight, TResult> {Left = pl, Right = pr, Dst = pd, Op = op};
+            ParallelExecutor.For(result.Length, state, ExecuteBinary);
+        }
+    }
+
+    public static unsafe void RunTernary<T1, T2, T3, TResult>(Span<T1> first, Span<T2> second, Span<T3> third, Span<TResult> result, TernaryOp<T1, T2, T3, TResult> op)
+        where T1 : unmanaged
+        where T2 : unmanaged
+        where T3 : unmanaged
+        where TResult : unmanaged
+    {
+        fixed (T1* p1 = first)
+        fixed (T2* p2 = second)
+        fixed (T3* p3 = third)
+        fixed (TResult* pd = result)
+        {
+            var state = new TernaryState<T1, T2, T3, TResult> {A = p1, B = p2, C = p3, Dst = pd, Op = op};
+            ParallelExecutor.For(result.Length, state, ExecuteTernary);
+        }
+    }
+
+    public static unsafe void RunBinaryScalar<TLeft, TRight, TScalar, TResult>(
+        Span<TLeft> left,
+        Span<TRight> right,
+        TScalar scalar,
+        Span<TResult> result,
+        BinaryScalarOp<TLeft, TRight, TScalar, TResult> op)
+        where TLeft : unmanaged
+        where TRight : unmanaged
+        where TResult : unmanaged
+    {
+        fixed (TLeft* pl = left)
+        fixed (TRight* pr = right)
+        fixed (TResult* pd = result)
+        {
+            var state = new BinaryScalarState<TLeft, TRight, TScalar, TResult>
+            {
+                Left   = pl,
+                Right  = pr,
+                Scalar = scalar,
+                Dst    = pd,
+                Op     = op,
+            };
+            ParallelExecutor.For(result.Length, state, ExecuteBinaryScalar);
+        }
+    }
+}
+
 /// <summary>
 /// Parallel span operation.
 /// </summary>
-internal sealed class ParallelNumberOperations<T> : ISpanNumberOperations<T> where T : unmanaged
+internal sealed class ParallelNumberOperation<T> : ISpanNumberOperation<T> where T : unmanaged
 {
-    private static readonly bool s_Supported = Environment.ProcessorCount >= 1 && typeof(T).CheckType().IsNumberType;
+    private static readonly bool s_Supported = Environment.ProcessorCount > 1;
     public bool Supported => s_Supported;
 
     private delegate T OperandOp(T value, T operand);
@@ -109,7 +296,7 @@ internal sealed class ParallelNumberOperations<T> : ISpanNumberOperations<T> whe
     private static unsafe void ExecuteReduce(int i, ReduceState state)
     {
         var start = state.Length * i / state.PartitionCount;
-        var end   = state.Length * (i + 1) / state.PartitionCount;
+        var end = state.Length * (i + 1) / state.PartitionCount;
         var value = state.Src[start];
         for (var index = start + 1; index < end; index++)
         {
@@ -140,7 +327,7 @@ internal sealed class ParallelNumberOperations<T> : ISpanNumberOperations<T> whe
         }
     }
 
-    private static unsafe T Reduce(Span<T> src, PairOp op)
+    private static unsafe T RunReduce(Span<T> src, PairOp op)
     {
         if (src.Length == 0)
         {
@@ -148,7 +335,7 @@ internal sealed class ParallelNumberOperations<T> : ISpanNumberOperations<T> whe
         }
 
         var partitionCount = Math.Min(src.Length, Math.Max(1, Environment.ProcessorCount));
-        var partials       = new T[partitionCount];
+        var partials = ArrayPool<T>.Shared.Rent(partitionCount);
 
         fixed (T* ps = src)
         fixed (T* pp = partials)
@@ -166,7 +353,7 @@ internal sealed class ParallelNumberOperations<T> : ISpanNumberOperations<T> whe
         }
 
         var result = partials[0];
-        for (var index = 1; index < partials.Length; index++)
+        for (var index = 1; index < partitionCount; index++)
         {
             result = op(result, partials[index]);
         }
@@ -196,28 +383,27 @@ internal sealed class ParallelNumberOperations<T> : ISpanNumberOperations<T> whe
 
     /// <inheritdoc />
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void Max(Span<T> left, Span<T> right, Span<T> result) =>
-        RunPair(left, right, result, static (l, r) => Operations<T>.GreaterThan(l, r) ? l : r);
-
-    /// <summary>
-    /// Gets the maximum value from the source span.
-    /// </summary>
-    /// <param name="src">The source span to find the maximum value from.</param>
-    /// <returns>The maximum value found in the source span.</returns>
-    public T GetMax(Span<T> src) => Reduce(src, static (left, right) => Operations<T>.GreaterThan(left, right) ? left : right);
+    public void Max(Span<T> left, Span<T> right, Span<T> result) => RunPair(left, right, result, static (l, r) => Operations<T>.GreaterThan(l, r) ? l : r);
 
     /// <inheritdoc />
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void Min(Span<T> left, Span<T> right, Span<T> result) =>
-        RunPair(left, right, result, static (l, r) => Operations<T>.LessThan(l, r) ? l : r);
+    public T GetMax(Span<T> src) => RunReduce(src, static (left, right) => Operations<T>.GreaterThan(left, right) ? left : right);
 
-    public T GetMin(Span<T> src) => Reduce(src, static (left, right) => Operations<T>.LessThan(left, right) ? left : right);
+    /// <inheritdoc />
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void Min(Span<T> left, Span<T> right, Span<T> result) => RunPair(left, right, result, static (l, r) => Operations<T>.LessThan(l, r) ? l : r);
+
+    /// <inheritdoc />
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public T GetMin(Span<T> src) => RunReduce(src, static (left, right) => Operations<T>.LessThan(left, right) ? left : right);
 }
 
-internal sealed class ParallelIntOperation : ISpanShiftLeft<int>, ISpanShiftRight<int>
+internal sealed class ParallelIntOperation : ISpanShift<int>
 {
+    private static readonly bool s_Supported = Environment.ProcessorCount > 1;
+
     /// <inheritdoc />
-    public bool Supported => true;
+    public bool Supported => s_Supported;
 
     private delegate int ShiftOp(int value, int count);
 
@@ -261,10 +447,12 @@ internal sealed class ParallelIntOperation : ISpanShiftLeft<int>, ISpanShiftRigh
 /// <summary>
 /// Parallel span operation.
 /// </summary>
-internal sealed class ParallelLongOperation : ISpanShiftLeft<long>, ISpanShiftRight<long>
+internal sealed class ParallelLongOperation : ISpanShift<long>
 {
+    private static readonly bool s_Supported = Environment.ProcessorCount > 1;
+
     /// <inheritdoc />
-    public bool Supported => true;
+    public bool Supported => s_Supported;
 
     private delegate long ShiftOp(long value, int count);
 
@@ -308,10 +496,12 @@ internal sealed class ParallelLongOperation : ISpanShiftLeft<long>, ISpanShiftRi
 /// <summary>
 /// Parallel span operation.
 /// </summary>
-internal sealed class ParallelUintOperation : ISpanShiftLeft<uint>, ISpanShiftRight<uint>
+internal sealed class ParallelUintOperation : ISpanShift<uint>
 {
+    private static readonly bool s_Supported = Environment.ProcessorCount > 1;
+
     /// <inheritdoc />
-    public bool Supported => true;
+    public bool Supported => s_Supported;
 
     private delegate uint ShiftOp(uint value, int count);
 
@@ -355,10 +545,12 @@ internal sealed class ParallelUintOperation : ISpanShiftLeft<uint>, ISpanShiftRi
 /// <summary>
 /// Parallel span operation.
 /// </summary>
-internal sealed class ParallelUlongOperation : ISpanShiftLeft<ulong>, ISpanShiftRight<ulong>
+internal sealed class ParallelUlongOperation : ISpanShift<ulong>
 {
+    private static readonly bool s_Supported = Environment.ProcessorCount > 1;
+
     /// <inheritdoc />
-    public bool Supported => true;
+    public bool Supported => s_Supported;
 
     private delegate ulong ShiftOp(ulong value, int count);
 
@@ -402,10 +594,12 @@ internal sealed class ParallelUlongOperation : ISpanShiftLeft<ulong>, ISpanShift
 /// <summary>
 /// Parallel span operation.
 /// </summary>
-internal sealed class ParallelFloatOperation : ISpanRealOperations<float>
+internal sealed class ParallelFloatOperation : ISpanRealOperation<float>
 {
+    private static readonly bool s_Supported = Environment.ProcessorCount > 1;
+
     /// <inheritdoc />
-    public bool Supported => true;
+    public bool Supported => s_Supported;
 
     private delegate float UnaryOp(float value);
 
@@ -596,14 +790,14 @@ internal sealed class ParallelFloatOperation : ISpanRealOperations<float>
     /// <inheritdoc />
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Hypot(Span<float> x, Span<float> y, Span<float> result) =>
-        RunBinary(x, y, result, static (vx, vy) => vx * vx + vy * vy);
+        RunBinary(x, y, result, static (vx, vy) => MathF.Sqrt(vx * vx + vy * vy));
 
     /// <inheritdoc />
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Hypot(Span<float> x, float y, Span<float> result)
     {
         var yy = y * y;
-        RunBinaryScalar(x, yy, result, static (vx, yyValue) => vx * vx + yyValue);
+        RunBinaryScalar(x, yy, result, static (vx, yyValue) => MathF.Sqrt(vx * vx + yyValue));
     }
 
     /// <inheritdoc />
@@ -668,10 +862,12 @@ internal sealed class ParallelFloatOperation : ISpanRealOperations<float>
 /// <summary>
 /// Parallel span operation.
 /// </summary>
-internal sealed class ParallelDoubleOperation : ISpanRealOperations<double>
+internal sealed class ParallelDoubleOperation : ISpanRealOperation<double>
 {
+    private static readonly bool s_Supported = Environment.ProcessorCount > 1;
+
     /// <inheritdoc />
-    public bool Supported => true;
+    public bool Supported => s_Supported;
 
     private delegate double UnaryOp(double value);
 
@@ -839,13 +1035,13 @@ internal sealed class ParallelDoubleOperation : ISpanRealOperations<double>
 
     /// <inheritdoc />
     public void Hypot(Span<double> x, Span<double> y, Span<double> result) =>
-        RunBinary(x, y, result, static (vx, vy) => vx * vx + vy * vy);
+        RunBinary(x, y, result, static (vx, vy) => Math.Sqrt(vx * vx + vy * vy));
 
     /// <inheritdoc />
     public void Hypot(Span<double> x, double y, Span<double> result)
     {
         var yy = y * y;
-        RunBinaryScalar(x, yy, result, static (vx, yyValue) => vx * vx + yyValue);
+        RunBinaryScalar(x, yy, result, static (vx, yyValue) => Math.Sqrt(vx * vx + yyValue));
     }
 
     /// <inheritdoc />
@@ -893,195 +1089,12 @@ internal sealed class ParallelDoubleOperation : ISpanRealOperations<double>
     public void Atanh(Span<double> src, Span<double> result) => RunUnary(src, result, Math.Atanh);
 }
 
-internal static class ParallelSpanRunner
+internal sealed class ParallelVector2Operation : ISpanVectorOperation<Vector2>
 {
-    public delegate TResult UnaryOp<TIn, TResult>(TIn value);
+    private static readonly bool s_Supported = Environment.ProcessorCount > 1;
 
-    public delegate TResult BinaryOp<TLeft, TRight, TResult>(TLeft left, TRight right);
-
-    public delegate TResult BinaryScalarOp<TLeft, TRight, TScalar, TResult>(TLeft left, TRight right, TScalar scalar);
-
-    public delegate TResult TernaryOp<T1, T2, T3, TResult>(T1 a, T2 b, T3 c);
-
-    private unsafe struct UnaryState<T> where T : unmanaged
-    {
-        public T*            Src;
-        public T*            Dst;
-        public UnaryOp<T, T> Op;
-    }
-
-    private unsafe struct ProjectState<TIn, TOut>
-        where TIn : unmanaged
-        where TOut : unmanaged
-    {
-        public TIn*               Src;
-        public TOut*              Dst;
-        public UnaryOp<TIn, TOut> Op;
-    }
-
-    private unsafe struct InPlaceState<T> where T : unmanaged
-    {
-        public T*            Data;
-        public UnaryOp<T, T> Op;
-    }
-
-    private unsafe struct BinaryState<TLeft, TRight, TResult>
-        where TLeft : unmanaged
-        where TRight : unmanaged
-        where TResult : unmanaged
-    {
-        public TLeft*                           Left;
-        public TRight*                          Right;
-        public TResult*                         Dst;
-        public BinaryOp<TLeft, TRight, TResult> Op;
-    }
-
-    private unsafe struct TernaryState<T1, T2, T3, TResult>
-        where T1 : unmanaged
-        where T2 : unmanaged
-        where T3 : unmanaged
-        where TResult : unmanaged
-    {
-        public T1*                            A;
-        public T2*                            B;
-        public T3*                            C;
-        public TResult*                       Dst;
-        public TernaryOp<T1, T2, T3, TResult> Op;
-    }
-
-    private unsafe struct BinaryScalarState<TLeft, TRight, TScalar, TResult>
-        where TLeft : unmanaged
-        where TRight : unmanaged
-        where TResult : unmanaged
-    {
-        public TLeft*                                          Left;
-        public TRight*                                         Right;
-        public TScalar                                         Scalar;
-        public TResult*                                        Dst;
-        public BinaryScalarOp<TLeft, TRight, TScalar, TResult> Op;
-    }
-
-    private static unsafe void ExecuteUnary<T>(int i, UnaryState<T> state) where T : unmanaged =>
-        state.Dst[i] = state.Op(state.Src[i]);
-
-    private static unsafe void ExecuteProject<TIn, TOut>(int i, ProjectState<TIn, TOut> state)
-        where TIn : unmanaged
-        where TOut : unmanaged =>
-        state.Dst[i] = state.Op(state.Src[i]);
-
-    private static unsafe void ExecuteInPlace<T>(int i, InPlaceState<T> state) where T : unmanaged =>
-        state.Data[i] = state.Op(state.Data[i]);
-
-    private static unsafe void ExecuteBinary<TLeft, TRight, TResult>(int i, BinaryState<TLeft, TRight, TResult> state)
-        where TLeft : unmanaged
-        where TRight : unmanaged
-        where TResult : unmanaged =>
-        state.Dst[i] = state.Op(state.Left[i], state.Right[i]);
-
-    private static unsafe void ExecuteTernary<T1, T2, T3, TResult>(int i, TernaryState<T1, T2, T3, TResult> state)
-        where T1 : unmanaged
-        where T2 : unmanaged
-        where T3 : unmanaged
-        where TResult : unmanaged =>
-        state.Dst[i] = state.Op(state.A[i], state.B[i], state.C[i]);
-
-    private static unsafe void ExecuteBinaryScalar<TLeft, TRight, TScalar, TResult>(int i, BinaryScalarState<TLeft, TRight, TScalar, TResult> state)
-        where TLeft : unmanaged
-        where TRight : unmanaged
-        where TResult : unmanaged =>
-        state.Dst[i] = state.Op(state.Left[i], state.Right[i], state.Scalar);
-
-    public static unsafe void RunUnary<T>(Span<T> src, Span<T> result, UnaryOp<T, T> op) where T : unmanaged
-    {
-        fixed (T* ps = src)
-        fixed (T* pd = result)
-        {
-            var state = new UnaryState<T> {Src = ps, Dst = pd, Op = op};
-            ParallelExecutor.For(result.Length, state, ExecuteUnary);
-        }
-    }
-
-    public static unsafe void RunProject<TIn, TOut>(Span<TIn> src, Span<TOut> result, UnaryOp<TIn, TOut> op)
-        where TIn : unmanaged
-        where TOut : unmanaged
-    {
-        fixed (TIn* ps = src)
-        fixed (TOut* pd = result)
-        {
-            var state = new ProjectState<TIn, TOut> {Src = ps, Dst = pd, Op = op};
-            ParallelExecutor.For(result.Length, state, ExecuteProject);
-        }
-    }
-
-    public static unsafe void RunInPlace<T>(Span<T> span, UnaryOp<T, T> op) where T : unmanaged
-    {
-        fixed (T* p = span)
-        {
-            var state = new InPlaceState<T> {Data = p, Op = op};
-            ParallelExecutor.For(span.Length, state, ExecuteInPlace);
-        }
-    }
-
-    public static unsafe void RunBinary<TLeft, TRight, TResult>(Span<TLeft> left, Span<TRight> right, Span<TResult> result, BinaryOp<TLeft, TRight, TResult> op)
-        where TLeft : unmanaged
-        where TRight : unmanaged
-        where TResult : unmanaged
-    {
-        fixed (TLeft* pl = left)
-        fixed (TRight* pr = right)
-        fixed (TResult* pd = result)
-        {
-            var state = new BinaryState<TLeft, TRight, TResult> {Left = pl, Right = pr, Dst = pd, Op = op};
-            ParallelExecutor.For(result.Length, state, ExecuteBinary);
-        }
-    }
-
-    public static unsafe void RunTernary<T1, T2, T3, TResult>(Span<T1> first, Span<T2> second, Span<T3> third, Span<TResult> result, TernaryOp<T1, T2, T3, TResult> op)
-        where T1 : unmanaged
-        where T2 : unmanaged
-        where T3 : unmanaged
-        where TResult : unmanaged
-    {
-        fixed (T1* p1 = first)
-        fixed (T2* p2 = second)
-        fixed (T3* p3 = third)
-        fixed (TResult* pd = result)
-        {
-            var state = new TernaryState<T1, T2, T3, TResult> {A = p1, B = p2, C = p3, Dst = pd, Op = op};
-            ParallelExecutor.For(result.Length, state, ExecuteTernary);
-        }
-    }
-
-    public static unsafe void RunBinaryScalar<TLeft, TRight, TScalar, TResult>(
-        Span<TLeft> left,
-        Span<TRight> right,
-        TScalar scalar,
-        Span<TResult> result,
-        BinaryScalarOp<TLeft, TRight, TScalar, TResult> op)
-        where TLeft : unmanaged
-        where TRight : unmanaged
-        where TResult : unmanaged
-    {
-        fixed (TLeft* pl = left)
-        fixed (TRight* pr = right)
-        fixed (TResult* pd = result)
-        {
-            var state = new BinaryScalarState<TLeft, TRight, TScalar, TResult>
-            {
-                Left   = pl,
-                Right  = pr,
-                Scalar = scalar,
-                Dst    = pd,
-                Op     = op,
-            };
-            ParallelExecutor.For(result.Length, state, ExecuteBinaryScalar);
-        }
-    }
-}
-
-internal sealed class ParallelVector2Operation : ISpanVectorOperations<Vector2>
-{
-    public bool Supported => true;
+    /// <inheritdoc />
+    public bool Supported => s_Supported;
 
     public void Dot(Span<Vector2> left, Span<Vector2> right, Span<Vector2> result) =>
         ParallelSpanRunner.RunBinary(left, right, result, static (l, r) =>
@@ -1166,9 +1179,12 @@ internal sealed class ParallelVector2Operation : ISpanVectorOperations<Vector2>
     }
 }
 
-internal sealed class ParallelVector3Operation : ISpanVectorOperations<Vector3>
+internal sealed class ParallelVector3Operation : ISpanVectorOperation<Vector3>
 {
-    public bool Supported => true;
+    private static readonly bool s_Supported = Environment.ProcessorCount > 1;
+
+    /// <inheritdoc />
+    public bool Supported => s_Supported;
 
     public void Dot(Span<Vector3> left, Span<Vector3> right, Span<Vector3> result) =>
         ParallelSpanRunner.RunBinary(left, right, result, static (l, r) =>
@@ -1249,9 +1265,12 @@ internal sealed class ParallelVector3Operation : ISpanVectorOperations<Vector3>
     }
 }
 
-internal sealed class ParallelVector4Operation : ISpanVectorOperations<Vector4>
+internal sealed class ParallelVector4Operation : ISpanVectorOperation<Vector4>
 {
-    public bool Supported => true;
+    private static readonly bool s_Supported = Environment.ProcessorCount > 1;
+
+    /// <inheritdoc />
+    public bool Supported => s_Supported;
 
     public void Dot(Span<Vector4> left, Span<Vector4> right, Span<Vector4> result) =>
         ParallelSpanRunner.RunBinary(left, right, result, static (l, r) =>

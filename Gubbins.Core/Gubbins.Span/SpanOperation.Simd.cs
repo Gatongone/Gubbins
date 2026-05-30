@@ -1,5 +1,4 @@
 ﻿using System.Numerics;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace Gubbins.Span;
@@ -7,7 +6,7 @@ namespace Gubbins.Span;
 /// <summary>
 /// SIMD span operation.
 /// </summary>
-internal sealed class SimdNumberOperations<T> : ISpanNumberOperations<T> where T : unmanaged
+internal sealed class SimdNumberOperation<T> : ISpanNumberOperation<T> where T : unmanaged
 {
     /// <inheritdoc/>
     public bool Supported => Vector.IsHardwareAccelerated;
@@ -80,7 +79,7 @@ internal sealed class SimdNumberOperations<T> : ISpanNumberOperations<T> where T
 
     /// <inheritdoc/>
     public void Modulo(Span<T> src, T operand, Span<T> result) =>
-        RunOperand(src, operand, result, static (va, vb) => va - va / vb * vb, Operations<T>.Modulo);
+        RunOperand(src, operand, result, static (va, vb) => VectorMath.Modulo(va, vb), Operations<T>.Modulo);
 
     /// <inheritdoc />
     public void Max(Span<T> left, Span<T> right, Span<T> result) =>
@@ -244,7 +243,7 @@ internal static class SimdShiftRunner<T> where T : unmanaged
 /// <summary>
 /// SIMD span operation.
 /// </summary>
-internal sealed class SimdIntOperation : ISpanShiftLeft<int>, ISpanShiftRight<int>
+internal sealed class SimdIntOperation : ISpanShift<int>
 {
     /// <inheritdoc/>
     public bool Supported => Vector.IsHardwareAccelerated;
@@ -259,7 +258,7 @@ internal sealed class SimdIntOperation : ISpanShiftLeft<int>, ISpanShiftRight<in
 /// <summary>
 /// SIMD span operation.
 /// </summary>
-internal sealed class SimdLongOperation : ISpanShiftLeft<long>, ISpanShiftRight<long>
+internal sealed class SimdLongOperation : ISpanShift<long>
 {
     /// <inheritdoc/>
     public bool Supported => Vector.IsHardwareAccelerated;
@@ -274,7 +273,7 @@ internal sealed class SimdLongOperation : ISpanShiftLeft<long>, ISpanShiftRight<
 /// <summary>
 /// SIMD span operation.
 /// </summary>
-internal sealed class SimdUintOperation : ISpanShiftLeft<uint>, ISpanShiftRight<uint>
+internal sealed class SimdUintOperation : ISpanShift<uint>
 {
     /// <inheritdoc/>
     public bool Supported => Vector.IsHardwareAccelerated;
@@ -289,7 +288,7 @@ internal sealed class SimdUintOperation : ISpanShiftLeft<uint>, ISpanShiftRight<
 /// <summary>
 /// SIMD span operation.
 /// </summary>
-internal sealed class SimdUlongOperation : ISpanShiftLeft<ulong>, ISpanShiftRight<ulong>
+internal sealed class SimdUlongOperation : ISpanShift<ulong>
 {
     /// <inheritdoc/>
     public bool Supported => Vector.IsHardwareAccelerated;
@@ -493,7 +492,7 @@ internal static class SimdPackedFloatRunner
 /// <summary>
 /// SIMD span operation.
 /// </summary>
-internal sealed class SimdFloatOperation : ISpanRealOperations<float>
+internal sealed class SimdFloatOperation : ISpanRealOperation<float>
 {
     public bool Supported => Vector.IsHardwareAccelerated;
 
@@ -519,10 +518,10 @@ internal sealed class SimdFloatOperation : ISpanRealOperations<float>
         SimdRealRunner<float>.RunTernaryMiddleScalar(x, y, amount, result, VectorMath.Lerp, static (a, b, t) => a * (1 - t) + b * t);
 
     public void Hypot(Span<float> x, Span<float> y, Span<float> result) =>
-        SimdRealRunner<float>.RunBinary(x, y, result, VectorMath.Hypot, static (a, b) => MathF.Sqrt(a * a * b * b));
+        SimdRealRunner<float>.RunBinary(x, y, result, VectorMath.Hypot, static (a, b) => MathF.Sqrt(a * a + b * b));
 
     public void Hypot(Span<float> x, float y, Span<float> result) =>
-        SimdRealRunner<float>.RunBinaryRightScalar(x, y, result, VectorMath.Hypot, static (a, b) => MathF.Sqrt(a * a * b * b));
+        SimdRealRunner<float>.RunBinaryRightScalar(x, y, result, VectorMath.Hypot, static (a, b) => MathF.Sqrt(a * a + b * b));
 
     public void Pow(Span<float> src, float exponent, Span<float> result) =>
         SimdRealRunner<float>.RunBinaryRightScalar(src, exponent, result, VectorMath.Pow, MathF.Pow);
@@ -582,7 +581,7 @@ internal sealed class SimdFloatOperation : ISpanRealOperations<float>
 /// <summary>
 /// SIMD span operation.
 /// </summary>
-internal sealed class SimdDoubleOperation : ISpanRealOperations<double>
+internal sealed class SimdDoubleOperation : ISpanRealOperation<double>
 {
     public bool Supported => Vector.IsHardwareAccelerated;
 
@@ -608,10 +607,10 @@ internal sealed class SimdDoubleOperation : ISpanRealOperations<double>
         SimdRealRunner<double>.RunTernaryMiddleScalar(x, y, amount, result, VectorMath.Lerp, static (a, b, t) => a * (1 - t) + b * t);
 
     public void Hypot(Span<double> x, Span<double> y, Span<double> result) =>
-        SimdRealRunner<double>.RunBinary(x, y, result, VectorMath.Hypot, static (a, b) => Math.Sqrt(a * a * b * b));
+        SimdRealRunner<double>.RunBinary(x, y, result, VectorMath.Hypot, static (a, b) => Math.Sqrt(a * a + b * b));
 
     public void Hypot(Span<double> x, double y, Span<double> result) =>
-        SimdRealRunner<double>.RunBinaryRightScalar(x, y, result, VectorMath.Hypot, static (a, b) => Math.Sqrt(a * a * b * b));
+        SimdRealRunner<double>.RunBinaryRightScalar(x, y, result, VectorMath.Hypot, static (a, b) => Math.Sqrt(a * a + b * b));
 
     public void Pow(Span<double> src, double exponent, Span<double> result) =>
         SimdRealRunner<double>.RunBinaryRightScalar(src, exponent, result, VectorMath.Pow, Math.Pow);
@@ -668,7 +667,7 @@ internal sealed class SimdDoubleOperation : ISpanRealOperations<double>
         SimdRealRunner<double>.RunUnary(src, result, VectorMath.Atanh, Math.Atanh);
 }
 
-internal sealed class SimdVectorOperation : ISpanVectorOperations<Vector2>
+internal sealed class SimdVector2Operation : ISpanVectorOperation<Vector2>
 {
     private static readonly int s_FloatVectorSize  = Vector<float>.Count;
     private static readonly int s_Vector2BatchSize = Vector<float>.Count / 2;
@@ -1077,7 +1076,7 @@ internal sealed class SimdVectorOperation : ISpanVectorOperations<Vector2>
     }
 }
 
-internal sealed class SimdVector3Operation : ISpanVectorOperations<Vector3>
+internal sealed class SimdVector3Operation : ISpanVectorOperation<Vector3>
 {
     private static readonly int s_BatchSize = Vector<float>.Count;
 
@@ -1535,7 +1534,7 @@ internal sealed class SimdVector3Operation : ISpanVectorOperations<Vector3>
     }
 }
 
-internal sealed class SimdVector4Operation : ISpanVectorOperations<Vector4>
+internal sealed class SimdVector4Operation : ISpanVectorOperation<Vector4>
 {
     private static readonly int s_FloatVectorSize  = Vector<float>.Count;
     private static readonly int s_Vector4BatchSize = Vector<float>.Count / 4;

@@ -6,7 +6,625 @@ using Unity.Mathematics;
 namespace Gubbins.Span
 {
     [BurstCompile]
-    public unsafe class BurstUlongOperations : ISpanNumberOperations<ulong>, ISpanGetMax<ulong>, ISpanGetMin<ulong>, ISpanShiftLeft<ulong>, ISpanShiftRight<ulong>
+    internal unsafe class BurstIntOperation : ISpanNumberOperation<int>, ISpanShift<int>
+    {
+        /// <inheritdoc/>
+        public bool Supported => BurstCompiler.IsEnabled;
+
+        /// <inheritdoc/>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void ShiftLeft(Span<int> src, int count, Span<int> result)
+        {
+            fixed (int* pSrc = src, pResult = result)
+                BurstShiftLeft(pSrc, count, pResult, src.Length);
+        }
+
+        /// <inheritdoc/>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void ShiftRight(Span<int> src, int count, Span<int> result)
+        {
+            fixed (int* pSrc = src, pResult = result)
+                BurstShiftRight(pSrc, count, pResult, src.Length);
+        }
+
+        /// <inheritdoc/>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Add(Span<int> src, int operand, Span<int> result)
+        {
+            fixed (int* pSrc = src, pResult = result)
+                BurstAdd(pSrc, operand, pResult, src.Length);
+        }
+
+        /// <inheritdoc/>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Subtract(Span<int> src, int operand, Span<int> result)
+        {
+            fixed (int* pSrc = src, pResult = result)
+                BurstSubtract(pSrc, operand, pResult, src.Length);
+        }
+
+        /// <inheritdoc/>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Multiply(Span<int> src, int operand, Span<int> result)
+        {
+            fixed (int* pSrc = src, pResult = result)
+                BurstMultiply(pSrc, operand, pResult, src.Length);
+        }
+
+        /// <inheritdoc/>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Divide(Span<int> src, int operand, Span<int> result)
+        {
+            fixed (int* pSrc = src, pResult = result)
+                BurstDivide(pSrc, operand, pResult, src.Length);
+        }
+
+        /// <inheritdoc/>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Modulo(Span<int> src, int operand, Span<int> result)
+        {
+            fixed (int* pSrc = src, pResult = result)
+                BurstModulo(pSrc, operand, pResult, src.Length);
+        }
+
+        /// <inheritdoc/>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Max(Span<int> left, Span<int> right, Span<int> result)
+        {
+            fixed (int* pLeft = left, pRight = right, pResult = result)
+                BurstMax(pLeft, pRight, pResult, left.Length);
+        }
+
+        /// <inheritdoc/>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Min(Span<int> left, Span<int> right, Span<int> result)
+        {
+            fixed (int* pLeft = left, pRight = right, pResult = result)
+                BurstMin(pLeft, pRight, pResult, left.Length);
+        }
+
+        /// <inheritdoc/>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public int GetMax(Span<int> src)
+        {
+            fixed (int* pSrc = src)
+                return BurstGetMax(pSrc, src.Length);
+        }
+
+        /// <inheritdoc/>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public int GetMin(Span<int> src)
+        {
+            fixed (int* pSrc = src)
+                return BurstGetMin(pSrc, src.Length);
+        }
+
+        [BurstCompile]
+        private static void BurstAdd(in int* src, int operand, int* result, int length)
+        {
+            for (var i = 0; i < length; i++)
+            {
+                result[i] = src[i] + operand;
+            }
+        }
+
+        [BurstCompile]
+        private static void BurstSubtract(in int* src, int operand, int* result, int length)
+        {
+            for (var i = 0; i < length; i++)
+            {
+                result[i] = src[i] - operand;
+            }
+        }
+
+        [BurstCompile]
+        private static void BurstMultiply(in int* src, int operand, int* result, int length)
+        {
+            for (var i = 0; i < length; i++)
+            {
+                result[i] = src[i] * operand;
+            }
+        }
+
+        [BurstCompile]
+        private static void BurstDivide(in int* src, int operand, int* result, int length)
+        {
+            for (var i = 0; i < length; i++)
+            {
+                result[i] = src[i] / operand;
+            }
+        }
+
+        [BurstCompile]
+        private static void BurstModulo(in int* src, int operand, int* result, int length)
+        {
+            for (var i = 0; i < length; i++)
+            {
+                result[i] = src[i] % operand;
+            }
+        }
+
+        [BurstCompile]
+        public static void BurstMax(in int* left, in int* right, int* result, int length)
+        {
+            for (var index = 0; index < length; index++)
+            {
+                var l = left[index];
+                var r = right[index];
+                result[index] = math.max(l, r);
+            }
+        }
+
+        [BurstCompile]
+        private static int BurstGetMax(in int* src, int length)
+        {
+            var max = src[0];
+            for (var index = 0; index < length; index++)
+            {
+                var cur = src[index];
+                max = math.max(max, cur);
+            }
+
+            return max;
+        }
+
+        [BurstCompile]
+        private static void BurstMin(in int* left, in int* right, int* result, int length)
+        {
+            for (var index = 1; index < length; index++)
+            {
+                var l = left[index];
+                var r = right[index];
+                result[index] = math.min(l, r);
+            }
+        }
+
+        [BurstCompile]
+        private static int BurstGetMin(in int* src, int length)
+        {
+            var min = src[0];
+            for (var index = 1; index < length; index++)
+            {
+                var cur = src[index];
+                min = math.min(min, cur);
+            }
+
+            return min;
+        }
+
+        [BurstCompile]
+        private static void BurstShiftLeft(in int* src, int count, int* result, int length)
+        {
+            for (var i = 0; i < length; i++)
+            {
+                result[i] = src[i] << count;
+            }
+        }
+
+        [BurstCompile]
+        private static void BurstShiftRight(in int* src, int count, int* result, int length)
+        {
+            for (var i = 0; i < length; i++)
+            {
+                result[i] = src[i] >> count;
+            }
+        }
+    }
+
+    [BurstCompile]
+    internal unsafe class BurstUintOperation : ISpanNumberOperation<uint>, ISpanShift<uint>
+    {
+        /// <inheritdoc/>
+        public bool Supported => BurstCompiler.IsEnabled;
+
+        /// <inheritdoc/>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void ShiftLeft(Span<uint> src, int count, Span<uint> result)
+        {
+            fixed (uint* pSrc = src, pResult = result)
+                BurstShiftLeft(pSrc, count, pResult, src.Length);
+        }
+
+        /// <inheritdoc/>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void ShiftRight(Span<uint> src, int count, Span<uint> result)
+        {
+            fixed (uint* pSrc = src, pResult = result)
+                BurstShiftRight(pSrc, count, pResult, src.Length);
+        }
+
+        /// <inheritdoc/>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Add(Span<uint> src, uint operand, Span<uint> result)
+        {
+            fixed (uint* pSrc = src, pResult = result)
+                BurstAdd(pSrc, operand, pResult, src.Length);
+        }
+
+        /// <inheritdoc/>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Subtract(Span<uint> src, uint operand, Span<uint> result)
+        {
+            fixed (uint* pSrc = src, pResult = result)
+                BurstSubtract(pSrc, operand, pResult, src.Length);
+        }
+
+        /// <inheritdoc/>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Multiply(Span<uint> src, uint operand, Span<uint> result)
+        {
+            fixed (uint* pSrc = src, pResult = result)
+                BurstMultiply(pSrc, operand, pResult, src.Length);
+        }
+
+        /// <inheritdoc/>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Divide(Span<uint> src, uint operand, Span<uint> result)
+        {
+            fixed (uint* pSrc = src, pResult = result)
+                BurstDivide(pSrc, operand, pResult, src.Length);
+        }
+
+        /// <inheritdoc/>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Modulo(Span<uint> src, uint operand, Span<uint> result)
+        {
+            fixed (uint* pSrc = src, pResult = result)
+                BurstModulo(pSrc, operand, pResult, src.Length);
+        }
+
+        /// <inheritdoc/>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Max(Span<uint> left, Span<uint> right, Span<uint> result)
+        {
+            fixed (uint* pLeft = left, pRight = right, pResult = result)
+                BurstMax(pLeft, pRight, pResult, left.Length);
+        }
+
+        /// <inheritdoc/>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Min(Span<uint> left, Span<uint> right, Span<uint> result)
+        {
+            fixed (uint* pLeft = left, pRight = right, pResult = result)
+                BurstMin(pLeft, pRight, pResult, left.Length);
+        }
+
+        /// <inheritdoc/>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public uint GetMax(Span<uint> src)
+        {
+            fixed (uint* pSrc = src)
+                return BurstGetMax(pSrc, src.Length);
+        }
+
+        /// <inheritdoc/>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public uint GetMin(Span<uint> src)
+        {
+            fixed (uint* pSrc = src)
+                return BurstGetMin(pSrc, src.Length);
+        }
+
+        [BurstCompile]
+        private static void BurstAdd(in uint* src, uint operand, uint* result, int length)
+        {
+            for (var i = 0; i < length; i++)
+            {
+                result[i] = src[i] + operand;
+            }
+        }
+
+        [BurstCompile]
+        private static void BurstSubtract(in uint* src, uint operand, uint* result, int length)
+        {
+            for (var i = 0; i < length; i++)
+            {
+                result[i] = src[i] - operand;
+            }
+        }
+
+        [BurstCompile]
+        private static void BurstMultiply(in uint* src, uint operand, uint* result, int length)
+        {
+            for (var i = 0; i < length; i++)
+            {
+                result[i] = src[i] * operand;
+            }
+        }
+
+        [BurstCompile]
+        private static void BurstDivide(in uint* src, uint operand, uint* result, int length)
+        {
+            for (var i = 0; i < length; i++)
+            {
+                result[i] = src[i] / operand;
+            }
+        }
+
+        [BurstCompile]
+        private static void BurstModulo(in uint* src, uint operand, uint* result, int length)
+        {
+            for (var i = 0; i < length; i++)
+            {
+                result[i] = src[i] % operand;
+            }
+        }
+
+        [BurstCompile]
+        public static void BurstMax(in uint* left, in uint* right, uint* result, int length)
+        {
+            for (var index = 0; index < length; index++)
+            {
+                var l = left[index];
+                var r = right[index];
+                result[index] = math.max(l, r);
+            }
+        }
+
+        [BurstCompile]
+        private static uint BurstGetMax(in uint* src, int length)
+        {
+            var max = src[0];
+            for (var index = 0; index < length; index++)
+            {
+                var cur = src[index];
+                max = math.max(max, cur);
+            }
+
+            return max;
+        }
+
+        [BurstCompile]
+        private static void BurstMin(in uint* left, in uint* right, uint* result, int length)
+        {
+            for (var index = 1; index < length; index++)
+            {
+                var l = left[index];
+                var r = right[index];
+                result[index] = math.min(l, r);
+            }
+        }
+
+        [BurstCompile]
+        private static uint BurstGetMin(in uint* src, int length)
+        {
+            var min = src[0];
+            for (var index = 1; index < length; index++)
+            {
+                var cur = src[index];
+                min = math.min(min, cur);
+            }
+
+            return min;
+        }
+
+        [BurstCompile]
+        private static void BurstShiftLeft(in uint* src, int count, uint* result, int length)
+        {
+            for (var i = 0; i < length; i++)
+            {
+                result[i] = src[i] << count;
+            }
+        }
+
+        [BurstCompile]
+        private static void BurstShiftRight(in uint* src, int count, uint* result, int length)
+        {
+            for (var i = 0; i < length; i++)
+            {
+                result[i] = src[i] >> count;
+            }
+        }
+    }
+
+    [BurstCompile]
+    internal unsafe class BurstLongOperation : ISpanNumberOperation<long>, ISpanShift<long>
+    {
+        /// <inheritdoc/>
+        public bool Supported => BurstCompiler.IsEnabled;
+
+        /// <inheritdoc/>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void ShiftLeft(Span<long> src, int count, Span<long> result)
+        {
+            fixed (long* pSrc = src, pResult = result)
+                BurstShiftLeft(pSrc, count, pResult, src.Length);
+        }
+
+        /// <inheritdoc/>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void ShiftRight(Span<long> src, int count, Span<long> result)
+        {
+            fixed (long* pSrc = src, pResult = result)
+                BurstShiftRight(pSrc, count, pResult, src.Length);
+        }
+
+        /// <inheritdoc/>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Add(Span<long> src, long operand, Span<long> result)
+        {
+            fixed (long* pSrc = src, pResult = result)
+                BurstAdd(pSrc, operand, pResult, src.Length);
+        }
+
+        /// <inheritdoc/>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Subtract(Span<long> src, long operand, Span<long> result)
+        {
+            fixed (long* pSrc = src, pResult = result)
+                BurstSubtract(pSrc, operand, pResult, src.Length);
+        }
+
+        /// <inheritdoc/>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Multiply(Span<long> src, long operand, Span<long> result)
+        {
+            fixed (long* pSrc = src, pResult = result)
+                BurstMultiply(pSrc, operand, pResult, src.Length);
+        }
+
+        /// <inheritdoc/>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Divide(Span<long> src, long operand, Span<long> result)
+        {
+            fixed (long* pSrc = src, pResult = result)
+                BurstDivide(pSrc, operand, pResult, src.Length);
+        }
+
+        /// <inheritdoc/>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Modulo(Span<long> src, long operand, Span<long> result)
+        {
+            fixed (long* pSrc = src, pResult = result)
+                BurstModulo(pSrc, operand, pResult, src.Length);
+        }
+
+        /// <inheritdoc/>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Max(Span<long> left, Span<long> right, Span<long> result)
+        {
+            fixed (long* pLeft = left, pRight = right, pResult = result)
+                BurstMax(pLeft, pRight, pResult, left.Length);
+        }
+
+        /// <inheritdoc/>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Min(Span<long> left, Span<long> right, Span<long> result)
+        {
+            fixed (long* pLeft = left, pRight = right, pResult = result)
+                BurstMin(pLeft, pRight, pResult, left.Length);
+        }
+
+        /// <inheritdoc/>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public long GetMax(Span<long> src)
+        {
+            fixed (long* pSrc = src)
+                return BurstGetMax(pSrc, src.Length);
+        }
+
+        /// <inheritdoc/>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public long GetMin(Span<long> src)
+        {
+            fixed (long* pSrc = src)
+                return BurstGetMin(pSrc, src.Length);
+        }
+
+        [BurstCompile]
+        private static void BurstAdd(in long* src, long operand, long* result, int length)
+        {
+            for (var i = 0; i < length; i++)
+            {
+                result[i] = src[i] + operand;
+            }
+        }
+
+        [BurstCompile]
+        private static void BurstSubtract(in long* src, long operand, long* result, int length)
+        {
+            for (var i = 0; i < length; i++)
+            {
+                result[i] = src[i] - operand;
+            }
+        }
+
+        [BurstCompile]
+        private static void BurstMultiply(in long* src, long operand, long* result, int length)
+        {
+            for (var i = 0; i < length; i++)
+            {
+                result[i] = src[i] * operand;
+            }
+        }
+
+        [BurstCompile]
+        private static void BurstDivide(in long* src, long operand, long* result, int length)
+        {
+            for (var i = 0; i < length; i++)
+            {
+                result[i] = src[i] / operand;
+            }
+        }
+
+        [BurstCompile]
+        private static void BurstModulo(in long* src, long operand, long* result, int length)
+        {
+            for (var i = 0; i < length; i++)
+            {
+                result[i] = src[i] % operand;
+            }
+        }
+
+        [BurstCompile]
+        public static void BurstMax(in long* left, in long* right, long* result, int length)
+        {
+            for (var index = 0; index < length; index++)
+            {
+                var l = left[index];
+                var r = right[index];
+                result[index] = math.max(l, r);
+            }
+        }
+
+        [BurstCompile]
+        private static long BurstGetMax(in long* src, int length)
+        {
+            var max = src[0];
+            for (var index = 0; index < length; index++)
+            {
+                var cur = src[index];
+                max = math.max(max, cur);
+            }
+
+            return max;
+        }
+
+        [BurstCompile]
+        private static void BurstMin(in long* left, in long* right, long* result, int length)
+        {
+            for (var index = 1; index < length; index++)
+            {
+                var l = left[index];
+                var r = right[index];
+                result[index] = math.min(l, r);
+            }
+        }
+
+        [BurstCompile]
+        private static long BurstGetMin(in long* src, int length)
+        {
+            var min = src[0];
+            for (var index = 1; index < length; index++)
+            {
+                var cur = src[index];
+                min = math.min(min, cur);
+            }
+
+            return min;
+        }
+
+        [BurstCompile]
+        private static void BurstShiftLeft(in long* src, int count, long* result, int length)
+        {
+            for (var i = 0; i < length; i++)
+            {
+                result[i] = src[i] << count;
+            }
+        }
+
+        [BurstCompile]
+        private static void BurstShiftRight(in long* src, int count, long* result, int length)
+        {
+            for (var i = 0; i < length; i++)
+            {
+                result[i] = src[i] >> count;
+            }
+        }
+    }
+
+    [BurstCompile]
+    internal unsafe class BurstUlongOperation : ISpanNumberOperation<ulong>, ISpanShift<ulong>
     {
         /// <inheritdoc/>
         public bool Supported => BurstCompiler.IsEnabled;
@@ -210,9 +828,9 @@ namespace Gubbins.Span
             }
         }
     }
-    
+
     [BurstCompile]
-    public unsafe class BurstFloatOperations : ISpanNumberOperations<float>, ISpanGetMax<float>, ISpanGetMin<float>, ISpanRealOperations<float>
+    internal unsafe class BurstFloatOperation : ISpanNumberOperation<float>, ISpanRealOperation<float>
     {
         /// <inheritdoc/>
         public bool Supported => BurstCompiler.IsEnabled;
@@ -844,7 +1462,7 @@ namespace Gubbins.Span
     }
 
     [BurstCompile]
-    public unsafe class BurstDoubleOperations : ISpanNumberOperations<double>, ISpanGetMax<double>, ISpanGetMin<double>, ISpanRealOperations<double>
+    internal unsafe class BurstDoubleOperation : ISpanNumberOperation<double>, ISpanRealOperation<double>
     {
         /// <inheritdoc/>
         public bool Supported => BurstCompiler.IsEnabled;

@@ -1,332 +1,442 @@
-﻿namespace Gubbins.Span.Tests;
+namespace Gubbins.Span.Tests;
 
-public abstract class NumberOperationTestsBase<T> where T : struct
+public abstract class NumberOperationTestsBase<T> where T : unmanaged
 {
-    protected abstract ISpanRealOperations<T> CreateOperation();
+    protected abstract ISpanNumberOperation<T> CreateOperation();
+    protected abstract T[] CreateReduceSource();
+    protected abstract (T[] left, T[] right) CreatePairSources();
+    protected abstract (T[] src, T operand) CreateOperandSource();
 
-    protected void TestFloor()
+    [Test]
+    public void GetMax_ShouldMatchScalar()
     {
         var op = CreateOperation();
-        var (src, expected) = CreateFloorTestData();
-        var result = new T[src.Length];
+        var src = CreateReduceSource();
+        var expected = GetMaxScalar(src);
 
-        op.Floor(src, result);
+        var actual = op.GetMax(src);
 
-        Assert.That(result, Is.EqualTo(expected).AsCollection);
+        Assert.That(actual, Is.EqualTo(expected));
     }
 
-    protected void TestCeiling()
+    [Test]
+    public void GetMin_ShouldMatchScalar()
     {
         var op = CreateOperation();
-        var (src, expected) = CreateCeilingTestData();
-        var result = new T[src.Length];
+        var src = CreateReduceSource();
+        var expected = GetMinScalar(src);
 
-        op.Ceiling(src, result);
+        var actual = op.GetMin(src);
 
-        Assert.That(result, Is.EqualTo(expected).AsCollection);
+        Assert.That(actual, Is.EqualTo(expected));
     }
 
-    protected void TestSqrt()
+    [Test]
+    public void Max_ShouldMatchScalar()
     {
         var op = CreateOperation();
-        var (src, expected) = CreateSqrtTestData();
-        var result = new T[src.Length];
+        var (left, right) = CreatePairSources();
+        var result = new T[left.Length];
 
-        op.Sqrt(src, result);
+        op.Max(left, right, result);
 
-        AssertTolerance(expected, result, GetTolerance());
-    }
-
-    protected void TestRound()
-    {
-        var op = CreateOperation();
-        var (src, expected) = CreateRoundTestData();
-        var result = new T[src.Length];
-
-        op.Round(src, result);
-
-        Assert.That(result, Is.EqualTo(expected).AsCollection);
-    }
-
-    protected void TestExp()
-    {
-        var op = CreateOperation();
-        var (src, expected) = CreateExpTestData();
-        var result = new T[src.Length];
-
-        op.Exp(src, result);
-
-        AssertTolerance(expected, result, GetTolerance() * 10);
-    }
-
-    protected void TestLog()
-    {
-        var op = CreateOperation();
-        var (src, expected) = CreateLogTestData();
-        var result = new T[src.Length];
-
-        op.Log(src, result);
-
-        AssertTolerance(expected, result, GetTolerance() * 10);
-    }
-
-    protected void TestTruncate()
-    {
-        var op = CreateOperation();
-        var (src, expected) = CreateTruncateTestData();
-        var result = new T[src.Length];
-
-        op.Truncate(src, result);
-
-        Assert.That(result, Is.EqualTo(expected).AsCollection);
-    }
-
-    protected abstract (T[] src, T[] expected) CreateFloorTestData();
-    protected abstract (T[] src, T[] expected) CreateCeilingTestData();
-    protected abstract (T[] src, T[] expected) CreateSqrtTestData();
-    protected abstract (T[] src, T[] expected) CreateRoundTestData();
-    protected abstract (T[] src, T[] expected) CreateExpTestData();
-    protected abstract (T[] src, T[] expected) CreateLogTestData();
-    protected abstract (T[] src, T[] expected) CreateTruncateTestData();
-    protected abstract double GetTolerance();
-
-    protected void AssertTolerance(T[] expected, T[] actual, double tolerance)
-    {
-        Assert.Multiple(() =>
+        var expected = new T[left.Length];
+        for (var i = 0; i < left.Length; i++)
         {
-            for (var i = 0; i < expected.Length; i++)
-            {
-                if (typeof(T) == typeof(float))
-                {
-                    var exp = (float)(object)expected[i];
-                    var act = (float)(object)actual[i];
-                    Assert.That(act, Is.EqualTo(exp).Within((float)tolerance));
-                }
-                else if (typeof(T) == typeof(double))
-                {
-                    var exp = (double)(object)expected[i];
-                    var act = (double)(object)actual[i];
-                    Assert.That(act, Is.EqualTo(exp).Within(tolerance));
-                }
-            }
-        });
+            expected[i] = GreaterThan(left[i], right[i]) ? left[i] : right[i];
+        }
+
+        Assert.That(result, Is.EqualTo(expected).AsCollection);
     }
+
+    [Test]
+    public void Min_ShouldMatchScalar()
+    {
+        var op = CreateOperation();
+        var (left, right) = CreatePairSources();
+        var result = new T[left.Length];
+
+        op.Min(left, right, result);
+
+        var expected = new T[left.Length];
+        for (var i = 0; i < left.Length; i++)
+        {
+            expected[i] = LessThan(left[i], right[i]) ? left[i] : right[i];
+        }
+
+        Assert.That(result, Is.EqualTo(expected).AsCollection);
+    }
+
+    [Test]
+    public void Add_ShouldMatchScalar()
+    {
+        var op = CreateOperation();
+        var (src, operand) = CreateOperandSource();
+        var result = new T[src.Length];
+
+        op.Add(src, operand, result);
+
+        var expected = new T[src.Length];
+        for (var i = 0; i < src.Length; i++)
+        {
+            expected[i] = AddScalar(src[i], operand);
+        }
+
+        Assert.That(result, Is.EqualTo(expected).AsCollection);
+    }
+
+    [Test]
+    public void Subtract_ShouldMatchScalar()
+    {
+        var op = CreateOperation();
+        var (src, operand) = CreateOperandSource();
+        var result = new T[src.Length];
+
+        op.Subtract(src, operand, result);
+
+        var expected = new T[src.Length];
+        for (var i = 0; i < src.Length; i++)
+        {
+            expected[i] = SubtractScalar(src[i], operand);
+        }
+
+        Assert.That(result, Is.EqualTo(expected).AsCollection);
+    }
+
+    [Test]
+    public void Multiply_ShouldMatchScalar()
+    {
+        var op = CreateOperation();
+        var (src, operand) = CreateOperandSource();
+        var result = new T[src.Length];
+
+        op.Multiply(src, operand, result);
+
+        var expected = new T[src.Length];
+        for (var i = 0; i < src.Length; i++)
+        {
+            expected[i] = MultiplyScalar(src[i], operand);
+        }
+
+        Assert.That(result, Is.EqualTo(expected).AsCollection);
+    }
+
+    [Test]
+    public void Divide_ShouldMatchScalar()
+    {
+        var op = CreateOperation();
+        var (src, operand) = CreateOperandSource();
+        var result = new T[src.Length];
+
+        op.Divide(src, operand, result);
+
+        var expected = new T[src.Length];
+        for (var i = 0; i < src.Length; i++)
+        {
+            expected[i] = DivideScalar(src[i], operand);
+        }
+
+        Assert.That(result, Is.EqualTo(expected).AsCollection);
+    }
+
+    [Test]
+    public void Modulo_ShouldMatchScalar()
+    {
+        var op = CreateOperation();
+        var (src, operand) = CreateOperandSource();
+        var result = new T[src.Length];
+
+        op.Modulo(src, operand, result);
+
+        var expected = new T[src.Length];
+        for (var i = 0; i < src.Length; i++)
+        {
+            expected[i] = ModuloScalar(src[i], operand);
+        }
+
+        Assert.That(result, Is.EqualTo(expected).AsCollection);
+    }
+
+    private static T GetMaxScalar(T[] src)
+    {
+        var max = src[0];
+        for (var i = 1; i < src.Length; i++)
+        {
+            if (GreaterThan(src[i], max))
+            {
+                max = src[i];
+            }
+        }
+
+        return max;
+    }
+
+    private static T GetMinScalar(T[] src)
+    {
+        var min = src[0];
+        for (var i = 1; i < src.Length; i++)
+        {
+            if (LessThan(src[i], min))
+            {
+                min = src[i];
+            }
+        }
+
+        return min;
+    }
+
+    private static bool GreaterThan(T left, T right) => Comparer<T>.Default.Compare(left, right) > 0;
+    private static bool LessThan(T left, T right) => Comparer<T>.Default.Compare(left, right) < 0;
+
+    protected abstract T AddScalar(T left, T right);
+    protected abstract T SubtractScalar(T left, T right);
+    protected abstract T MultiplyScalar(T left, T right);
+    protected abstract T DivideScalar(T left, T right);
+    protected abstract T ModuloScalar(T left, T right);
+}
+
+public abstract class IntNumberOperationTestsBase : NumberOperationTestsBase<int>
+{
+    protected override int[] CreateReduceSource() => [3, -2, 7, 7, 0, -9, 5];
+
+    protected override (int[] left, int[] right) CreatePairSources() =>
+        ([1, -5, 9, 4, 0], [2, -5, 3, 10, 0]);
+
+    protected override (int[] src, int operand) CreateOperandSource() =>
+        ([3, -2, 7, 0, -9, 5], 2);
+
+    protected override int AddScalar(int left, int right) => left + right;
+    protected override int SubtractScalar(int left, int right) => left - right;
+    protected override int MultiplyScalar(int left, int right) => left * right;
+    protected override int DivideScalar(int left, int right) => left / right;
+    protected override int ModuloScalar(int left, int right) => left % right;
+}
+
+public abstract class LongNumberOperationTestsBase : NumberOperationTestsBase<long>
+{
+    protected override long[] CreateReduceSource() => [3L, -2L, 7L, 7L, 0L, -9L, 5L];
+
+    protected override (long[] left, long[] right) CreatePairSources() =>
+        ([1L, -5L, 9L, 4L, 0L], [2L, -5L, 3L, 10L, 0L]);
+
+    protected override (long[] src, long operand) CreateOperandSource() =>
+        ([3L, -2L, 7L, 0L, -9L, 5L], 2L);
+
+    protected override long AddScalar(long left, long right) => left + right;
+    protected override long SubtractScalar(long left, long right) => left - right;
+    protected override long MultiplyScalar(long left, long right) => left * right;
+    protected override long DivideScalar(long left, long right) => left / right;
+    protected override long ModuloScalar(long left, long right) => left % right;
+}
+
+public abstract class UintNumberOperationTestsBase : NumberOperationTestsBase<uint>
+{
+    protected override uint[] CreateReduceSource() => [3u, 2u, 7u, 7u, 0u, 9u, 5u];
+
+    protected override (uint[] left, uint[] right) CreatePairSources() =>
+        ([1u, 5u, 9u, 4u, 0u], [2u, 5u, 3u, 10u, 0u]);
+
+    protected override (uint[] src, uint operand) CreateOperandSource() =>
+        ([3u, 2u, 7u, 0u, 9u, 5u], 2u);
+
+    protected override uint AddScalar(uint left, uint right) => left + right;
+    protected override uint SubtractScalar(uint left, uint right) => left - right;
+    protected override uint MultiplyScalar(uint left, uint right) => left * right;
+    protected override uint DivideScalar(uint left, uint right) => left / right;
+    protected override uint ModuloScalar(uint left, uint right) => left % right;
+}
+
+public abstract class UlongNumberOperationTestsBase : NumberOperationTestsBase<ulong>
+{
+    protected override ulong[] CreateReduceSource() => [3ul, 2ul, 7ul, 7ul, 0ul, 9ul, 5ul];
+
+    protected override (ulong[] left, ulong[] right) CreatePairSources() =>
+        ([1ul, 5ul, 9ul, 4ul, 0ul], [2ul, 5ul, 3ul, 10ul, 0ul]);
+
+    protected override (ulong[] src, ulong operand) CreateOperandSource() =>
+        ([3ul, 2ul, 7ul, 0ul, 9ul, 5ul], 2ul);
+
+    protected override ulong AddScalar(ulong left, ulong right) => left + right;
+    protected override ulong SubtractScalar(ulong left, ulong right) => left - right;
+    protected override ulong MultiplyScalar(ulong left, ulong right) => left * right;
+    protected override ulong DivideScalar(ulong left, ulong right) => left / right;
+    protected override ulong ModuloScalar(ulong left, ulong right) => left % right;
 }
 
 public abstract class FloatNumberOperationTestsBase : NumberOperationTestsBase<float>
 {
-    [Test]
-    public void Floor_ShouldMatchScalar() => TestFloor();
+    protected override float[] CreateReduceSource() => [3.5f, -2f, 7f, 7.25f, 0f, -9f, 5.1f];
 
-    [Test]
-    public void Ceiling_ShouldMatchScalar() => TestCeiling();
+    protected override (float[] left, float[] right) CreatePairSources() =>
+        ([1.5f, -5.1f, 9f, 4.2f, 0f], [2.5f, -5.1f, 3f, 10.1f, 0f]);
 
-    [Test]
-    public void Sqrt_ShouldMatchScalar() => TestSqrt();
+    protected override (float[] src, float operand) CreateOperandSource() =>
+        ([3.5f, -2f, 7f, 0f, -9f, 5.1f], 2f);
 
-    [Test]
-    public void Round_ShouldMatchScalar() => TestRound();
-
-    [Test]
-    public void Exp_ShouldMatchScalar() => TestExp();
-
-    [Test]
-    public void Log_ShouldMatchScalar() => TestLog();
-
-    [Test]
-    public void Truncate_ShouldMatchScalar() => TestTruncate();
-
-    protected override (float[] src, float[] expected) CreateFloorTestData()
-    {
-        var src = new[] { 1.5f, 2.9f, -3.2f, 0f, -0.5f, 100.99f };
-        var expected = new float[src.Length];
-        for (var i = 0; i < src.Length; i++)
-            expected[i] = MathF.Floor(src[i]);
-        return (src, expected);
-    }
-
-    protected override (float[] src, float[] expected) CreateCeilingTestData()
-    {
-        var src = new[] { 1.5f, 2.1f, -3.9f, 0f, -0.5f, 100.01f };
-        var expected = new float[src.Length];
-        for (var i = 0; i < src.Length; i++)
-            expected[i] = MathF.Ceiling(src[i]);
-        return (src, expected);
-    }
-
-    protected override (float[] src, float[] expected) CreateSqrtTestData()
-    {
-        var src = new[] { 0f, 1f, 4f, 9f, 16f, 25f, 100f };
-        var expected = new float[src.Length];
-        for (var i = 0; i < src.Length; i++)
-            expected[i] = MathF.Sqrt(src[i]);
-        return (src, expected);
-    }
-
-    protected override (float[] src, float[] expected) CreateRoundTestData()
-    {
-        var src = new[] { 1.4f, 1.5f, 2.5f, -1.5f, 0f, 100.49f };
-        var expected = new float[src.Length];
-        for (var i = 0; i < src.Length; i++)
-            expected[i] = MathF.Round(src[i]);
-        return (src, expected);
-    }
-
-    protected override (float[] src, float[] expected) CreateExpTestData()
-    {
-        var src = new[] { 0f, 1f, -1f, 2f, -2f };
-        var expected = new float[src.Length];
-        for (var i = 0; i < src.Length; i++)
-            expected[i] = MathF.Exp(src[i]);
-        return (src, expected);
-    }
-
-    protected override (float[] src, float[] expected) CreateLogTestData()
-    {
-        var src = new[] { 1f, 2f, 10f, 100f, 0.5f };
-        var expected = new float[src.Length];
-        for (var i = 0; i < src.Length; i++)
-            expected[i] = MathF.Log(src[i]);
-        return (src, expected);
-    }
-
-    protected override (float[] src, float[] expected) CreateTruncateTestData()
-    {
-        var src = new[] { 1.9f, -1.9f, 0f, 100.5f, -0.1f };
-        var expected = new float[src.Length];
-        for (var i = 0; i < src.Length; i++)
-            expected[i] = MathF.Truncate(src[i]);
-        return (src, expected);
-    }
-
-    protected override double GetTolerance() => 1e-5;
+    protected override float AddScalar(float left, float right) => left + right;
+    protected override float SubtractScalar(float left, float right) => left - right;
+    protected override float MultiplyScalar(float left, float right) => left * right;
+    protected override float DivideScalar(float left, float right) => left / right;
+    protected override float ModuloScalar(float left, float right) => left % right;
 }
 
 public abstract class DoubleNumberOperationTestsBase : NumberOperationTestsBase<double>
 {
-    [Test]
-    public void Floor_ShouldMatchScalar() => TestFloor();
+    protected override double[] CreateReduceSource() => [3.5, -2.0, 7.0, 7.25, 0.0, -9.0, 5.1];
 
-    [Test]
-    public void Ceiling_ShouldMatchScalar() => TestCeiling();
+    protected override (double[] left, double[] right) CreatePairSources() =>
+        ([1.5, -5.1, 9.0, 4.2, 0.0], [2.5, -5.1, 3.0, 10.1, 0.0]);
 
-    [Test]
-    public void Sqrt_ShouldMatchScalar() => TestSqrt();
+    protected override (double[] src, double operand) CreateOperandSource() =>
+        ([3.5, -2.0, 7.0, 0.0, -9.0, 5.1], 2.0);
 
-    [Test]
-    public void Round_ShouldMatchScalar() => TestRound();
-
-    [Test]
-    public void Exp_ShouldMatchScalar() => TestExp();
-
-    [Test]
-    public void Log_ShouldMatchScalar() => TestLog();
-
-    [Test]
-    public void Truncate_ShouldMatchScalar() => TestTruncate();
-
-    protected override (double[] src, double[] expected) CreateFloorTestData()
-    {
-        var src = new[] { 1.5, 2.9, -3.2, 0.0, -0.5, 100.99 };
-        var expected = new double[src.Length];
-        for (var i = 0; i < src.Length; i++)
-            expected[i] = Math.Floor(src[i]);
-        return (src, expected);
-    }
-
-    protected override (double[] src, double[] expected) CreateCeilingTestData()
-    {
-        var src = new[] { 1.5, 2.1, -3.9, 0.0, -0.5, 100.01 };
-        var expected = new double[src.Length];
-        for (var i = 0; i < src.Length; i++)
-            expected[i] = Math.Ceiling(src[i]);
-        return (src, expected);
-    }
-
-    protected override (double[] src, double[] expected) CreateSqrtTestData()
-    {
-        var src = new[] { 0.0, 1.0, 4.0, 9.0, 16.0, 25.0, 100.0 };
-        var expected = new double[src.Length];
-        for (var i = 0; i < src.Length; i++)
-            expected[i] = Math.Sqrt(src[i]);
-        return (src, expected);
-    }
-
-    protected override (double[] src, double[] expected) CreateRoundTestData()
-    {
-        var src = new[] { 1.4, 1.5, 2.5, -1.5, 0.0, 100.49 };
-        var expected = new double[src.Length];
-        for (var i = 0; i < src.Length; i++)
-            expected[i] = Math.Round(src[i]);
-        return (src, expected);
-    }
-
-    protected override (double[] src, double[] expected) CreateExpTestData()
-    {
-        var src = new[] { 0.0, 1.0, -1.0, 2.0, -2.0 };
-        var expected = new double[src.Length];
-        for (var i = 0; i < src.Length; i++)
-            expected[i] = Math.Exp(src[i]);
-        return (src, expected);
-    }
-
-    protected override (double[] src, double[] expected) CreateLogTestData()
-    {
-        var src = new[] { 1.0, 2.0, 10.0, 100.0, 0.5 };
-        var expected = new double[src.Length];
-        for (var i = 0; i < src.Length; i++)
-            expected[i] = Math.Log(src[i]);
-        return (src, expected);
-    }
-
-    protected override (double[] src, double[] expected) CreateTruncateTestData()
-    {
-        var src = new[] { 1.9, -1.9, 0.0, 100.5, -0.1 };
-        var expected = new double[src.Length];
-        for (var i = 0; i < src.Length; i++)
-            expected[i] = Math.Truncate(src[i]);
-        return (src, expected);
-    }
-
-    protected override double GetTolerance() => 1e-10;
+    protected override double AddScalar(double left, double right) => left + right;
+    protected override double SubtractScalar(double left, double right) => left - right;
+    protected override double MultiplyScalar(double left, double right) => left * right;
+    protected override double DivideScalar(double left, double right) => left / right;
+    protected override double ModuloScalar(double left, double right) => left % right;
 }
 
 [TestFixture]
-public class ParallelFloatOperationTests : FloatNumberOperationTestsBase
+public class SerialIntNumberOperationTests : IntNumberOperationTestsBase
 {
-    protected override ISpanRealOperations<float> CreateOperation()
-    {
-        var type = typeof(ISpanRealOperations<float>).Assembly.GetType("Gubbins.Span.ParallelFloatOperation", throwOnError: true)!;
-        return (ISpanRealOperations<float>)Activator.CreateInstance(type, nonPublic: true)!;
-    }
+    protected override ISpanNumberOperation<int> CreateOperation() => new SerialNumberOperation<int>();
 }
 
 [TestFixture]
-public class ParallelDoubleOperationTests : DoubleNumberOperationTestsBase
+public class SerialLongNumberOperationTests : LongNumberOperationTestsBase
 {
-    protected override ISpanRealOperations<double> CreateOperation()
-    {
-        var type = typeof(ISpanRealOperations<double>).Assembly.GetType("Gubbins.Span.ParallelDoubleOperation", throwOnError: true)!;
-        return (ISpanRealOperations<double>)Activator.CreateInstance(type, nonPublic: true)!;
-    }
+    protected override ISpanNumberOperation<long> CreateOperation() => new SerialNumberOperation<long>();
 }
 
 [TestFixture]
-public class SerialFloatOperationTests : FloatNumberOperationTestsBase
+public class SerialUintNumberOperationTests : UintNumberOperationTestsBase
 {
-    protected override ISpanRealOperations<float> CreateOperation()
-    {
-        var type = typeof(ISpanRealOperations<float>).Assembly.GetType("Gubbins.Span.SerialFloatOperations", throwOnError: true)!;
-        return (ISpanRealOperations<float>)Activator.CreateInstance(type, nonPublic: true)!;
-    }
+    protected override ISpanNumberOperation<uint> CreateOperation() => new SerialNumberOperation<uint>();
 }
 
 [TestFixture]
-public class SerialDoubleOperationTests : DoubleNumberOperationTestsBase
+public class SerialUlongNumberOperationTests : UlongNumberOperationTestsBase
 {
-    protected override ISpanRealOperations<double> CreateOperation()
-    {
-        var type = typeof(ISpanRealOperations<double>).Assembly.GetType("Gubbins.Span.SerialDoubleOperations", throwOnError: true)!;
-        return (ISpanRealOperations<double>)Activator.CreateInstance(type, nonPublic: true)!;
-    }
+    protected override ISpanNumberOperation<ulong> CreateOperation() => new SerialNumberOperation<ulong>();
+}
+
+[TestFixture]
+public class SerialFloatNumberOperationTests : FloatNumberOperationTestsBase
+{
+    protected override ISpanNumberOperation<float> CreateOperation() => new SerialNumberOperation<float>();
+}
+
+[TestFixture]
+public class SerialDoubleNumberOperationTests : DoubleNumberOperationTestsBase
+{
+    protected override ISpanNumberOperation<double> CreateOperation() => new SerialNumberOperation<double>();
+}
+
+[TestFixture]
+public class ParallelIntNumberOperationTests : IntNumberOperationTestsBase
+{
+    protected override ISpanNumberOperation<int> CreateOperation() => new ParallelNumberOperation<int>();
+}
+
+[TestFixture]
+public class ParallelLongNumberOperationTests : LongNumberOperationTestsBase
+{
+    protected override ISpanNumberOperation<long> CreateOperation() => new ParallelNumberOperation<long>();
+}
+
+[TestFixture]
+public class ParallelUintNumberOperationTests : UintNumberOperationTestsBase
+{
+    protected override ISpanNumberOperation<uint> CreateOperation() => new ParallelNumberOperation<uint>();
+}
+
+[TestFixture]
+public class ParallelUlongNumberOperationTests : UlongNumberOperationTestsBase
+{
+    protected override ISpanNumberOperation<ulong> CreateOperation() => new ParallelNumberOperation<ulong>();
+}
+
+[TestFixture]
+public class ParallelFloatNumberOperationTests : FloatNumberOperationTestsBase
+{
+    protected override ISpanNumberOperation<float> CreateOperation() => new ParallelNumberOperation<float>();
+}
+
+[TestFixture]
+public class ParallelDoubleNumberOperationTests : DoubleNumberOperationTestsBase
+{
+    protected override ISpanNumberOperation<double> CreateOperation() => new ParallelNumberOperation<double>();
+}
+
+[TestFixture]
+public class SimdIntNumberOperationTests : IntNumberOperationTestsBase
+{
+    protected override ISpanNumberOperation<int> CreateOperation() => new SimdNumberOperation<int>();
+}
+
+[TestFixture]
+public class SimdLongNumberOperationTests : LongNumberOperationTestsBase
+{
+    protected override ISpanNumberOperation<long> CreateOperation() => new SimdNumberOperation<long>();
+}
+
+[TestFixture]
+public class SimdUintNumberOperationTests : UintNumberOperationTestsBase
+{
+    protected override ISpanNumberOperation<uint> CreateOperation() => new SimdNumberOperation<uint>();
+}
+
+[TestFixture]
+public class SimdUlongNumberOperationTests : UlongNumberOperationTestsBase
+{
+    protected override ISpanNumberOperation<ulong> CreateOperation() => new SimdNumberOperation<ulong>();
+}
+
+[TestFixture]
+public class SimdFloatNumberOperationTests : FloatNumberOperationTestsBase
+{
+    protected override ISpanNumberOperation<float> CreateOperation() => new SimdNumberOperation<float>();
+}
+
+[TestFixture]
+public class SimdDoubleNumberOperationTests : DoubleNumberOperationTestsBase
+{
+    protected override ISpanNumberOperation<double> CreateOperation() => new SimdNumberOperation<double>();
+}
+
+[TestFixture]
+public class ParallelSimdIntNumberOperationTests : IntNumberOperationTestsBase
+{
+    protected override ISpanNumberOperation<int> CreateOperation() => new ParallelSimdNumberOperation<int>();
+}
+
+[TestFixture]
+public class ParallelSimdLongNumberOperationTests : LongNumberOperationTestsBase
+{
+    protected override ISpanNumberOperation<long> CreateOperation() => new ParallelSimdNumberOperation<long>();
+}
+
+[TestFixture]
+public class ParallelSimdUintNumberOperationTests : UintNumberOperationTestsBase
+{
+    protected override ISpanNumberOperation<uint> CreateOperation() => new ParallelSimdNumberOperation<uint>();
+}
+
+[TestFixture]
+public class ParallelSimdUlongNumberOperationTests : UlongNumberOperationTestsBase
+{
+    protected override ISpanNumberOperation<ulong> CreateOperation() => new ParallelSimdNumberOperation<ulong>();
+}
+
+[TestFixture]
+public class ParallelSimdFloatNumberOperationTests : FloatNumberOperationTestsBase
+{
+    protected override ISpanNumberOperation<float> CreateOperation() => new ParallelSimdNumberOperation<float>();
+}
+
+[TestFixture]
+public class ParallelSimdDoubleNumberOperationTests : DoubleNumberOperationTestsBase
+{
+    protected override ISpanNumberOperation<double> CreateOperation() => new ParallelSimdNumberOperation<double>();
 }

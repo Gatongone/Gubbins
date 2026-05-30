@@ -6,7 +6,7 @@ namespace Gubbins.Span;
 /// <summary>
 /// Serial span operation.
 /// </summary>
-internal sealed class SerialNumberOperations<T> : ISpanNumberOperations<T>  where T : unmanaged
+public sealed class SerialNumberOperation<T> : ISpanNumberOperation<T>  where T : unmanaged
 {
     public bool Supported => true;
 
@@ -113,7 +113,7 @@ internal sealed class SerialNumberOperations<T> : ISpanNumberOperations<T>  wher
 /// <summary>
 /// Serial span operation.
 /// </summary>
-internal sealed class SerialIntOperations : ISpanShiftLeft<int>, ISpanShiftRight<int>
+public sealed class SerialIntOperation : ISpanShift<int>
 {
     /// <inheritdoc />
     public bool Supported => true;
@@ -142,7 +142,7 @@ internal sealed class SerialIntOperations : ISpanShiftLeft<int>, ISpanShiftRight
 /// <summary>
 /// Serial span operation.
 /// </summary>
-internal sealed class SerialUintOperations : ISpanShiftLeft<uint>, ISpanShiftRight<uint>
+public sealed class SerialUintOperation : ISpanShift<uint>
 {
     /// <inheritdoc />
     public bool Supported => true;
@@ -171,7 +171,7 @@ internal sealed class SerialUintOperations : ISpanShiftLeft<uint>, ISpanShiftRig
 /// <summary>
 /// Serial span operation.
 /// </summary>
-internal sealed class SerialLongOperations : ISpanShiftLeft<long>, ISpanShiftRight<long>
+public sealed class SerialLongOperation : ISpanShift<long>
 {
     /// <inheritdoc />
     public bool Supported => true;
@@ -200,7 +200,7 @@ internal sealed class SerialLongOperations : ISpanShiftLeft<long>, ISpanShiftRig
 /// <summary>
 /// Serial span operation.
 /// </summary>
-internal sealed class SerialUlongOperations : ISpanShiftLeft<ulong>, ISpanShiftRight<ulong>
+public sealed class SerialUlongOperation : ISpanShift<ulong>
 {
     /// <inheritdoc />
     public bool Supported => true;
@@ -229,7 +229,7 @@ internal sealed class SerialUlongOperations : ISpanShiftLeft<ulong>, ISpanShiftR
 /// <summary>
 /// Serial span operation.
 /// </summary>
-internal sealed class SerialFloatOperations : ISpanRealOperations<float>
+public sealed class SerialFloatOperation : ISpanRealOperation<float>
 {
     /// <inheritdoc />
     public bool Supported => true;
@@ -359,7 +359,7 @@ internal sealed class SerialFloatOperations : ISpanRealOperations<float>
 /// <summary>
 /// Serial span operation.
 /// </summary>
-internal sealed class SerialDoubleOperations : ISpanRealOperations<double>
+public sealed class SerialDoubleOperation : ISpanRealOperation<double>
 {
     /// <inheritdoc />
     public bool Supported => true;
@@ -486,7 +486,7 @@ internal sealed class SerialDoubleOperations : ISpanRealOperations<double>
     }
 }
 
-internal sealed class SerialVector2Operation : ISpanVectorOperations<Vector2>
+internal sealed class SerialVector2Operation : ISpanVectorOperation<Vector2>
 {
     public bool Supported => true;
 
@@ -624,7 +624,7 @@ internal sealed class SerialVector2Operation : ISpanVectorOperations<Vector2>
     }
 }
 
-internal sealed class SerialVector3Operation : ISpanVectorOperations<Vector3>
+internal sealed class SerialVector3Operation : ISpanVectorOperation<Vector3>
 {
     public bool Supported => true;
 
@@ -759,7 +759,7 @@ internal sealed class SerialVector3Operation : ISpanVectorOperations<Vector3>
     }
 }
 
-internal sealed class SerialVector4Operation : ISpanVectorOperations<Vector4>
+internal sealed class SerialVector4Operation : ISpanVectorOperation<Vector4>
 {
     public bool Supported => true;
 
