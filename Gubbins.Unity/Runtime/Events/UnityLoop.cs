@@ -1,10 +1,4 @@
-﻿// Copyright ©2024 Gatongone
-// Author: Gatongone
-// Email: gatongone@gmail.com
-// Created On: 2024/03/17-22:17:00
-// Github: https://github.com/Gatongone
-
-using System;
+﻿using System;
 using UnityEngine.Assertions;
 using UnityEngine.LowLevel;
 
@@ -12,43 +6,45 @@ namespace Gubbins.Events
 {
     internal static class UnityLoop
     {
-        private const string SYS_NAME_INITIALIZATION   = "Initialization";
-        private const string SYS_NAME_EARLY_UPDATE     = "EarlyUpdate";
-        private const string SYS_NAME_FIXED_UPDATE     = "FixedUpdate";
-        private const string SYS_NAME_PRE_UPDATE       = "PreUpdate";
-        private const string SYS_NAME_UPDATE           = "Update";
-        private const string SYS_NAME_PRE_LATE_UPDATE  = "PreLateUpdate";
-        private const string SYS_NAME_POST_LATE_UPDATE = "PostLateUpdate";
-        private static PlayerLoopSystemWrapper m_InitializationSys;
-        private static PlayerLoopSystemWrapper m_EarlyUpdateSys;
-        private static PlayerLoopSystemWrapper m_FixedUpdateSys;
-        private static PlayerLoopSystemWrapper m_PreUpdateSys;
-        private static PlayerLoopSystemWrapper m_UpdateSys;
-        private static PlayerLoopSystemWrapper m_PreLateUpdateSys;
-        private static PlayerLoopSystemWrapper m_PostLateUpdateSys;
-        private static readonly PlayerLoopSystem m_RootLooper;
-        private static readonly PlayerLoopSystem m_DefaultLooper;
+        private const           string                  SYS_NAME_INITIALIZATION   = "Initialization";
+        private const           string                  SYS_NAME_EARLY_UPDATE     = "EarlyUpdate";
+        private const           string                  SYS_NAME_FIXED_UPDATE     = "FixedUpdate";
+        private const           string                  SYS_NAME_PRE_UPDATE       = "PreUpdate";
+        private const           string                  SYS_NAME_UPDATE           = "Update";
+        private const           string                  SYS_NAME_PRE_LATE_UPDATE  = "PreLateUpdate";
+        private const           string                  SYS_NAME_POST_LATE_UPDATE = "PostLateUpdate";
+        private static          PlayerLoopSystemWrapper s_InitializationSys;
+        private static          PlayerLoopSystemWrapper s_EarlyUpdateSys;
+        private static          PlayerLoopSystemWrapper s_FixedUpdateSys;
+        private static          PlayerLoopSystemWrapper s_PreUpdateSys;
+        private static          PlayerLoopSystemWrapper s_UpdateSys;
+        private static          PlayerLoopSystemWrapper s_PreLateUpdateSys;
+        private static          PlayerLoopSystemWrapper s_PostLateUpdateSys;
+        private static readonly PlayerLoopSystem        s_RootLooper;
+        private static readonly PlayerLoopSystem        s_DefaultLooper;
 
         static UnityLoop()
         {
-            m_DefaultLooper = PlayerLoop.GetDefaultPlayerLoop();
+            s_DefaultLooper = PlayerLoop.GetDefaultPlayerLoop();
             var loop = PlayerLoop.GetDefaultPlayerLoop();
             for (var index = 0; index < loop.subSystemList.Length; index++)
             {
                 ref var system = ref loop.subSystemList[index];
                 var updateKind = GetUpdateKind(system);
-                if (updateKind == UpdateKind.None) continue;
+                if (updateKind == Kind.None) continue;
                 var newSysCol = new PlayerLoopSystem[system.subSystemList.Length + 1];
                 for (var i = 0; i < system.subSystemList.Length; i++)
                 {
                     newSysCol[i] = system.subSystemList[i];
                 }
+
                 newSysCol[system.subSystemList.Length] = new PlayerLoopSystem();
                 SetLoopSystem(updateKind, new PlayerLoopSystemWrapper(newSysCol, system.subSystemList.Length));
                 system.subSystemList = newSysCol;
             }
+
             PlayerLoop.SetPlayerLoop(loop);
-            m_RootLooper = loop;
+            s_RootLooper = loop;
 #if UNITY_EDITOR
             UnityEditor.EditorApplication.playModeStateChanged += OnStateChanged;
 #endif
@@ -58,114 +54,115 @@ namespace Gubbins.Events
         {
             if (!UnityEditor.EditorApplication.isPlayingOrWillChangePlaymode && UnityEditor.EditorApplication.isPlaying)
             {
-                PlayerLoop.SetPlayerLoop(m_DefaultLooper);
+                PlayerLoop.SetPlayerLoop(s_DefaultLooper);
             }
         }
 #endif
 
-        internal static void RegisterUpdate(UpdateKind kind, PlayerLoopSystem.UpdateFunction onUpdate)
+        internal static void RegisterUpdate(Kind kind, PlayerLoopSystem.UpdateFunction onUpdate)
         {
-            Assert.AreNotEqual(kind, UpdateKind.None, $"Not supported update kind: {kind}");
+            Assert.AreNotEqual(kind, Kind.None, $"Not supported update kind: {kind}");
             switch (kind)
             {
-                case UpdateKind.Initialization:
-                    m_InitializationSys.AddListener(onUpdate);
+                case Kind.Initialization:
+                    s_InitializationSys.AddListener(onUpdate);
                     break;
-                case UpdateKind.EarlyUpdate:
-                    m_EarlyUpdateSys.AddListener(onUpdate);
+                case Kind.EarlyUpdate:
+                    s_EarlyUpdateSys.AddListener(onUpdate);
                     break;
-                case UpdateKind.FixedUpdate:
-                    m_FixedUpdateSys.AddListener(onUpdate);
+                case Kind.FixedUpdate:
+                    s_FixedUpdateSys.AddListener(onUpdate);
                     break;
-                case UpdateKind.PreUpdate:
-                    m_PreUpdateSys.AddListener(onUpdate);
+                case Kind.PreUpdate:
+                    s_PreUpdateSys.AddListener(onUpdate);
                     break;
-                case UpdateKind.Update:
-                    m_UpdateSys.AddListener(onUpdate);
+                case Kind.Update:
+                    s_UpdateSys.AddListener(onUpdate);
                     break;
-                case UpdateKind.PreLateUpdate:
-                    m_PreLateUpdateSys.AddListener(onUpdate);
+                case Kind.PreLateUpdate:
+                    s_PreLateUpdateSys.AddListener(onUpdate);
                     break;
-                case UpdateKind.PostLateUpdate:
-                    m_PostLateUpdateSys.AddListener(onUpdate);
+                case Kind.PostLateUpdate:
+                    s_PostLateUpdateSys.AddListener(onUpdate);
                     break;
                 default: throw new ArgumentOutOfRangeException(nameof(kind), kind, null);
             }
-            PlayerLoop.SetPlayerLoop(m_RootLooper);
+
+            PlayerLoop.SetPlayerLoop(s_RootLooper);
         }
 
-        public static void UnregisterUpdate(UpdateKind kind, PlayerLoopSystem.UpdateFunction onUpdate)
+        public static void UnregisterUpdate(Kind kind, PlayerLoopSystem.UpdateFunction onUpdate)
         {
-            Assert.AreNotEqual(kind, UpdateKind.None, $"Not supported update kind: {kind}");
+            Assert.AreNotEqual(kind, Kind.None, $"Not supported update kind: {kind}");
             switch (kind)
             {
-                case UpdateKind.Initialization:
-                    m_InitializationSys.RemoveListener(onUpdate);
+                case Kind.Initialization:
+                    s_InitializationSys.RemoveListener(onUpdate);
                     break;
-                case UpdateKind.EarlyUpdate:
-                    m_EarlyUpdateSys.RemoveListener(onUpdate);
+                case Kind.EarlyUpdate:
+                    s_EarlyUpdateSys.RemoveListener(onUpdate);
                     break;
-                case UpdateKind.FixedUpdate:
-                    m_FixedUpdateSys.RemoveListener(onUpdate);
+                case Kind.FixedUpdate:
+                    s_FixedUpdateSys.RemoveListener(onUpdate);
                     break;
-                case UpdateKind.PreUpdate:
-                    m_PreUpdateSys.RemoveListener(onUpdate);
+                case Kind.PreUpdate:
+                    s_PreUpdateSys.RemoveListener(onUpdate);
                     break;
-                case UpdateKind.Update:
-                    m_UpdateSys.RemoveListener(onUpdate);
+                case Kind.Update:
+                    s_UpdateSys.RemoveListener(onUpdate);
                     break;
-                case UpdateKind.PreLateUpdate:
-                    m_PreLateUpdateSys.RemoveListener(onUpdate);
+                case Kind.PreLateUpdate:
+                    s_PreLateUpdateSys.RemoveListener(onUpdate);
                     break;
-                case UpdateKind.PostLateUpdate:
-                    m_PostLateUpdateSys.RemoveListener(onUpdate);
-                    break;
-                default: throw new ArgumentOutOfRangeException(nameof(kind), kind, null);
-            }
-        }
-
-        private static void SetLoopSystem(UpdateKind kind, PlayerLoopSystemWrapper playerLoopSystemWrapper)
-        {
-            switch (kind)
-            {
-                case UpdateKind.Initialization:
-                    m_InitializationSys = playerLoopSystemWrapper;
-                    break;
-                case UpdateKind.EarlyUpdate:
-                    m_EarlyUpdateSys = playerLoopSystemWrapper;
-                    break;
-                case UpdateKind.FixedUpdate:
-                    m_FixedUpdateSys = playerLoopSystemWrapper;
-                    break;
-                case UpdateKind.PreUpdate:
-                    m_PreUpdateSys = playerLoopSystemWrapper;
-                    break;
-                case UpdateKind.Update:
-                    m_UpdateSys = playerLoopSystemWrapper;
-                    break;
-                case UpdateKind.PreLateUpdate:
-                    m_PreLateUpdateSys = playerLoopSystemWrapper;
-                    break;
-                case UpdateKind.PostLateUpdate:
-                    m_PostLateUpdateSys = playerLoopSystemWrapper;
+                case Kind.PostLateUpdate:
+                    s_PostLateUpdateSys.RemoveListener(onUpdate);
                     break;
                 default: throw new ArgumentOutOfRangeException(nameof(kind), kind, null);
             }
         }
 
-        private static UpdateKind GetUpdateKind(PlayerLoopSystem system) => system.type.Name switch
+        private static void SetLoopSystem(Kind kind, PlayerLoopSystemWrapper playerLoopSystemWrapper)
         {
-            SYS_NAME_INITIALIZATION   => UpdateKind.Initialization,
-            SYS_NAME_EARLY_UPDATE     => UpdateKind.EarlyUpdate,
-            SYS_NAME_FIXED_UPDATE     => UpdateKind.FixedUpdate,
-            SYS_NAME_PRE_UPDATE       => UpdateKind.PreUpdate,
-            SYS_NAME_UPDATE           => UpdateKind.Update,
-            SYS_NAME_PRE_LATE_UPDATE  => UpdateKind.PreLateUpdate,
-            SYS_NAME_POST_LATE_UPDATE => UpdateKind.PostLateUpdate,
-            _                         => UpdateKind.None
+            switch (kind)
+            {
+                case Kind.Initialization:
+                    s_InitializationSys = playerLoopSystemWrapper;
+                    break;
+                case Kind.EarlyUpdate:
+                    s_EarlyUpdateSys = playerLoopSystemWrapper;
+                    break;
+                case Kind.FixedUpdate:
+                    s_FixedUpdateSys = playerLoopSystemWrapper;
+                    break;
+                case Kind.PreUpdate:
+                    s_PreUpdateSys = playerLoopSystemWrapper;
+                    break;
+                case Kind.Update:
+                    s_UpdateSys = playerLoopSystemWrapper;
+                    break;
+                case Kind.PreLateUpdate:
+                    s_PreLateUpdateSys = playerLoopSystemWrapper;
+                    break;
+                case Kind.PostLateUpdate:
+                    s_PostLateUpdateSys = playerLoopSystemWrapper;
+                    break;
+                default: throw new ArgumentOutOfRangeException(nameof(kind), kind, null);
+            }
+        }
+
+        private static Kind GetUpdateKind(PlayerLoopSystem system) => system.type.Name switch
+        {
+            SYS_NAME_INITIALIZATION   => Kind.Initialization,
+            SYS_NAME_EARLY_UPDATE     => Kind.EarlyUpdate,
+            SYS_NAME_FIXED_UPDATE     => Kind.FixedUpdate,
+            SYS_NAME_PRE_UPDATE       => Kind.PreUpdate,
+            SYS_NAME_UPDATE           => Kind.Update,
+            SYS_NAME_PRE_LATE_UPDATE  => Kind.PreLateUpdate,
+            SYS_NAME_POST_LATE_UPDATE => Kind.PostLateUpdate,
+            _                         => Kind.None
         };
 
-        public enum UpdateKind
+        public enum Kind
         {
             None,
             Initialization,
@@ -177,11 +174,10 @@ namespace Gubbins.Events
             PostLateUpdate
         }
 
-
         private class PlayerLoopSystemWrapper
         {
             private readonly PlayerLoopSystem[] m_Loppers;
-            private readonly int m_Index;
+            private readonly int                m_Index;
             public PlayerLoopSystemWrapper(PlayerLoopSystem[] sysCol, int index) => (m_Loppers, m_Index) = (sysCol, index);
 
             public void AddListener(PlayerLoopSystem.UpdateFunction onUpdate)
