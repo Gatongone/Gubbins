@@ -13,17 +13,16 @@
 
     <Target Name="PostBuild" BeforeTargets="PostBuildEvent">
         <PropertyGroup>
-            <UnitySupportVer>'netstandard2.1'</UnitySupportVer>
-            <DotNetVer>'$([System.IO.Path]::GetFileName('$(OutDir.TrimEnd('\'))'))'</DotNetVer>
-            <UnityOutDir>$(SolutionDir)..\Gubbins.Unity\Plugins</UnityOutDir>
+            <UnitySupportVer>netstandard2.1</UnitySupportVer>
+            <DotNetVer>$(TargetFramework)</DotNetVer>
+            <UnityOutDir>$(ProjectDir)..\Gubbins.Unity\Plugins</UnityOutDir>
         </PropertyGroup>
         <ItemGroup>
             <OutputFiles Include="$(OutputPath)$(ProjectName).dll"/>
             <OutputFiles Include="$(OutputPath)$(ProjectName).pdb" Condition="Exists('$(OutputPath)$(ProjectName).pdb')"/>
             <OutputFiles Include="$(OutputPath)$(ProjectName).mdb" Condition="Exists('$(OutputPath)$(ProjectName).mdb')"/>
         </ItemGroup>
-
-        <Copy SourceFiles="@(OutputFiles)" DestinationFolder="$(UnityOutDir)" SkipUnchangedFiles="true" Condition=" $(DotNetVer) == $(UnitySupportVer) "/>
+        <Copy SourceFiles="@(OutputFiles)" DestinationFolder="$(UnityOutDir)" SkipUnchangedFiles="true" Condition=" '$(UnityOutDir)' != '' and '$(DotNetVer)' == '$(UnitySupportVer)' "/>
     </Target>
 
 </Project>
