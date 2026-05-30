@@ -1,9 +1,3 @@
-// Copyright ©2024 Gatongone
-// Author: Gatongone
-// Email: gatongone@gmail.com
-// Created On: 2023/09/04-08:31:34
-// Github: https://github.com/Gatongone
-
 using System;
 using System.Threading.Tasks;
 using JetBrains.Annotations;

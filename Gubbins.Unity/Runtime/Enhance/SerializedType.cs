@@ -4,7 +4,7 @@ using UnityEngine;
 namespace Gubbins.Enhance
 {
     [Serializable]
-    public struct SerializedType
+    public struct SerializedType : IEquatable<SerializedType>, IEquatable<Type>
     {
         [SerializeField]
         private string m_TypeString;
@@ -14,11 +14,9 @@ namespace Gubbins.Enhance
         {
             get
             {
-                if (m_Type == null || m_TypeString != m_Type.ToString())
-                {
-                    if (string.IsNullOrEmpty(m_TypeString)) return null;
-                    m_Type = Type.GetType(m_TypeString);
-                }
+                if (m_Type != null && m_TypeString == m_Type.ToString()) return m_Type;
+                if (string.IsNullOrEmpty(m_TypeString)) return null;
+                m_Type = Type.GetType(m_TypeString);
 
                 return m_Type;
             }
@@ -27,7 +25,10 @@ namespace Gubbins.Enhance
         public SerializedType(Type type) => (m_Type, m_TypeString) = (type, type.ToString());
         public static implicit operator SerializedType(Type type) => new(type);
         public static implicit operator Type(SerializedType type) => type.Type;
+        public bool Equals(SerializedType other) => Type == other.Type;
+        public bool Equals(Type other) => Type == other;
         public override string ToString() => Type?.ToString();
+        public override int GetHashCode() => Type != null ? Type.GetHashCode() : 0;
     }
 
     public class TypeFromAttribute : PropertyAttribute
