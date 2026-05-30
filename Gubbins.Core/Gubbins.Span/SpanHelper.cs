@@ -39,23 +39,21 @@ internal static class VectorExtensions
 
 internal static class VectorMath
 {
+#if !NET_6_0_OR_GREATER
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Vector<TTo> As<TFrom, TTo>(this Vector<TFrom> vector) where TFrom : struct where TTo : struct
     {
-#if NET_6_0_OR_GREATER
-        return vector.As<TFrom, TTo>();
-#else
         return Native.Cast<Vector<TFrom>, Vector<TTo>>(ref vector);
-#endif
     }
+#endif
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Vector<T> Modulo<T>(Vector<T> a, Vector<T> b) where T : struct
     {
         if (typeof(T) == typeof(float))
         {
-            var floatA = As<T, float>(a);
-            var floatB = As<T, float>(b);
+            var floatA = a.As<T, float>();
+            var floatB = b.As<T, float>();
             var quotient = floatA / floatB;
             var truncated = Vector.ConditionalSelect(
                 Vector.GreaterThanOrEqual(quotient, Vector<float>.Zero),
@@ -65,7 +63,7 @@ internal static class VectorMath
             return (floatA - truncated * floatB).As<float, T>();
         }
 
-        if(typeof(T) == typeof(double))
+        if (typeof(T) == typeof(double))
         {
             var doubleA = a.As<T, double>();
             var doubleB = b.As<T, double>();
