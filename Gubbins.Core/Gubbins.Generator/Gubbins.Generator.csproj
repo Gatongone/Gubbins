@@ -26,7 +26,7 @@
         <PropertyGroup>
             <UnitySupportVer>netstandard2.0</UnitySupportVer>
             <DotNetVer>$(TargetFramework)</DotNetVer>
-            <UnityOutDir>$(ProjectDir)..\Gubbins.Unity\Plugins</UnityOutDir>
+            <UnityOutDir>$(ProjectDir)..\..\Gubbins.Unity\Plugins</UnityOutDir>
         </PropertyGroup>
         <ItemGroup>
             <OutputFiles Include="$(OutputPath)$(ProjectName).dll"/>
