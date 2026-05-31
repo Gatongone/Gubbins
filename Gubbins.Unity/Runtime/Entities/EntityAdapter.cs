@@ -4,62 +4,57 @@ using Gubbins.Context;
 using Gubbins.Enhance;
 using Gubbins.Unsafe;
 using Unity.Collections;
-using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 using UnityEngine.Jobs;
 
 namespace Gubbins.Entities
 {
     /// <summary>
-    /// 
+    /// A MonoBehaviour that serves as an adapter to create and manage an entity
+    /// based on the GameObject's transform and specified components.
     /// </summary>
     public class EntityAdapter : MonoBehaviour
     {
         /// <summary>
         /// Global list of all entity transforms managed by adapters.
         /// </summary>
-        internal static readonly NativeList<TransformAccess> Transforms = new(Allocator.Persistent);
+        // internal static readonly NativeList<TransformAccess> Transforms = new(Allocator.Persistent);
 
         /// <summary>
-        /// The entity index in the ECS world.
+        /// The entity index.
         /// </summary>
-        [SerializeField, ReadOnly] private int m_Index;
+        [SerializeField, Enhance.ReadOnly] private int m_Index;
 
         /// <summary>
-        /// The entity version for validation.
+        /// The entity version.
         /// </summary>
-        [SerializeField, ReadOnly] private uint m_Version;
+        [SerializeField, Enhance.ReadOnly] private uint m_Version;
 
-        /// <summary>
-        /// Serialized context type for dependency injection.
-        /// </summary>
-        [SerializeField, TypeFrom(typeof(IContext), TypeKind.Implementation)]
-        private SerializedType m_Context;
+        [SerializeField] public SerializedReference<IContext> m_Context;
 
         /// <summary>
         /// Serialized component types for entity construction.
         /// </summary>
-        [SerializeField, TypeFrom(typeof(IComponent), TypeKind.Implementation)]
-        private SerializedType[] m_Components;
+        [SerializeField]
+        private ComponentSet m_Components;
 
         /// <summary>
         /// The resolved context instance for this entity.
         /// </summary>
-        public IContext Context { get; private set; }
+        public IContext Context => m_SerializedContext ?? m_Context.Value;
+
+        private IContext m_SerializedContext;
 
         /// <summary>
         /// Unity Awake callback. Initializes the entity and registers it in the ECS world.
         /// </summary>
         private void Awake()
         {
-            if (m_Context.Type == null)
-            {
-                throw new ArgumentException("Context is not assigned.");
-            }
+            var context = m_Context.Value;
 
-            Context = ApplicationContext.Global.Resolve(m_Context.Type) as IContext;
+            m_SerializedContext = context ?? throw new ArgumentException("Context is not assigned.");
 
-            var cmd = Context!.Resolve<IEntityCommand>();
+            var cmd = m_SerializedContext!.Resolve<IEntityCommand>();
             if (cmd == null)
             {
                 throw new ArgumentException("No IEntityCommand registered in the context.");
@@ -74,35 +69,35 @@ namespace Gubbins.Entities
         /// <param name="cmd">The entity command interface for insertion.</param>
         private void BuildEntity(IEntityCommand cmd)
         {
-            var trans = new TransformAccess
-            {
-                position   = transform.position,
-                rotation   = transform.rotation,
-                localScale = transform.localScale
-            };
-
-            Transforms.Add(trans);
-
-            var types = ArrayPool<Type>.Shared.Rent(m_Components.Length);
-            using var payload = new NativeList<byte>(m_Components.Length, Allocator.Temp);
-            var payloadSize = 0;
-            for (var i = 0; i < m_Components.Length; i++)
-            {
-                var type = m_Components[i].Type;
-                var size = UnsafeUtility.SizeOf(type);
-                payloadSize += size;
-                if (!TryInitPosition(payload, ref trans, type, UnsafeUtility.SizeOf(type)))
-                {
-                    payload.AddReplicate(0, size);
-                }
-
-                types[i] = type;
-            }
-
-            var entity = cmd.Insert(payload.AsArray().AsSpan(), types.AsSpan());
-            payload.Resize(payloadSize, NativeArrayOptions.UninitializedMemory);
-            m_Index   = entity.Index;
-            m_Version = entity.Version;
+            // var trans = new TransformAccess
+            // {
+            //     position   = transform.position,
+            //     rotation   = transform.rotation,
+            //     localScale = transform.localScale
+            // };
+            //
+            // Transforms.Add(trans);
+            //
+            // var types = ArrayPool<Type>.Shared.Rent(m_Components.Length);
+            // using var payload = new NativeList<byte>(m_Components.Length, Allocator.Temp);
+            // var payloadSize = 0;
+            // for (var i = 0; i < m_Components.Length; i++)
+            // {
+            //     var type = m_Components[i].Type;
+            //     var size = UnsafeUtility.SizeOf(type);
+            //     payloadSize += size;
+            //     if (!TryInitPosition(payload, ref trans, type, UnsafeUtility.SizeOf(type)))
+            //     {
+            //         payload.AddReplicate(0, size);
+            //     }
+            //
+            //     types[i] = type;
+            // }
+            //
+            // var entity = cmd.Insert(payload.AsArray().AsSpan(), types.AsSpan());
+            // payload.Resize(payloadSize, NativeArrayOptions.UninitializedMemory);
+            // m_Index   = entity.Index;
+            // m_Version = entity.Version;
         }
 
         /// <summary>

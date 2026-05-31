@@ -1,8 +1,11 @@
-﻿namespace Gubbins.Entities
+﻿using System;
+
+namespace Gubbins.Entities
 {
     /// <summary>
     /// Represents the rotation of an entity around the X-axis in world space, defined by its X Euler angle.
     /// </summary>
+    [Serializable]
     public struct RotationX : IComponent
     {
         public float Value;
@@ -11,6 +14,7 @@
     /// <summary>
     /// Represents the rotation of an entity around the Y-axis in world space, defined by its Y Euler angle.
     /// </summary>
+    [Serializable]
     public struct RotationY : IComponent
     {
         public float Value;
@@ -27,6 +31,7 @@
     /// <summary>
     /// Represents the rotation of an entity in world space, defined by its X and Y Euler angles.
     /// </summary>
+    [Serializable]
     public struct RotationXY : IComponent
     {
         public float X;
@@ -36,6 +41,7 @@
     /// <summary>
     /// Represents the rotation of an entity in world space, defined by its X and Z Euler angles.
     /// </summary>
+    [Serializable]
     public struct RotationXZ : IComponent
     {
         public float X;
@@ -45,6 +51,7 @@
     /// <summary>
     /// Represents the rotation of an entity in world space, defined by its Y and Z Euler angles.
     /// </summary>
+    [Serializable]
     public struct RotationYZ : IComponent
     {
         public float Y;
@@ -54,6 +61,7 @@
     /// <summary>
     /// Represents the rotation of an entity in world space, defined by its Euler angles (X, Y, Z).
     /// </summary>
+    [Serializable]
     public struct Rotation : IComponent
     {
         public float X;
