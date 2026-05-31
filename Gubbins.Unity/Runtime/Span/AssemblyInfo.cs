@@ -1,1 +1,1 @@
-﻿[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Gubbins.Editor")]
+﻿[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Gubbins.Unity.Editor")]

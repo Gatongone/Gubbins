@@ -4,4 +4,5 @@
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Gubbins.Entities")]
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Gubbins.Context")]
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Gubbins.Enhance")]
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Gubbins.Unity.Editor")]
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("Gubbins.Unity.Unsafe")]
