@@ -23,6 +23,7 @@ namespace Gubbins.Entities
     /// <summary>
     /// Represents the rotation of an entity around the Z-axis in world space, defined by its Z Euler angle.
     /// </summary>
+    [Serializable]
     public struct RotationZ : IComponent
     {
         public float Value;
