@@ -13,6 +13,8 @@ namespace Gubbins.Editor
     [CustomPropertyDrawer(typeof(ComponentSet))]
     internal class ComponentSetDrawer : PropertyDrawer
     {
+        private const int BORDER_RADIUS = 4;
+
         /// <summary>
         /// All Component types.
         /// </summary>
@@ -23,6 +25,9 @@ namespace Gubbins.Editor
         /// </summary>
         private readonly Dictionary<string, ReorderableList> m_ListCache = new();
 
+        /// <summary>
+        /// IMGUI foldout header style.
+        /// </summary>
         private static GUIStyle s_FoldoutHeaderStyle => new(EditorStyles.foldoutHeader)
         {
             margin    = new RectOffset(0, 0, 0, 0),
@@ -37,13 +42,13 @@ namespace Gubbins.Editor
         /// - Does not contain generic parameters.
         /// - Is an unmanaged type (value type without reference type fields).
         /// </summary>
-         private static Type[] GetComponentTypes() => AppDomain.CurrentDomain.GetAssemblies()
-                                                               .SelectMany(asm => asm.GetTypes())
-                                                               .Where(t => typeof(IComponent).IsAssignableFrom(t) &&
-                                                                   !t.IsAbstract &&
-                                                                   !t.ContainsGenericParameters &&
-                                                                   CheckIsTypeUnmanaged(t))
-                                                               .ToArray();
+        private static Type[] GetComponentTypes() => AppDomain.CurrentDomain.GetAssemblies()
+                                                              .SelectMany(asm => asm.GetTypes())
+                                                              .Where(t => typeof(IComponent).IsAssignableFrom(t) &&
+                                                                  !t.IsAbstract &&
+                                                                  !t.ContainsGenericParameters &&
+                                                                  CheckIsTypeUnmanaged(t))
+                                                              .ToArray();
 
         /// <summary>
         /// Checks if the provided type is unmanaged, which means it is a value type that does not contain any reference type fields.
@@ -108,29 +113,39 @@ namespace Gubbins.Editor
             UpdateFoldoutTitle(foldout, property, componentsProp);
             foldout.RegisterValueChangedCallback(evt => property.isExpanded = evt.newValue);
 
+            var style = foldout.style;
             var borderCol = new Color(0.1f, 0.1f, 0.1f);
-            foldout.style.borderTopWidth    = 1;
-            foldout.style.borderRightWidth  = 1;
-            foldout.style.borderBottomWidth = 1;
-            foldout.style.borderLeftWidth   = 1;
-            foldout.style.borderTopColor    = borderCol;
-            foldout.style.borderRightColor  = borderCol;
-            foldout.style.borderBottomColor = borderCol;
-            foldout.style.borderLeftColor   = borderCol;
-            foldout.style.marginTop         = 4;
-            foldout.style.marginBottom      = 4;
-            foldout.style.backgroundColor   = EditorColors.Content;
+            style.borderTopWidth          = 1;
+            style.borderRightWidth        = 1;
+            style.borderBottomWidth       = 1;
+            style.borderLeftWidth         = 1;
+            style.marginTop               = 4;
+            style.marginBottom            = 4;
+            style.borderTopColor          = borderCol;
+            style.borderRightColor        = borderCol;
+            style.borderBottomColor       = borderCol;
+            style.borderLeftColor         = borderCol;
+            style.borderBottomLeftRadius  = BORDER_RADIUS;
+            style.borderBottomRightRadius = BORDER_RADIUS;
+            style.borderTopLeftRadius     = BORDER_RADIUS;
+            style.borderTopRightRadius    = BORDER_RADIUS;
+            style.backgroundColor         = EditorColors.Content;
 
             var toggle = foldout.Q<Toggle>();
             if (toggle != null)
             {
-                toggle.style.unityFontStyleAndWeight = FontStyle.Bold;
-                toggle.style.paddingLeft             = 5;
-                toggle.style.marginLeft              = 0;
-                toggle.style.marginRight             = 0;
-                toggle.style.marginTop               = 2;
-                toggle.style.marginBottom            = 2;
+                style.unityFontStyleAndWeight = FontStyle.Bold;
+                style.paddingLeft             = 15;
+                style.marginLeft              = 0;
+                style.marginRight             = 0;
+                style.marginTop               = 2;
+                style.marginBottom            = 2;
             }
+
+            foldout.contentContainer.style.paddingLeft  = 0;
+            foldout.contentContainer.style.marginLeft   = 0;
+            foldout.contentContainer.style.paddingRight = 5;
+            foldout.contentContainer.style.marginRight  = 5;
 
             return foldout;
         }
@@ -154,7 +169,7 @@ namespace Gubbins.Editor
                 marginLeft  = 2,
                 marginRight = 2,
                 height      = StyleKeyword.Auto,
-                flexGrow    = 0,
+                flexGrow    = 0
             }
         };
 
@@ -207,12 +222,27 @@ namespace Gubbins.Editor
                 enterChildren = false;
             }
 
-            item.style.paddingTop    = 4;
-            item.style.paddingBottom = 4;
-            item.style.paddingLeft   = 4;
-            item.style.paddingRight  = 4;
+            var style = item.style;
+            var borderCol = EditorColors.Text;
+            borderCol = new Color(borderCol.r, borderCol.g, borderCol.b, 0.15f);
 
-            item.style.backgroundColor = index % 2 == 0 ? EditorColors.Background2 : EditorColors.Background;
+            style.paddingTop              = 4;
+            style.paddingBottom           = 4;
+            style.paddingLeft             = 4;
+            style.paddingRight            = 4;
+            style.borderBottomWidth       = 1;
+            style.borderTopWidth          = 1;
+            style.borderLeftWidth         = 1;
+            style.borderRightWidth        = 1;
+            style.borderBottomColor       = borderCol;
+            style.borderTopColor          = borderCol;
+            style.borderLeftColor         = borderCol;
+            style.borderRightColor        = borderCol;
+            style.borderBottomLeftRadius  = BORDER_RADIUS;
+            style.borderBottomRightRadius = BORDER_RADIUS;
+            style.borderTopLeftRadius     = BORDER_RADIUS;
+            style.borderTopRightRadius    = BORDER_RADIUS;
+            style.backgroundColor         = index % 2 == 0 ? EditorColors.Background2 : EditorColors.Background;
         }
 
         /// <summary>
@@ -259,14 +289,22 @@ namespace Gubbins.Editor
             var addButton = new Button
             {
                 iconImage = Background.FromTexture2D(EditorGUIUtility.IconContent("Toolbar Plus").image as Texture2D),
-                tooltip   = "Add Component"
+                tooltip   = "Add Component",
+                style =
+                {
+                    backgroundColor = Color.clear,
+                }
             };
             addButton.clicked += () => ShowAddComponentMenuUIElements(addButton, componentsProp, property, foldout, listView);
 
             var removeButton = new Button
             {
                 iconImage = Background.FromTexture2D(EditorGUIUtility.IconContent("Toolbar Minus").image as Texture2D),
-                tooltip   = "Remove Selected Component"
+                tooltip   = "Remove Selected Component",
+                style =
+                {
+                    backgroundColor = Color.clear,
+                }
             };
             removeButton.clicked += () => RemoveSelectedComponent(listView, componentsProp, property, refreshUI);
 
