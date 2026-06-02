@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using Gubbins.Entities;
 using UnityEditor;
+using UnityEditor.UIElements;
 using UnityEditorInternal;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 namespace Gubbins.Editor
 {
@@ -14,7 +16,7 @@ namespace Gubbins.Editor
         /// <summary>
         /// All Component types.
         /// </summary>
-        private static readonly Type[] s_ComponentTypes = new ComponentSetDrawer().GetComponentTypes();
+        private static readonly Type[] s_ComponentTypes = GetComponentTypes();
 
         /// <summary>
         /// Each SerializedProperty corresponds to a ReorderableList, cached with the path as the key.
@@ -23,8 +25,8 @@ namespace Gubbins.Editor
 
         private static GUIStyle s_FoldoutHeaderStyle => new(EditorStyles.foldoutHeader)
         {
-            margin  = new RectOffset(0, 0, 0, 0),
-            padding = new RectOffset(14, 0, 0, 0),
+            margin    = new RectOffset(0, 0, 0, 0),
+            padding   = new RectOffset(14, 0, 0, 0),
             fontStyle = FontStyle.Bold
         };
 
@@ -35,14 +37,277 @@ namespace Gubbins.Editor
         /// - Does not contain generic parameters.
         /// - Is an unmanaged type (value type without reference type fields).
         /// </summary>
-        public Type[] GetComponentTypes() => AppDomain.CurrentDomain.GetAssemblies()
-                                                      .SelectMany(asm => asm.GetTypes())
-                                                      .Where(t => typeof(IComponent).IsAssignableFrom(t) &&
-                                                          !t.IsAbstract &&
-                                                          !t.ContainsGenericParameters &&
-                                                          CheckIsTypeUnmanaged(t))
-                                                      .ToArray();
-        /// <inheritdoc/>
+         private static Type[] GetComponentTypes() => AppDomain.CurrentDomain.GetAssemblies()
+                                                               .SelectMany(asm => asm.GetTypes())
+                                                               .Where(t => typeof(IComponent).IsAssignableFrom(t) &&
+                                                                   !t.IsAbstract &&
+                                                                   !t.ContainsGenericParameters &&
+                                                                   CheckIsTypeUnmanaged(t))
+                                                               .ToArray();
+
+        /// <summary>
+        /// Checks if the provided type is unmanaged, which means it is a value type that does not contain any reference type fields.
+        /// </summary>
+        /// <param name="type">The type to check for being unmanaged. </param>
+        /// <returns>True if the type is unmanaged; otherwise, false.</returns>
+        private static bool CheckIsTypeUnmanaged(Type type)
+        {
+            if (type.IsPrimitive || type.IsPointer || type.IsEnum)
+                return true;
+            if (!type.IsValueType)
+                return false;
+
+            // // A type is considered unmanaged if it is a value type and all of its fields are either of
+            // the same type (to allow for recursive structs) or are unmanaged types.
+            return !type.GetFields().Any(f => f.FieldType != type && !CheckIsTypeUnmanaged(f.FieldType));
+        }
+
+        #region UIToolkit
+
+        /// <summary>
+        /// UI Toolkit version.
+        /// </summary>
+        public override VisualElement CreatePropertyGUI(SerializedProperty property)
+        {
+            if (s_ComponentTypes.Length == 0)
+                return new Label("No valid component types found.");
+
+            var componentsProp = property.FindPropertyRelative("Components");
+            if (componentsProp == null)
+                return new Label("Components property not found.");
+
+            var root = new VisualElement();
+            var foldout = CreateComponentFoldout(property, componentsProp);
+            var listView = CreateComponentListView(property, componentsProp);
+
+            var refreshUI = new Action(() =>
+            {
+                UpdateFoldoutTitle(foldout, property, componentsProp);
+                RefreshListView(listView, componentsProp);
+            });
+
+            RegisterReorderCallback(listView, property, componentsProp, refreshUI);
+
+            foldout.Add(listView);
+            foldout.Add(CreateListFooter(property, componentsProp, foldout, listView, refreshUI));
+            root.Add(foldout);
+
+            return root;
+        }
+
+        /// <summary>
+        /// Creates the foldout header that displays the component count and tracks expanded state.
+        /// </summary>
+        private static Foldout CreateComponentFoldout(SerializedProperty property, SerializedProperty componentsProp)
+        {
+            var foldout = new Foldout
+            {
+                value = property.isExpanded
+            };
+
+            UpdateFoldoutTitle(foldout, property, componentsProp);
+            foldout.RegisterValueChangedCallback(evt => property.isExpanded = evt.newValue);
+
+            var borderCol = new Color(0.1f, 0.1f, 0.1f);
+            foldout.style.borderTopWidth    = 1;
+            foldout.style.borderRightWidth  = 1;
+            foldout.style.borderBottomWidth = 1;
+            foldout.style.borderLeftWidth   = 1;
+            foldout.style.borderTopColor    = borderCol;
+            foldout.style.borderRightColor  = borderCol;
+            foldout.style.borderBottomColor = borderCol;
+            foldout.style.borderLeftColor   = borderCol;
+            foldout.style.marginTop         = 4;
+            foldout.style.marginBottom      = 4;
+            foldout.style.backgroundColor   = EditorColors.Content;
+
+            var toggle = foldout.Q<Toggle>();
+            if (toggle != null)
+            {
+                toggle.style.unityFontStyleAndWeight = FontStyle.Bold;
+                toggle.style.paddingLeft             = 5;
+                toggle.style.marginLeft              = 0;
+                toggle.style.marginRight             = 0;
+                toggle.style.marginTop               = 2;
+                toggle.style.marginBottom            = 2;
+            }
+
+            return foldout;
+        }
+
+        /// <summary>
+        /// Creates and configures the UI Toolkit ListView used to render component entries.
+        /// </summary>
+        private static ListView CreateComponentListView(SerializedProperty property, SerializedProperty componentsProp) => new()
+        {
+            reorderable                   = true,
+            reorderMode                   = ListViewReorderMode.Animated,
+            showBorder                    = true,
+            selectionType                 = SelectionType.Single,
+            showAlternatingRowBackgrounds = AlternatingRowBackground.None,
+            virtualizationMethod          = CollectionVirtualizationMethod.DynamicHeight,
+            itemsSource                   = GetComponentItems(componentsProp),
+            makeItem                      = MakeComponentListItem,
+            bindItem                      = (item, index) => BindComponentListItem(item, index, componentsProp, property.serializedObject),
+            style =
+            {
+                marginLeft  = 2,
+                marginRight = 2,
+                height      = StyleKeyword.Auto,
+                flexGrow    = 0,
+            }
+        };
+
+        /// <summary>
+        /// Builds the visual tree for one list item.
+        /// </summary>
+        private static VisualElement MakeComponentListItem()
+        {
+            var itemRoot = new VisualElement();
+
+            var typeLabel = new Label
+            {
+                name = "type-label",
+                style =
+                {
+                    unityFontStyleAndWeight = FontStyle.Bold
+                }
+            };
+            itemRoot.Add(typeLabel);
+
+            var propertiesContainer = new VisualElement {name = "properties-container"};
+            itemRoot.Add(propertiesContainer);
+            return itemRoot;
+        }
+
+        /// <summary>
+        /// Binds one list item to the corresponding managed-reference component data.
+        /// </summary>
+        private static void BindComponentListItem(VisualElement item, int index, SerializedProperty componentsProp, SerializedObject serializedObject)
+        {
+            if (index < 0 || index >= componentsProp.arraySize)
+                return;
+
+            var element = componentsProp.GetArrayElementAtIndex(index);
+            var typeLabel = item.Q<Label>("type-label");
+            var propertiesContainer = item.Q<VisualElement>("properties-container");
+
+            typeLabel.text = element.managedReferenceValue?.GetType().Name ?? "Null";
+            propertiesContainer.Clear();
+
+            var prop = element.Copy();
+            var endProp = prop.GetEndProperty();
+            var enterChildren = true;
+            while (prop.NextVisible(enterChildren) &&
+                !SerializedProperty.EqualContents(prop, endProp))
+            {
+                var field = new PropertyField(prop.Copy());
+                field.Bind(serializedObject);
+                propertiesContainer.Add(field);
+                enterChildren = false;
+            }
+
+            item.style.paddingTop    = 4;
+            item.style.paddingBottom = 4;
+            item.style.paddingLeft   = 4;
+            item.style.paddingRight  = 4;
+
+            item.style.backgroundColor = index % 2 == 0 ? EditorColors.Background2 : EditorColors.Background;
+        }
+
+        /// <summary>
+        /// Registers reorder handling so drag operations are written back to the serialized array.
+        /// </summary>
+        private static void RegisterReorderCallback(ListView listView, SerializedProperty property, SerializedProperty componentsProp, Action refreshUI)
+        {
+            listView.itemIndexChanged += (oldIndex, newIndex) =>
+            {
+                componentsProp.MoveArrayElement(oldIndex, newIndex);
+                property.serializedObject.ApplyModifiedProperties();
+                refreshUI();
+                listView.selectedIndex = newIndex;
+            };
+        }
+
+        /// <summary>
+        /// Creates the footer with add/remove buttons for component list operations.
+        /// </summary>
+        private static VisualElement CreateListFooter(
+            SerializedProperty property,
+            SerializedProperty componentsProp,
+            Foldout foldout,
+            ListView listView,
+            Action refreshUI)
+        {
+            var footer = new VisualElement();
+            footer.AddToClassList("unity-base-vertical-collection-view__footer");
+            footer.style.width          = Length.Percent(100);
+            footer.style.flexDirection  = FlexDirection.Row;
+            footer.style.justifyContent = Justify.FlexEnd;
+            footer.style.marginTop      = 3;
+            footer.style.paddingBottom  = 2;
+
+            var footerButtons = new VisualElement
+            {
+                style =
+                {
+                    flexDirection  = FlexDirection.Row,
+                    justifyContent = Justify.FlexEnd
+                }
+            };
+
+            var addButton = new Button
+            {
+                iconImage = Background.FromTexture2D(EditorGUIUtility.IconContent("Toolbar Plus").image as Texture2D),
+                tooltip   = "Add Component"
+            };
+            addButton.clicked += () => ShowAddComponentMenuUIElements(addButton, componentsProp, property, foldout, listView);
+
+            var removeButton = new Button
+            {
+                iconImage = Background.FromTexture2D(EditorGUIUtility.IconContent("Toolbar Minus").image as Texture2D),
+                tooltip   = "Remove Selected Component"
+            };
+            removeButton.clicked += () => RemoveSelectedComponent(listView, componentsProp, property, refreshUI);
+
+            footerButtons.Add(addButton);
+            footerButtons.Add(removeButton);
+            footer.Add(footerButtons);
+
+            return footer;
+        }
+
+        /// <summary>
+        /// Removes the currently selected component item and refreshes the list UI.
+        /// </summary>
+        private static void RemoveSelectedComponent(ListView listView, SerializedProperty componentsProp, SerializedProperty property, Action refreshUI)
+        {
+            var selectedIndex = listView.selectedIndex;
+            if (selectedIndex < 0 || selectedIndex >= componentsProp.arraySize)
+                return;
+
+            componentsProp.DeleteArrayElementAtIndex(selectedIndex);
+            property.serializedObject.ApplyModifiedProperties();
+
+            refreshUI();
+            listView.selectedIndex = Mathf.Clamp(selectedIndex - 1, 0, componentsProp.arraySize - 1);
+        }
+
+        /// <summary>
+        /// Updates the foldout title text to include the current component count.
+        /// </summary>
+        private static void UpdateFoldoutTitle(Foldout foldout, SerializedProperty property, SerializedProperty componentsProp)
+        {
+            foldout.text = $"{property.displayName} ({componentsProp.arraySize})";
+        }
+
+        #endregion
+
+        #region IMGUI
+
+        /// <summary>
+        /// IMGUI version.
+        /// </summary>
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
             if (s_ComponentTypes.Length == 0)
@@ -81,7 +346,77 @@ namespace Gubbins.Editor
             {
                 height += GetOrCreateList(property).GetHeight();
             }
+
             return height;
+        }
+
+        /// <summary>
+        /// Refreshes the ListView to reflect changes in the underlying array.
+        /// </summary>
+        private static void RefreshListView(ListView listView, SerializedProperty arrayProperty)
+        {
+            listView.itemsSource = GetComponentItems(arrayProperty);
+            listView.Rebuild();
+        }
+
+        /// <summary>
+        /// Gets a list of component items for the ListView.
+        /// </summary>
+        private static List<int> GetComponentItems(SerializedProperty arrayProperty)
+        {
+            var items = new List<int>();
+            for (var i = 0; i < arrayProperty.arraySize; i++)
+            {
+                items.Add(i);
+            }
+
+            return items;
+        }
+
+        /// <summary>
+        /// Shows a dropdown menu to add a new component to the list using UIElements.
+        /// </summary>
+        private static void ShowAddComponentMenuUIElements(
+            VisualElement triggerElement,
+            SerializedProperty componentsProp,
+            SerializedProperty property,
+            Foldout foldout,
+            ListView listView)
+        {
+            // Get existing component types in the list to filter out from the menu
+            var existingTypes = new HashSet<Type>();
+            for (var i = 0; i < componentsProp.arraySize; i++)
+            {
+                var element = componentsProp.GetArrayElementAtIndex(i);
+                var obj = element.managedReferenceValue;
+                if (obj != null)
+                    existingTypes.Add(obj.GetType());
+            }
+
+            // Filter available component types to only those not already in the list
+            var availableTypes = s_ComponentTypes.Where(t => !existingTypes.Contains(t)).ToArray();
+
+            if (availableTypes.Length == 0)
+                return;
+
+            var menu = new GenericMenu();
+            foreach (var type in availableTypes)
+            {
+                var capturedType = type;
+                menu.AddItem(new GUIContent(capturedType.FullName), false, () =>
+                {
+                    componentsProp.arraySize++;
+                    var newElement = componentsProp.GetArrayElementAtIndex(componentsProp.arraySize - 1);
+                    newElement.managedReferenceValue = Activator.CreateInstance(capturedType);
+                    property.serializedObject.ApplyModifiedProperties();
+
+                    // Update UI
+                    foldout.text = $"{property.displayName} ({componentsProp.arraySize})";
+                    RefreshListView(listView, componentsProp);
+                });
+            }
+
+            menu.DropDown(triggerElement.worldBound);
         }
 
         /// <summary>
@@ -98,8 +433,8 @@ namespace Gubbins.Editor
                 list = new ReorderableList(property.serializedObject, componentsProp, true, false, true, true);
 
                 list.elementHeightCallback = index => GetElementHeight(list.serializedProperty, index);
-                list.drawElementCallback   = (rect, index, isActive, isFocused) => DrawElement(rect, index, list.serializedProperty);
-                list.onAddDropdownCallback = (buttonRect, rlist) => ShowAddComponentMenu(buttonRect, property);
+                list.drawElementCallback   = (rect, index, _, _) => DrawElement(rect, index, list.serializedProperty);
+                list.onAddDropdownCallback = (buttonRect, _) => ShowAddComponentMenu(buttonRect, property);
                 list.footerHeight          = EditorGUIUtility.singleLineHeight;
 
                 m_ListCache[key] = list;
@@ -210,21 +545,6 @@ namespace Gubbins.Editor
             menu.DropDown(buttonRect);
         }
 
-        /// <summary>
-        /// Checks if the provided type is unmanaged, which means it is a value type that does not contain any reference type fields.
-        /// </summary>
-        /// <param name="type">The type to check for being unmanaged. </param>
-        /// <returns>True if the type is unmanaged; otherwise, false.</returns>
-        private static bool CheckIsTypeUnmanaged(Type type)
-        {
-            if (type.IsPrimitive || type.IsPointer || type.IsEnum)
-                return true;
-            if (!type.IsValueType)
-                return false;
-
-            // // A type is considered unmanaged if it is a value type and all of its fields are either of
-            // the same type (to allow for recursive structs) or are unmanaged types.
-            return !type.GetFields().Any(f => f.FieldType != type && !CheckIsTypeUnmanaged(f.FieldType));
-        }
+        #endregion
     }
 }
