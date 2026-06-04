@@ -27,7 +27,7 @@ namespace Gubbins.Editor
         /// </summary>
         public override VisualElement CreatePropertyGUI(SerializedProperty property)
         {
-            if (!TryGetTypes(out var types)) return new VisualElement();
+            if (!TryGetTypes(property, out var types)) return new VisualElement();
 
             var container = new VisualElement();
             var typeString = property.FindPropertyRelative("m_TypeString");
@@ -51,7 +51,7 @@ namespace Gubbins.Editor
         /// </summary>
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
-            if (!TryGetTypes(out var types)) return;
+            if (!TryGetTypes(property, out var types)) return;
 
             var typeString = property.FindPropertyRelative("m_TypeString");
             var index = typeString.stringValue == null ? 0 : Array.IndexOf(types, typeString.stringValue);
@@ -67,20 +67,63 @@ namespace Gubbins.Editor
         /// </summary>
         /// <param name="types">Types matched <see cref="TypeFromAttribute"/>.</param>
         /// <returns>True when the type field type is <see cref="SerializedType"/>.</returns>
-        private bool TryGetTypes(out string[] types)
+        private bool TryGetTypes(SerializedProperty property, out string[] types)
         {
             var typeFrom = attribute as TypeFromAttribute;
             types = null;
 
-            if (fieldInfo.FieldType != typeof(SerializedType)) return false;
+            if (GetDrawnType(property) != typeof(SerializedType)) return false;
 
             var typeKind = typeFrom?.Kind ?? TypeKind.All;
             var targetTypes = typeFrom is {Type: not null} ? GetAllSubTypes(typeFrom.Type) : s_AllTypes;
 
-            types = targetTypes.Where(type => VerifyTypeKind(typeKind, type) && !typeFrom.Exclude.Contains(type))
+            var excludedTypes = typeFrom?.Exclude ?? Array.Empty<Type>();
+            types = targetTypes.Where(type => VerifyTypeKind(typeKind, type) && !excludedTypes.Contains(type))
                                .Select(type => type.ToString())
                                .ToArray();
             return true;
+        }
+
+        /// <summary>
+        /// Resolve the actual drawn type for direct fields and collection elements.
+        /// </summary>
+        private Type GetDrawnType(SerializedProperty property)
+        {
+            var drawnType = fieldInfo?.FieldType;
+            if (drawnType == null)
+                return null;
+
+            if (drawnType == typeof(SerializedType))
+                return drawnType;
+
+            if (!property.propertyPath.Contains(".Array.data["))
+                return drawnType;
+
+            while (drawnType != null && drawnType != typeof(SerializedType))
+            {
+                drawnType = GetElementType(drawnType);
+                if (drawnType == null || !typeof(System.Collections.IEnumerable).IsAssignableFrom(drawnType))
+                    break;
+            }
+
+            return drawnType;
+        }
+
+        /// <summary>
+        /// Get element type if the type is array or generic collection, otherwise return null.
+        /// </summary>
+        private static Type GetElementType(Type type)
+        {
+            if (type == null)
+                return null;
+
+            if (type.IsArray)
+                return type.GetElementType();
+
+            if (type.IsGenericType)
+                return type.GetGenericArguments().FirstOrDefault();
+
+            return null;
         }
 
         /// <summary>

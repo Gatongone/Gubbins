@@ -23,15 +23,114 @@ namespace Gubbins.Editor
         /// </summary>
         private Type GetExpectedType(SerializedProperty property)
         {
-            var declaringType = property.serializedObject.targetObject.GetType();
-            var field = declaringType.GetField(property.propertyPath,
-                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
-            if (field != null && field.FieldType.IsGenericType && field.FieldType.GetGenericTypeDefinition() == typeof(SerializedReference<>))
+            // Fast path: Unity usually provides fieldInfo for direct fields and collection elements.
+            var expectedType = TryGetExpectedTypeFromContainerType(fieldInfo?.FieldType);
+            if (expectedType != null)
+                return expectedType;
+
+            // Fallback: resolve nested property paths (including Array.data[x]) via reflection.
+            var targetType = property.serializedObject.targetObject.GetType();
+            var resolvedType = ResolvePropertyPathType(targetType, property.propertyPath);
+            return TryGetExpectedTypeFromContainerType(resolvedType);
+        }
+
+        /// <summary>
+        /// Try to extract the expected type T from a given container type, which could be either the <seealso cref="SerializedReference{T}"/> itself or a collection containing it (e.g. <c>SerializedReference{T}[]</c>).
+        /// </summary>
+        private Type TryGetExpectedTypeFromContainerType(Type containerType)
+        {
+            if (containerType == null)
+                return null;
+
+            if (containerType.IsGenericType && containerType.GetGenericTypeDefinition() == typeof(SerializedReference<>))
+                return containerType.GetGenericArguments()[0];
+
+            var elementType = GetElementType(containerType);
+            if (elementType == null)
+                return null;
+
+            return elementType.IsGenericType && elementType.GetGenericTypeDefinition() == typeof(SerializedReference<>)
+                ? elementType.GetGenericArguments()[0]
+                : null;
+        }
+
+        /// <summary>
+        /// Resolve the type of a property given its root object type and the property's path, which may include nested fields and array elements (e.g. "myList.Array.data[0].myField").
+        /// </summary>
+        private Type ResolvePropertyPathType(Type rootType, string propertyPath)
+        {
+            if (rootType == null || string.IsNullOrEmpty(propertyPath))
+                return null;
+
+            var currentType = rootType;
+            var path = propertyPath.Replace(".Array.data[", "[");
+            var pathElements = path.Split('.');
+
+            foreach (var element in pathElements)
             {
-                return field.FieldType.GetGenericArguments()[0];
+                var bracketIndex = element.IndexOf('[');
+                if (bracketIndex >= 0)
+                {
+                    var fieldName = element.Substring(0, bracketIndex);
+                    currentType = GetFieldTypeInHierarchy(currentType, fieldName);
+                    currentType = GetElementType(currentType);
+                }
+                else
+                {
+                    currentType = GetFieldTypeInHierarchy(currentType, element);
+                }
+
+                if (currentType == null)
+                    return null;
+            }
+
+            return currentType;
+        }
+
+        /// <summary>
+        /// Search for a field with the given name in the specified type and its base types, returning the field's type if found, or null if not found.
+        /// </summary>
+        private Type GetFieldTypeInHierarchy(Type currentType, string fieldName)
+        {
+            const System.Reflection.BindingFlags flags =
+                System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.Public |
+                System.Reflection.BindingFlags.NonPublic;
+
+            while (currentType != null)
+            {
+                var field = currentType.GetField(fieldName, flags);
+                if (field != null)
+                    return field.FieldType;
+
+                currentType = currentType.BaseType;
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// If the given type is a collection (array or generic collection), return the element type; otherwise, return null.
+        /// </summary>
+        private Type GetElementType(Type collectionType)
+        {
+            if (collectionType == null)
+                return null;
+
+            if (collectionType.IsArray)
+                return collectionType.GetElementType();
+
+            if (collectionType.IsGenericType)
+            {
+                var genericDef = collectionType.GetGenericTypeDefinition();
+                if (genericDef == typeof(List<>) || genericDef == typeof(IList<>) || genericDef == typeof(IReadOnlyList<>))
+                    return collectionType.GetGenericArguments()[0];
+            }
+
+            var enumerableInterface = collectionType.GetInterfaces()
+                                                    .FirstOrDefault(i => i.IsGenericType &&
+                                                        i.GetGenericTypeDefinition() == typeof(IEnumerable<>));
+            return enumerableInterface?.GetGenericArguments()[0];
         }
 
         /// <summary>
@@ -45,9 +144,11 @@ namespace Gubbins.Editor
                             .Where(t => expectedType.IsAssignableFrom(t) &&
                                 !t.IsAbstract &&
                                 !t.ContainsGenericParameters &&
-                                (t.IsNewable(out _) || typeof(UnityEngine.Object).IsAssignableFrom(t)))
+                                (ContainsDefaultConstructor(t) || typeof(UnityEngine.Object).IsAssignableFrom(t)))
                             .ToList();
         }
+
+        private bool ContainsDefaultConstructor(Type type) => type.GetConstructor(Type.EmptyTypes) != null;
 
         /// <summary>
         /// UIElement version.
