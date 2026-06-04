@@ -288,7 +288,11 @@ namespace Gubbins.Editor
 
             var addButton = new Button
             {
+#if UNITY_2023_1_OR_NEWER
                 iconImage = Background.FromTexture2D(EditorGUIUtility.IconContent("Toolbar Plus").image as Texture2D),
+#else
+                text = "+",
+#endif
                 tooltip   = "Add Component",
                 style =
                 {
@@ -299,7 +303,11 @@ namespace Gubbins.Editor
 
             var removeButton = new Button
             {
+#if UNITY_2023_1_OR_NEWER
                 iconImage = Background.FromTexture2D(EditorGUIUtility.IconContent("Toolbar Minus").image as Texture2D),
+#else
+                text = "-",
+#endif
                 tooltip   = "Remove Selected Component",
                 style =
                 {
