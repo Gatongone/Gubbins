@@ -99,18 +99,18 @@ namespace Gubbins.Editor
             }
         }
 
-        /// <summary>
-        /// UI Toolkit version.
-        /// </summary>
-        public override VisualElement CreatePropertyGUI(SerializedProperty property)
-        {
-            // Use IMGUIContainer so UI Toolkit inspector gets the same searchable dropdown behavior.
-            return new IMGUIContainer(() =>
-            {
-                var rect = EditorGUILayout.GetControlRect(true, EditorGUIUtility.singleLineHeight);
-                DrawTypeSelector(rect, property, new GUIContent(property.displayName));
-            });
-        }
+        // /// <summary>
+        // /// UI Toolkit version.
+        // /// </summary>
+        // public override VisualElement CreatePropertyGUI(SerializedProperty property)
+        // {
+        //     // Use IMGUIContainer so UI Toolkit inspector gets the same searchable dropdown behavior.
+        //     return new IMGUIContainer(() =>
+        //     {
+        //         var rect = EditorGUILayout.GetControlRect(true, EditorGUIUtility.singleLineHeight);
+        //         DrawTypeSelector(rect, property, new GUIContent(property.displayName));
+        //     });
+        // }
 
         /// <summary>
         /// IMGUI version.
@@ -145,12 +145,13 @@ namespace Gubbins.Editor
             var buttonRect = EditorGUI.PrefixLabel(position, new GUIContent(FormatNaming(label.text)));
             if (EditorGUI.DropdownButton(buttonRect, new GUIContent(currentDisplay), FocusType.Keyboard))
             {
+                var screenRect = GUIUtility.GUIToScreenRect(buttonRect);
                 var dropdown = new TypeAdvancedDropdown(options, newIndex =>
                 {
                     ApplySelection(typeString, options, newIndex);
                     property.serializedObject.ApplyModifiedProperties();
                 });
-                dropdown.Show(buttonRect);
+                dropdown.Show(screenRect);
             }
 
             EditorGUI.EndProperty();
@@ -209,15 +210,15 @@ namespace Gubbins.Editor
                                                 .ToHashSet();
 
             var typedOptions = builtOptions.Select(type =>
-                                             {
-                                                 var key = $"{GetNamespaceGroup(type)}|{GetFriendlyTypeName(type)}";
-                                                 return new TypeOption(type, duplicateNameKeys.Contains(key));
-                                             })
-                                             .OrderBy(option => option.NamespaceGroup, StringComparer.Ordinal)
-                                             .ThenBy(option => option.TypeName, StringComparer.Ordinal)
-                                             .ThenBy(option => option.AssemblyName, StringComparer.Ordinal)
-                                             .ThenBy(option => option.SerializedName, StringComparer.Ordinal)
-                                             .ToList();
+                                           {
+                                               var key = $"{GetNamespaceGroup(type)}|{GetFriendlyTypeName(type)}";
+                                               return new TypeOption(type, duplicateNameKeys.Contains(key));
+                                           })
+                                           .OrderBy(option => option.NamespaceGroup, StringComparer.Ordinal)
+                                           .ThenBy(option => option.TypeName, StringComparer.Ordinal)
+                                           .ThenBy(option => option.AssemblyName, StringComparer.Ordinal)
+                                           .ThenBy(option => option.SerializedName, StringComparer.Ordinal)
+                                           .ToList();
 
             s_OptionCache[cacheKey] = typedOptions;
             return typedOptions;
@@ -465,7 +466,6 @@ namespace Gubbins.Editor
             typeString.stringValue = index <= 0 ? null : options[index - 1].SerializedName;
         }
 
-
         /// <summary>
         /// Build a menu path with namespace segments split to submenus.
         /// </summary>
@@ -507,9 +507,9 @@ namespace Gubbins.Editor
             public TypeAdvancedDropdown(IReadOnlyList<TypeOption> options, Action<int> onSelected)
                 : base(new AdvancedDropdownState())
             {
-                m_Options = options;
+                m_Options    = options;
                 m_OnSelected = onSelected;
-                minimumSize = new Vector2(420f, 460f);
+                minimumSize  = new Vector2(420f, 460f);
             }
 
             protected override AdvancedDropdownItem BuildRoot()
@@ -555,7 +555,7 @@ namespace Gubbins.Editor
 
                     if (!groups.TryGetValue(key, out var groupItem))
                     {
-                        groupItem = new AdvancedDropdownItem(segment);
+                        groupItem   = new AdvancedDropdownItem(segment);
                         groups[key] = groupItem;
                         parent.AddChild(groupItem);
                     }
