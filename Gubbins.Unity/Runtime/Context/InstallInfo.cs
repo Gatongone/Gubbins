@@ -6,16 +6,15 @@ using Gubbins.Spawner;
 namespace Gubbins.Context
 {
     [Serializable]
-    public struct InstallInfo
+    public class InstallInfo
     {
-        public  Scope                                Scope;
-        public  string                               Key;
-        public  Type                                 Type;
-        private Type                                 InstanceType;
-        HashSet<Type>                                Bindings;
-        public UnityEngine.Object                    Prototype;
-        public SerializedReference<ISpawner>         Factory;
-        public SerializedReference<IScopeController> Controller;
-        public uint                                  Prewarm;
+        public  Scope                                 Scope;
+        public  string                                Key;
+        public  SerializedType                        Type;
+        public  HashSet<Type>                         Bindings;
+        public  UnityEngine.Object                    Prototype;
+        public  SerializedReference<ISpawner>         Factory;
+        public  SerializedReference<IScopeController> Controller;
+        public  uint                                  Prewarm;
     }
 }

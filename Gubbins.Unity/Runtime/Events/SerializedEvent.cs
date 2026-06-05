@@ -16,8 +16,8 @@ namespace Gubbins.Events
     {
         private const TypeKind DEFAULT_TYPE_KIND = TypeKind.Implementation | TypeKind.Newable | TypeKind.Class;
 
-        [SerializeField, TypeFrom(typeof(IEvent), DEFAULT_TYPE_KIND, typeof(SerializedEvent), typeof(Event))]
-        private SerializedType m_Event;
+        [SerializeField, TypeFrom(kind: DEFAULT_TYPE_KIND, exclude: new[] {typeof(SerializedEvent), typeof(Event)})]
+        private SerializedType<IEvent> m_Event;
 
         [SerializeField] private UnityEvent m_Handlers;
 
