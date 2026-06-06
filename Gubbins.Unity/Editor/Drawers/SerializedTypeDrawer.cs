@@ -99,19 +99,6 @@ namespace Gubbins.Editor
             }
         }
 
-        // /// <summary>
-        // /// UI Toolkit version.
-        // /// </summary>
-        // public override VisualElement CreatePropertyGUI(SerializedProperty property)
-        // {
-        //     // Use IMGUIContainer so UI Toolkit inspector gets the same searchable dropdown behavior.
-        //     return new IMGUIContainer(() =>
-        //     {
-        //         var rect = EditorGUILayout.GetControlRect(true, EditorGUIUtility.singleLineHeight);
-        //         DrawTypeSelector(rect, property, new GUIContent(property.displayName));
-        //     });
-        // }
-
         /// <summary>
         /// IMGUI version.
         /// </summary>

@@ -15,8 +15,7 @@ namespace Gubbins.Editor
     [CustomPropertyDrawer(typeof(SerializedReference<>))]
     internal class SerializedReferencePropertyDrawer : PropertyDrawer
     {
-        private static readonly StyleLength s_LabelWidth     = new(Length.Percent(40f));
-        private const           float       VERTICAL_SPACING = 2;
+        private const float VERTICAL_SPACING = 2;
 
         /// <summary>
         /// Extract the expected type T from <see cref="SerializedReference{T}"/> using reflection.
@@ -176,7 +175,7 @@ namespace Gubbins.Editor
             // Type selector dropdown
             EditorGUIUtility.labelWidth = 0;
             var typeDropdown = new DropdownField(property.displayName, typeNames, GetCurrentIndex());
-            typeDropdown.labelElement.style.width = s_LabelWidth;
+            typeDropdown.AddToClassList(ObjectField.alignedFieldUssClassName);
             root.Add(typeDropdown);
 
             // Container for the reference field, which will be dynamically updated based on the selected type.
@@ -268,9 +267,9 @@ namespace Gubbins.Editor
                 {
                     objectType        = objectType,
                     value             = unityProp.objectReferenceValue,
-                    allowSceneObjects = true,
+                    allowSceneObjects = true
                 };
-                objectField.labelElement.style.width = s_LabelWidth;
+                objectField.AddToClassList(ObjectField.alignedFieldUssClassName);
                 objectField.RegisterValueChangedCallback(evt =>
                 {
                     var newObj = evt.newValue;
