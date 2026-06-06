@@ -3,13 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Text.RegularExpressions;
 using Gubbins.Enhance;
 using UnityEditor;
 using UnityEditor.IMGUI.Controls;
 using UnityEngine;
-using UnityEngine.UIElements;
 
 namespace Gubbins.Editor
 {
@@ -84,7 +81,7 @@ namespace Gubbins.Editor
                 var name = appendAssembly && !string.IsNullOrEmpty(AssemblyName)
                     ? $"{TypeName} [{AssemblyName}]"
                     : TypeName;
-                DisplayName = $"{NamespaceGroup} ▸ {name}";
+                DisplayName = $"{name} [{NamespaceGroup}]";
                 MenuPath    = BuildMenuPath(NamespaceGroup, name);
             }
 
@@ -94,7 +91,7 @@ namespace Gubbins.Editor
                 TypeName       = serializedName;
                 AssemblyName   = string.Empty;
                 SerializedName = serializedName;
-                DisplayName    = $"Missing ▸ {serializedName}";
+                DisplayName    = $"Missing [{serializedName}]";
                 MenuPath       = BuildMenuPath("Missing", serializedName);
             }
         }
@@ -103,12 +100,6 @@ namespace Gubbins.Editor
         /// IMGUI version.
         /// </summary>
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
-            => DrawTypeSelector(position, property, label);
-
-        /// <summary>
-        /// Shared IMGUI drawing path used by both IMGUI and UI Toolkit inspectors.
-        /// </summary>
-        private void DrawTypeSelector(Rect position, SerializedProperty property, GUIContent label)
         {
             EditorGUI.BeginProperty(position, label, property);
 
@@ -129,7 +120,7 @@ namespace Gubbins.Editor
 
             var currentIndex = GetCurrentIndex(options, typeString.stringValue);
             var currentDisplay = currentIndex <= 0 ? NULL_OPTION_LABEL : options[currentIndex - 1].DisplayName;
-            var buttonRect = EditorGUI.PrefixLabel(position, new GUIContent(FormatNaming(label.text)));
+            var buttonRect = EditorGUI.PrefixLabel(position, new GUIContent(property.displayName));
             if (EditorGUI.DropdownButton(buttonRect, new GUIContent(currentDisplay), FocusType.Keyboard))
             {
                 var screenRect = GUIUtility.GUIToScreenRect(buttonRect);
@@ -170,7 +161,7 @@ namespace Gubbins.Editor
         /// </summary>
         private static List<TypeOption> GetOrBuildBaseOptions(Type wrapperType, TypeFromAttribute typeFrom)
         {
-            var includeTypes = GetIncludeTypes(wrapperType, typeFrom).ToArray();
+            var includeTypes = typeFrom?.Include ?? Array.Empty<Type>();
             var excludedTypes = typeFrom?.Exclude ?? Array.Empty<Type>();
             var typeKind = typeFrom?.Kind ?? TypeKind.All;
             var cacheKey = new FilterCacheKey(wrapperType, typeKind, BuildTypeKey(includeTypes), BuildTypeKey(excludedTypes));
@@ -327,24 +318,6 @@ namespace Gubbins.Editor
         }
 
         /// <summary>
-        /// Build the include roots from the generic wrapper type and the TypeFrom attribute.
-        /// </summary>
-        private static IEnumerable<Type> GetIncludeTypes(Type wrapperType, TypeFromAttribute typeFrom)
-        {
-            if (wrapperType.IsGenericType && wrapperType.GetGenericTypeDefinition() == typeof(SerializedType<>))
-                yield return wrapperType.GetGenericArguments()[0];
-
-            if (typeFrom?.Include == null)
-                yield break;
-
-            foreach (var type in typeFrom.Include)
-            {
-                if (type != null)
-                    yield return type;
-            }
-        }
-
-        /// <summary>
         /// Get all types that can be assigned to <paramref name="type"/>.
         /// </summary>
         private static IEnumerable<Type> GetAllSubTypesCached(Type type)
@@ -414,7 +387,13 @@ namespace Gubbins.Editor
         {
             try
             {
-                return assembly.GetTypes();
+                return assembly.GetTypes().Where(static type => type is
+                {
+                    IsNestedPrivate    : false,
+                    IsNestedFamily     : false,
+                    IsNestedFamANDAssem: false,
+                    IsNestedFamORAssem : false
+                } and not {IsAbstract: true, IsSealed: true});
             }
             catch (ReflectionTypeLoadException exception)
             {
@@ -459,7 +438,7 @@ namespace Gubbins.Editor
         private static string BuildMenuPath(string namespaceGroup, string typeName)
         {
             var namespacePath = namespaceGroup.Replace('.', '/');
-            return string.IsNullOrEmpty(namespacePath) ? typeName : $"{namespacePath}/{typeName}";
+            return string.IsNullOrEmpty(namespacePath) ? typeName : $"{namespacePath}/{typeName} [{namespaceGroup}]";
         }
 
         /// <summary>
@@ -505,9 +484,10 @@ namespace Gubbins.Editor
                 root.AddChild(new TypeAdvancedDropdownItem(NULL_OPTION_LABEL, 0));
 
                 var groups = new Dictionary<string, AdvancedDropdownItem>();
-                foreach (var option in m_Options.Select((value, index) => (value, index)))
+                for (var index = 0; index < m_Options.Count; index++)
                 {
-                    AddPath(root, groups, option.value.MenuPath, option.index + 1);
+                    var option = m_Options[index];
+                    AddPath(root, groups, option.MenuPath, index + 1);
                 }
 
                 return root;
@@ -556,8 +536,7 @@ namespace Gubbins.Editor
         {
             public readonly int Index;
 
-            public TypeAdvancedDropdownItem(string name, int index)
-                : base(name)
+            public TypeAdvancedDropdownItem(string name, int index) : base(name)
             {
                 Index = index;
             }
@@ -632,64 +611,6 @@ namespace Gubbins.Editor
         {
             var genericIndex = typeName.IndexOf('`');
             return genericIndex < 0 ? typeName : typeName.Substring(0, genericIndex);
-        }
-
-        /// <summary>
-        /// Upper camel case strategy. The following naming will output "SuperMan":
-        /// <list type="bullet">
-        ///     <item>_superMan</item>
-        ///     <item>_SuperMan</item>
-        ///     <item>s_SuperMan</item>
-        ///     <item>m_SuperMan</item>
-        ///     <item>superMan</item>
-        ///     <item>Super_Man</item>
-        ///     <item>SUPER_MAN</item>
-        ///     <item>super_man</item>
-        /// </list>
-        /// </summary>
-        internal static string FormatNaming(string name)
-        {
-            if (string.IsNullOrEmpty(name)) return name;
-            name = StandardizeHungarianNotation(name);
-
-            var chars = name.ToCharArray();
-            var sb = new StringBuilder();
-
-            for (var i = 0; i < chars.Length; i++)
-            {
-                if (chars[i] == '_') continue;
-
-                var c = chars[i];
-                if (i == 0)
-                {
-                    if (char.IsLower(c)) c = char.ToUpper(c);
-                }
-                else
-                {
-                    if (char.IsUpper(chars[i - 1]) && char.IsUpper(chars[i]))
-                        c = char.ToLower(c);
-                    if (chars[i - 1] == '_')
-                        c = char.ToUpper(c);
-                }
-
-                sb.Append(c);
-            }
-
-            return sb.ToString();
-        }
-
-        /// <summary>
-        /// Clear Hungarian style.
-        /// </summary>
-        /// <param name="name">Origin input string.</param>
-        /// <returns>Standardized name.</returns>
-        private static string StandardizeHungarianNotation(string name)
-        {
-            if (Regex.IsMatch(name, @"^[ms]_\w.+"))
-                name = name.Substring(2, name.Length - 2);
-            if (Regex.IsMatch(name, @"^_\w.+") || Regex.IsMatch(name, "^[ms][A-Z].*"))
-                name = name.Substring(1, name.Length - 1);
-            return name;
         }
 
         /// <summary>
