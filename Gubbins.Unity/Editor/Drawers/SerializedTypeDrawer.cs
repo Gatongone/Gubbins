@@ -28,74 +28,6 @@ namespace Gubbins.Editor
         private static readonly Dictionary<Type, bool>                       s_IsNewableCache   = new();
         private static readonly Dictionary<string, Type>                     s_WrapperTypeCache = new();
 
-        private readonly struct FilterCacheKey : IEquatable<FilterCacheKey>
-        {
-            public readonly Type     WrapperType;
-            public readonly TypeKind Kind;
-            public readonly string   IncludeKey;
-            public readonly string   ExcludeKey;
-
-            public FilterCacheKey(Type wrapperType, TypeKind kind, string includeKey, string excludeKey)
-            {
-                WrapperType = wrapperType;
-                Kind        = kind;
-                IncludeKey  = includeKey;
-                ExcludeKey  = excludeKey;
-            }
-
-            public bool Equals(FilterCacheKey other) => WrapperType == other.WrapperType &&
-                Kind == other.Kind &&
-                IncludeKey == other.IncludeKey &&
-                ExcludeKey == other.ExcludeKey;
-
-            public override bool Equals(object obj) => obj is FilterCacheKey other && Equals(other);
-
-            public override int GetHashCode()
-            {
-                unchecked
-                {
-                    var hashCode = WrapperType != null ? WrapperType.GetHashCode() : 0;
-                    hashCode = (hashCode * 397) ^ (int) Kind;
-                    hashCode = (hashCode * 397) ^ (IncludeKey != null ? IncludeKey.GetHashCode() : 0);
-                    hashCode = (hashCode * 397) ^ (ExcludeKey != null ? ExcludeKey.GetHashCode() : 0);
-                    return hashCode;
-                }
-            }
-        }
-
-        private readonly struct TypeOption
-        {
-            public readonly string NamespaceGroup;
-            public readonly string TypeName;
-            public readonly string AssemblyName;
-            public readonly string SerializedName;
-            public readonly string DisplayName;
-            public readonly string MenuPath;
-
-            public TypeOption(Type type, bool appendAssembly)
-            {
-                NamespaceGroup = GetNamespaceGroup(type);
-                TypeName       = GetFriendlyTypeName(type);
-                AssemblyName   = type.Assembly.GetName().Name;
-                SerializedName = type.ToString();
-                var name = appendAssembly && !string.IsNullOrEmpty(AssemblyName)
-                    ? $"{TypeName} [{AssemblyName}]"
-                    : TypeName;
-                DisplayName = $"{name} [{NamespaceGroup}]";
-                MenuPath    = BuildMenuPath(NamespaceGroup, name);
-            }
-
-            public TypeOption(string serializedName)
-            {
-                NamespaceGroup = "Missing";
-                TypeName       = serializedName;
-                AssemblyName   = string.Empty;
-                SerializedName = serializedName;
-                DisplayName    = $"Missing [{serializedName}]";
-                MenuPath       = BuildMenuPath("Missing", serializedName);
-            }
-        }
-
         /// <summary>
         /// IMGUI version.
         /// </summary>
@@ -135,6 +67,7 @@ namespace Gubbins.Editor
             EditorGUI.EndProperty();
         }
 
+        /// <inheritdoc/>
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label) => EditorGUIUtility.singleLineHeight;
 
         /// <summary>
@@ -465,83 +398,6 @@ namespace Gubbins.Editor
             return true;
         }
 
-        private sealed class TypeAdvancedDropdown : AdvancedDropdown
-        {
-            private readonly IReadOnlyList<TypeOption> m_Options;
-            private readonly Action<int>               m_OnSelected;
-
-            public TypeAdvancedDropdown(IReadOnlyList<TypeOption> options, Action<int> onSelected)
-                : base(new AdvancedDropdownState())
-            {
-                m_Options    = options;
-                m_OnSelected = onSelected;
-                minimumSize  = new Vector2(420f, 460f);
-            }
-
-            protected override AdvancedDropdownItem BuildRoot()
-            {
-                var root = new AdvancedDropdownItem("Select Type");
-                root.AddChild(new TypeAdvancedDropdownItem(NULL_OPTION_LABEL, 0));
-
-                var groups = new Dictionary<string, AdvancedDropdownItem>();
-                for (var index = 0; index < m_Options.Count; index++)
-                {
-                    var option = m_Options[index];
-                    AddPath(root, groups, option.MenuPath, index + 1);
-                }
-
-                return root;
-            }
-
-            protected override void ItemSelected(AdvancedDropdownItem item)
-            {
-                if (item is TypeAdvancedDropdownItem typedItem)
-                    m_OnSelected?.Invoke(typedItem.Index);
-            }
-
-            private static void AddPath(AdvancedDropdownItem root, IDictionary<string, AdvancedDropdownItem> groups, string path, int index)
-            {
-                var segments = path.Split('/');
-                var parent = root;
-                var key = string.Empty;
-
-                for (var i = 0; i < segments.Length; i++)
-                {
-                    var segment = segments[i];
-                    if (string.IsNullOrEmpty(segment))
-                        continue;
-
-                    key = string.IsNullOrEmpty(key) ? segment : $"{key}/{segment}";
-                    var isLeaf = i == segments.Length - 1;
-
-                    if (isLeaf)
-                    {
-                        parent.AddChild(new TypeAdvancedDropdownItem(segment, index));
-                        continue;
-                    }
-
-                    if (!groups.TryGetValue(key, out var groupItem))
-                    {
-                        groupItem   = new AdvancedDropdownItem(segment);
-                        groups[key] = groupItem;
-                        parent.AddChild(groupItem);
-                    }
-
-                    parent = groupItem;
-                }
-            }
-        }
-
-        private sealed class TypeAdvancedDropdownItem : AdvancedDropdownItem
-        {
-            public readonly int Index;
-
-            public TypeAdvancedDropdownItem(string name, int index) : base(name)
-            {
-                Index = index;
-            }
-        }
-
         /// <summary>
         /// Get the namespace grouping label for a type.
         /// </summary>
@@ -667,6 +523,166 @@ namespace Gubbins.Editor
             return string.Join("|", types.Where(type => type != null)
                                          .Select(type => type.AssemblyQualifiedName)
                                          .OrderBy(name => name, StringComparer.Ordinal));
+        }
+
+        /// <summary>
+        /// Struct used as a cache key for filtered type options.
+        /// </summary>
+        private readonly struct FilterCacheKey : IEquatable<FilterCacheKey>
+        {
+            public readonly Type     WrapperType;
+            public readonly TypeKind Kind;
+            public readonly string   IncludeKey;
+            public readonly string   ExcludeKey;
+
+            public FilterCacheKey(Type wrapperType, TypeKind kind, string includeKey, string excludeKey)
+            {
+                WrapperType = wrapperType;
+                Kind        = kind;
+                IncludeKey  = includeKey;
+                ExcludeKey  = excludeKey;
+            }
+
+            public bool Equals(FilterCacheKey other) => WrapperType == other.WrapperType &&
+                Kind == other.Kind &&
+                IncludeKey == other.IncludeKey &&
+                ExcludeKey == other.ExcludeKey;
+
+            public override bool Equals(object obj) => obj is FilterCacheKey other && Equals(other);
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    var hashCode = WrapperType != null ? WrapperType.GetHashCode() : 0;
+                    hashCode = (hashCode * 397) ^ (int) Kind;
+                    hashCode = (hashCode * 397) ^ (IncludeKey != null ? IncludeKey.GetHashCode() : 0);
+                    hashCode = (hashCode * 397) ^ (ExcludeKey != null ? ExcludeKey.GetHashCode() : 0);
+                    return hashCode;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Structured representation of a type option for display and selection.
+        /// </summary>
+        private readonly struct TypeOption
+        {
+            public readonly string NamespaceGroup;
+            public readonly string TypeName;
+            public readonly string AssemblyName;
+            public readonly string SerializedName;
+            public readonly string DisplayName;
+            public readonly string MenuPath;
+
+            public TypeOption(Type type, bool appendAssembly)
+            {
+                NamespaceGroup = GetNamespaceGroup(type);
+                TypeName       = GetFriendlyTypeName(type);
+                AssemblyName   = type.Assembly.GetName().Name;
+                SerializedName = type.ToString();
+                var name = appendAssembly && !string.IsNullOrEmpty(AssemblyName)
+                    ? $"{TypeName} [{AssemblyName}]"
+                    : TypeName;
+                DisplayName = $"{name} [{NamespaceGroup}]";
+                MenuPath    = BuildMenuPath(NamespaceGroup, name);
+            }
+
+            public TypeOption(string serializedName)
+            {
+                NamespaceGroup = "Missing";
+                TypeName       = serializedName;
+                AssemblyName   = string.Empty;
+                SerializedName = serializedName;
+                DisplayName    = $"Missing [{serializedName}]";
+                MenuPath       = BuildMenuPath("Missing", serializedName);
+            }
+        }
+
+        /// <summary>
+        /// Custom dropdown implementation to display type options in a hierarchical menu with search support.
+        /// </summary>
+        /// <remarks>
+        /// The search functionality will cause lag, maybe we should use UIToolkit for better performance if this becomes a problem.
+        /// </remarks>
+        private sealed class TypeAdvancedDropdown : AdvancedDropdown
+        {
+            private readonly IReadOnlyList<TypeOption> m_Options;
+            private readonly Action<int>               m_OnSelected;
+
+            public TypeAdvancedDropdown(IReadOnlyList<TypeOption> options, Action<int> onSelected)
+                : base(new AdvancedDropdownState())
+            {
+                m_Options    = options;
+                m_OnSelected = onSelected;
+                minimumSize  = new Vector2(420f, 460f);
+            }
+
+            protected override AdvancedDropdownItem BuildRoot()
+            {
+                var root = new AdvancedDropdownItem("Select Type");
+                root.AddChild(new TypeAdvancedDropdownItem(NULL_OPTION_LABEL, 0));
+
+                var groups = new Dictionary<string, AdvancedDropdownItem>();
+                for (var index = 0; index < m_Options.Count; index++)
+                {
+                    var option = m_Options[index];
+                    AddPath(root, groups, option.MenuPath, index + 1);
+                }
+
+                return root;
+            }
+
+            protected override void ItemSelected(AdvancedDropdownItem item)
+            {
+                if (item is TypeAdvancedDropdownItem typedItem)
+                    m_OnSelected?.Invoke(typedItem.Index);
+            }
+
+            private static void AddPath(AdvancedDropdownItem root, IDictionary<string, AdvancedDropdownItem> groups, string path, int index)
+            {
+                var segments = path.Split('/');
+                var parent = root;
+                var key = string.Empty;
+
+                for (var i = 0; i < segments.Length; i++)
+                {
+                    var segment = segments[i];
+                    if (string.IsNullOrEmpty(segment))
+                        continue;
+
+                    key = string.IsNullOrEmpty(key) ? segment : $"{key}/{segment}";
+                    var isLeaf = i == segments.Length - 1;
+
+                    if (isLeaf)
+                    {
+                        parent.AddChild(new TypeAdvancedDropdownItem(segment, index));
+                        continue;
+                    }
+
+                    if (!groups.TryGetValue(key, out var groupItem))
+                    {
+                        groupItem   = new AdvancedDropdownItem(segment);
+                        groups[key] = groupItem;
+                        parent.AddChild(groupItem);
+                    }
+
+                    parent = groupItem;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Dropdown item that holds the index of the corresponding type option for selection callbacks.
+        /// </summary>
+        private sealed class TypeAdvancedDropdownItem : AdvancedDropdownItem
+        {
+            public readonly int Index;
+
+            public TypeAdvancedDropdownItem(string name, int index) : base(name)
+            {
+                Index = index;
+            }
         }
     }
 }
