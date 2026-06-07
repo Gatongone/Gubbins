@@ -5,7 +5,7 @@
 /// allowing for flexibility in how objects are created and managed within the context of the application.
 /// </summary>
 /// <typeparam name="TProduct">The type of the product.</typeparam>
-public interface ISpawner<out TProduct>
+public interface ISpawner<out TProduct> : ISpawner
 {
     /// <summary>
     /// Get a instance of the specified type.

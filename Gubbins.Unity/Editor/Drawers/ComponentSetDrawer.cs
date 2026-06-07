@@ -105,48 +105,39 @@ namespace Gubbins.Editor
         /// </summary>
         private static Foldout CreateComponentFoldout(SerializedProperty property, SerializedProperty componentsProp)
         {
+            var borderCol = new Color(0.1f, 0.1f, 0.1f);
             var foldout = new Foldout
             {
-                value = property.isExpanded
+                value = property.isExpanded,
+                style =
+                {
+                    paddingLeft             = 15,
+                    marginLeft              = 0,
+                    marginRight             = 0,
+                    marginTop               = 2,
+                    marginBottom            = 2,
+                    borderTopWidth          = 1,
+                    borderRightWidth        = 1,
+                    borderBottomWidth       = 1,
+                    borderLeftWidth         = 1,
+                    borderTopColor          = borderCol,
+                    borderRightColor        = borderCol,
+                    borderBottomColor       = borderCol,
+                    borderLeftColor         = borderCol,
+                    borderBottomLeftRadius  = BORDER_RADIUS,
+                    borderBottomRightRadius = BORDER_RADIUS,
+                    borderTopLeftRadius     = BORDER_RADIUS,
+                    borderTopRightRadius    = BORDER_RADIUS,
+                    backgroundColor         = EditorColors.Content,
+                    unityFontStyleAndWeight = FontStyle.Bold
+                }
             };
-
-            UpdateFoldoutTitle(foldout, property, componentsProp);
-            foldout.RegisterValueChangedCallback(evt => property.isExpanded = evt.newValue);
-
-            var style = foldout.style;
-            var borderCol = new Color(0.1f, 0.1f, 0.1f);
-            style.borderTopWidth          = 1;
-            style.borderRightWidth        = 1;
-            style.borderBottomWidth       = 1;
-            style.borderLeftWidth         = 1;
-            style.marginTop               = 4;
-            style.marginBottom            = 4;
-            style.borderTopColor          = borderCol;
-            style.borderRightColor        = borderCol;
-            style.borderBottomColor       = borderCol;
-            style.borderLeftColor         = borderCol;
-            style.borderBottomLeftRadius  = BORDER_RADIUS;
-            style.borderBottomRightRadius = BORDER_RADIUS;
-            style.borderTopLeftRadius     = BORDER_RADIUS;
-            style.borderTopRightRadius    = BORDER_RADIUS;
-            style.backgroundColor         = EditorColors.Content;
-
-            var toggle = foldout.Q<Toggle>();
-            if (toggle != null)
-            {
-                style.unityFontStyleAndWeight = FontStyle.Bold;
-                style.paddingLeft             = 15;
-                style.marginLeft              = 0;
-                style.marginRight             = 0;
-                style.marginTop               = 2;
-                style.marginBottom            = 2;
-            }
-
             foldout.contentContainer.style.paddingLeft  = 0;
             foldout.contentContainer.style.marginLeft   = 0;
             foldout.contentContainer.style.paddingRight = 5;
             foldout.contentContainer.style.marginRight  = 5;
-
+            UpdateFoldoutTitle(foldout, property, componentsProp);
+            foldout.RegisterValueChangedCallback(evt => property.isExpanded = evt.newValue);
             return foldout;
         }
 
@@ -293,10 +284,10 @@ namespace Gubbins.Editor
 #else
                 text = "+",
 #endif
-                tooltip   = "Add Component",
+                tooltip = "Add Component",
                 style =
                 {
-                    backgroundColor = Color.clear,
+                    backgroundColor = Color.clear
                 }
             };
             addButton.clicked += () => ShowAddComponentMenuUIElements(addButton, componentsProp, property, foldout, listView);
@@ -308,10 +299,10 @@ namespace Gubbins.Editor
 #else
                 text = "-",
 #endif
-                tooltip   = "Remove Selected Component",
+                tooltip = "Remove Selected Component",
                 style =
                 {
-                    backgroundColor = Color.clear,
+                    backgroundColor = Color.clear
                 }
             };
             removeButton.clicked += () => RemoveSelectedComponent(listView, componentsProp, property, refreshUI);

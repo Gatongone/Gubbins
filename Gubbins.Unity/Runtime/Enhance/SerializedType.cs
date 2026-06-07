@@ -1,4 +1,5 @@
 ﻿using System;
+using Gubbins.Unsafe;
 using UnityEngine;
 
 namespace Gubbins.Enhance
@@ -28,7 +29,7 @@ namespace Gubbins.Enhance
             {
                 if (m_Type != null && m_TypeString == m_Type.ToString()) return m_Type;
                 if (string.IsNullOrEmpty(m_TypeString)) return null;
-                m_Type = Type.GetType(m_TypeString);
+                m_Type = Type.GetType(m_TypeString, Reflection.LoadAssemblyResolver, Reflection.DomainTypeResolver);
                 return m_Type;
             }
         }
@@ -104,7 +105,7 @@ namespace Gubbins.Enhance
             {
                 if (m_Type != null && m_TypeString == m_Type.ToString()) return m_Type;
                 if (string.IsNullOrEmpty(m_TypeString)) return null;
-                m_Type = Type.GetType(m_TypeString);
+                m_Type = Type.GetType(m_TypeString, Reflection.LoadAssemblyResolver, Reflection.DomainTypeResolver);
                 return m_Type;
             }
         }
@@ -182,7 +183,7 @@ namespace Gubbins.Enhance
         /// <summary>
         /// Types to include in the filter.
         /// </summary>
-        public Type[] Include;
+        public readonly Type[] Include;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="TypeFromAttribute"/> class.
@@ -210,37 +211,43 @@ namespace Gubbins.Enhance
         /// <summary>Interface types.</summary>
         Interface = 1 << 1,
 
+        /// <summary>Non-abstract types.</summary>
+        NotAbstract = 1 << 2,
+
+        /// <summary>Non-interface types</summary>
+        NotInterface = 1 << 3,
+
         /// <summary>Concrete implementation types.</summary>
-        Implementation = 1 << 2,
+        Implementation = 1 << 4,
 
         /// <summary>Class types.</summary>
-        Class = 1 << 3,
+        Class = 1 << 5,
 
         /// <summary>Struct types.</summary>
-        Struct = 1 << 4,
+        Struct = 1 << 6,
 
         /// <summary>Types with a public parameterless constructor.</summary>
-        Newable = 1 << 5,
+        Newable = 1 << 7,
 
         /// <summary>Unmanaged types.</summary>
-        Unmanaged = 1 << 6,
+        Unmanaged = 1 << 8,
 
         /// <summary>Type contains generic parameters.</summary>
-        Generic = 1 << 7,
+        Generic = 1 << 9,
 
         /// <summary>Type does not contain generic parameters.</summary>
-        NotGeneric = 1 << 8,
+        NotGeneric = 1 << 10,
 
         /// <summary>Unity components (classes deriving from <see cref="UnityEngine.Component"/>).</summary>
-        Component = 1 << 9,
+        Component = 1 << 11,
 
         /// <summary>Unity scriptable objects (classes deriving from <see cref="UnityEngine.ScriptableObject"/>).</summary>
-        ScriptableObject = 1 << 10,
+        ScriptableObject = 1 << 12,
 
         /// <summary>Unity objects including components, scriptable objects, and other Unity types.</summary>
         UnityObject = Component | ScriptableObject,
 
         /// <summary>All types.</summary>
-        All = Abstract | Interface | Implementation | Class | Struct | Newable | Unmanaged | Generic | NotGeneric | UnityObject
+        All = 1 << 13
     }
 }

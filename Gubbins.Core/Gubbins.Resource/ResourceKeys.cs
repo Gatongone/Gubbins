@@ -1,6 +1,6 @@
 ﻿using Gubbins.Resource;
 
-namespace Gubbins.Resources;
+namespace Gubbins.Resource;
 
 public readonly struct Path(string path) : IResourceKey, IEquatable<Path>
 {

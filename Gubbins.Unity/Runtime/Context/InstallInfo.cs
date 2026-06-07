@@ -1,20 +1,20 @@
 ﻿using System;
-using System.Collections.Generic;
 using Gubbins.Enhance;
 using Gubbins.Spawner;
 
 namespace Gubbins.Context
 {
     [Serializable]
-    public class InstallInfo
+    public struct SerializedInstallInfo
     {
-        public  Scope                                 Scope;
-        public  string                                Key;
-        public  SerializedType                        Type;
-        public  HashSet<Type>                         Bindings;
-        public  UnityEngine.Object                    Prototype;
-        public  SerializedReference<ISpawner>         Factory;
-        public  SerializedReference<IScopeController> Controller;
-        public  uint                                  Prewarm;
+        public Scope                                 Scope;
+        public string                                Key;
+        [TypeFrom(TypeKind.NotAbstract | TypeKind.NotInterface | TypeKind.NotGeneric)]
+        public SerializedType                        Type;
+        public SerializedType[]                      Bindings;
+        public UnityEngine.Object                    Prototype;
+        public SerializedReference<ISpawner>         Spawner;
+        public SerializedReference<IScopeController> Controller;
+        public uint                                  Prewarm;
     }
 }

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Gubbins.Enhance;
+using Gubbins.Unsafe;
 using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine;
@@ -486,7 +487,7 @@ namespace Gubbins.Editor
         private Type GetTypeFromName(string typeName)
         {
             if (string.IsNullOrEmpty(typeName)) return null;
-            return Type.GetType(typeName);
+            return Type.GetType(typeName, Reflection.LoadAssemblyResolver, Reflection.DomainTypeResolver);
         }
 
         /// <summary>

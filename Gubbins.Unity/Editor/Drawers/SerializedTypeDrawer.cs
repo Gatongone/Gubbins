@@ -7,6 +7,7 @@ using Gubbins.Enhance;
 using UnityEditor;
 using UnityEditor.IMGUI.Controls;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 namespace Gubbins.Editor
 {
@@ -28,112 +29,7 @@ namespace Gubbins.Editor
         private static readonly Dictionary<Type, bool>                       s_IsNewableCache   = new();
         private static readonly Dictionary<string, Type>                     s_WrapperTypeCache = new();
 
-        /// <summary>
-        /// IMGUI version.
-        /// </summary>
-        public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
-        {
-            EditorGUI.BeginProperty(position, label, property);
-
-            var typeString = property.FindPropertyRelative(TYPE_STRING_PROPERTY_NAME);
-            if (typeString == null)
-            {
-                EditorGUI.LabelField(position, label.text, "SerializedType requires an m_TypeString backing field.");
-                EditorGUI.EndProperty();
-                return;
-            }
-
-            if (!TryBuildOptions(property, typeString.stringValue, out var options))
-            {
-                EditorGUI.LabelField(position, label.text, "TypeFrom only supports SerializedType and SerializedType<T>.");
-                EditorGUI.EndProperty();
-                return;
-            }
-
-            var currentIndex = GetCurrentIndex(options, typeString.stringValue);
-            var currentDisplay = currentIndex <= 0 ? NULL_OPTION_LABEL : options[currentIndex - 1].DisplayName;
-            var buttonRect = EditorGUI.PrefixLabel(position, new GUIContent(property.displayName));
-            if (EditorGUI.DropdownButton(buttonRect, new GUIContent(currentDisplay), FocusType.Keyboard))
-            {
-                var screenRect = GUIUtility.GUIToScreenRect(buttonRect);
-                var dropdown = new TypeAdvancedDropdown(options, newIndex =>
-                {
-                    ApplySelection(typeString, options, newIndex);
-                    property.serializedObject.ApplyModifiedProperties();
-                });
-                dropdown.Show(screenRect);
-            }
-
-            EditorGUI.EndProperty();
-        }
-
-        /// <inheritdoc/>
-        public override float GetPropertyHeight(SerializedProperty property, GUIContent label) => EditorGUIUtility.singleLineHeight;
-
-        /// <summary>
-        /// Build the selectable type list for the current property.
-        /// </summary>
-        private bool TryBuildOptions(SerializedProperty property, string currentSerializedName, out List<TypeOption> options)
-        {
-            options = null;
-            var wrapperType = GetSerializedTypeWrapper(property);
-            if (wrapperType == null)
-                return false;
-
-            var typeFrom = attribute as TypeFromAttribute;
-            options = GetOrBuildBaseOptions(wrapperType, typeFrom);
-
-            if (!string.IsNullOrEmpty(currentSerializedName) && options.All(option => option.SerializedName != currentSerializedName))
-                options = options.Concat(new[] {new TypeOption(currentSerializedName)}).ToList();
-
-            return true;
-        }
-
-        /// <summary>
-        /// Resolve or build cached options for a specific wrapper and filter configuration.
-        /// </summary>
-        private static List<TypeOption> GetOrBuildBaseOptions(Type wrapperType, TypeFromAttribute typeFrom)
-        {
-            var includeTypes = typeFrom?.Include ?? Array.Empty<Type>();
-            var excludedTypes = typeFrom?.Exclude ?? Array.Empty<Type>();
-            var typeKind = typeFrom?.Kind ?? TypeKind.All;
-            var cacheKey = new FilterCacheKey(wrapperType, typeKind, BuildTypeKey(includeTypes), BuildTypeKey(excludedTypes));
-
-            if (s_OptionCache.TryGetValue(cacheKey, out var cachedOptions))
-                return cachedOptions;
-
-            var excludedTypeSet = new HashSet<Type>(excludedTypes);
-            var candidateTypes = includeTypes.Length == 0
-                ? s_AllTypes
-                : includeTypes.SelectMany(GetAllSubTypesCached).Distinct().ToArray();
-
-            var builtOptions = candidateTypes.Where(type => type != null)
-                                             .Where(IsSelectableTypeCandidate)
-                                             .Where(type => !excludedTypeSet.Contains(type))
-                                             .Where(type => VerifyTypeKind(typeKind, type))
-                                             .GroupBy(type => type.ToString())
-                                             .Select(group => group.First())
-                                             .ToArray();
-
-            var duplicateNameKeys = builtOptions.GroupBy(type => $"{GetNamespaceGroup(type)}|{GetFriendlyTypeName(type)}")
-                                                .Where(group => group.Count() > 1)
-                                                .Select(group => group.Key)
-                                                .ToHashSet();
-
-            var typedOptions = builtOptions.Select(type =>
-                                           {
-                                               var key = $"{GetNamespaceGroup(type)}|{GetFriendlyTypeName(type)}";
-                                               return new TypeOption(type, duplicateNameKeys.Contains(key));
-                                           })
-                                           .OrderBy(option => option.NamespaceGroup, StringComparer.Ordinal)
-                                           .ThenBy(option => option.TypeName, StringComparer.Ordinal)
-                                           .ThenBy(option => option.AssemblyName, StringComparer.Ordinal)
-                                           .ThenBy(option => option.SerializedName, StringComparer.Ordinal)
-                                           .ToList();
-
-            s_OptionCache[cacheKey] = typedOptions;
-            return typedOptions;
-        }
+        #region Common
 
         /// <summary>
         /// Resolve the actual serialized wrapper type for direct fields and collection elements.
@@ -279,6 +175,10 @@ namespace Gubbins.Editor
                 return false;
             if ((typeKind & TypeKind.Abstract) != 0 && !type.IsAbstract)
                 return false;
+            if ((typeKind & TypeKind.NotAbstract) != 0 && type.IsAbstract)
+                return false;
+            if ((typeKind & TypeKind.NotInterface) != 0 && type.IsInterface)
+                return false;
             if ((typeKind & TypeKind.Implementation) != 0 && (type.IsAbstract || type.IsInterface))
                 return false;
             if ((typeKind & TypeKind.Newable) != 0 && !IsTypeNewableCached(type))
@@ -293,7 +193,6 @@ namespace Gubbins.Editor
                 return false;
             if ((typeKind & TypeKind.NotGeneric) != 0 && type.ContainsGenericParameters)
                 return false;
-
             if ((typeKind & TypeKind.UnityObject) == TypeKind.UnityObject) return typeof(UnityEngine.Object).IsAssignableFrom(type);
 
             if ((typeKind & TypeKind.Component) != 0 && !typeof(Component).IsAssignableFrom(type))
@@ -404,72 +303,6 @@ namespace Gubbins.Editor
         private static string GetNamespaceGroup(Type type) => string.IsNullOrEmpty(type.Namespace) ? "(Global)" : type.Namespace;
 
         /// <summary>
-        /// Build a friendly type name suitable for editor popups.
-        /// </summary>
-        private static string GetFriendlyTypeName(Type type)
-        {
-            if (type == null)
-                return string.Empty;
-
-            if (type.IsGenericParameter)
-                return type.Name;
-
-            if (type.IsArray)
-                return $"{GetFriendlyTypeName(type.GetElementType())}[{new string(',', type.GetArrayRank() - 1)}]";
-
-            if (type.IsByRef)
-                return $"{GetFriendlyTypeName(type.GetElementType())}&";
-
-            if (type.IsPointer)
-                return $"{GetFriendlyTypeName(type.GetElementType())}*";
-
-            var typeName = GetFriendlyNestedTypeName(type);
-            var genericArguments = GetOwnGenericArguments(type);
-            if (genericArguments.Length == 0)
-                return typeName;
-
-            return $"{typeName}<{string.Join(", ", genericArguments.Select(GetFriendlyTypeName))}>";
-        }
-
-        /// <summary>
-        /// Build a nested type name without namespace and generic arity suffixes.
-        /// </summary>
-        private static string GetFriendlyNestedTypeName(Type type)
-        {
-            var name = StripGenericArity(type.Name);
-            if (type.DeclaringType == null)
-                return name;
-
-            return $"{GetFriendlyNestedTypeName(type.DeclaringType)}.{name}";
-        }
-
-        /// <summary>
-        /// Get only the generic arguments introduced by the current type, excluding declaring-type arguments.
-        /// </summary>
-        private static Type[] GetOwnGenericArguments(Type type)
-        {
-            if (!type.IsGenericType)
-                return Array.Empty<Type>();
-
-            var allArguments = type.GetGenericArguments();
-            var declaringArgumentCount = type.DeclaringType?.GetGenericArguments().Length ?? 0;
-            var ownArgumentCount = Math.Max(0, allArguments.Length - declaringArgumentCount);
-            if (ownArgumentCount == 0)
-                return Array.Empty<Type>();
-
-            return allArguments.Skip(declaringArgumentCount).ToArray();
-        }
-
-        /// <summary>
-        /// Strip the generic arity suffix from a CLR type name.
-        /// </summary>
-        private static string StripGenericArity(string typeName)
-        {
-            var genericIndex = typeName.IndexOf('`');
-            return genericIndex < 0 ? typeName : typeName.Substring(0, genericIndex);
-        }
-
-        /// <summary>
         /// Checks if the provided type is unmanaged, which means it is a value type that does not contain any reference type fields.
         /// </summary>
         /// <param name="type">The type to check for being unmanaged. </param>
@@ -525,6 +358,182 @@ namespace Gubbins.Editor
                                          .OrderBy(name => name, StringComparer.Ordinal));
         }
 
+        #endregion
+
+        #region UIToolKit
+
+        /// <summary>
+        /// UIToolkit version.
+        /// </summary>
+        public override VisualElement CreatePropertyGUI(SerializedProperty property)
+        {
+            var typeString = property.FindPropertyRelative(TYPE_STRING_PROPERTY_NAME);
+            if (typeString == null)
+            {
+                return new Label("SerializedType requires an m_TypeString backing field.");
+            }
+
+            if (!TryBuildOptions(property, typeString.stringValue, out var options))
+            {
+                return new Label("TypeFrom only supports SerializedType and SerializedType<T>.");
+            }
+
+            var root = new VisualElement();
+            var button = new ButtonPopupField(property.displayName);
+            button.AddToClassList(ButtonPopupField.alignedFieldUssClassName);
+            root.Add(button);
+            UpdateButtonText();
+
+            button.clicked += () =>
+            {
+                // Get the button's screen rectangle for the dropdown
+                var buttonRect = button.worldBound;
+                var screenRect = GUIUtility.GUIToScreenRect(buttonRect);
+                var dropdown = new TypeAdvancedDropdown(options, newIndex =>
+                {
+                    ApplySelection(typeString, options, newIndex);
+                    UpdateButtonText();
+                    property.serializedObject.ApplyModifiedProperties();
+                });
+                dropdown.Show(screenRect);
+            };
+
+            Undo.undoRedoPerformed += OnUndoRedo;
+
+            // Clean up event subscription when the element is removed
+            root.RegisterCallback<DetachFromPanelEvent>(_ => Undo.undoRedoPerformed -= OnUndoRedo);
+
+            return root;
+
+            // Refresh button text from the current serialized value
+            void UpdateButtonText()
+            {
+                var currentString = typeString.stringValue;
+                var idx = GetCurrentIndex(options, currentString);
+                button.text = idx <= 0 ? NULL_OPTION_LABEL : options[idx - 1].DisplayName;
+            }
+
+            // Handle external changes (undo/redo, reset, etc.)
+            void OnUndoRedo()
+            {
+                property.serializedObject.Update();
+                UpdateButtonText();
+            }
+        }
+
+        #endregion
+
+        #region IMGUI
+
+        /// <summary>
+        /// IMGUI version.
+        /// </summary>
+        public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
+        {
+            EditorGUI.BeginProperty(position, label, property);
+
+            var typeString = property.FindPropertyRelative(TYPE_STRING_PROPERTY_NAME);
+            if (typeString == null)
+            {
+                EditorGUI.LabelField(position, label.text, "SerializedType requires an m_TypeString backing field.");
+                EditorGUI.EndProperty();
+                return;
+            }
+
+            if (!TryBuildOptions(property, typeString.stringValue, out var options))
+            {
+                EditorGUI.LabelField(position, label.text, "TypeFrom only supports SerializedType and SerializedType<T>.");
+                EditorGUI.EndProperty();
+                return;
+            }
+
+            var currentIndex = GetCurrentIndex(options, typeString.stringValue);
+            var currentDisplay = currentIndex <= 0 ? NULL_OPTION_LABEL : options[currentIndex - 1].DisplayName;
+            var buttonRect = EditorGUI.PrefixLabel(position, new GUIContent(property.displayName));
+            if (EditorGUI.DropdownButton(buttonRect, new GUIContent(currentDisplay), FocusType.Keyboard))
+            {
+                var screenRect = GUIUtility.GUIToScreenRect(buttonRect);
+                var dropdown = new TypeAdvancedDropdown(options, newIndex =>
+                {
+                    ApplySelection(typeString, options, newIndex);
+                    property.serializedObject.ApplyModifiedProperties();
+                });
+                dropdown.Show(screenRect);
+            }
+
+            EditorGUI.EndProperty();
+        }
+
+        /// <inheritdoc/>
+        public override float GetPropertyHeight(SerializedProperty property, GUIContent label) => EditorGUIUtility.singleLineHeight;
+
+        /// <summary>
+        /// Build the selectable type list for the current property.
+        /// </summary>
+        private bool TryBuildOptions(SerializedProperty property, string currentSerializedName, out List<TypeOption> options)
+        {
+            options = null;
+            var wrapperType = GetSerializedTypeWrapper(property);
+            if (wrapperType == null)
+                return false;
+
+            var typeFrom = attribute as TypeFromAttribute;
+            options = GetOrBuildBaseOptions(wrapperType, typeFrom);
+
+            if (!string.IsNullOrEmpty(currentSerializedName) && options.All(option => option.SerializedName != currentSerializedName))
+                options = options.Concat(new[] {new TypeOption(currentSerializedName)}).ToList();
+
+            return true;
+        }
+
+        /// <summary>
+        /// Resolve or build cached options for a specific wrapper and filter configuration.
+        /// </summary>
+        private static List<TypeOption> GetOrBuildBaseOptions(Type wrapperType, TypeFromAttribute typeFrom)
+        {
+            var includeTypes = typeFrom?.Include ?? Array.Empty<Type>();
+            var excludedTypes = typeFrom?.Exclude ?? Array.Empty<Type>();
+            var typeKind = typeFrom?.Kind ?? TypeKind.All;
+            var cacheKey = new FilterCacheKey(wrapperType, typeKind, BuildTypeKey(includeTypes), BuildTypeKey(excludedTypes));
+
+            if (s_OptionCache.TryGetValue(cacheKey, out var cachedOptions))
+                return cachedOptions;
+
+            var excludedTypeSet = new HashSet<Type>(excludedTypes);
+            var candidateTypes = includeTypes.Length == 0
+                ? s_AllTypes
+                : includeTypes.SelectMany(GetAllSubTypesCached).Distinct().ToArray();
+
+            var builtOptions = candidateTypes.Where(type => type != null)
+                                             .Where(IsSelectableTypeCandidate)
+                                             .Where(type => !excludedTypeSet.Contains(type))
+                                             .Where(type => VerifyTypeKind(typeKind, type))
+                                             .GroupBy(type => type.ToString())
+                                             .Select(group => group.First())
+                                             .ToArray();
+
+            var duplicateNameKeys = builtOptions.GroupBy(type => $"{GetNamespaceGroup(type)}|{TypeName.GetFriendlyTypeName(type)}")
+                                                .Where(group => group.Count() > 1)
+                                                .Select(group => group.Key)
+                                                .ToHashSet();
+
+            var typedOptions = builtOptions.Select(type =>
+                                           {
+                                               var key = $"{GetNamespaceGroup(type)}|{TypeName.GetFriendlyTypeName(type)}";
+                                               return new TypeOption(type, duplicateNameKeys.Contains(key));
+                                           })
+                                           .OrderBy(option => option.NamespaceGroup, StringComparer.Ordinal)
+                                           .ThenBy(option => option.TypeName, StringComparer.Ordinal)
+                                           .ThenBy(option => option.AssemblyName, StringComparer.Ordinal)
+                                           .ThenBy(option => option.SerializedName, StringComparer.Ordinal)
+                                           .ToList();
+
+            s_OptionCache[cacheKey] = typedOptions;
+            return typedOptions;
+        }
+
+        #endregion
+
         /// <summary>
         /// Struct used as a cache key for filtered type options.
         /// </summary>
@@ -578,7 +587,7 @@ namespace Gubbins.Editor
             public TypeOption(Type type, bool appendAssembly)
             {
                 NamespaceGroup = GetNamespaceGroup(type);
-                TypeName       = GetFriendlyTypeName(type);
+                TypeName       = Editor.TypeName.GetFriendlyTypeName(type);
                 AssemblyName   = type.Assembly.GetName().Name;
                 SerializedName = type.ToString();
                 var name = appendAssembly && !string.IsNullOrEmpty(AssemblyName)

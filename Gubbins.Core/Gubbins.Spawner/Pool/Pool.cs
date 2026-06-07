@@ -114,6 +114,9 @@ public class Pool<T> : IPool<T>
                 OnInstanceRemoved(instance);
         }
     }
+
+    /// <inheritdoc/>
+    object? ISpawner.Spawn() => Spawn();
 }
 
 /// <summary>
@@ -211,4 +214,7 @@ public class TraceablePool<T> : IPool<T>, ITraceablePool, IEnumerable<T>
 
     /// <inheritdoc />
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+    /// <inheritdoc/>
+    object? ISpawner.Spawn() => Spawn();
 }
