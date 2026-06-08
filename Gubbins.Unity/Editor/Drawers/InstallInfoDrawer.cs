@@ -117,7 +117,7 @@ namespace Gubbins.Editor
                 ClearProperty(properties.Bindings);
                 properties.Key.stringValue = changedType.Type != null ? changedType.Type.ToString() : string.Empty;
 
-                if (curScope is Scope.Multiton || changedType.Type == null || root.Contains(prototype) && !changedType.Type.IsAssignableFrom(typeof(UnityEngine.Object)))
+                if (root.Contains(prototype) && (curScope is Scope.Multiton || changedType.Type == null || !changedType.Type.IsAssignableFrom(typeof(UnityEngine.Object))))
                 {
                     root.Remove(prototype);
                 }
@@ -130,6 +130,7 @@ namespace Gubbins.Editor
                 {
                     root.Remove(bindings);
                 }
+
                 if (changedType.Type != null)
                 {
                     bindings = CreateBindingProperty(properties.Bindings, properties.Type);
@@ -235,19 +236,22 @@ namespace Gubbins.Editor
 
             var listView = new ListView
             {
-                reorderable             = true,
-                allowAdd                = true,
-                allowRemove             = true,
-                showBorder              = true,
+                reorderable = true,
+
                 showAddRemoveFooter     = true,
                 showBoundCollectionSize = false,
                 itemsSource             = ExtractArrayProperties(property),
                 reorderMode             = ListViewReorderMode.Animated,
                 selectionType           = SelectionType.Single,
-                onAdd                   = OnAdd,
-                onRemove                = OnRemove,
-                bindItem                = BindItem,
-                makeItem                = static () => new Label(),
+#if UNITY_2023_2_OR_NEWER
+                onAdd = OnAdd,
+                onRemove = OnRemove,
+                allowAdd = true,
+                allowRemove = true,
+#endif
+                showBorder = true,
+                bindItem   = BindItem,
+                makeItem   = static () => new Label(),
                 style =
                 {
                     paddingBottom = 10
@@ -256,6 +260,44 @@ namespace Gubbins.Editor
             listView.itemIndexChanged += OnRecord;
             foldout.text              =  property.displayName;
             foldout.Add(listView);
+#if !UNITY_2023_2_OR_NEWER
+            listView.itemsAdded += items =>
+            {
+                foreach (var item in items)
+                {
+                    var menu = new GenericMenu();
+                    var boundedTypes = ExtractArrayProperties(property);
+                    foreach (var bindingType in bindingTypes.Except(boundedTypes).OrderBy(t => t.ToString()))
+                    {
+                        menu.AddItem(new GUIContent(TypeName.GetFriendlyTypeFullName(bindingType)), false, () =>
+                        {
+                            property.arraySize++;
+                            var element = property.GetArrayElementAtIndex(property.arraySize - 1);
+                            element.boxedValue = new SerializedType(bindingType);
+                            property.serializedObject.ApplyModifiedProperties();
+                            RefreshList(listView);
+                        });
+                    }
+
+                    menu.ShowAsContext();
+                }
+            };
+            listView.itemsRemoved += items =>
+            {
+                foreach (var item in items)
+                {
+                    if (item < 0 || item >= property.arraySize)
+                    {
+                        continue;
+                    }
+
+                    property.DeleteArrayElementAtIndex(item);
+                    property.serializedObject.ApplyModifiedProperties();
+                }
+
+                RefreshList(listView);
+            };
+#endif
             return foldout;
 
             void OnRecord(int start, int end)

@@ -15,7 +15,7 @@ namespace Gubbins.Editor
 
         public event System.Action clicked;
 
-        [CreateProperty(ReadOnly = true)]
+        [CreateProperty]
         public string text
         {
             get => m_TextElement.text;
