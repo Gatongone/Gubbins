@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using Gubbins.Enhance;
+using Unity.Collections.LowLevel.Unsafe;
 using UnityEditor;
 using UnityEditor.IMGUI.Controls;
 using UnityEngine;
@@ -187,7 +188,7 @@ namespace Gubbins.Editor
                 return false;
             if ((typeKind & TypeKind.Class) != 0 && !type.IsClass)
                 return false;
-            if ((typeKind & TypeKind.Unmanaged) != 0 && !IsTypeUnmanagedCached(type))
+            if ((typeKind & TypeKind.Unmanaged) != 0 && !UnsafeUtility.IsUnmanaged(type))
                 return false;
             if ((typeKind & TypeKind.Generic) != 0 && !type.ContainsGenericParameters)
                 return false;
@@ -329,19 +330,6 @@ namespace Gubbins.Editor
 
             result                 = type.IsNewable(out _);
             s_IsNewableCache[type] = result;
-            return result;
-        }
-
-        /// <summary>
-        /// Cached wrapper for unmanaged checks.
-        /// </summary>
-        private static bool IsTypeUnmanagedCached(Type type)
-        {
-            if (s_IsUnmanagedCache.TryGetValue(type, out var result))
-                return result;
-
-            result                   = CheckIsTypeUnmanaged(type);
-            s_IsUnmanagedCache[type] = result;
             return result;
         }
 

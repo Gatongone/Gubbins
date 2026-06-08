@@ -1,6 +1,7 @@
 using System;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 
@@ -19,6 +20,15 @@ namespace Gubbins.Unsafe
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override void SetObjectAddress(object source, void* destination) => UnsafeUtility.CopyObjectAddressToPtr(source, destination);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public override void Free(IntPtr ptr) => UnsafeUtility.Free(ptr.ToPointer(), Allocator.Persistent);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public override IntPtr Allocate(int size, int align = 8) => (IntPtr) UnsafeUtility.Malloc(size, align, Allocator.Persistent);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public override T ConvertToStructure<T>(void* ptr) => UnsafeUtility.ReadArrayElement<T>(ptr, 0);
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ReplaceInstance() => Native.Operation = new UnityUnsafeOperation();
