@@ -304,23 +304,6 @@ namespace Gubbins.Editor
         private static string GetNamespaceGroup(Type type) => string.IsNullOrEmpty(type.Namespace) ? "(Global)" : type.Namespace;
 
         /// <summary>
-        /// Checks if the provided type is unmanaged, which means it is a value type that does not contain any reference type fields.
-        /// </summary>
-        /// <param name="type">The type to check for being unmanaged. </param>
-        /// <returns>True if the type is unmanaged; otherwise, false.</returns>
-        private static bool CheckIsTypeUnmanaged(Type type)
-        {
-            if (type.IsPrimitive || type.IsPointer || type.IsEnum)
-                return true;
-            if (!type.IsValueType)
-                return false;
-
-            // // A type is considered unmanaged if it is a value type and all of its fields are either of
-            // the same type (to allow for recursive structs) or are unmanaged types.
-            return !type.GetFields().Any(f => f.FieldType != type && !CheckIsTypeUnmanaged(f.FieldType));
-        }
-
-        /// <summary>
         /// Cached wrapper for IsNewable to avoid repeated reflection checks across repaints.
         /// </summary>
         private static bool IsTypeNewableCached(Type type)
@@ -423,16 +406,13 @@ namespace Gubbins.Editor
             var typeString = property.FindPropertyRelative(TYPE_STRING_PROPERTY_NAME);
             if (typeString == null)
             {
-                EditorGUI.LabelField(position, label.text, "SerializedType requires an m_TypeString backing field.");
                 EditorGUI.EndProperty();
                 return;
             }
 
             if (!TryBuildOptions(property, typeString.stringValue, out var options))
             {
-                EditorGUI.LabelField(position, label.text, "TypeFrom only supports SerializedType and SerializedType<T>.");
-                EditorGUI.EndProperty();
-                return;
+                options = new List<TypeOption>();
             }
 
             var currentIndex = GetCurrentIndex(options, typeString.stringValue);

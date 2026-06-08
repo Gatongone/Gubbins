@@ -1,5 +1,5 @@
 ﻿using System.Reflection;
-using Unity.Properties;
+using UnityEditor.UIElements;
 using UnityEngine.UIElements;
 
 namespace Gubbins.Editor
@@ -15,7 +15,6 @@ namespace Gubbins.Editor
 
         public event System.Action clicked;
 
-        [CreateProperty]
         public string text
         {
             get => m_TextElement.text;

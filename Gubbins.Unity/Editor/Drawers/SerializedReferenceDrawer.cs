@@ -355,7 +355,7 @@ namespace Gubbins.Editor
             // Draw the type selector popup
             var typeRect = new Rect(position.x, position.y, position.width, EditorGUIUtility.singleLineHeight);
             var currentIndex = currentType == null ? 0 : allTypes.IndexOf(currentType) + 1;
-            var newIndex = EditorGUI.Popup(typeRect, label.text + " Type", currentIndex, typeNames);
+            var newIndex = EditorGUI.Popup(typeRect, label.text, currentIndex, typeNames);
             if (newIndex != currentIndex)
             {
                 if (newIndex == 0)
@@ -398,8 +398,10 @@ namespace Gubbins.Editor
             if (effectiveType != null)
             {
                 EditorGUI.indentLevel++;
-                var fieldRect = new Rect(position.x, position.y + EditorGUIUtility.singleLineHeight + VERTICAL_SPACING,
-                    position.width, GetPropertyHeight(property, label) - EditorGUIUtility.singleLineHeight - VERTICAL_SPACING);
+                var fieldRect = new Rect(position.x,
+                    position.y + EditorGUIUtility.singleLineHeight + VERTICAL_SPACING,
+                    position.width,
+                    GetPropertyHeight(property, label) - EditorGUIUtility.singleLineHeight - VERTICAL_SPACING);
                 if (typeof(UnityEngine.Object).IsAssignableFrom(effectiveType))
                 {
                     DrawUnityObjectField(fieldRect, unityProp, effectiveType, typeNameProp);
@@ -424,7 +426,7 @@ namespace Gubbins.Editor
                 var currentObj = unityProp.objectReferenceValue;
 
                 EditorGUI.BeginChangeCheck();
-                var newObj = EditorGUI.ObjectField(rect, string.Empty, currentObj, objectFieldType, true);
+                var newObj = EditorGUI.ObjectField(rect, new GUIContent(" "), currentObj, objectFieldType, true);
                 if (!EditorGUI.EndChangeCheck()) return;
                 if (newObj == null)
                 {

@@ -16,7 +16,7 @@
   ],
   "dependencies": {
     "com.unity.mathematics": "1.2.6",
-    "com.unity.burst": "1.8.29",
-    "com.unity.collections": "2.6.7"
+    "com.unity.burst": "1.8.26",
+    "com.unity.collections": "1.5.2"
   }
 }

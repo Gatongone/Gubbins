@@ -51,7 +51,7 @@ namespace Gubbins.Editor
             var prewarm = CreatePropertyField(properties.Prewarm);
             var prototype = CreatePropertyField(properties.Prototype);
             var currentScope = (Scope) properties.Scope.enumValueIndex;
-            var serializedType = (SerializedType) properties.Type.boxedValue;
+            var serializedType = (SerializedType) properties.Type.GetValue();
 
             // Build root.
             root.Add(key);
@@ -111,7 +111,7 @@ namespace Gubbins.Editor
             });
             type.RegisterValueChangeCallback(evt =>
             {
-                var changedType = (SerializedType) evt.changedProperty.boxedValue;
+                var changedType = (SerializedType) evt.changedProperty.GetValue();
                 var curScope = (Scope) properties.Scope.enumValueIndex;
                 ClearProperty(properties.Prototype);
                 ClearProperty(properties.Bindings);
@@ -156,9 +156,9 @@ namespace Gubbins.Editor
             {
                 property.ClearArray();
             }
-            else if (property.boxedValue != null)
+            else if (property.GetValue() != null)
             {
-                property.boxedValue = null;
+                property.SetValue(null);
             }
             else if (property.objectReferenceValue != null)
             {
@@ -184,7 +184,7 @@ namespace Gubbins.Editor
         private VisualElement CreateBindingProperty(SerializedProperty property, SerializedProperty type)
         {
             Type actualType = null;
-            if (type?.boxedValue is SerializedType serializedType)
+            if (type?.GetValue() is SerializedType serializedType)
             {
                 actualType = serializedType.Type;
             }
@@ -257,47 +257,13 @@ namespace Gubbins.Editor
                     paddingBottom = 10
                 }
             };
+#if !UNITY_2023_2_OR_NEWER
+            listView.itemsAdded   += OnAdd;
+            listView.itemsRemoved += OnRemove;
+#endif
             listView.itemIndexChanged += OnRecord;
             foldout.text              =  property.displayName;
             foldout.Add(listView);
-#if !UNITY_2023_2_OR_NEWER
-            listView.itemsAdded += items =>
-            {
-                foreach (var item in items)
-                {
-                    var menu = new GenericMenu();
-                    var boundedTypes = ExtractArrayProperties(property);
-                    foreach (var bindingType in bindingTypes.Except(boundedTypes).OrderBy(t => t.ToString()))
-                    {
-                        menu.AddItem(new GUIContent(TypeName.GetFriendlyTypeFullName(bindingType)), false, () =>
-                        {
-                            property.arraySize++;
-                            var element = property.GetArrayElementAtIndex(property.arraySize - 1);
-                            element.boxedValue = new SerializedType(bindingType);
-                            property.serializedObject.ApplyModifiedProperties();
-                            RefreshList(listView);
-                        });
-                    }
-
-                    menu.ShowAsContext();
-                }
-            };
-            listView.itemsRemoved += items =>
-            {
-                foreach (var item in items)
-                {
-                    if (item < 0 || item >= property.arraySize)
-                    {
-                        continue;
-                    }
-
-                    property.DeleteArrayElementAtIndex(item);
-                    property.serializedObject.ApplyModifiedProperties();
-                }
-
-                RefreshList(listView);
-            };
-#endif
             return foldout;
 
             void OnRecord(int start, int end)
@@ -308,25 +274,13 @@ namespace Gubbins.Editor
                 for (var i = 0; i < newOrder.Count; i++)
                 {
                     var elem = property.GetArrayElementAtIndex(i);
-                    elem.boxedValue = new SerializedType(newOrder[i]);
+                    elem.SetValue(new SerializedType(newOrder[i]));
                 }
 
                 property.serializedObject.ApplyModifiedProperties();
             }
 
-            void RefreshList(BaseListView list)
-            {
-                list.itemsSource = ExtractArrayProperties(property);
-                list.Rebuild();
-            }
-
-            void BindItem(VisualElement element, int index)
-            {
-                var label = (Label) element;
-                var types = ExtractArrayProperties(property);
-                label.text = index < types.Count ? TypeName.GetFriendlyTypeFullName(types[index]) : "null";
-            }
-
+#if UNITY_2022_2_OR_NEWER
             void OnAdd(BaseListView list)
             {
                 var menu = new GenericMenu();
@@ -358,6 +312,58 @@ namespace Gubbins.Editor
                 list.RemoveAt(list.selectedIndex);
                 RefreshList(list);
             }
+#else
+            void RefreshList(ListView list)
+            {
+                list.itemsSource = ExtractArrayProperties(property);
+                list.Rebuild();
+            }
+
+            void BindItem(VisualElement element, int index)
+            {
+                var label = (Label) element;
+                var types = ExtractArrayProperties(property);
+                label.text = index < types.Count ? TypeName.GetFriendlyTypeFullName(types[index]) : "null";
+            }
+
+            void OnAdd(IEnumerable<int> items)
+            {
+                foreach (var item in items)
+                {
+                    var menu = new GenericMenu();
+                    var boundedTypes = ExtractArrayProperties(property);
+                    foreach (var bindingType in bindingTypes.Except(boundedTypes).OrderBy(t => t.ToString()))
+                    {
+                        menu.AddItem(new GUIContent(TypeName.GetFriendlyTypeFullName(bindingType)), false, () =>
+                        {
+                            property.arraySize++;
+                            var element = property.GetArrayElementAtIndex(property.arraySize - 1);
+                            element.SetValue(new SerializedType(bindingType));
+                            property.serializedObject.ApplyModifiedProperties();
+                            RefreshList(listView);
+                        });
+                    }
+
+                    menu.ShowAsContext();
+                }
+            }
+
+            void OnRemove(IEnumerable<int> items)
+            {
+                foreach (var item in items)
+                {
+                    if (item < 0 || item >= property.arraySize)
+                    {
+                        continue;
+                    }
+
+                    property.DeleteArrayElementAtIndex(item);
+                    property.serializedObject.ApplyModifiedProperties();
+                }
+
+                RefreshList(listView);
+            }
+#endif
 
             List<Type> ExtractArrayProperties(SerializedProperty arrayProperty)
             {
@@ -371,7 +377,7 @@ namespace Gubbins.Editor
                 for (var i = 0; i < arrayProperty.arraySize; i++)
                 {
                     var element = arrayProperty.GetArrayElementAtIndex(i);
-                    var elementType = (SerializedType) element.boxedValue;
+                    var elementType = (SerializedType) element.GetValue();
                     if (elementType.Type != null)
                     {
                         types.Add(elementType.Type);
