@@ -6,6 +6,11 @@ namespace Gubbins.Editor
     public static class TypeName
     {
         /// <summary>
+        /// Get the namespace grouping label for a type.
+        /// </summary>
+        public static string GetNamespaceGroup(Type type) => string.IsNullOrEmpty(type.Namespace) ? "(Global)" : type.Namespace;
+
+        /// <summary>
         /// Build a friendly type name including namespace, suitable for editor popups.
         /// </summary>
         public static string GetFriendlyTypeFullName(Type type) => string.IsNullOrEmpty(type.Namespace) ? GetFriendlyTypeName(type) : $"{type.Namespace}.{GetFriendlyTypeName(type)}";

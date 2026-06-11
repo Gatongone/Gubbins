@@ -134,18 +134,61 @@ namespace Gubbins.Editor
         }
 
         /// <summary>
-        /// Get all implementations of the given interface type across all loaded assemblies.
+        /// Get all implementations of the given interface type across all loaded assemblies,
+        /// including open generic type definitions that implement it when closed.
         /// </summary>
         private List<Type> GetAllImplementations(Type expectedType)
         {
             if (expectedType == null) return new List<Type>();
             return AppDomain.CurrentDomain.GetAssemblies()
-                            .SelectMany(asm => asm.GetTypes())
-                            .Where(t => expectedType.IsAssignableFrom(t) &&
-                                !t.IsAbstract &&
-                                !t.ContainsGenericParameters &&
-                                (ContainsDefaultConstructor(t) || typeof(UnityEngine.Object).IsAssignableFrom(t)))
+                            .SelectMany(asm =>
+                            {
+                                try
+                                {
+                                    return asm.GetTypes();
+                                }
+                                catch
+                                {
+                                    return Array.Empty<Type>();
+                                }
+                            })
+                            .Where(t => t != null && !t.IsAbstract && IsSelectableImplementation(t, expectedType))
                             .ToList();
+        }
+
+        private bool IsSelectableImplementation(Type t, Type expectedType)
+        {
+            if (t.IsGenericTypeDefinition)
+                return CanOpenGenericImplement(t, expectedType);
+            return !t.ContainsGenericParameters &&
+                expectedType.IsAssignableFrom(t) &&
+                (ContainsDefaultConstructor(t) || typeof(UnityEngine.Object).IsAssignableFrom(t));
+        }
+
+        /// <summary>
+        /// Returns true if the open generic type definition can be closed to implement <paramref name="expectedType"/>.
+        /// Works by inspecting the raw (unbound) interface and base-class list of the definition.
+        /// </summary>
+        private static bool CanOpenGenericImplement(Type openGenericDef, Type expectedType)
+        {
+            foreach (var iface in openGenericDef.GetInterfaces())
+            {
+                var def = iface.IsGenericType ? iface.GetGenericTypeDefinition() : iface;
+                if (def == expectedType) return true;
+                if (!iface.ContainsGenericParameters && expectedType.IsAssignableFrom(iface)) return true;
+            }
+
+            var baseType = openGenericDef.BaseType;
+            while (baseType != null &&
+                baseType != typeof(object))
+            {
+                var def = baseType.IsGenericType ? baseType.GetGenericTypeDefinition() : baseType;
+                if (def == expectedType) return true;
+                if (!baseType.ContainsGenericParameters && expectedType.IsAssignableFrom(baseType)) return true;
+                baseType = baseType.BaseType;
+            }
+
+            return false;
         }
 
         private bool ContainsDefaultConstructor(Type type) => type.GetConstructor(Type.EmptyTypes) != null;
@@ -170,12 +213,13 @@ namespace Gubbins.Editor
 
             // Get all implementations of the expected type for the dropdown, and prepare the list of type names with a "Null" option at the beginning.
             var allImplementations = GetAllImplementations(expectedType);
-            var typeNames = allImplementations.Select(t => t.Name).Prepend("Null").ToList();
+            var typeNames = allImplementations.Select(t => TypeName.GetFriendlyTypeName(t)).Prepend("Null").ToList();
 
 
             // Type selector dropdown
             EditorGUIUtility.labelWidth = 0;
-            var typeDropdown = new DropdownField(property.displayName, typeNames, GetCurrentIndex());
+            var typeDropdown = new DropdownField(property.displayName, typeNames, 0);
+            typeDropdown.SetValueWithoutNotify(GetCurrentDisplayName());
             typeDropdown.AddToClassList(ObjectField.alignedFieldUssClassName);
             root.Add(typeDropdown);
 
@@ -195,26 +239,26 @@ namespace Gubbins.Editor
                 else
                 {
                     var newType = allImplementations[newIndex - 1];
-                    if (typeof(UnityEngine.Object).IsAssignableFrom(newType))
+
+                    if (newType.ContainsGenericParameters)
                     {
-                        pureProp.managedReferenceValue = null;
-                        unityProp.objectReferenceValue = null;
-                        typeNameProp.stringValue       = newType.AssemblyQualifiedName;
-                    }
-                    else
-                    {
-                        try
+                        // The builder window is asynchronous: it shows now and invokes the callback once the user finishes.
+                        GenericTypeBuilderWindow.Show(newType, closedType =>
                         {
-                            var instance = Activator.CreateInstance(newType);
-                            pureProp.managedReferenceValue = instance;
-                            unityProp.objectReferenceValue = null;
-                            typeNameProp.stringValue       = newType.AssemblyQualifiedName;
-                        }
-                        catch (Exception e)
-                        {
-                            Debug.LogError($"Failed to create instance of {newType.Name}: {e.Message}");
-                        }
+                            if (closedType == null)
+                                ClearReference(pureProp, unityProp, typeNameProp);
+                            else
+                                ApplyConcreteType(closedType, pureProp, unityProp, typeNameProp);
+                            property.serializedObject.ApplyModifiedProperties();
+                            typeDropdown.SetValueWithoutNotify(GetCurrentDisplayName());
+                            RefreshContent();
+                        });
+                        // Keep showing the current value until the builder window completes.
+                        typeDropdown.SetValueWithoutNotify(GetCurrentDisplayName());
+                        return;
                     }
+
+                    ApplyConcreteType(newType, pureProp, unityProp, typeNameProp);
                 }
 
                 property.serializedObject.ApplyModifiedProperties();
@@ -224,7 +268,7 @@ namespace Gubbins.Editor
             // Tracking serialized object to update the dropdown and content when changes are made to the property from other places (e.g. undo/redo, or changes to the reference fields).
             root.TrackSerializedObjectValue(property.serializedObject, _ =>
             {
-                typeDropdown.SetValueWithoutNotify(typeNames[GetCurrentIndex()]);
+                typeDropdown.SetValueWithoutNotify(GetCurrentDisplayName());
                 RefreshContent();
             });
 
@@ -242,7 +286,26 @@ namespace Gubbins.Editor
                 var currentType = GetCurrentType();
                 if (currentType == null) return 0;
                 var idx = allImplementations.IndexOf(currentType);
-                return idx >= 0 ? idx + 1 : 0;
+                if (idx >= 0) return idx + 1;
+                // Closed generic: map back to the open generic definition in the list.
+                if (currentType.IsGenericType)
+                {
+                    idx = allImplementations.IndexOf(currentType.GetGenericTypeDefinition());
+                    if (idx >= 0) return idx + 1;
+                }
+
+                return 0;
+            }
+
+            string GetCurrentDisplayName()
+            {
+                var currentType = GetCurrentType();
+                if (currentType == null) return typeNames[0];
+                // For a closed generic show the actual instantiated name, e.g. Foo<int> instead of Foo<T>.
+                if (currentType.IsGenericType && !currentType.IsGenericTypeDefinition)
+                    return TypeName.GetFriendlyTypeName(currentType);
+                var idx = GetCurrentIndex();
+                return typeNames[idx];
             }
 
             void RefreshContent()
@@ -255,10 +318,14 @@ namespace Gubbins.Editor
                 // If it's not a Unity Object, draw the managed reference property field.
                 if (!typeof(UnityEngine.Object).IsAssignableFrom(effectiveType))
                 {
-                    var propertyField = new PropertyField(pureProp, " ");
-                    propertyField.SetEnabled(pureProp.managedReferenceValue != null);
-                    propertyField.RegisterValueChangeCallback(_ => { property.serializedObject.ApplyModifiedProperties(); });
-                    contentContainer.Add(propertyField);
+                    if (pureProp.GetValue() != null)
+                    {
+                        var propertyField = new PropertyField(pureProp, " ");
+                        propertyField.SetEnabled(pureProp.managedReferenceValue != null);
+                        propertyField.RegisterValueChangeCallback(_ => { property.serializedObject.ApplyModifiedProperties(); });
+                        contentContainer.Add(propertyField);
+                    }
+
                     return;
                 }
 
@@ -318,7 +385,7 @@ namespace Gubbins.Editor
                     }
 
                     unityProp.serializedObject.ApplyModifiedProperties();
-                    typeDropdown.SetValueWithoutNotify(typeNames[GetCurrentIndex()]);
+                    typeDropdown.SetValueWithoutNotify(GetCurrentDisplayName());
                     RefreshContent();
                 });
                 contentContainer.Add(objectField);
@@ -350,44 +417,63 @@ namespace Gubbins.Editor
             var currentValue = GetCurrentValue(pureProp, unityProp);
             var currentType = currentValue?.GetType() ?? GetTypeFromName(typeNameProp.stringValue);
             var allTypes = GetAllImplementations(type);
-            var typeNames = allTypes.Select(t => t.Name).Prepend("Null").ToArray();
+            var typeNames = allTypes.Select(TypeName.GetFriendlyTypeName).Prepend("Null").ToArray();
 
-            // Draw the type selector popup
+            // Map current type to index, resolving closed generics back to their open definition.
+            var currentIndex = 0;
+            if (currentType != null)
+            {
+                var idx = allTypes.IndexOf(currentType);
+                if (idx < 0 && currentType.IsGenericType)
+                    idx = allTypes.IndexOf(currentType.GetGenericTypeDefinition());
+                if (idx >= 0) currentIndex = idx + 1;
+            }
+
+            // Draw the type selector popup, substituting the actual closed-generic name when applicable.
+            var displayNames = typeNames;
+            if (currentIndex > 0 && currentType != null && currentType.IsGenericType && !currentType.IsGenericTypeDefinition)
+            {
+                displayNames               = typeNames.ToArray();
+                displayNames[currentIndex] = TypeName.GetFriendlyTypeName(currentType);
+            }
+
             var typeRect = new Rect(position.x, position.y, position.width, EditorGUIUtility.singleLineHeight);
-            var currentIndex = currentType == null ? 0 : allTypes.IndexOf(currentType) + 1;
-            var newIndex = EditorGUI.Popup(typeRect, label.text, currentIndex, typeNames);
+            var newIndex = EditorGUI.Popup(typeRect, label.text, currentIndex, displayNames);
             if (newIndex != currentIndex)
             {
                 if (newIndex == 0)
                 {
-                    // User selected "Null", clear both references and the expected type name.
                     ClearReference(pureProp, unityProp, typeNameProp);
                 }
                 else
                 {
                     var newType = allTypes[newIndex - 1];
-                    // Just set reference for UnityEngine.Object types
-                    if (typeof(UnityEngine.Object).IsAssignableFrom(newType))
+
+                    if (newType.ContainsGenericParameters)
                     {
-                        pureProp.managedReferenceValue = null;
-                        unityProp.objectReferenceValue = null;
-                        typeNameProp.stringValue       = newType.AssemblyQualifiedName;
-                    }
-                    // Create instance for pure C# class
-                    else
-                    {
-                        try
+                        // The builder window is asynchronous. Capture the property path and re-resolve a fresh
+                        // SerializedObject when the callback fires, since the current one is invalid by then.
+                        var serializedObject = property.serializedObject;
+                        var propertyPath     = property.propertyPath;
+                        GenericTypeBuilderWindow.Show(newType, closedType =>
                         {
-                            var instance = Activator.CreateInstance(newType);
-                            pureProp.managedReferenceValue = instance;
-                            unityProp.objectReferenceValue = null;
-                            typeNameProp.stringValue       = newType.AssemblyQualifiedName;
-                        }
-                        catch (Exception e)
-                        {
-                            Debug.LogError($"Failed to create instance of {newType.Name}: {e.Message}");
-                        }
+                            serializedObject.Update();
+                            var prop = serializedObject.FindProperty(propertyPath);
+                            if (prop == null) return;
+                            var pure  = prop.FindPropertyRelative("pureReference");
+                            var unity = prop.FindPropertyRelative("unityReference");
+                            var name  = prop.FindPropertyRelative("expectedTypeName");
+                            if (closedType == null)
+                                ClearReference(pure, unity, name);
+                            else
+                                ApplyConcreteType(closedType, pure, unity, name);
+                            serializedObject.ApplyModifiedProperties();
+                        });
+                        EditorGUI.EndProperty();
+                        return;
                     }
+
+                    ApplyConcreteType(newType, pureProp, unityProp, typeNameProp);
                 }
 
                 property.serializedObject.ApplyModifiedProperties();
@@ -514,6 +600,39 @@ namespace Gubbins.Editor
             pureProp.managedReferenceValue = null;
             unityProp.objectReferenceValue = null;
             typeNameProp.stringValue       = null;
+        }
+
+        /// <summary>
+        /// Assign a concrete (fully closed) type to the property: store the assembly qualified name and, for pure C#
+        /// types, instantiate a managed reference. UnityEngine.Object types only record the type name.
+        /// </summary>
+        private void ApplyConcreteType(Type type, SerializedProperty pureProp, SerializedProperty unityProp, SerializedProperty typeNameProp)
+        {
+            if (typeof(UnityEngine.Object).IsAssignableFrom(type))
+            {
+                pureProp.managedReferenceValue = null;
+                unityProp.objectReferenceValue = null;
+                typeNameProp.stringValue       = type.AssemblyQualifiedName;
+                return;
+            }
+
+            try
+            {
+                if (!type.IsGenericType)
+                {
+                    pureProp.managedReferenceValue = Activator.CreateInstance(type);
+                }
+                else
+                {
+                    pureProp.managedReferenceValue = null;
+                }
+                unityProp.objectReferenceValue = null;
+                typeNameProp.stringValue       = type.AssemblyQualifiedName;
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"Failed to create instance of {type.Name}: {e.Message}");
+            }
         }
 
         /// <summary>

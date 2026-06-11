@@ -49,7 +49,7 @@ namespace Gubbins.Editor
             var controller = CreatePropertyField(properties.Controller);
             var spawner = CreatePropertyField(properties.Spawner);
             var prewarm = CreatePropertyField(properties.Prewarm);
-            var prototype = CreatePropertyField(properties.Prototype);
+            var prototype = CreatePrototypeField(properties.Prototype, properties.Type);
             var currentScope = (Scope) properties.Scope.enumValueIndex;
             var serializedType = (SerializedType) properties.Type.GetValue();
 
@@ -86,7 +86,7 @@ namespace Gubbins.Editor
                 currentScope = newScope;
                 if (newScope is Scope.Singleton or Scope.Multiton)
                 {
-                    ClearProperty(properties.Controller);
+                    properties.Controller.Clear();
                     if (root.Contains(controller))
                     {
                         root.Remove(controller);
@@ -113,8 +113,9 @@ namespace Gubbins.Editor
             {
                 var changedType = (SerializedType) evt.changedProperty.GetValue();
                 var curScope = (Scope) properties.Scope.enumValueIndex;
-                ClearProperty(properties.Prototype);
-                ClearProperty(properties.Bindings);
+                properties.Prototype.Clear();
+                properties.Bindings.Clear();
+                properties.Spawner.Clear();
                 properties.Key.stringValue = changedType.Type != null ? changedType.Type.ToString() : string.Empty;
 
                 if (root.Contains(prototype) && (curScope is Scope.Multiton || changedType.Type == null || !changedType.Type.IsAssignableFrom(typeof(UnityEngine.Object))))
@@ -145,27 +146,6 @@ namespace Gubbins.Editor
             return root;
         }
 
-        private static void ClearProperty(SerializedProperty property)
-        {
-            if (property == null)
-            {
-                throw new ArgumentNullException(nameof(property));
-            }
-
-            if (property.isArray)
-            {
-                property.ClearArray();
-            }
-            else if (property.GetValue() != null)
-            {
-                property.SetValue(null);
-            }
-            else if (property.objectReferenceValue != null)
-            {
-                property.objectReferenceValue = null;
-            }
-        }
-
         private PropertyField CreatePropertyField(SerializedProperty property)
         {
             if (property == null)
@@ -176,6 +156,55 @@ namespace Gubbins.Editor
             var field = new PropertyField(property, property.displayName);
             field.AddToClassList(ObjectField.alignedFieldUssClassName);
             return field;
+        }
+
+        private ObjectField CreatePrototypeField(SerializedProperty prototypeProperty, SerializedProperty typeProperty)
+        {
+            if (prototypeProperty == null)
+            {
+                throw new ArgumentNullException(nameof(prototypeProperty));
+            }
+
+            var field = new ObjectField(prototypeProperty.displayName) {objectType = typeof(UnityEngine.Object)};
+            field.AddToClassList(ObjectField.alignedFieldUssClassName);
+            field.BindProperty(prototypeProperty);
+
+            field.RegisterCallback<DragUpdatedEvent>(evt =>
+            {
+                var targetType = typeProperty?.GetValue() is SerializedType st ? st.Type : null;
+                if (targetType == null) return;
+
+                foreach (var obj in DragAndDrop.objectReferences)
+                {
+                    if (IsValidPrototype(obj, targetType)) return;
+                }
+
+                DragAndDrop.visualMode = DragAndDropVisualMode.Rejected;
+                evt.StopPropagation();
+            }, TrickleDown.TrickleDown);
+
+            field.RegisterValueChangedCallback(evt =>
+            {
+                if (evt.newValue == null) return;
+                var targetType = typeProperty?.GetValue() is SerializedType st ? st.Type : null;
+                if (targetType == null || IsValidPrototype(evt.newValue, targetType)) return;
+
+                Debug.LogWarning($"[InstallInfo] Prototype must be a {targetType.Name} or a GameObject with a {targetType.Name} component.");
+                field.SetValueWithoutNotify(evt.previousValue);
+                prototypeProperty.objectReferenceValue = evt.previousValue;
+                prototypeProperty.serializedObject.ApplyModifiedProperties();
+            });
+
+            return field;
+        }
+
+        private static bool IsValidPrototype(UnityEngine.Object obj, Type type)
+        {
+            if (obj == null || type == null) return true;
+            if (type.IsAssignableFrom(obj.GetType())) return true;
+            if (obj is GameObject go && typeof(Component).IsAssignableFrom(type))
+                return go.GetComponent(type) != null;
+            return false;
         }
 
         /// <summary>
@@ -280,7 +309,7 @@ namespace Gubbins.Editor
                 property.serializedObject.ApplyModifiedProperties();
             }
 
-#if UNITY_2022_2_OR_NEWER
+#if UNITY_2023_2_OR_NEWER
             void OnAdd(BaseListView list)
             {
                 var menu = new GenericMenu();
@@ -312,20 +341,13 @@ namespace Gubbins.Editor
                 list.RemoveAt(list.selectedIndex);
                 RefreshList(list);
             }
-#else
-            void RefreshList(ListView list)
+
+            void RefreshList(BaseListView list)
             {
                 list.itemsSource = ExtractArrayProperties(property);
                 list.Rebuild();
             }
-
-            void BindItem(VisualElement element, int index)
-            {
-                var label = (Label) element;
-                var types = ExtractArrayProperties(property);
-                label.text = index < types.Count ? TypeName.GetFriendlyTypeFullName(types[index]) : "null";
-            }
-
+#else
             void OnAdd(IEnumerable<int> items)
             {
                 foreach (var item in items)
@@ -363,7 +385,19 @@ namespace Gubbins.Editor
 
                 RefreshList(listView);
             }
+
+            void RefreshList(BaseListView list)
+            {
+                list.itemsSource = ExtractArrayProperties(property);
+                list.Rebuild();
+            }
 #endif
+            void BindItem(VisualElement element, int index)
+            {
+                var label = (Label) element;
+                var types = ExtractArrayProperties(property);
+                label.text = index < types.Count ? TypeName.GetFriendlyTypeFullName(types[index]) : "null";
+            }
 
             List<Type> ExtractArrayProperties(SerializedProperty arrayProperty)
             {

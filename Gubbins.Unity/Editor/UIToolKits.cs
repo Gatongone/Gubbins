@@ -7,6 +7,54 @@ namespace Gubbins.Editor
 {
     internal static class UIToolKits
     {
+        internal static void Clear(this SerializedProperty property)
+        {
+            if (property == null)
+            {
+                throw new ArgumentNullException(nameof(property));
+            }
+
+            if (property.isArray)
+            {
+                property.ClearArray();
+                return;
+            }
+
+            switch (property.propertyType)
+            {
+                case SerializedPropertyType.ObjectReference:
+                    property.objectReferenceValue = null;
+                    return;
+                case SerializedPropertyType.ManagedReference:
+                    property.managedReferenceValue = null;
+                    return;
+                case SerializedPropertyType.String:
+                    property.stringValue = string.Empty;
+                    return;
+                case SerializedPropertyType.Generic:
+                {
+                    // boxedValue cannot handle types that contain [SerializeReference] fields
+                    // (e.g. SerializedReference<T>), so recurse into children instead.
+                    var iter = property.Copy();
+                    var end  = iter.GetEndProperty();
+                    if (iter.Next(true))
+                    {
+                        while (!SerializedProperty.EqualContents(iter, end))
+                        {
+                            iter.Copy().Clear();
+                            if (!iter.Next(false)) break;
+                        }
+                    }
+                    return;
+                }
+            }
+
+            if (property.GetValue() != null)
+            {
+                property.SetValue(null);
+            }
+        }
+
 #if UNITY_2022_2_OR_NEWER
         internal static object GetValue(this SerializedProperty property)
         {
@@ -15,7 +63,7 @@ namespace Gubbins.Editor
 
         internal static void SetValue(this SerializedProperty property, object value)
         {
-           return property.boxedValue = value;
+            property.boxedValue = value;
         }
 #else
         internal static object GetValue(this SerializedProperty property)

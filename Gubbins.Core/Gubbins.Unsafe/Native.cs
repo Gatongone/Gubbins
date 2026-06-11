@@ -265,7 +265,11 @@ public sealed unsafe class Native
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static object Box(void* address, Type sourceType, uint offset)
     {
+        #if NET5_0_OR_GREATER
+        var valueObj = RuntimeHelpers.GetUninitializedObject(sourceType);
+        #else
         var valueObj = FormatterServices.GetUninitializedObject(sourceType);
+        #endif
         CopyMemory(address, Unbox(valueObj), offset);
         return valueObj;
     }

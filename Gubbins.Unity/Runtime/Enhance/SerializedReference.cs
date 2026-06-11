@@ -35,6 +35,12 @@ namespace Gubbins.Enhance
                     }
                 }
 
+                if (!string.IsNullOrEmpty(expectedTypeName))
+                {
+                    var expectedType = Type.GetType(expectedTypeName);
+                    return pureReference = expectedType != null && typeof(T).IsAssignableFrom(expectedType) ? (T) Activator.CreateInstance(expectedType)! : null;
+                }
+
                 return null;
             }
             set
