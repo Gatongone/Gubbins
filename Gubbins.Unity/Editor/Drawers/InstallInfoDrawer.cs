@@ -3,10 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using Gubbins.Context;
 using Gubbins.Enhance;
+using Gubbins.Spawner;
 using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
+using Object = UnityEngine.Object;
 
 namespace Gubbins.Editor
 {
@@ -57,7 +59,7 @@ namespace Gubbins.Editor
             root.Add(key);
             root.Add(scope);
             root.Add(type);
-            if (currentScope is not Scope.Multiton && serializedType.Type != null && !serializedType.Type.IsAssignableFrom(typeof(UnityEngine.Object)))
+            if (serializedType.Type != null && typeof(Object).IsAssignableFrom(serializedType.Type))
             {
                 root.Add(prototype);
             }
@@ -75,7 +77,12 @@ namespace Gubbins.Editor
             }
 
             // Register callbacks.
-            scope.RegisterValueChangeCallback(evt =>
+            scope.RegisterValueChangeCallback(OnScopeChanged);
+            type.RegisterValueChangeCallback(OnTypeChanged);
+            prototype.RegisterValueChangedCallback(OnPrototypeChanged);
+            return root;
+
+            void OnScopeChanged(SerializedPropertyChangeEvent evt)
             {
                 var newScope = (Scope) evt.changedProperty.enumValueIndex;
                 if (currentScope == newScope)
@@ -108,21 +115,24 @@ namespace Gubbins.Editor
                 }
 
                 property.serializedObject.ApplyModifiedProperties();
-            });
-            type.RegisterValueChangeCallback(evt =>
+            }
+
+            void OnTypeChanged(SerializedPropertyChangeEvent evt)
             {
                 var changedType = (SerializedType) evt.changedProperty.GetValue();
-                var curScope = (Scope) properties.Scope.enumValueIndex;
                 properties.Prototype.Clear();
                 properties.Bindings.Clear();
-                properties.Spawner.Clear();
+#if UNITY_2023_2_OR_NEWER
+                AssignSpawner(properties.Spawner, SelectSpawnerType(changedType.Type));
+#endif
                 properties.Key.stringValue = changedType.Type != null ? changedType.Type.ToString() : string.Empty;
+                var canAssignObject = changedType.Type != null && typeof(Object).IsAssignableFrom(changedType.Type);
 
-                if (root.Contains(prototype) && (curScope is Scope.Multiton || changedType.Type == null || !changedType.Type.IsAssignableFrom(typeof(UnityEngine.Object))))
+                if (root.Contains(prototype) && !canAssignObject)
                 {
                     root.Remove(prototype);
                 }
-                else if (!root.Contains(prototype))
+                else if (!root.Contains(prototype) && canAssignObject)
                 {
                     root.Insert(root.IndexOf(type) + 1, prototype);
                 }
@@ -142,8 +152,33 @@ namespace Gubbins.Editor
                 }
 
                 property.serializedObject.ApplyModifiedProperties();
-            });
-            return root;
+
+                // Rebuild the spawner field so its dropdown reflects the new product-type constraint.
+                var spawnerIndex = root.IndexOf(spawner);
+                if (spawnerIndex >= 0)
+                {
+                    root.Remove(spawner);
+                    spawner = CreatePropertyField(properties.Spawner);
+                    root.Insert(spawnerIndex, spawner);
+                }
+            }
+
+            void OnPrototypeChanged(ChangeEvent<Object> evt)
+            {
+                var newPrototype = evt.newValue;
+                if (newPrototype == null)
+                {
+                    return;
+                }
+
+                var targetType = properties.Type.GetValue() is SerializedType st ? st.Type : null;
+                if (targetType != null && !IsValidPrototype(newPrototype, targetType))
+                {
+                    return;
+                }
+
+                WirePrototypeToSpawner(properties.Spawner, newPrototype);
+            }
         }
 
         private PropertyField CreatePropertyField(SerializedProperty property)
@@ -205,6 +240,123 @@ namespace Gubbins.Editor
             if (obj is GameObject go && typeof(Component).IsAssignableFrom(type))
                 return go.GetComponent(type) != null;
             return false;
+        }
+
+        /// <summary>
+        /// Choose the spawner best suited to constructing <paramref name="product"/>, closed with that product type:
+        /// ScriptableSpawner for ScriptableObjects, ComponentSpawner for Components, NewableSpawner when a public
+        /// parameterless constructor exists, otherwise UninitializedSpawner.
+        /// </summary>
+        private static Type SelectSpawnerType(Type product)
+        {
+            if (product == null)
+            {
+                return null;
+            }
+
+            Type open;
+            if (typeof(ScriptableObject).IsAssignableFrom(product))
+            {
+                open = typeof(ScriptableSpawner<>);
+            }
+            else if (typeof(Component).IsAssignableFrom(product))
+            {
+                open = typeof(ComponentSpawner<>);
+            }
+            else if (product.GetConstructor(Type.EmptyTypes) != null)
+            {
+                open = typeof(NewableSpawner<>);
+            }
+            else
+            {
+                open = typeof(UninitializedSpawner<>);
+            }
+
+            try
+            {
+                return open.MakeGenericType(product);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Assign a freshly constructed spawner of <paramref name="spawnerType"/> to the
+        /// <see cref="SerializedReference{T}"/> backing the Spawner field, or clear it when null.
+        /// </summary>
+        private static void AssignSpawner(SerializedProperty spawnerProperty, Type spawnerType)
+        {
+            var pureRef = spawnerProperty.FindPropertyRelative("pureReference");
+            var unityRef = spawnerProperty.FindPropertyRelative("unityReference");
+            var typeName = spawnerProperty.FindPropertyRelative("expectedTypeName");
+
+            if (spawnerType == null)
+            {
+                if (pureRef != null) pureRef.managedReferenceValue = null;
+                if (unityRef != null) unityRef.objectReferenceValue = null;
+                if (typeName != null) typeName.stringValue = string.Empty;
+                return;
+            }
+
+            object instance = null;
+            try
+            {
+                instance = Activator.CreateInstance(spawnerType);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[InstallInfo] Failed to create spawner {spawnerType}: {e.Message}");
+            }
+
+            if (pureRef != null) pureRef.managedReferenceValue = instance;
+            if (unityRef != null) unityRef.objectReferenceValue = null;
+            if (typeName != null) typeName.stringValue = spawnerType.AssemblyQualifiedName;
+        }
+
+        /// <summary>
+        /// Copy a prototype into the spawner when their kinds match: a GameObject into ComponentSpawner.Prefab,
+        /// or a ScriptableObject into ScriptableSpawner.Instance. No-op otherwise.
+        /// </summary>
+        private static void WirePrototypeToSpawner(SerializedProperty spawnerProperty, Object prototype)
+        {
+            if (spawnerProperty == null || prototype == null)
+            {
+                return;
+            }
+
+            var pureRef = spawnerProperty.FindPropertyRelative("pureReference");
+            var instance = pureRef?.managedReferenceValue;
+            if (instance == null || !instance.GetType().IsGenericType)
+            {
+                return;
+            }
+
+            var definition = instance.GetType().GetGenericTypeDefinition();
+            string fieldName;
+            if (prototype is GameObject && definition == typeof(ComponentSpawner<>))
+            {
+                fieldName = nameof(ComponentSpawner<Component>.Prefab);
+            }
+            else if (prototype is ScriptableObject && definition == typeof(ScriptableSpawner<>))
+            {
+                fieldName = nameof(ScriptableSpawner<ScriptableObject>.Instance);
+            }
+            else
+            {
+                return;
+            }
+
+            var field = instance.GetType().GetField(fieldName);
+            if (field == null || !field.FieldType.IsInstanceOfType(prototype))
+            {
+                return;
+            }
+
+            field.SetValue(instance, prototype);
+            pureRef.managedReferenceValue = instance;
+            spawnerProperty.serializedObject.ApplyModifiedProperties();
         }
 
         /// <summary>

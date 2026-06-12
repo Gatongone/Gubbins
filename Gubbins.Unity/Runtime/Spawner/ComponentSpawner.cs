@@ -1,7 +1,10 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
+using Object = UnityEngine.Object;
 
 namespace Gubbins.Spawner
 {
+    [Serializable]
     public class ComponentSpawner<T> : ISpawner<T> where T : Component
     {
         public bool       DontDestroyOnLoad;
@@ -14,13 +17,11 @@ namespace Gubbins.Spawner
 
         public T Spawn()
         {
-            var go = default(GameObject);
-            var result = default(T);
+            GameObject go;
+            T result;
             if (!Prefab)
             {
                 go = new GameObject();
-
-
                 result = go.AddComponent<T>();
             }
             else

@@ -13,6 +13,7 @@ namespace Gubbins.Context
         public SerializedType                        Type;
         public SerializedType[]                      Bindings;
         public UnityEngine.Object                    Prototype;
+        [GenericArgumentFrom(typeof(ISpawner<>), nameof(Type))]
         public SerializedReference<ISpawner>         Spawner;
         public SerializedReference<IScopeController> Controller;
         public uint                                  Prewarm;

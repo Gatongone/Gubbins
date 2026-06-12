@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using Gubbins.Enhance;
 using Gubbins.Unsafe;
 using UnityEditor;
@@ -23,6 +24,15 @@ namespace Gubbins.Editor
         /// </summary>
         private Type GetExpectedType(SerializedProperty property)
         {
+            // A [GenericArgumentFrom] field constrains the expected type to a generic closed with a sibling's value.
+            var constraintArg = GetConstraintArgument(property, out var openGeneric);
+            if (openGeneric != null && constraintArg != null)
+            {
+                var closed = TryMakeGeneric(openGeneric, constraintArg);
+                if (closed != null)
+                    return closed;
+            }
+
             // Fast path: Unity usually provides fieldInfo for direct fields and collection elements.
             var expectedType = TryGetExpectedTypeFromContainerType(fieldInfo?.FieldType);
             if (expectedType != null)
@@ -134,6 +144,99 @@ namespace Gubbins.Editor
         }
 
         /// <summary>
+        /// Resolve the generic argument supplied by a <see cref="GenericArgumentFromAttribute"/> on the field,
+        /// reading the value of the referenced sibling field. Returns null (and a null <paramref name="openGeneric"/>)
+        /// when the field carries no such attribute.
+        /// </summary>
+        private Type GetConstraintArgument(SerializedProperty property, out Type openGeneric)
+        {
+            openGeneric = null;
+            var attr = fieldInfo?.GetCustomAttribute<GenericArgumentFromAttribute>();
+            if (attr == null)
+                return null;
+
+            openGeneric = attr.OpenGeneric;
+            return ResolveSiblingType(property, attr.TypeMember);
+        }
+
+        /// <summary>
+        /// Read the <see cref="Type"/> value of a sibling field located alongside <paramref name="property"/>.
+        /// </summary>
+        private static Type ResolveSiblingType(SerializedProperty property, string memberName)
+        {
+            var path = property.propertyPath;
+            var lastDot = path.LastIndexOf('.');
+            var siblingPath = lastDot < 0 ? memberName : path.Substring(0, lastDot + 1) + memberName;
+            var siblingProp = property.serializedObject.FindProperty(siblingPath);
+            return siblingProp?.GetValue() is SerializedType serializedType ? serializedType.Type : null;
+        }
+
+        /// <summary>
+        /// Close a single-parameter open generic definition with <paramref name="argument"/>, returning null if the
+        /// definition is not a single-parameter open generic or the argument violates its constraints.
+        /// </summary>
+        private static Type TryMakeGeneric(Type openGeneric, Type argument)
+        {
+            if (openGeneric == null || argument == null || !openGeneric.IsGenericTypeDefinition)
+                return null;
+            if (openGeneric.GetGenericArguments().Length != 1)
+                return null;
+            try
+            {
+                return openGeneric.MakeGenericType(argument);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Get all implementations assignable to <paramref name="closedExpected"/>, closing single-parameter generic
+        /// definitions with <paramref name="argument"/> so the dropdown offers concrete, type-matched spawners
+        /// (e.g. <c>AutoSpawner&lt;Foo&gt;</c>) rather than open definitions requiring a manual type argument.
+        /// </summary>
+        private List<Type> GetConstrainedImplementations(Type closedExpected, Type argument)
+        {
+            var result = new List<Type>();
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                Type[] types;
+                try
+                {
+                    types = asm.GetTypes();
+                }
+                catch
+                {
+                    continue;
+                }
+
+                foreach (var t in types)
+                {
+                    if (t == null || t.IsAbstract)
+                        continue;
+
+                    if (t.IsGenericTypeDefinition)
+                    {
+                        var closed = TryMakeGeneric(t, argument);
+                        if (closed != null && IsInstantiableMatch(closed, closedExpected))
+                            result.Add(closed);
+                    }
+                    else if (!t.ContainsGenericParameters && IsInstantiableMatch(t, closedExpected))
+                    {
+                        result.Add(t);
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        private bool IsInstantiableMatch(Type t, Type expectedType) =>
+            expectedType.IsAssignableFrom(t) &&
+            (ContainsDefaultConstructor(t) || typeof(UnityEngine.Object).IsAssignableFrom(t));
+
+        /// <summary>
         /// Get all implementations of the given interface type across all loaded assemblies,
         /// including open generic type definitions that implement it when closed.
         /// </summary>
@@ -212,7 +315,10 @@ namespace Gubbins.Editor
             }
 
             // Get all implementations of the expected type for the dropdown, and prepare the list of type names with a "Null" option at the beginning.
-            var allImplementations = GetAllImplementations(expectedType);
+            var constraintArg = GetConstraintArgument(property, out _);
+            var allImplementations = constraintArg != null
+                ? GetConstrainedImplementations(expectedType, constraintArg)
+                : GetAllImplementations(expectedType);
             var typeNames = allImplementations.Select(t => TypeName.GetFriendlyTypeName(t)).Prepend("Null").ToList();
 
 
@@ -416,7 +522,10 @@ namespace Gubbins.Editor
             // Get all implementations of the expected type for the dropdown, and prepare the list of type names with a "Null" option at the beginning.
             var currentValue = GetCurrentValue(pureProp, unityProp);
             var currentType = currentValue?.GetType() ?? GetTypeFromName(typeNameProp.stringValue);
-            var allTypes = GetAllImplementations(type);
+            var constraintArg = GetConstraintArgument(property, out _);
+            var allTypes = constraintArg != null
+                ? GetConstrainedImplementations(type, constraintArg)
+                : GetAllImplementations(type);
             var typeNames = allTypes.Select(TypeName.GetFriendlyTypeName).Prepend("Null").ToArray();
 
             // Map current type to index, resolving closed generics back to their open definition.

@@ -1,5 +1,8 @@
-﻿namespace Gubbins.Spawner
+﻿using System;
+
+namespace Gubbins.Spawner
 {
+    [Serializable]
     public class NewableSpawner<T> : ISpawner<T> where T : new()
     {
         public T Spawn() => new();

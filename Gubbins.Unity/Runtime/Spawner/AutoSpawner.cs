@@ -3,6 +3,7 @@ using UnityEngine;
 
 namespace Gubbins.Spawner
 {
+    [Serializable]
     public class AutoSpawner<T> : ISpawner<T>
     {
         private static readonly ISpawner<T> s_Instance;

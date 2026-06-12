@@ -68,4 +68,25 @@ namespace Gubbins.Enhance
 
         public static implicit operator T(SerializedReference<T> reference) => reference.Value;
     }
+
+    /// <summary>
+    /// Constrains a <see cref="SerializedReference{T}"/> field's selectable implementations to a closed
+    /// generic type, where the type argument is taken from a sibling field at draw time. Generic
+    /// implementation definitions are auto-closed with that same type argument.
+    /// </summary>
+    /// <example>
+    /// <c>[GenericArgumentFrom(typeof(ISpawner&lt;&gt;), nameof(Type))]</c> on a
+    /// <c>SerializedReference&lt;ISpawner&gt;</c> field restricts the dropdown to <c>ISpawner&lt;Type&gt;</c>.
+    /// </example>
+    [AttributeUsage(AttributeTargets.Field)]
+    public sealed class GenericArgumentFromAttribute : Attribute
+    {
+        /// <summary>The open generic definition to close, e.g. <c>typeof(ISpawner&lt;&gt;)</c>.</summary>
+        public Type OpenGeneric { get; }
+
+        /// <summary>The name of the sibling field whose value supplies the generic argument.</summary>
+        public string TypeMember { get; }
+
+        public GenericArgumentFromAttribute(Type openGeneric, string typeMember) => (OpenGeneric, TypeMember) = (openGeneric, typeMember);
+    }
 }
