@@ -334,9 +334,13 @@ namespace Gubbins.Editor
             root.Add(contentContainer);
             typeDropdown.RegisterValueChangedCallback(evt =>
             {
+                // Ignore ChangeEvent<string> that bubble up from child text elements (e.g. relabeling the
+                // dropdown's own label): only react to the dropdown's own value changes.
+                if (evt.target != typeDropdown) return;
+
                 var newIndex = typeNames.IndexOf(evt.newValue);
                 var oldIndex = GetCurrentIndex();
-                if (newIndex == oldIndex) return;
+                if (newIndex < 0 || newIndex == oldIndex) return;
 
                 if (newIndex == 0)
                 {
@@ -379,6 +383,15 @@ namespace Gubbins.Editor
             });
 
             RefreshContent();
+
+            // When the parent PropertyField carries "no-expand-children", the owner drawer manages content
+            // externally; suppress our contentContainer to avoid duplicate field rendering.
+            root.RegisterCallback<AttachToPanelEvent>(_ =>
+            {
+                if (root.parent?.ClassListContains("no-expand-children") == true)
+                    contentContainer.style.display = DisplayStyle.None;
+            });
+
             return root;
 
             Type GetCurrentType()
@@ -727,7 +740,10 @@ namespace Gubbins.Editor
 
             try
             {
-                if (!type.IsGenericType)
+                // Only *open* generics (with unbound type parameters) can't be instantiated. Closed generics
+                // such as ComponentSpawner<Sample> are concrete and, on Unity 2023.2+/Unity 6, serialize fine
+                // as managed references — instantiate them so their fields are editable in the inspector.
+                if (!type.ContainsGenericParameters)
                 {
                     pureProp.managedReferenceValue = Activator.CreateInstance(type);
                 }

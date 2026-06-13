@@ -1,4 +1,5 @@
-﻿using System;
+﻿using System.Collections.Generic;
+using System;
 using System.Linq;
 using System.Reflection;
 using UnityEditor;
@@ -7,13 +8,40 @@ namespace Gubbins.Editor
 {
     internal static class UIToolKits
     {
-        internal static void Clear(this SerializedProperty property)
+        /// <summary>
+        /// Return the immediate child <see cref="SerializedProperty"/> instances of <paramref name="property"/> —
+        /// i.e. every serialized field/property of the type it currently represents. This walks the live serialized
+        /// data rather than reflecting over a type, so it works for <c>[SerializeReference]</c> managed references
+        /// (where <see cref="SerializedProperty.FindPropertyRelative"/> by name is unreliable). Leaf properties and
+        /// object references — which have no embedded children — yield an empty array.
+        /// </summary>
+        internal static SerializedProperty[] GetChildren(this SerializedProperty property)
         {
-            if (property == null)
+            var children = new List<SerializedProperty>();
+            if (!property.hasChildren || property.propertyType == SerializedPropertyType.ObjectReference)
             {
-                throw new ArgumentNullException(nameof(property));
+                return children.ToArray();
             }
 
+            var iterator = property.Copy();
+            var end      = iterator.GetEndProperty();
+            if (iterator.Next(true))
+            {
+                while (!SerializedProperty.EqualContents(iterator, end))
+                {
+                    children.Add(iterator.Copy());
+                    if (!iterator.Next(false)) break;
+                }
+            }
+
+            return children.ToArray();
+        }
+
+        /// <summary>
+        /// Clear the value of <paramref name="property"/> according to its type: arrays are cleared of all elements;
+        /// </summary>
+        internal static void Clear(this SerializedProperty property)
+        {
             if (property.isArray)
             {
                 property.ClearArray();

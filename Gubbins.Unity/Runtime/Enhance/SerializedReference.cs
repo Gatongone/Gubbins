@@ -7,11 +7,11 @@ namespace Gubbins.Enhance
     [Serializable]
     public class SerializedReference<T> where T : class
     {
-        [SerializeReference] private T pureReference;
+        [SerializeReference] internal T pureReference;
 
-        [SerializeField] private Object unityReference;
+        [SerializeField] internal Object unityReference;
 
-        [SerializeField] private string expectedTypeName;
+        [SerializeField] internal string expectedTypeName;
 
         public T Value
         {
