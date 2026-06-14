@@ -75,13 +75,6 @@ public class ApplicationContext : IScopeController, IDependenciesRegistry, ICont
         Bake();
     }
 
-    public ApplicationContext(IEnumerable<InstallInfo> installInfo, IContext? parent = null)
-    {
-        Parent = parent;
-        this.RegisterAll(installInfo);
-        Bake();
-    }
-
     ~ApplicationContext()
     {
         if (!m_Disposed)
