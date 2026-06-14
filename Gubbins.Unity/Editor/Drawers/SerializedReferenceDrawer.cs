@@ -19,6 +19,12 @@ namespace Gubbins.Editor
     {
         private const float VERTICAL_SPACING = 2;
 
+        // Enumerating implementations scans every type in every loaded assembly, which is expensive. The type set
+        // is fixed for the editor session (a script recompile triggers a domain reload that clears these), so the
+        // results are cached and shared across all drawer instances.
+        private static readonly Dictionary<Type, List<Type>>          s_ImplementationCache = new();
+        private static readonly Dictionary<(Type expected, Type arg), List<Type>> s_ConstrainedCache = new();
+
         /// <summary>
         /// Extract the expected type T from <see cref="SerializedReference{T}"/> using reflection.
         /// </summary>
@@ -198,6 +204,9 @@ namespace Gubbins.Editor
         /// </summary>
         private List<Type> GetConstrainedImplementations(Type closedExpected, Type argument)
         {
+            if (s_ConstrainedCache.TryGetValue((closedExpected, argument), out var cached))
+                return cached;
+
             var result = new List<Type>();
             foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
             {
@@ -229,6 +238,7 @@ namespace Gubbins.Editor
                 }
             }
 
+            s_ConstrainedCache[(closedExpected, argument)] = result;
             return result;
         }
 
@@ -243,7 +253,10 @@ namespace Gubbins.Editor
         private List<Type> GetAllImplementations(Type expectedType)
         {
             if (expectedType == null) return new List<Type>();
-            return AppDomain.CurrentDomain.GetAssemblies()
+            if (s_ImplementationCache.TryGetValue(expectedType, out var cached))
+                return cached;
+
+            var result = AppDomain.CurrentDomain.GetAssemblies()
                             .SelectMany(asm =>
                             {
                                 try
@@ -257,6 +270,8 @@ namespace Gubbins.Editor
                             })
                             .Where(t => t != null && !t.IsAbstract && IsSelectableImplementation(t, expectedType))
                             .ToList();
+            s_ImplementationCache[expectedType] = result;
+            return result;
         }
 
         private bool IsSelectableImplementation(Type t, Type expectedType)
