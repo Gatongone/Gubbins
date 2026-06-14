@@ -11,6 +11,11 @@ namespace Gubbins.Entities
 
         [SerializeField, HideInInspector] private byte[] m_Payload;
 
+        /// <summary>
+        /// The raw component data laid out as the concatenation of each component's unmanaged
+        /// struct bytes, in declaration order. This matches the buffer layout expected by
+        /// <see cref="IEntityCommand.Insert"/>; its length equals the sum of the component sizes.
+        /// </summary>
         public byte[] Payload => m_Payload;
 
         public int ComponentCount => Components?.Length ?? 0;
@@ -23,31 +28,48 @@ namespace Gubbins.Entities
         }
 
         /// <summary>
-        /// Rebuilds derived arrays so they stay aligned with Components.
+        /// Rebuilds <see cref="m_Payload"/> from the current components by copying each boxed
+        /// component's unmanaged bytes into a single contiguous buffer, in declaration order.
         /// </summary>
-        private void SyncDerivedData()
+        /// <returns>The rebuilt payload buffer.</returns>
+        public unsafe byte[] BuildPayload()
         {
             var count = ComponentCount;
             if (count == 0)
             {
-                m_Payload = Array.Empty<byte>();
-                return;
+                return m_Payload = Array.Empty<byte>();
             }
 
-            m_Payload = new byte[count];
-
+            var totalSize = 0;
             for (var i = 0; i < count; i++)
             {
                 var component = Components[i];
                 if (component == null)
                     continue;
 
-                var type = component.GetType();
-                m_Payload[i] = (byte) Native.GetStackSize(type);
+                totalSize += (int) Native.GetStackSize(component.GetType());
             }
+
+            var payload = new byte[totalSize];
+            fixed (byte* destination = payload)
+            {
+                var offset = 0;
+                for (var i = 0; i < count; i++)
+                {
+                    var component = Components[i];
+                    if (component == null)
+                        continue;
+
+                    var size = (int) Native.GetStackSize(component.GetType());
+                    Native.CopyMemory(Native.Unbox(component), destination + offset, (uint) size);
+                    offset += size;
+                }
+            }
+
+            return m_Payload = payload;
         }
 
-        void ISerializationCallbackReceiver.OnBeforeSerialize() => SyncDerivedData();
+        void ISerializationCallbackReceiver.OnBeforeSerialize() => BuildPayload();
 
         void ISerializationCallbackReceiver.OnAfterDeserialize() { }
     }

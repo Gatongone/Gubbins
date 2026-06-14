@@ -3,7 +3,7 @@
 namespace Gubbins.Entities
 {
     /// <summary>
-    /// Represents the position of an entity in world space along the X-axis, defined by its X coordinate.
+    /// Represents the position of an entity in local space along the X-axis, defined by its X coordinate.
     /// </summary>
     [Serializable]
     public struct PositionX : IComponent
@@ -12,7 +12,7 @@ namespace Gubbins.Entities
     }
 
     /// <summary>
-    /// Represents the position of an entity in world space along the Y-axis, defined by its Y coordinate.
+    /// Represents the position of an entity in local space along the Y-axis, defined by its Y coordinate.
     /// </summary>
     [Serializable]
     public struct PositionY : IComponent
@@ -21,7 +21,7 @@ namespace Gubbins.Entities
     }
 
     /// <summary>
-    /// Represents the position of an entity in world space along the Z-axis, defined by its Z coordinate.
+    /// Represents the position of an entity in local space along the Z-axis, defined by its Z coordinate.
     /// </summary>
     [Serializable]
     public struct PositionZ : IComponent
@@ -30,7 +30,7 @@ namespace Gubbins.Entities
     }
 
     /// <summary>
-    /// Represents the position of an entity in world space, defined by its X and Y coordinates.
+    /// Represents the position of an entity in local space, defined by its X and Y coordinates.
     /// </summary>
     [Serializable]
     public struct PositionXY : IComponent
@@ -40,7 +40,7 @@ namespace Gubbins.Entities
     }
 
     /// <summary>
-    /// Represents the position of an entity in world space, defined by its X and Z coordinates.
+    /// Represents the position of an entity in local space, defined by its X and Z coordinates.
     /// </summary>
     [Serializable]
     public struct PositionXZ : IComponent
@@ -50,7 +50,7 @@ namespace Gubbins.Entities
     }
 
     /// <summary>
-    /// Represents the position of an entity in world space, defined by its Y and Z coordinates.
+    /// Represents the position of an entity in local space, defined by its Y and Z coordinates.
     /// </summary>
     [Serializable]
     public struct PositionYZ : IComponent
@@ -60,7 +60,7 @@ namespace Gubbins.Entities
     }
 
     /// <summary>
-    /// Represents the position of an entity in world space, defined by its X, Y, and Z coordinates.
+    /// Represents the position of an entity in local space, defined by its X, Y, and Z coordinates.
     /// </summary>
     [Serializable]
     public struct Position : IComponent

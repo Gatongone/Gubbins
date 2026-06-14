@@ -3,7 +3,7 @@
 namespace Gubbins.Entities
 {
     /// <summary>
-    /// Represents the local scale of an entity along the X-axis in world space.
+    /// Represents the local scale of an entity along the X-axis in local space.
     /// </summary>
     [Serializable]
     public struct ScaleX : IComponent
@@ -12,7 +12,7 @@ namespace Gubbins.Entities
     }
 
     /// <summary>
-    /// Represents the local scale of an entity along the Y-axis in world space.
+    /// Represents the local scale of an entity along the Y-axis in local space.
     /// </summary>
     [Serializable]
     public struct ScaleY : IComponent
@@ -21,7 +21,7 @@ namespace Gubbins.Entities
     }
 
     /// <summary>
-    /// Represents the local scale of an entity along the Z-axis in world space.
+    /// Represents the local scale of an entity along the Z-axis in local space.
     /// </summary>
     [Serializable]
     public struct ScaleZ : IComponent
@@ -30,7 +30,7 @@ namespace Gubbins.Entities
     }
 
     /// <summary>
-    /// Represents the local scale of an entity in world space, with separate components for the X and Y axes.
+    /// Represents the local scale of an entity in local space, with separate components for the X and Y axes.
     /// </summary>
     [Serializable]
     public struct ScaleXY : IComponent
@@ -40,7 +40,7 @@ namespace Gubbins.Entities
     }
 
     /// <summary>
-    /// Represents the local scale of an entity in world space, with separate components for the X and Z axes.
+    /// Represents the local scale of an entity in local space, with separate components for the X and Z axes.
     /// </summary>
     [Serializable]
     public struct ScaleXZ : IComponent
@@ -50,7 +50,7 @@ namespace Gubbins.Entities
     }
 
     /// <summary>
-    /// Represents the local scale of an entity in world space, with separate components for the Y and Z axes.
+    /// Represents the local scale of an entity in local space, with separate components for the Y and Z axes.
     /// </summary>
     [Serializable]
     public struct ScaleYZ : IComponent
@@ -60,7 +60,7 @@ namespace Gubbins.Entities
     }
 
     /// <summary>
-    /// Represents the local scale of an entity in world space, with separate components for each axis (X, Y, Z).
+    /// Represents the local scale of an entity in local space, with separate components for each axis (X, Y, Z).
     /// </summary>
     [Serializable]
     public struct Scale : IComponent

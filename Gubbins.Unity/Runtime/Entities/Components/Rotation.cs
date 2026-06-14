@@ -3,7 +3,7 @@
 namespace Gubbins.Entities
 {
     /// <summary>
-    /// Represents the rotation of an entity around the X-axis in world space, defined by its X Euler angle.
+    /// Represents the rotation of an entity around the X-axis in local space, defined by its X Euler angle.
     /// </summary>
     [Serializable]
     public struct RotationX : IComponent
@@ -12,7 +12,7 @@ namespace Gubbins.Entities
     }
 
     /// <summary>
-    /// Represents the rotation of an entity around the Y-axis in world space, defined by its Y Euler angle.
+    /// Represents the rotation of an entity around the Y-axis in local space, defined by its Y Euler angle.
     /// </summary>
     [Serializable]
     public struct RotationY : IComponent
@@ -21,7 +21,7 @@ namespace Gubbins.Entities
     }
 
     /// <summary>
-    /// Represents the rotation of an entity around the Z-axis in world space, defined by its Z Euler angle.
+    /// Represents the rotation of an entity around the Z-axis in local space, defined by its Z Euler angle.
     /// </summary>
     [Serializable]
     public struct RotationZ : IComponent
@@ -30,7 +30,7 @@ namespace Gubbins.Entities
     }
 
     /// <summary>
-    /// Represents the rotation of an entity in world space, defined by its X and Y Euler angles.
+    /// Represents the rotation of an entity in local space, defined by its X and Y Euler angles.
     /// </summary>
     [Serializable]
     public struct RotationXY : IComponent
@@ -40,7 +40,7 @@ namespace Gubbins.Entities
     }
 
     /// <summary>
-    /// Represents the rotation of an entity in world space, defined by its X and Z Euler angles.
+    /// Represents the rotation of an entity in local space, defined by its X and Z Euler angles.
     /// </summary>
     [Serializable]
     public struct RotationXZ : IComponent
@@ -50,7 +50,7 @@ namespace Gubbins.Entities
     }
 
     /// <summary>
-    /// Represents the rotation of an entity in world space, defined by its Y and Z Euler angles.
+    /// Represents the rotation of an entity in local space, defined by its Y and Z Euler angles.
     /// </summary>
     [Serializable]
     public struct RotationYZ : IComponent
@@ -60,7 +60,7 @@ namespace Gubbins.Entities
     }
 
     /// <summary>
-    /// Represents the rotation of an entity in world space, defined by its Euler angles (X, Y, Z).
+    /// Represents the rotation of an entity in local space, defined by its Euler angles (X, Y, Z).
     /// </summary>
     [Serializable]
     public struct Rotation : IComponent
