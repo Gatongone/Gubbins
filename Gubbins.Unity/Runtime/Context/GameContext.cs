@@ -1,33 +1,161 @@
 using System;
 using System.Linq;
-using Gubbins.Context;
 using Gubbins.Enhance;
 using UnityEngine;
 
-[CreateAssetMenu(fileName = "GameContext", menuName = "Context/GameContext")]
-public class GameContext : ScriptableObject, IContext, IDependenciesRegistry
+namespace Gubbins.Context
 {
-    private ApplicationContext m_Context;
+    /// <summary>
+    /// A ScriptableObject that represents the game context. It is used to register dependencies and listen to events.
+    /// </summary>
+    [CreateAssetMenu(fileName = "GameContext", menuName = "Context/GameContext")]
+    public class GameContext : ScriptableObject, IContext, IDependenciesRegistry
+    {
+        /// <summary>
+        /// Proxy to the actual application context.
+        /// </summary>
+        private ApplicationContext m_Context;
 
-    public IContext Parent => m_Context.Parent;
+        /// <summary>
+        /// The list of dependencies installers to initialize the context with.
+        /// These installers will be executed in the order they are defined in the array.
+        /// </summary>
+        [SerializeField] private SerializedReference<IDependenciesInstaller>[] m_Installers;
 
-    [SerializeField] private SerializedReference<IDependenciesInstaller>[] m_Installers;
+        /// <summary>
+        /// The list of event listeners to register with the context.
+        /// These listeners will be executed in the order they are defined in the array.
+        /// </summary>
+        [SerializeField] private SerializedReference<IEventListener>[] m_Listeners;
 
-    private IDependenciesRegistry m_Registry => m_Context;
-    private IDependenciesResolver m_Resolver => m_Context;
+        /// <summary>
+        /// Gets the parent context. For GameContext, the parent context is always the global context,
+        /// which is shared across the entire application.
+        /// </summary>
+        public IContext Parent => ApplicationContext.Global;
 
-    private void Awake() => m_Context = new ApplicationContext(m_Installers.Where(item => item is {Value: not null})
-                                                                           .Select(static item => item.Value), ApplicationContext.Global);
+        /// <summary>
+        /// Gets the dependencies registry of the context.
+        /// </summary>
+        private IDependenciesRegistry m_Registry => m_Context;
 
-    public object Resolve(Type type, string key) => m_Resolver.Resolve(type, key);
+        /// <summary>
+        /// Gets the dependencies resolver of the context.
+        /// </summary>
+        private IDependenciesResolver m_Resolver => m_Context;
 
-    public object[] ResolveAll(Type type) => m_Resolver.ResolveAll(type);
+        /// <summary>
+        /// <inheritdoc cref="m_Resolver"/>.
+        /// </summary>
+        public static IDependenciesResolver Resolver { get; private set; }
 
-    public void Dispose() => m_Context.Dispose();
+        /// <summary>
+        /// <inheritdoc cref="m_Registry"/>.
+        /// </summary>
+        public static IDependenciesRegistry Registry { get; private set; }
 
-    public IBindingDecorator Register(Type type) => m_Registry.Register(type);
+        /// <summary>
+        /// Gets the current instance of the GameContext.
+        /// </summary>
+        public static IContext Instance { get; private set; }
 
-    public INotMultitonBindingDecorator Register(object instance) => m_Registry.Register(instance);
+        /// <summary>
+        /// Indicates whether the GameContext instance has been initialized.
+        /// </summary>
+        private bool m_HasInit;
 
-    public IMultitonBindingDecorator Register(object[] instances) => m_Registry.Register(instances);
+        /// <summary>
+        /// Initializes the GameContext instance and sets up the application context with the specified installers and listeners.
+        /// </summary>
+        private void OnEnable()
+        {
+#if UNITY_EDITOR
+            var isPlaying = Application.isPlaying || UnityEditor.EditorApplication.isPlayingOrWillChangePlaymode;
+#else
+            var isPlaying = Application.isPlaying;
+#endif
+            // We don't initialize instance on editor mode.
+            if (!isPlaying || m_HasInit)
+            {
+                return;
+            }
+
+            Instance = this;
+            Resolver = m_Resolver;
+            Registry = m_Registry;
+            var installers = m_Installers.Where(static installer => installer.Value != null)
+                                         .Select(static installer => installer.Value);
+            m_Context = new ApplicationContext(installers);
+            foreach (var listener in m_Listeners)
+            {
+                listener.Value?.Listen(m_Resolver, m_Registry);
+            }
+
+            m_HasInit = true;
+        }
+
+        /// <summary>
+        /// Releases any resources held by the context.
+        /// </summary>
+        public void Dispose() => m_Context.Dispose();
+
+        /// <inheritdoc/>
+        object IDependenciesResolver.Resolve(Type type, string key) => m_Resolver.Resolve(type, key);
+
+        /// <inheritdoc/>
+        object[] IDependenciesResolver.ResolveAll(Type type) => m_Resolver.ResolveAll(type);
+
+        /// <inheritdoc/>
+        public IBindingDecorator Register(Type type) => m_Registry.Register(type);
+
+        /// <inheritdoc/>
+        INotMultitonBindingDecorator IDependenciesRegistry.Register(object instance) => m_Registry.Register(instance);
+
+        /// <inheritdoc/>
+        IMultitonBindingDecorator IDependenciesRegistry.Register(object[] instances) => m_Registry.Register(instances);
+
+#if UNITY_EDITOR
+        /// <summary>
+        /// Editor-only class that automatically registers any imported GameContext assets to the Preloaded Assets in Player Settings.
+        /// </summary>
+        private class PreloadAutoRegister : UnityEditor.AssetPostprocessor
+        {
+            /// <summary>
+            /// Automatically registers any imported GameContext assets to the Preloaded Assets in Player Settings.
+            /// </summary>
+            private static void OnPostprocessAllAssets(string[] importedAssets, string[] deletedAssets, string[] movedAssets, string[] movedFromAssetPaths)
+            {
+                foreach (var assetPath in importedAssets)
+                {
+                    var obj = UnityEditor.AssetDatabase.LoadAssetAtPath<ScriptableObject>(assetPath);
+                    if (obj is GameContext)
+                    {
+                        RegisterToPreload(obj);
+                    }
+                }
+            }
+
+            /// <summary>
+            /// Registers the given ScriptableObject asset to the Preloaded Assets in Player Settings if it's not already registered.
+            /// </summary>
+            private static void RegisterToPreload(ScriptableObject asset)
+            {
+                var preloadedAssets = UnityEditor.PlayerSettings.GetPreloadedAssets().ToList();
+                // Remove null entries that may exist in the Preloaded Assets list.
+                preloadedAssets.RemoveAll(static a => a == null);
+
+                // Prevent duplicate registration.
+                if (preloadedAssets.Contains(asset) || preloadedAssets.Any(static a => a is GameContext))
+                {
+                    Debug.LogWarning($"A GameContext asset is already registered in Preloaded Assets. Multiple GameContext assets may lead to unexpected behavior. Skipping registration of {asset.name}.");
+                    return;
+                }
+
+                preloadedAssets.Add(asset);
+                UnityEditor.PlayerSettings.SetPreloadedAssets(preloadedAssets.ToArray());
+                UnityEditor.AssetDatabase.SaveAssets();
+            }
+        }
+#endif
+    }
 }

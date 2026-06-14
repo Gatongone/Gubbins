@@ -79,10 +79,10 @@ internal static class ErrorDiagnostic
             defaultSeverity: DiagnosticSeverity.Error,
             isEnabledByDefault: true);
 
-        public static readonly DiagnosticDescriptor TypeIsNotEventBus = new(
+        public static readonly DiagnosticDescriptor TypeCantBeSubscribed = new(
             id: Id.TYPE_IS_NOT_EVENT_BUS,
-            title: "Type is not event bus.",
-            messageFormat: "Type must be assignable from Gubbins.Message.IEventBus<TNotification>. Type: {0}.",
+            title: "Event can't be subscribed.",
+            messageFormat: "Type must be assignable from Gubbins.Events.IWeakEventSubscriable<TNotification> or Gubbins.Events.IEventSubscriable<TNotification>. Type: {0}.",
             category: "DiagnosticsGenerator",
             defaultSeverity: DiagnosticSeverity.Error,
             isEnabledByDefault: true);

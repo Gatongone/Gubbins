@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis;
@@ -10,8 +9,9 @@ namespace Gubbins.Generator;
 [Generator]
 public class EventGenerator : ISourceGenerator
 {
-    private const string EVENT_NAMESPACE = "Gubbins.Context";
-    private const string FILE_NAME       = "EventListener.g.cs";
+    private const string EVENT_NAMESPACE     = "Gubbins.Context";
+    private const string EVENT_BUS_NAMESPACE = "Gubbins.Events";
+    private const string FILE_NAME           = "EventListener.g.cs";
 
     private const string CODE_BODY_WITH_NAMESPACE =
         """
@@ -42,6 +42,7 @@ public class EventGenerator : ISourceGenerator
         {ClearEvent}
             {Indentation}}
         {TypeEnd}
+        }
         """;
 
     private const string CODE_BODY_WITHOUT_NAMESPACE =
@@ -83,21 +84,7 @@ public class EventGenerator : ISourceGenerator
         {Indentation}{
         {Indentation}    event{Index} = new {EventName}();
         {Indentation}    registry.Register(event{Index})
-        {Indentation}            .BindTo<IEvent<{Notification}>, IEventBroadcastable<{Notification}>, IEventSubscriable<{Notification}>, IWeakEventSubscriable<{Notification}>>()
-        {Indentation}            .WithKey(nameof({EventName}))
-        {Indentation}            .AsSingleton();
-        {Indentation}}
-        {Indentation}event{Index}.{Subscribe}({MethodName});
-        """;
-
-    private const string EMPTY_NOTIFICATION_LISTEN_BODY =
-        """
-        {Indentation}var event{Index} = resolver.Resolve<{EventName}>(nameof({EventName}));
-        {Indentation}if (event{Index} == null)
-        {Indentation}{
-        {Indentation}    event{Index} = new {EventName}();
-        {Indentation}    registry.Register(event{Index})
-        {Indentation}            .BindTo<IEvent<{Notification}>, IEventBroadcastable<{Notification}>, IEventSubscriable<{Notification}>, IWeakEventSubscriable<{Notification}>, IEvent, IEventBroadcastable, IEventSubscriable, IWeakEventSubscriable>()
+        {Indentation}            .BindTo<{Bindings}>()
         {Indentation}            .WithKey(nameof({EventName}))
         {Indentation}            .AsSingleton();
         {Indentation}}
@@ -134,13 +121,6 @@ public class EventGenerator : ISourceGenerator
 
         var body = FormatBody(bodyTemplate, typeInfo, containsNamespace, indentation, listenBody, clearBody);
         context.AddSource($"{typeInfo.FullName}.{FILE_NAME}", body);
-        var path = $"E:\\Gatongone\\Projects\\CSharp\\Test\\{typeInfo.FullName}.{FILE_NAME}";
-        if (!File.Exists(path))
-        {
-            using var stream = new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite);
-            using var writer = new StreamWriter(stream);
-            writer.Write(body);
-        }
     }
 
     private void ProcessMethodInfo(GeneratorExecutionContext context, MethodInfo methodInfo, StringBuilder listenBody, StringBuilder clearBody, ref int index, bool containsNamespace, TypeInfo typeInfo)
@@ -162,9 +142,9 @@ public class EventGenerator : ISourceGenerator
 
     private static bool ValidateEventInfo(GeneratorExecutionContext context, EventInfo eventInfo, MethodInfo methodInfo)
     {
-        if (!eventInfo.IsEventBus)
+        if (!eventInfo.CanBeSubscribed)
         {
-            context.ReportDiagnostic(ErrorDiagnostic.Descriptor.TypeIsNotEventBus, methodInfo.Location, eventInfo.Symbol.ToDisplayString());
+            context.ReportDiagnostic(ErrorDiagnostic.Descriptor.TypeCantBeSubscribed, methodInfo.Location, eventInfo.Symbol.ToDisplayString());
             return false;
         }
 
@@ -205,21 +185,54 @@ public class EventGenerator : ISourceGenerator
 
     private string FormatListenBody(EventInfo eventInfo, MethodInfo methodInfo, TypeInfo info, int index, bool containsNamespace)
     {
-        var listenBody = eventInfo.ParameterTypes.Length == 0 ? EMPTY_NOTIFICATION_LISTEN_BODY : LISTEN_BODY;
         var indentation = containsNamespace ? info.NestedTypes.Length : info.NestedTypes.Length - 1;
         var eventName = eventInfo.Symbol.ToDisplayString();
 
         // ReSharper disable InconsistentNaming
-        return listenBody.Format
+        return LISTEN_BODY.Format
         (
             Indentation => new string('\t', indentation + 2),
             Index => index.ToString(),
             EventName => eventName,
             MethodName => methodInfo.Name,
-            Notification => eventInfo.Notification,
-            Subscribe => "Subscribe"
+            Bindings => BuildBindings(eventInfo.Symbol, eventInfo.Notification),
+            // Prefer strong subscription; fall back to weak when the event is weak-only.
+            Subscribe => Implements(eventInfo.Symbol, "IEventSubscriable", generic: true) ? "Subscribe" : "SubscribeWeakly"
         );
     }
+
+    /// <summary>
+    /// Builds the <c>BindTo&lt;...&gt;</c> type-argument list from the event interfaces the target type
+    /// actually implements, so e.g. a subscribe-only event is not bound to <c>IEventBroadcastable&lt;T&gt;</c>.
+    /// </summary>
+    private static string BuildBindings(ITypeSymbol type, string notification)
+    {
+        var bindings = new List<string>();
+
+        // Generic interfaces carrying the notification type.
+        if (Implements(type, "IEvent", generic: true))                bindings.Add($"IEvent<{notification}>");
+        if (Implements(type, "IEventBroadcastable", generic: true))   bindings.Add($"IEventBroadcastable<{notification}>");
+        if (Implements(type, "IEventSubscriable", generic: true))     bindings.Add($"IEventSubscriable<{notification}>");
+        if (Implements(type, "IWeakEventSubscriable", generic: true)) bindings.Add($"IWeakEventSubscriable<{notification}>");
+
+        // Non-generic (Unit) interfaces, only present on parameterless events.
+        if (Implements(type, "IEvent", generic: false))                bindings.Add("IEvent");
+        if (Implements(type, "IEventBroadcastable", generic: false))   bindings.Add("IEventBroadcastable");
+        if (Implements(type, "IEventSubscriable", generic: false))     bindings.Add("IEventSubscriable");
+        if (Implements(type, "IWeakEventSubscriable", generic: false)) bindings.Add("IWeakEventSubscriable");
+
+        return string.Join(", ", bindings);
+    }
+
+    /// <summary>
+    /// Whether <paramref name="type"/> implements the given <c>Gubbins.Events</c> interface,
+    /// distinguishing the generic (<c>I...&lt;T&gt;</c>) and non-generic (Unit) variants by arity.
+    /// </summary>
+    private static bool Implements(ITypeSymbol type, string interfaceName, bool generic) =>
+        type.AllInterfaces.Any(symbol =>
+            symbol.ContainingNamespace.ToDisplayString().Equals(EVENT_BUS_NAMESPACE) &&
+            symbol.Name.Equals(interfaceName) &&
+            symbol.TypeArguments.Length == (generic ? 1 : 0));
 
     // ReSharper disable InconsistentNaming
     private string FormatBody(string bodyTemplate, TypeInfo typeInfo, bool containsNamespace, string indentation, StringBuilder listenBody, StringBuilder clearBody) => bodyTemplate.Format
@@ -227,6 +240,7 @@ public class EventGenerator : ISourceGenerator
         Generator => nameof(EventGenerator),
         TypeStart => typeInfo.NestedTypes.GetTypeStringBegin(containsNamespace ? 0 : -1),
         TypeEnd => typeInfo.NestedTypes.GetTypeStringEnd(containsNamespace ? 0 : -1),
+        CreateTime => DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
         Namespace => typeInfo.Namespace,
         Indentation => indentation,
         ListenEvent => listenBody.ToString(),
@@ -294,7 +308,6 @@ public class EventGenerator : ISourceGenerator
                 ParameterTypes = method.Parameters.Select(p => p.Type.ToDisplayString()).ToArray(),
                 Events         = events.ToArray(),
                 Name           = method.Name,
-                FullName       = method.ToDisplayString(),
                 Location       = method.Locations.First()
             };
 
@@ -312,10 +325,10 @@ public class EventGenerator : ISourceGenerator
             switch (attribute.ConstructorArguments.Length)
             {
                 case 0:
-                    type   = attribute.AttributeClass!.TypeArguments.First();
+                    type = attribute.AttributeClass!.TypeArguments.First();
                     break;
                 case 1:
-                    type   = (ITypeSymbol) attribute.ConstructorArguments[0].Value!;
+                    type = (ITypeSymbol) attribute.ConstructorArguments[0].Value!;
                     break;
                 default: return null;
             }
@@ -324,7 +337,7 @@ public class EventGenerator : ISourceGenerator
             {
                 Symbol         = type,
                 Location       = type.Locations.First(),
-                IsEventBus     = TryGetEventBusInfo(type, out var notification, out var parameterTypes),
+                CanBeSubscribed     = TryGetEventBusInfo(type, out var notification, out var parameterTypes),
                 Notification   = notification,
                 ParameterTypes = parameterTypes
             };
@@ -348,8 +361,8 @@ public class EventGenerator : ISourceGenerator
             return true;
 
             bool MatchEventBus(INamedTypeSymbol symbol) =>
-                symbol.ContainingNamespace.ToDisplayString().Equals(EVENT_NAMESPACE) &&
-                symbol.Name.Equals("IEvent") &&
+                symbol.ContainingNamespace.ToDisplayString().Equals(EVENT_BUS_NAMESPACE) &&
+                (symbol.Name.Equals("IEventSubscriable") || symbol.Name.Equals("IWeakEventSubscriable")) &&
                 symbol.TypeArguments.Length == 1;
         }
 
@@ -380,7 +393,6 @@ public class EventGenerator : ISourceGenerator
     private struct MethodInfo
     {
         public string      Name;
-        public string      FullName;
         public EventInfo[] Events;
         public string[]    ParameterTypes;
         public Location    Location;
@@ -391,7 +403,7 @@ public class EventGenerator : ISourceGenerator
         public ITypeSymbol Symbol;
         public string[]    ParameterTypes;
         public string      Notification;
-        public bool        IsEventBus;
+        public bool        CanBeSubscribed;
         public Location    Location;
     }
 }

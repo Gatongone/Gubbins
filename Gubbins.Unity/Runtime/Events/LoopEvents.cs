@@ -14,7 +14,7 @@ namespace Gubbins.Events
         /// </summary>
         public class Initialization : LoopEvent
         {
-            internal Initialization() : base(UnityLoop.Kind.Initialization) { }
+            public Initialization() : base(UnityLoop.Kind.Initialization) { }
         }
 
         /// <summary>
@@ -22,7 +22,7 @@ namespace Gubbins.Events
         /// </summary>
         public class EarlyUpdate : LoopEvent
         {
-            internal EarlyUpdate() : base(UnityLoop.Kind.EarlyUpdate) { }
+            public EarlyUpdate() : base(UnityLoop.Kind.EarlyUpdate) { }
         }
 
         /// <summary>
@@ -30,7 +30,7 @@ namespace Gubbins.Events
         /// </summary>
         public class Update : LoopEvent
         {
-            internal Update() : base(UnityLoop.Kind.Update) { }
+            public Update() : base(UnityLoop.Kind.Update) { }
         }
 
         /// <summary>
@@ -38,7 +38,7 @@ namespace Gubbins.Events
         /// </summary>
         public class FixedUpdate : LoopEvent
         {
-            internal FixedUpdate() : base(UnityLoop.Kind.FixedUpdate) { }
+            public FixedUpdate() : base(UnityLoop.Kind.FixedUpdate) { }
         }
 
         /// <summary>
@@ -46,7 +46,7 @@ namespace Gubbins.Events
         /// </summary>
         public class PreUpdate : LoopEvent
         {
-            internal PreUpdate() : base(UnityLoop.Kind.PreUpdate) { }
+            public PreUpdate() : base(UnityLoop.Kind.PreUpdate) { }
         }
 
         /// <summary>
@@ -54,7 +54,7 @@ namespace Gubbins.Events
         /// </summary>
         public class PreLateUpdate : LoopEvent
         {
-            internal PreLateUpdate() : base(UnityLoop.Kind.PreLateUpdate) { }
+            public PreLateUpdate() : base(UnityLoop.Kind.PreLateUpdate) { }
         }
 
         /// <summary>
@@ -62,7 +62,7 @@ namespace Gubbins.Events
         /// </summary>
         public class PostLateUpdate : LoopEvent
         {
-            internal PostLateUpdate() : base(UnityLoop.Kind.PostLateUpdate) { }
+            public PostLateUpdate() : base(UnityLoop.Kind.PostLateUpdate) { }
         }
     }
 
