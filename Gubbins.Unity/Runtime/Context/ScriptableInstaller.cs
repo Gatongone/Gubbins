@@ -1,13 +1,12 @@
-﻿using UnityEngine;
+﻿using Gubbins.Enhance;
+using UnityEngine;
 
 namespace Gubbins.Context
 {
     [CreateAssetMenu(fileName = "ScriptableInstaller", menuName = "Context/ScriptableInstaller")]
     public class ScriptableInstaller : ScriptableObject, IDependenciesInstaller
     {
-        public SerializedInstallInfo[] InstallInfo;
-        public void Install(IDependenciesRegistry registry)
-        {
-        }
+        [HideLabel] public SerializedInstallInfo[] InstallInfos;
+        public void Install(IDependenciesRegistry registry) { }
     }
 }
