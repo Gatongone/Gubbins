@@ -37,22 +37,12 @@ namespace Gubbins.Context
         /// <summary>
         /// Gets the dependencies registry of the context.
         /// </summary>
-        private IDependenciesRegistry m_Registry => m_Context;
+        public IDependenciesRegistry Registry => m_Context;
 
         /// <summary>
         /// Gets the dependencies resolver of the context.
         /// </summary>
-        private IDependenciesResolver m_Resolver => m_Context;
-
-        /// <summary>
-        /// <inheritdoc cref="m_Resolver"/>.
-        /// </summary>
-        public static IDependenciesResolver Resolver { get; private set; }
-
-        /// <summary>
-        /// <inheritdoc cref="m_Registry"/>.
-        /// </summary>
-        public static IDependenciesRegistry Registry { get; private set; }
+        public IDependenciesResolver Resolver => m_Context;
 
         /// <summary>
         /// Gets the current instance of the GameContext.
@@ -81,14 +71,12 @@ namespace Gubbins.Context
             }
 
             Instance = this;
-            Resolver = m_Resolver;
-            Registry = m_Registry;
             var installers = m_Installers.Where(static installer => installer.Value != null)
                                          .Select(static installer => installer.Value);
-            m_Context = new ApplicationContext(installers);
+            m_Context = new ApplicationContext(installers, Parent);
             foreach (var listener in m_Listeners)
             {
-                listener.Value?.Listen(m_Resolver, m_Registry);
+                listener.Value?.Listen(Resolver, Registry);
             }
 
             m_HasInit = true;
@@ -97,22 +85,30 @@ namespace Gubbins.Context
         /// <summary>
         /// Releases any resources held by the context.
         /// </summary>
-        public void Dispose() => m_Context.Dispose();
+        public void Dispose()
+        {
+            foreach (var item in m_Listeners)
+            {
+                item.Value?.Clear(Resolver);
+            }
+
+            m_Context.Dispose();
+        }
 
         /// <inheritdoc/>
-        object IDependenciesResolver.Resolve(Type type, string key) => m_Resolver.Resolve(type, key);
+        object IDependenciesResolver.Resolve(Type type, string key) => Resolver.Resolve(type, key);
 
         /// <inheritdoc/>
-        object[] IDependenciesResolver.ResolveAll(Type type) => m_Resolver.ResolveAll(type);
+        object[] IDependenciesResolver.ResolveAll(Type type) => Resolver.ResolveAll(type);
 
         /// <inheritdoc/>
-        public IBindingDecorator Register(Type type) => m_Registry.Register(type);
+        public IBindingDecorator Register(Type type) => Registry.Register(type);
 
         /// <inheritdoc/>
-        INotMultitonBindingDecorator IDependenciesRegistry.Register(object instance) => m_Registry.Register(instance);
+        INotMultitonBindingDecorator IDependenciesRegistry.Register(object instance) => Registry.Register(instance);
 
         /// <inheritdoc/>
-        IMultitonBindingDecorator IDependenciesRegistry.Register(object[] instances) => m_Registry.Register(instances);
+        IMultitonBindingDecorator IDependenciesRegistry.Register(object[] instances) => Registry.Register(instances);
 
 #if UNITY_EDITOR
         /// <summary>
