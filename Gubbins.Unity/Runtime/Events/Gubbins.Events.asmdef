@@ -11,7 +11,8 @@
     "precompiledReferences": [
         "Gubbins.Events.dll",
         "Gubbins.Unsafe.dll",
-        "Gubbins.Enhance.dll"
+        "Gubbins.Enhance.dll",
+        "Gubbins.Context.dll"
     ],
     "autoReferenced": true,
     "defineConstraints": [],

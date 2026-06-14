@@ -13,8 +13,7 @@ namespace Gubbins.Events
         private readonly UnityEngine.Events.UnityEvent m_UnityEvent;
 
         /// <param name="unityEvent">The UnityEvent to wrap and invoke.</param>
-        public UnityEventHandler(UnityEngine.Events.UnityEvent unityEvent)
-            => m_UnityEvent = unityEvent;
+        public UnityEventHandler(UnityEngine.Events.UnityEvent unityEvent) => m_UnityEvent = unityEvent;
 
         /// <inheritdoc/>
         public void Handle(Unit notification) => m_UnityEvent.Invoke();
