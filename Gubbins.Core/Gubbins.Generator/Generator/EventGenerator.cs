@@ -50,8 +50,7 @@ public class EventGenerator : ISourceGenerator
         // Generator: {Generator}
         // Created On: {CreateTime}
 
-        using Gubbins.Domain;
-        using Gubbins.Event;
+        using Gubbins.Events;
         using Gubbins.Context;
 
         {TypeStart}

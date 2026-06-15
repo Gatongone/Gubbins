@@ -22,8 +22,8 @@ namespace Gubbins.Editor
         // Enumerating implementations scans every type in every loaded assembly, which is expensive. The type set
         // is fixed for the editor session (a script recompile triggers a domain reload that clears these), so the
         // results are cached and shared across all drawer instances.
-        private static readonly Dictionary<Type, List<Type>>          s_ImplementationCache = new();
-        private static readonly Dictionary<(Type expected, Type arg), List<Type>> s_ConstrainedCache = new();
+        private static readonly Dictionary<Type, List<Type>>                      s_ImplementationCache = new();
+        private static readonly Dictionary<(Type expected, Type arg), List<Type>> s_ConstrainedCache    = new();
 
         /// <summary>
         /// Extract the expected type T from <see cref="SerializedReference{T}"/> using reflection.
@@ -208,33 +208,20 @@ namespace Gubbins.Editor
                 return cached;
 
             var result = new List<Type>();
-            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            foreach (var type in AssemblyCache.AllTypes)
             {
-                Type[] types;
-                try
-                {
-                    types = asm.GetTypes();
-                }
-                catch
-                {
+                if (type == null || type.IsAbstract)
                     continue;
-                }
 
-                foreach (var t in types)
+                if (type.IsGenericTypeDefinition)
                 {
-                    if (t == null || t.IsAbstract)
-                        continue;
-
-                    if (t.IsGenericTypeDefinition)
-                    {
-                        var closed = TryMakeGeneric(t, argument);
-                        if (closed != null && IsInstantiableMatch(closed, closedExpected))
-                            result.Add(closed);
-                    }
-                    else if (!t.ContainsGenericParameters && IsInstantiableMatch(t, closedExpected))
-                    {
-                        result.Add(t);
-                    }
+                    var closed = TryMakeGeneric(type, argument);
+                    if (closed != null && IsInstantiableMatch(closed, closedExpected))
+                        result.Add(closed);
+                }
+                else if (!type.ContainsGenericParameters && IsInstantiableMatch(type, closedExpected))
+                {
+                    result.Add(type);
                 }
             }
 
@@ -256,20 +243,9 @@ namespace Gubbins.Editor
             if (s_ImplementationCache.TryGetValue(expectedType, out var cached))
                 return cached;
 
-            var result = AppDomain.CurrentDomain.GetAssemblies()
-                            .SelectMany(asm =>
-                            {
-                                try
-                                {
-                                    return asm.GetTypes();
-                                }
-                                catch
-                                {
-                                    return Array.Empty<Type>();
-                                }
-                            })
-                            .Where(t => t != null && !t.IsAbstract && IsSelectableImplementation(t, expectedType))
-                            .ToList();
+            var result = AssemblyCache.AllTypes
+                                      .Where(t => t is {IsAbstract: false} && IsSelectableImplementation(t, expectedType))
+                                      .ToList();
             s_ImplementationCache[expectedType] = result;
             return result;
         }
@@ -591,15 +567,15 @@ namespace Gubbins.Editor
                         // The builder window is asynchronous. Capture the property path and re-resolve a fresh
                         // SerializedObject when the callback fires, since the current one is invalid by then.
                         var serializedObject = property.serializedObject;
-                        var propertyPath     = property.propertyPath;
+                        var propertyPath = property.propertyPath;
                         GenericTypeBuilderWindow.Show(newType, closedType =>
                         {
                             serializedObject.Update();
                             var prop = serializedObject.FindProperty(propertyPath);
                             if (prop == null) return;
-                            var pure  = prop.FindPropertyRelative("pureReference");
+                            var pure = prop.FindPropertyRelative("pureReference");
                             var unity = prop.FindPropertyRelative("unityReference");
-                            var name  = prop.FindPropertyRelative("expectedTypeName");
+                            var name = prop.FindPropertyRelative("expectedTypeName");
                             if (closedType == null)
                                 ClearReference(pure, unity, name);
                             else
@@ -766,6 +742,7 @@ namespace Gubbins.Editor
                 {
                     pureProp.managedReferenceValue = null;
                 }
+
                 unityProp.objectReferenceValue = null;
                 typeNameProp.stringValue       = type.AssemblyQualifiedName;
             }

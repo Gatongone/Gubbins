@@ -70,17 +70,16 @@ namespace Gubbins.Editor
         {
             var constraints = genericParam.GetGenericParameterConstraints();
             var attrs = genericParam.GenericParameterAttributes;
-            return AppDomain.CurrentDomain.GetAssemblies()
-                            .SelectMany(asm => asm.GetTypes())
-                            .Where(t => t is
-                            {
-                                IsNestedPrivate    : false,
-                                IsNestedFamily     : false,
-                                IsNestedFamANDAssem: false,
-                                IsNestedFamORAssem : false
-                            } and not {IsAbstract: true, IsSealed: true} && SatisfiesConstraints(t, constraints, attrs))
-                            .OrderBy(t => t.ToString(), StringComparer.Ordinal)
-                            .ToArray();
+            return AssemblyCache.AllTypes
+                                .Where(t => t is
+                                {
+                                    IsNestedPrivate    : false,
+                                    IsNestedFamily     : false,
+                                    IsNestedFamANDAssem: false,
+                                    IsNestedFamORAssem : false
+                                } and not {IsAbstract: true, IsSealed: true} && SatisfiesConstraints(t, constraints, attrs))
+                                .OrderBy(t => t.ToString(), StringComparer.Ordinal)
+                                .ToArray();
         }
 
         private static bool SatisfiesConstraints(Type t, Type[] constraints, GenericParameterAttributes attrs)
@@ -195,6 +194,7 @@ namespace Gubbins.Editor
                 Complete(null);
                 Close();
             }
+
             EditorGUILayout.EndHorizontal();
             EditorGUILayout.Space(4);
         }

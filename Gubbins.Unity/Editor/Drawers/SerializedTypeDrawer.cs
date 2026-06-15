@@ -207,32 +207,21 @@ namespace Gubbins.Editor
         /// <summary>
         /// Load all non-null types from all loaded assemblies.
         /// </summary>
-        private static Type[] LoadAllTypes() => AppDomain.CurrentDomain.GetAssemblies()
-                                                         .SelectMany(GetLoadableTypes)
-                                                         .Where(type => type != null)
-                                                         .Distinct()
-                                                         .ToArray();
+        private static Type[] LoadAllTypes() => AssemblyCache.AllTypes
+                                                             .Where(IsLoadableTypes)
+                                                             .Distinct()
+                                                             .ToArray();
 
         /// <summary>
-        /// Get all types from an assembly without failing on partial load errors.
+        /// Filter out compiler-generated and non-instantiable types to avoid cluttering the dropdown with unusable options.
         /// </summary>
-        private static IEnumerable<Type> GetLoadableTypes(Assembly assembly)
+        private static bool IsLoadableTypes(Type type) => type is
         {
-            try
-            {
-                return assembly.GetTypes().Where(static type => type is
-                {
-                    IsNestedPrivate    : false,
-                    IsNestedFamily     : false,
-                    IsNestedFamANDAssem: false,
-                    IsNestedFamORAssem : false
-                } and not {IsAbstract: true, IsSealed: true});
-            }
-            catch (ReflectionTypeLoadException exception)
-            {
-                return exception.Types.Where(type => type != null);
-            }
-        }
+            IsNestedPrivate    : false,
+            IsNestedFamily     : false,
+            IsNestedFamANDAssem: false,
+            IsNestedFamORAssem : false
+        } and not {IsAbstract: true, IsSealed: true};
 
         /// <summary>
         /// Determine whether a type is SerializedType or SerializedType{T}.

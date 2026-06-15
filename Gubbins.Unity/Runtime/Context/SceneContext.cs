@@ -73,7 +73,12 @@ namespace Gubbins.Context
             m_Context = new ApplicationContext(installers, Parent);
             foreach (var listener in m_Listeners)
             {
-                listener.Value?.Listen(Resolver, Registry);
+                var target = listener.Value;
+                if (target != null)
+                {
+                    target.Listen(Resolver, Registry);
+                    m_Context.Inject(target);
+                }
             }
 
             m_HasInit = true;

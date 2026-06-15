@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using Gubbins.Enhance;
+using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 
 namespace Gubbins.Context
@@ -52,6 +53,7 @@ namespace Gubbins.Context
         /// <summary>
         /// Indicates whether the GameContext instance has been initialized.
         /// </summary>
+        [NonSerialized]
         private bool m_HasInit;
 
         /// <summary>
@@ -65,7 +67,7 @@ namespace Gubbins.Context
             var isPlaying = Application.isPlaying;
 #endif
             // We don't initialize instance on editor mode.
-            if (!isPlaying || m_HasInit)
+            if (!isPlaying || m_HasInit || Instance != null)
             {
                 return;
             }
@@ -76,9 +78,13 @@ namespace Gubbins.Context
             m_Context = new ApplicationContext(installers, Parent);
             foreach (var listener in m_Listeners)
             {
-                listener.Value?.Listen(Resolver, Registry);
+                var target = listener.Value;
+                if (target != null)
+                {
+                    m_Context.Inject(target);
+                    target.Listen(Resolver, Registry);
+                }
             }
-
             m_HasInit = true;
         }
 
@@ -137,16 +143,18 @@ namespace Gubbins.Context
             private static void RegisterToPreload(ScriptableObject asset)
             {
                 var preloadedAssets = UnityEditor.PlayerSettings.GetPreloadedAssets().ToList();
-                // Remove null entries that may exist in the Preloaded Assets list.
-                preloadedAssets.RemoveAll(static a => a == null);
 
                 // Prevent duplicate registration.
-                if (preloadedAssets.Contains(asset) || preloadedAssets.Any(static a => a is GameContext))
+                if (preloadedAssets.Contains(asset))
                 {
-                    Debug.LogWarning($"A GameContext asset is already registered in Preloaded Assets. Multiple GameContext assets may lead to unexpected behavior. Skipping registration of {asset.name}.");
                     return;
                 }
-
+                if (preloadedAssets.Any(static a => a is GameContext))
+                {
+                    Debug.LogWarning($"A GameContext asset is already registered in Preloaded Assets. Multiple GameContext assets may lead to unexpected behavior. Please ensure only one GameContext asset is registered. Asset path: {UnityEditor.AssetDatabase.GetAssetPath(asset)}");
+                }
+                // Remove null entries that may exist in the Preloaded Assets list.
+                preloadedAssets.RemoveAll(static a => a == null);
                 preloadedAssets.Add(asset);
                 UnityEditor.PlayerSettings.SetPreloadedAssets(preloadedAssets.ToArray());
                 UnityEditor.AssetDatabase.SaveAssets();
