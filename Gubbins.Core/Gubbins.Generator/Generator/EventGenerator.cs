@@ -209,15 +209,15 @@ public class EventGenerator : ISourceGenerator
         var bindings = new List<string>();
 
         // Generic interfaces carrying the notification type.
-        if (Implements(type, "IEvent", generic: true))                bindings.Add($"IEvent<{notification}>");
-        if (Implements(type, "IEventBroadcastable", generic: true))   bindings.Add($"IEventBroadcastable<{notification}>");
-        if (Implements(type, "IEventSubscriable", generic: true))     bindings.Add($"IEventSubscriable<{notification}>");
+        if (Implements(type, "IEvent", generic: true)) bindings.Add($"IEvent<{notification}>");
+        if (Implements(type, "IEventBroadcastable", generic: true)) bindings.Add($"IEventBroadcastable<{notification}>");
+        if (Implements(type, "IEventSubscriable", generic: true)) bindings.Add($"IEventSubscriable<{notification}>");
         if (Implements(type, "IWeakEventSubscriable", generic: true)) bindings.Add($"IWeakEventSubscriable<{notification}>");
 
         // Non-generic (Unit) interfaces, only present on parameterless events.
-        if (Implements(type, "IEvent", generic: false))                bindings.Add("IEvent");
-        if (Implements(type, "IEventBroadcastable", generic: false))   bindings.Add("IEventBroadcastable");
-        if (Implements(type, "IEventSubscriable", generic: false))     bindings.Add("IEventSubscriable");
+        if (Implements(type, "IEvent", generic: false)) bindings.Add("IEvent");
+        if (Implements(type, "IEventBroadcastable", generic: false)) bindings.Add("IEventBroadcastable");
+        if (Implements(type, "IEventSubscriable", generic: false)) bindings.Add("IEventSubscriable");
         if (Implements(type, "IWeakEventSubscriable", generic: false)) bindings.Add("IWeakEventSubscriable");
 
         return string.Join(", ", bindings);
@@ -334,11 +334,11 @@ public class EventGenerator : ISourceGenerator
 
             var eventInfo = new EventInfo
             {
-                Symbol         = type,
-                Location       = type.Locations.First(),
-                CanBeSubscribed     = TryGetEventBusInfo(type, out var notification, out var parameterTypes),
-                Notification   = notification,
-                ParameterTypes = parameterTypes
+                Symbol          = type,
+                Location        = type.Locations.First(),
+                CanBeSubscribed = TryGetEventBusInfo(type, out var notification, out var parameterTypes),
+                Notification    = notification,
+                ParameterTypes  = parameterTypes
             };
 
             return eventInfo;

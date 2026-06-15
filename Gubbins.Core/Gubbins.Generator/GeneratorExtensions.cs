@@ -204,7 +204,7 @@ internal static class GeneratorExtensions
 
     internal static bool TryGetInterface(this ITypeSymbol typeSymbol, Predicate<INamedTypeSymbol> filter, out INamedTypeSymbol? interfaceSymbol)
     {
-        var curType = typeSymbol.BaseType;
+        var curType = typeSymbol;
         while (curType != null)
         {
             foreach (var @interface in curType.Interfaces)
@@ -216,7 +216,7 @@ internal static class GeneratorExtensions
                 }
             }
 
-            curType = curType is not ITypeSymbol baseTypeSymbol ? null : baseTypeSymbol.BaseType;
+            curType = curType.BaseType;
         }
 
         interfaceSymbol = null;
