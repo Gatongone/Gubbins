@@ -126,7 +126,7 @@ public class ApplicationContext : IScopeController, IDependenciesRegistry, ICont
             // Else get key from actual type.
             : GetKeyFromActualType(type!);
 
-        return ResolveKey(key) ?? Parent?.Resolve(type, key);
+        return ResolveKey(key) ?? Parent?.Resolve(type, null);
     }
 
     /// <inheritdoc/>
@@ -389,7 +389,7 @@ public class ApplicationContext : IScopeController, IDependenciesRegistry, ICont
     /// <param name="dependencyObject">The install info witch scope is Multiton.</param>
     private void RegisterMultiton(DependencyInfo dependencyObject)
     {
-        if (dependencyObject.Instances != null! && !dependencyObject.Instances.Any())
+        if (dependencyObject.Instances != null && dependencyObject.Instances.Any())
         {
             var cache = new Stack<object>(dependencyObject.Instances);
             m_MultitonCache.Add(dependencyObject.Key!, cache);
