@@ -1,10 +1,10 @@
 using System;
+using Gubbins.Enhance;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;
 using Unity.Jobs.LowLevel.Unsafe;
 using Unity.Mathematics;
-using UnityEngine.Collections;
 using UnityEngine.Device;
 
 namespace Gubbins.Span

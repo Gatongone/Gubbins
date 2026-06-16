@@ -7,6 +7,8 @@ using Gubbins.Context;
 using Gubbins.Enhance;
 using Gubbins.Unsafe;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
+using Unity.Jobs;
 using UnityEngine;
 using UnityEngine.Jobs;
 
@@ -43,6 +45,22 @@ namespace Gubbins.Entities
         /// job. Grown on demand; index matches the transform slot.
         /// </summary>
         private static NativeArray<TransformSnapshot> s_Snapshots;
+
+        /// <summary>
+        /// Scatter groups keyed by the <see cref="IEntityQuery"/> each adapter resolves (one per
+        /// repository). Each group keeps an entity-index → transform-slot map so the per-frame
+        /// query-push can write component columns straight into <see cref="s_Snapshots"/> without a
+        /// per-entity record lookup. Entity indices collide across repositories, so the maps must stay
+        /// partitioned by query rather than shared globally.
+        /// </summary>
+        private static readonly Dictionary<IEntityQuery, QueryGroup> s_Groups = new();
+
+        /// <summary>
+        /// When true, the per-frame scatter runs as chained Burst jobs (<see cref="ScatterJob{T}"/>);
+        /// when false it runs inline on the main thread. Exposed so the two strategies can be compared
+        /// at runtime. Toggling takes effect on the next <see cref="SyncTransforms"/>.
+        /// </summary>
+        public static bool BurstScatter = true;
 
         /// <summary>
         /// The entity index.
@@ -124,6 +142,13 @@ namespace Gubbins.Entities
             }
 
             s_Owners.Clear();
+
+            foreach (var group in s_Groups.Values)
+            {
+                group.Dispose();
+            }
+
+            s_Groups.Clear();
         }
 #if UNITY_EDITOR
         /// <summary>
@@ -138,6 +163,20 @@ namespace Gubbins.Entities
             }
         }
 #endif
+
+        /// <summary>
+        /// Configures this adapter from code before activation, for spawning entities at runtime
+        /// (tests/benchmarks) instead of via the inspector. Call on an inactive GameObject so the values
+        /// are in place when <see cref="Awake"/> runs.
+        /// </summary>
+        /// <param name="context">The context resolving <see cref="IEntityCommand"/>/<see cref="IEntityQuery"/>.</param>
+        /// <param name="components">The component instances for the entity (transform components are reseeded from the GameObject).</param>
+        public void Configure(IContext context, params IComponent[] components)
+        {
+            m_Context ??= new SerializedReference<IContext>();
+            m_Context.Value        = context;
+            m_Components.Components = components;
+        }
 
         /// <summary>
         /// Unity Awake callback. Initializes the entity and registers it in the ECS world.
@@ -205,6 +244,23 @@ namespace Gubbins.Entities
             Transforms.Add(transform);
             Entities.Add(entity);
             s_Owners.Add(this);
+
+            // Join the scatter group for this repository so the per-frame push can resolve this
+            // entity's transform slot by entity index. Adapters without a query supply no data, so the
+            // slot simply stays untouched by the writeback.
+            if (m_Query != null)
+            {
+                if (!s_Groups.TryGetValue(m_Query, out var group))
+                {
+                    group = new QueryGroup(m_Query);
+                    s_Groups.Add(m_Query, group);
+                }
+
+                group.ActiveVariants |= m_Variants;
+                group.MemberCount++;
+                group.Map(entity.Index, m_TransformSlot);
+            }
+
             return entity;
         }
 
@@ -374,6 +430,21 @@ namespace Gubbins.Entities
             var slot = m_TransformSlot;
             var last = Transforms.length - 1;
 
+            // Leave this entity's scatter group before the swap-back repoints slots below.
+            if (m_Query != null && s_Groups.TryGetValue(m_Query, out var myGroup))
+            {
+                if (myGroup.SlotMap.IsCreated && m_Index < myGroup.SlotMap.Length)
+                {
+                    myGroup.SlotMap[m_Index] = -1;
+                }
+
+                if (--myGroup.MemberCount == 0)
+                {
+                    myGroup.Dispose();
+                    s_Groups.Remove(m_Query);
+                }
+            }
+
             Transforms.RemoveAtSwapBack(slot);
             Entities.RemoveAtSwapBack(slot);
 
@@ -383,18 +454,27 @@ namespace Gubbins.Entities
             s_Owners.RemoveAt(last);
             moved.m_TransformSlot = slot;
 
+            // Repoint the moved adapter's slot in its own group map. Skipped when this was the last slot
+            // (then 'moved' is this adapter, whose entry was just cleared above).
+            if (slot != last && moved.m_Query != null && s_Groups.TryGetValue(moved.m_Query, out var movedGroup) && movedGroup.SlotMap.IsCreated)
+            {
+                movedGroup.SlotMap[moved.m_Index] = slot;
+            }
+
             m_TransformSlot = -1;
         }
 
         /// <summary>
-        /// Gathers each registered entity's transform components on the main thread, then writes them
-        /// back onto the bound transforms in parallel via <see cref="TransformSyncJob"/>. Driven once
-        /// per frame by <see cref="EntityTransformSyncRunner"/>.
+        /// Pushes each repository's transform-component columns into the per-slot snapshots, then writes
+        /// them back onto the bound transforms in parallel via <see cref="TransformSyncJob"/>. Driven
+        /// once per frame by <see cref="EntityTransformSyncRunner"/>.
         /// </summary>
         /// <remarks>
-        /// Both the canonical <see cref="Position"/>/<see cref="Rotation"/>/<see cref="Scale"/>
-        /// components and their axis-subset variants are synced back; absent axes leave the
-        /// corresponding transform component untouched.
+        /// Rather than reading each entity's record one at a time, this iterates the SoA component
+        /// snippets of one query per active variant and scatters them into <see cref="s_Snapshots"/> by
+        /// transform slot. Both the canonical <see cref="Position"/>/<see cref="Rotation"/>/
+        /// <see cref="Scale"/> components, their axis-subset variants and the quaternion
+        /// <see cref="Orientation"/> are synced back; absent axes leave the transform untouched.
         /// </remarks>
         internal static void SyncTransforms()
         {
@@ -411,12 +491,32 @@ namespace Gubbins.Entities
 
             EnsureSnapshotCapacity(count);
 
-            for (var i = 0; i < count; i++)
-            {
-                s_Snapshots[i] = s_Owners[i].CaptureSnapshot();
-            }
+            // Zero the active slots in one sequential memset so transforms whose entity supplies no data
+            // this frame are left untouched by the writeback (Flags == 0). The scatter re-populates the
+            // live slots; this is much cheaper than a strided per-slot read-modify-write.
+            ClearSnapshots(count);
 
-            new TransformSyncJob {Snapshots = s_Snapshots}.Schedule(Transforms).Complete();
+            if (BurstScatter)
+            {
+                // Chain a scatter job per active variant: variants serialize (an entity may carry both
+                // Position and Rotation → same slot), but each variant's segments run in parallel.
+                var dependency = default(JobHandle);
+                foreach (var group in s_Groups.Values)
+                {
+                    dependency = ScatterGroupBurst(group, dependency);
+                }
+
+                new TransformSyncJob {Snapshots = s_Snapshots}.Schedule(Transforms, dependency).Complete();
+            }
+            else
+            {
+                foreach (var group in s_Groups.Values)
+                {
+                    ScatterGroupMain(group);
+                }
+
+                new TransformSyncJob {Snapshots = s_Snapshots}.Schedule(Transforms).Complete();
+            }
         }
 
         /// <summary>
@@ -440,225 +540,244 @@ namespace Gubbins.Entities
         }
 
         /// <summary>
-        /// Reads this entity's transform components from its repository into a snapshot, recording one
-        /// flag per axis so the writeback job merges only the axes this entity actually owns. Returns
-        /// an empty snapshot (no flags) when the handle is stale or no query is available, so the
-        /// writeback job leaves the transform untouched.
+        /// Zeroes the first <paramref name="count"/> snapshots with a single sequential memset, clearing
+        /// every channel and its flags so unwritten slots are skipped by the writeback.
         /// </summary>
-        /// <returns>The captured transform snapshot.</returns>
-        private TransformSnapshot CaptureSnapshot()
+        private static unsafe void ClearSnapshots(int count)
         {
-            var snapshot = default(TransformSnapshot);
-
-            if (m_Query == null || !m_Query.Contains(m_Index))
-            {
-                return snapshot;
-            }
-
-            var record = m_Query.Get(m_Index);
-
-            // Guard against a stale handle whose index has been reused by a different entity.
-            if (record.Entity.Version != m_Version)
-            {
-                return snapshot;
-            }
-
-            var chunk = record.Chunk;
-            var index = record.IndexInChunk;
-
-            if ((m_Variants & TransformVariants.AnyPosition) != 0) CapturePosition(chunk, index, ref snapshot);
-            if ((m_Variants & TransformVariants.AnyRotation) != 0) CaptureRotation(chunk, index, ref snapshot);
-            if ((m_Variants & TransformVariants.Orientation) != 0) CaptureOrientation(chunk, index, ref snapshot);
-            if ((m_Variants & TransformVariants.AnyScale) != 0) CaptureScale(chunk, index, ref snapshot);
-            return snapshot;
+            UnsafeUtility.MemClear(
+                NativeArrayUnsafeUtility.GetUnsafePtr(s_Snapshots),
+                (long) count * UnsafeUtility.SizeOf<TransformSnapshot>());
         }
 
         /// <summary>
-        /// Reads whichever position variants this entity owns into the snapshot's position channel,
-        /// flagging only the axes each variant supplies.
+        /// Main-thread scatter: runs one query per active variant and writes each column into
+        /// <see cref="s_Snapshots"/> inline. A snapshot may be touched by several passes (e.g. an entity
+        /// carrying both Position and Rotation), which is fine since the writes are sequential here.
         /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void CapturePosition(Chunk chunk, int index, ref TransformSnapshot snapshot)
+        private static void ScatterGroupMain(QueryGroup group)
         {
-            var variants = m_Variants;
+            var a = group.ActiveVariants;
 
-            if ((variants & TransformVariants.Position) != 0)
-            {
-                ref var c = ref chunk.Get<Position>(index);
-                snapshot.Position =  new Vector3(c.X, c.Y, c.Z);
-                snapshot.Flags    |= TransformSnapshot.HAS_POSITION;
-            }
-
-            if ((variants & TransformVariants.PositionX) != 0)
-            {
-                snapshot.Position.x =  chunk.Get<PositionX>(index).Value;
-                snapshot.Flags      |= TransformSnapshot.POS_X;
-            }
-
-            if ((variants & TransformVariants.PositionY) != 0)
-            {
-                snapshot.Position.y =  chunk.Get<PositionY>(index).Value;
-                snapshot.Flags      |= TransformSnapshot.POS_Y;
-            }
-
-            if ((variants & TransformVariants.PositionZ) != 0)
-            {
-                snapshot.Position.z =  chunk.Get<PositionZ>(index).Value;
-                snapshot.Flags      |= TransformSnapshot.POS_Z;
-            }
-
-            if ((variants & TransformVariants.PositionXY) != 0)
-            {
-                ref var c = ref chunk.Get<PositionXY>(index);
-                snapshot.Position.x =  c.X;
-                snapshot.Position.y =  c.Y;
-                snapshot.Flags      |= TransformSnapshot.POS_X | TransformSnapshot.POS_Y;
-            }
-
-            if ((variants & TransformVariants.PositionXZ) != 0)
-            {
-                ref var c = ref chunk.Get<PositionXZ>(index);
-                snapshot.Position.x =  c.X;
-                snapshot.Position.z =  c.Z;
-                snapshot.Flags      |= TransformSnapshot.POS_X | TransformSnapshot.POS_Z;
-            }
-
-            if ((variants & TransformVariants.PositionYZ) != 0)
-            {
-                ref var c = ref chunk.Get<PositionYZ>(index);
-                snapshot.Position.y =  c.Y;
-                snapshot.Position.z =  c.Z;
-                snapshot.Flags      |= TransformSnapshot.POS_Y | TransformSnapshot.POS_Z;
-            }
+            if ((a & TransformVariants.Position)    != 0) ScatterComponentMain(group, s_CtxPosition);
+            if ((a & TransformVariants.PositionX)   != 0) ScatterComponentMain(group, s_CtxPositionX);
+            if ((a & TransformVariants.PositionY)   != 0) ScatterComponentMain(group, s_CtxPositionY);
+            if ((a & TransformVariants.PositionZ)   != 0) ScatterComponentMain(group, s_CtxPositionZ);
+            if ((a & TransformVariants.PositionXY)  != 0) ScatterComponentMain(group, s_CtxPositionXY);
+            if ((a & TransformVariants.PositionXZ)  != 0) ScatterComponentMain(group, s_CtxPositionXZ);
+            if ((a & TransformVariants.PositionYZ)  != 0) ScatterComponentMain(group, s_CtxPositionYZ);
+            if ((a & TransformVariants.Rotation)    != 0) ScatterComponentMain(group, s_CtxRotation);
+            if ((a & TransformVariants.RotationX)   != 0) ScatterComponentMain(group, s_CtxRotationX);
+            if ((a & TransformVariants.RotationY)   != 0) ScatterComponentMain(group, s_CtxRotationY);
+            if ((a & TransformVariants.RotationZ)   != 0) ScatterComponentMain(group, s_CtxRotationZ);
+            if ((a & TransformVariants.RotationXY)  != 0) ScatterComponentMain(group, s_CtxRotationXY);
+            if ((a & TransformVariants.RotationXZ)  != 0) ScatterComponentMain(group, s_CtxRotationXZ);
+            if ((a & TransformVariants.RotationYZ)  != 0) ScatterComponentMain(group, s_CtxRotationYZ);
+            if ((a & TransformVariants.Orientation) != 0) ScatterComponentMain(group, s_CtxOrientation);
+            if ((a & TransformVariants.Scale)       != 0) ScatterComponentMain(group, s_CtxScale);
+            if ((a & TransformVariants.ScaleX)      != 0) ScatterComponentMain(group, s_CtxScaleX);
+            if ((a & TransformVariants.ScaleY)      != 0) ScatterComponentMain(group, s_CtxScaleY);
+            if ((a & TransformVariants.ScaleZ)      != 0) ScatterComponentMain(group, s_CtxScaleZ);
+            if ((a & TransformVariants.ScaleXY)     != 0) ScatterComponentMain(group, s_CtxScaleXY);
+            if ((a & TransformVariants.ScaleXZ)     != 0) ScatterComponentMain(group, s_CtxScaleXZ);
+            if ((a & TransformVariants.ScaleYZ)     != 0) ScatterComponentMain(group, s_CtxScaleYZ);
         }
 
         /// <summary>
-        /// Reads whichever rotation variants this entity owns into the snapshot's Euler channel,
-        /// flagging only the axes each variant supplies.
+        /// Burst scatter: schedules one <see cref="ScatterJob{T}"/> per active variant, chained after
+        /// <paramref name="dependency"/> so variants serialize while each variant's segments run in
+        /// parallel. Returns the combined handle for the next group / the writeback.
         /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void CaptureRotation(Chunk chunk, int index, ref TransformSnapshot snapshot)
+        private static JobHandle ScatterGroupBurst(QueryGroup group, JobHandle dependency)
         {
-            var variants = m_Variants;
+            var a = group.ActiveVariants;
 
-            if ((variants & TransformVariants.Rotation) != 0)
+            if ((a & TransformVariants.Position)    != 0) dependency = ScatterComponentBurst(group, s_CtxPosition,    dependency);
+            if ((a & TransformVariants.PositionX)   != 0) dependency = ScatterComponentBurst(group, s_CtxPositionX,   dependency);
+            if ((a & TransformVariants.PositionY)   != 0) dependency = ScatterComponentBurst(group, s_CtxPositionY,   dependency);
+            if ((a & TransformVariants.PositionZ)   != 0) dependency = ScatterComponentBurst(group, s_CtxPositionZ,   dependency);
+            if ((a & TransformVariants.PositionXY)  != 0) dependency = ScatterComponentBurst(group, s_CtxPositionXY,  dependency);
+            if ((a & TransformVariants.PositionXZ)  != 0) dependency = ScatterComponentBurst(group, s_CtxPositionXZ,  dependency);
+            if ((a & TransformVariants.PositionYZ)  != 0) dependency = ScatterComponentBurst(group, s_CtxPositionYZ,  dependency);
+            if ((a & TransformVariants.Rotation)    != 0) dependency = ScatterComponentBurst(group, s_CtxRotation,    dependency);
+            if ((a & TransformVariants.RotationX)   != 0) dependency = ScatterComponentBurst(group, s_CtxRotationX,   dependency);
+            if ((a & TransformVariants.RotationY)   != 0) dependency = ScatterComponentBurst(group, s_CtxRotationY,   dependency);
+            if ((a & TransformVariants.RotationZ)   != 0) dependency = ScatterComponentBurst(group, s_CtxRotationZ,   dependency);
+            if ((a & TransformVariants.RotationXY)  != 0) dependency = ScatterComponentBurst(group, s_CtxRotationXY,  dependency);
+            if ((a & TransformVariants.RotationXZ)  != 0) dependency = ScatterComponentBurst(group, s_CtxRotationXZ,  dependency);
+            if ((a & TransformVariants.RotationYZ)  != 0) dependency = ScatterComponentBurst(group, s_CtxRotationYZ,  dependency);
+            if ((a & TransformVariants.Orientation) != 0) dependency = ScatterComponentBurst(group, s_CtxOrientation, dependency);
+            if ((a & TransformVariants.Scale)       != 0) dependency = ScatterComponentBurst(group, s_CtxScale,       dependency);
+            if ((a & TransformVariants.ScaleX)      != 0) dependency = ScatterComponentBurst(group, s_CtxScaleX,      dependency);
+            if ((a & TransformVariants.ScaleY)      != 0) dependency = ScatterComponentBurst(group, s_CtxScaleY,      dependency);
+            if ((a & TransformVariants.ScaleZ)      != 0) dependency = ScatterComponentBurst(group, s_CtxScaleZ,      dependency);
+            if ((a & TransformVariants.ScaleXY)     != 0) dependency = ScatterComponentBurst(group, s_CtxScaleXY,     dependency);
+            if ((a & TransformVariants.ScaleXZ)     != 0) dependency = ScatterComponentBurst(group, s_CtxScaleXZ,     dependency);
+            if ((a & TransformVariants.ScaleYZ)     != 0) dependency = ScatterComponentBurst(group, s_CtxScaleYZ,     dependency);
+
+            return dependency;
+        }
+
+        /// <summary>
+        /// Main-thread variant: queries one component type and writes each value into the owning
+        /// entity's transform slot in contiguous SoA order. Entities with no registered adapter
+        /// (slot &lt; 0) or outside the map are skipped.
+        /// </summary>
+        private static void ScatterComponentMain<T>(QueryGroup group, EntityQueryContext<T> context)
+            where T : unmanaged, ITransformComponent
+        {
+            if (!group.SlotMap.IsCreated)
             {
-                ref var c = ref chunk.Get<Rotation>(index);
-                snapshot.Euler =  new Vector3(c.X, c.Y, c.Z);
-                snapshot.Flags |= TransformSnapshot.HAS_ROTATION;
+                return;
             }
 
-            if ((variants & TransformVariants.RotationX) != 0)
-            {
-                snapshot.Euler.x =  chunk.Get<RotationX>(index).Value;
-                snapshot.Flags   |= TransformSnapshot.ROT_X;
-            }
+            using var result = group.Query.GetQueryHandle(context).Query();
 
-            if ((variants & TransformVariants.RotationY) != 0)
-            {
-                snapshot.Euler.y =  chunk.Get<RotationY>(index).Value;
-                snapshot.Flags   |= TransformSnapshot.ROT_Y;
-            }
+            var (entities, components) = result.Batches;
+            var map = group.SlotMap;
 
-            if ((variants & TransformVariants.RotationZ) != 0)
+            for (var segment = 0; segment < entities.SegmentCount; segment++)
             {
-                snapshot.Euler.z =  chunk.Get<RotationZ>(index).Value;
-                snapshot.Flags   |= TransformSnapshot.ROT_Z;
-            }
+                var ids   = entities[segment];
+                var comps = components[segment];
 
-            if ((variants & TransformVariants.RotationXY) != 0)
-            {
-                ref var c = ref chunk.Get<RotationXY>(index);
-                snapshot.Euler.x =  c.X;
-                snapshot.Euler.y =  c.Y;
-                snapshot.Flags   |= TransformSnapshot.ROT_X | TransformSnapshot.ROT_Y;
-            }
+                for (var j = 0; j < ids.Length; j++)
+                {
+                    var index = ids[j].Index;
+                    if ((uint) index >= (uint) map.Length)
+                    {
+                        continue;
+                    }
 
-            if ((variants & TransformVariants.RotationXZ) != 0)
-            {
-                ref var c = ref chunk.Get<RotationXZ>(index);
-                snapshot.Euler.x =  c.X;
-                snapshot.Euler.z =  c.Z;
-                snapshot.Flags   |= TransformSnapshot.ROT_X | TransformSnapshot.ROT_Z;
-            }
+                    var slot = map[index];
+                    if (slot < 0)
+                    {
+                        continue;
+                    }
 
-            if ((variants & TransformVariants.RotationYZ) != 0)
-            {
-                ref var c = ref chunk.Get<RotationYZ>(index);
-                snapshot.Euler.y =  c.Y;
-                snapshot.Euler.z =  c.Z;
-                snapshot.Flags   |= TransformSnapshot.ROT_Y | TransformSnapshot.ROT_Z;
+                    var snapshot = s_Snapshots[slot];
+                    comps[j].Write(ref snapshot);
+                    s_Snapshots[slot] = snapshot;
+                }
             }
         }
 
         /// <summary>
-        /// Reads the quaternion <see cref="Orientation"/> component into the snapshot. Written to the
-        /// transform verbatim, so it overrides any Euler rotation axes during writeback.
+        /// Burst variant: schedules a <see cref="ScatterJob{T}"/> per query segment, chained after
+        /// <paramref name="dependency"/> and after each other — all jobs write the shared snapshot array,
+        /// so they must be ordered (each is still internally parallel over its chunk). The snippet spans
+        /// are aliased as <see cref="NativeArray{T}"/> views over the pinned chunk memory with no copy;
+        /// the query result can be disposed immediately because the chunk — not the result — owns the
+        /// pin, and all jobs complete within the frame.
         /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void CaptureOrientation(Chunk chunk, int index, ref TransformSnapshot snapshot)
+        private static JobHandle ScatterComponentBurst<T>(QueryGroup group, EntityQueryContext<T> context, JobHandle dependency)
+            where T : unmanaged, ITransformComponent
         {
-            ref var c = ref chunk.Get<Orientation>(index);
-            snapshot.Orientation =  new Quaternion(c.X, c.Y, c.Z, c.W);
-            snapshot.Flags       |= TransformSnapshot.HAS_ORIENTATION;
+            if (!group.SlotMap.IsCreated)
+            {
+                return dependency;
+            }
+
+            using var result = group.Query.GetQueryHandle(context).Query();
+
+            var (entities, components) = result.Batches;
+
+            for (var segment = 0; segment < entities.SegmentCount; segment++)
+            {
+                var ids   = entities[segment];
+                var count = ids.Length;
+                if (count == 0)
+                {
+                    continue;
+                }
+
+                var job = new ScatterJob<T>
+                {
+                    Entities          = ids.ToNativeArray(),
+                    Components        = components[segment].ToNativeArray(),
+                    SlotByEntityIndex = group.SlotMap,
+                    Snapshots         = s_Snapshots,
+                };
+
+                // Every job writes s_Snapshots, and distinct variants may target the same slot, so all
+                // jobs must run in sequence. Each is still internally parallel over its chunk's elements.
+                dependency = job.Schedule(count, 128, dependency);
+            }
+
+            return dependency;
         }
 
+        // Cached single-component query contexts, one per transform variant. Reused every frame so the
+        // scatter never allocates a context.
+        private static readonly EntityQueryContext<Position>    s_CtxPosition    = new();
+        private static readonly EntityQueryContext<PositionX>   s_CtxPositionX   = new();
+        private static readonly EntityQueryContext<PositionY>   s_CtxPositionY   = new();
+        private static readonly EntityQueryContext<PositionZ>   s_CtxPositionZ   = new();
+        private static readonly EntityQueryContext<PositionXY>  s_CtxPositionXY  = new();
+        private static readonly EntityQueryContext<PositionXZ>  s_CtxPositionXZ  = new();
+        private static readonly EntityQueryContext<PositionYZ>  s_CtxPositionYZ  = new();
+        private static readonly EntityQueryContext<Rotation>    s_CtxRotation    = new();
+        private static readonly EntityQueryContext<RotationX>   s_CtxRotationX   = new();
+        private static readonly EntityQueryContext<RotationY>   s_CtxRotationY   = new();
+        private static readonly EntityQueryContext<RotationZ>   s_CtxRotationZ   = new();
+        private static readonly EntityQueryContext<RotationXY>  s_CtxRotationXY  = new();
+        private static readonly EntityQueryContext<RotationXZ>  s_CtxRotationXZ  = new();
+        private static readonly EntityQueryContext<RotationYZ>  s_CtxRotationYZ  = new();
+        private static readonly EntityQueryContext<Orientation> s_CtxOrientation = new();
+        private static readonly EntityQueryContext<Scale>       s_CtxScale       = new();
+        private static readonly EntityQueryContext<ScaleX>      s_CtxScaleX      = new();
+        private static readonly EntityQueryContext<ScaleY>      s_CtxScaleY      = new();
+        private static readonly EntityQueryContext<ScaleZ>      s_CtxScaleZ      = new();
+        private static readonly EntityQueryContext<ScaleXY>     s_CtxScaleXY     = new();
+        private static readonly EntityQueryContext<ScaleXZ>     s_CtxScaleXZ     = new();
+        private static readonly EntityQueryContext<ScaleYZ>     s_CtxScaleYZ     = new();
+
         /// <summary>
-        /// Reads whichever scale variants this entity owns into the snapshot's scale channel,
-        /// flagging only the axes each variant supplies.
+        /// Per-repository scatter state: the resolved query, an entity-index → transform-slot map (a
+        /// native array so the Burst job can read it directly), the union of variants its members carry,
+        /// and a member count so the group is dropped — and its map disposed — when empty.
         /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void CaptureScale(Chunk chunk, int index, ref TransformSnapshot snapshot)
+        private sealed class QueryGroup
         {
-            var variants = m_Variants;
+            public readonly IEntityQuery      Query;
+            public          NativeArray<int>  SlotMap;
+            public          TransformVariants ActiveVariants;
+            public          int               MemberCount;
 
-            if ((variants & TransformVariants.Scale) != 0)
+            public QueryGroup(IEntityQuery query) => Query = query;
+
+            /// <summary>Maps an entity index to its transform slot, growing the native map as needed.</summary>
+            public void Map(int entityIndex, int slot)
             {
-                ref var c = ref chunk.Get<Scale>(index);
-                snapshot.Scale =  new Vector3(c.X, c.Y, c.Z);
-                snapshot.Flags |= TransformSnapshot.HAS_SCALE;
+                if (!SlotMap.IsCreated || entityIndex >= SlotMap.Length)
+                {
+                    var old   = SlotMap.IsCreated ? SlotMap.Length : 0;
+                    var size  = Mathf.Max(entityIndex + 1, old == 0 ? 16 : old * 2);
+                    var grown = new NativeArray<int>(size, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
+
+                    for (var i = 0; i < size; i++)
+                    {
+                        grown[i] = i < old ? SlotMap[i] : -1;
+                    }
+
+                    if (SlotMap.IsCreated)
+                    {
+                        SlotMap.Dispose();
+                    }
+
+                    SlotMap = grown;
+                }
+
+                SlotMap[entityIndex] = slot;
             }
 
-            if ((variants & TransformVariants.ScaleX) != 0)
+            /// <summary>Releases the native slot map.</summary>
+            public void Dispose()
             {
-                snapshot.Scale.x =  chunk.Get<ScaleX>(index).Value;
-                snapshot.Flags   |= TransformSnapshot.SCL_X;
-            }
-
-            if ((variants & TransformVariants.ScaleY) != 0)
-            {
-                snapshot.Scale.y =  chunk.Get<ScaleY>(index).Value;
-                snapshot.Flags   |= TransformSnapshot.SCL_Y;
-            }
-
-            if ((variants & TransformVariants.ScaleZ) != 0)
-            {
-                snapshot.Scale.z =  chunk.Get<ScaleZ>(index).Value;
-                snapshot.Flags   |= TransformSnapshot.SCL_Z;
-            }
-
-            if ((variants & TransformVariants.ScaleXY) != 0)
-            {
-                ref var c = ref chunk.Get<ScaleXY>(index);
-                snapshot.Scale.x =  c.X;
-                snapshot.Scale.y =  c.Y;
-                snapshot.Flags   |= TransformSnapshot.SCL_X | TransformSnapshot.SCL_Y;
-            }
-
-            if ((variants & TransformVariants.ScaleXZ) != 0)
-            {
-                ref var c = ref chunk.Get<ScaleXZ>(index);
-                snapshot.Scale.x =  c.X;
-                snapshot.Scale.z =  c.Z;
-                snapshot.Flags   |= TransformSnapshot.SCL_X | TransformSnapshot.SCL_Z;
-            }
-
-            if ((variants & TransformVariants.ScaleYZ) != 0)
-            {
-                ref var c = ref chunk.Get<ScaleYZ>(index);
-                snapshot.Scale.y =  c.Y;
-                snapshot.Scale.z =  c.Z;
-                snapshot.Flags   |= TransformSnapshot.SCL_Y | TransformSnapshot.SCL_Z;
+                if (SlotMap.IsCreated)
+                {
+                    SlotMap.Dispose();
+                }
             }
         }
 
