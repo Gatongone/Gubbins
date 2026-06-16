@@ -69,4 +69,19 @@ namespace Gubbins.Entities
         public float Y;
         public float Z;
     }
+
+    /// <summary>
+    /// Represents the full orientation of an entity in local space as a quaternion (X, Y, Z, W).
+    /// Unlike <see cref="Rotation"/> and its axis subsets, this is written to the transform verbatim
+    /// with no Euler conversion, so it composes and interpolates without gimbal-lock artifacts. Use it
+    /// for arbitrary 3D orientation; use the Euler variants for designer-authored or single-axis spin.
+    /// </summary>
+    [Serializable]
+    public struct Orientation : IComponent
+    {
+        public float X;
+        public float Y;
+        public float Z;
+        public float W;
+    }
 }
