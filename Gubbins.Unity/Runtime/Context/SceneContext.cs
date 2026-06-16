@@ -7,6 +7,9 @@ using UnityEngine.SceneManagement;
 
 namespace Gubbins.Context
 {
+    /// <summary>
+    /// A context that is specific to a Unity scene, allowing for scene-specific dependency registration and resolution.
+    /// </summary>
     [DefaultExecutionOrder(-1)]
     public class SceneContext : MonoBehaviour, IContext, IDependenciesRegistry
     {
@@ -28,10 +31,11 @@ namespace Gubbins.Context
         [SerializeField] private SerializedReference<IEventListener>[] m_Listeners;
 
         /// <summary>
-        /// Gets the parent context. For SceneContext, the parent context is always the GameContext,
-        /// which is shared across the entire application.
+        /// The parent context for the SceneContext, which is the GameContext instance if it has been initialized,
+        /// or the PreloadContext instance which is a special context that is initialized on preload phase
+        /// if the GameContext instance has not been initialized.
         /// </summary>
-        public IContext Parent => GameContext.Instance ?? ApplicationContext.Global;
+        public IContext Parent => GameContext.Instance ?? PreloadContext.Instance;
 
         /// <summary>
         /// Gets the dependencies registry of the context.

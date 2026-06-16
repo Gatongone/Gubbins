@@ -7,7 +7,7 @@ using UnityEngine;
 
 namespace Gubbins.Unsafe
 {
-    internal unsafe class UnityUnsafeOperation : Memory
+    internal unsafe class UnityMemory : Memory
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override uint GetFieldOffset(FieldInfo fieldInfo) => (uint) UnsafeUtility.GetFieldOffset(fieldInfo);
@@ -31,6 +31,12 @@ namespace Gubbins.Unsafe
         public override T ConvertToStructure<T>(void* ptr) => UnsafeUtility.ReadArrayElement<T>(ptr, 0);
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ReplaceInstance() => Native.Operation = new UnityUnsafeOperation();
+        private static void ReplaceInstance() => Native.Operation = new UnityMemory();
+
+        /// <remarks>
+        /// Prevent preload phase call but <see cref="ReplaceInstance"/> not called.
+        /// It will cause a null reference exception when preload phase call <see cref="Memory"/> for the first time.
+        /// </remarks>
+        static UnityMemory() => ReplaceInstance();
     }
 }

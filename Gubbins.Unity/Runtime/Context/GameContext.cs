@@ -1,7 +1,6 @@
 using System;
 using System.Linq;
 using Gubbins.Enhance;
-using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 
 namespace Gubbins.Context
@@ -30,10 +29,9 @@ namespace Gubbins.Context
         [SerializeField] private SerializedReference<IEventListener>[] m_Listeners;
 
         /// <summary>
-        /// Gets the parent context. For GameContext, the parent context is always the global context,
-        /// which is shared across the entire application.
+        /// The parent context for the GameContext, which is a special context that is initialized on preload phase.
         /// </summary>
-        public IContext Parent => ApplicationContext.Global;
+        public IContext Parent => PreloadContext.Instance;
 
         /// <summary>
         /// Gets the dependencies registry of the context.
@@ -53,8 +51,7 @@ namespace Gubbins.Context
         /// <summary>
         /// Indicates whether the GameContext instance has been initialized.
         /// </summary>
-        [NonSerialized]
-        private bool m_HasInit;
+        [NonSerialized] private bool m_HasInit;
 
         /// <summary>
         /// Initializes the GameContext instance and sets up the application context with the specified installers and listeners.
@@ -85,6 +82,7 @@ namespace Gubbins.Context
                     target.Listen(Resolver, Registry);
                 }
             }
+
             m_HasInit = true;
         }
 
@@ -149,10 +147,12 @@ namespace Gubbins.Context
                 {
                     return;
                 }
+
                 if (preloadedAssets.Any(static a => a is GameContext))
                 {
                     Debug.LogWarning($"A GameContext asset is already registered in Preloaded Assets. Multiple GameContext assets may lead to unexpected behavior. Please ensure only one GameContext asset is registered. Asset path: {UnityEditor.AssetDatabase.GetAssetPath(asset)}");
                 }
+
                 // Remove null entries that may exist in the Preloaded Assets list.
                 preloadedAssets.RemoveAll(static a => a == null);
                 preloadedAssets.Add(asset);
