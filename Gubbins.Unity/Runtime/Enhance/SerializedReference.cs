@@ -13,6 +13,8 @@ namespace Gubbins.Enhance
 
         [SerializeField] internal string expectedTypeName;
 
+        public Type ExpectedType => Type.GetType(expectedTypeName);
+
         public T Value
         {
             get

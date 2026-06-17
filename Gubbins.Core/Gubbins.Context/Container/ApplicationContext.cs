@@ -45,6 +45,16 @@ public class ApplicationContext : IScopeController, IDependenciesRegistry, ICont
     private readonly Dictionary<Type, List<string>> m_ActualTypeMaps = new();
 
     /// <summary>
+    /// Key to actual type mappings, used to construct spawner-less dependencies via constructor injection.
+    /// </summary>
+    private readonly Dictionary<string, Type> m_KeyToType = new();
+
+    /// <summary>
+    /// Keys currently being constructed via constructor injection, used to detect circular dependencies.
+    /// </summary>
+    private readonly HashSet<string> m_Constructing = new();
+
+    /// <summary>
     /// Binding type to key mappings.
     /// </summary>
     private readonly Dictionary<Type, List<string>> m_BindingMaps = new();
@@ -93,6 +103,8 @@ public class ApplicationContext : IScopeController, IDependenciesRegistry, ICont
         m_ScopeMaps.Clear();
         m_SpawnerMaps.Clear();
         m_ActualTypeMaps.Clear();
+        m_KeyToType.Clear();
+        m_Constructing.Clear();
         m_BindingMaps.Clear();
         m_InstallQueue.Clear();
         OnScopeFinish?.Invoke();
@@ -219,14 +231,18 @@ public class ApplicationContext : IScopeController, IDependenciesRegistry, ICont
             return stack.Pop();
         }
 
-        // Create instance from spawner.
-        if (!m_SpawnerMaps.TryGetValue(key, out var spawner))
+        // Create instance from spawner, or fall back to constructor injection.
+        object? instance;
+        if (m_SpawnerMaps.TryGetValue(key, out var spawner))
         {
-            throw new ArgumentException($"Spawner never been registered. Key : {key}");
+            instance = spawner.Spawn();
+        }
+        else
+        {
+            instance = ConstructByInjection(key)
+                ?? throw new ArgumentException($"Spawner never been registered. Key : {key}");
         }
 
-        // Create instance from spawner.
-        var instance = spawner.Spawn();
         if (instance == null) return null;
         this.Inject(instance);
         return instance;
@@ -248,19 +264,67 @@ public class ApplicationContext : IScopeController, IDependenciesRegistry, ICont
             return instance;
         }
 
-        if (!m_SpawnerMaps.TryGetValue(key, out var spawner))
+        // Create instance from spawner, or fall back to constructor injection.
+        if (m_SpawnerMaps.TryGetValue(key, out var spawner))
         {
-            throw new ArgumentException($"Spawner never been registered. Key : {key}");
+            instance = spawner.Spawn();
+        }
+        else
+        {
+            instance = ConstructByInjection(key)
+                ?? throw new ArgumentException($"Spawner never been registered. Key : {key}");
         }
 
-        // Create instance from spawner.
-        instance = spawner.Spawn();
         if (instance == null) return null;
 
         // Append to cache.
         m_SingletonsCache.Add(key, instance);
         this.Inject(instance);
         return instance;
+    }
+
+    /// <summary>
+    /// Construct a spawner-less dependency by resolving the parameters of its inject/greediest constructor.
+    /// </summary>
+    /// <param name="key">Key of the dependency.</param>
+    /// <returns>The constructed instance, or <see langword="null"/> when the key has no known type or usable constructor.</returns>
+    /// <exception cref="ArgumentException">Throw when a constructor parameter cannot be resolved.</exception>
+    /// <exception cref="InvalidOperationException">Throw when a circular constructor dependency is detected.</exception>
+    private object? ConstructByInjection(string key)
+    {
+        if (!m_KeyToType.TryGetValue(key, out var type))
+        {
+            return null;
+        }
+
+        var injectConstructor = InjectCache.GetInjectConstructor(type);
+        if (injectConstructor == null)
+        {
+            return null;
+        }
+
+        if (!m_Constructing.Add(key))
+        {
+            throw new InvalidOperationException($"Circular constructor dependency detected for type '{type}' (key: {key}).");
+        }
+
+        try
+        {
+            var parameters = injectConstructor.Parameters;
+            var args = new object[parameters.Length];
+            for (var index = 0; index < parameters.Length; index++)
+            {
+                var parameter = parameters[index];
+                args[index] = Resolve(parameter.Type, parameter.Key)
+                    ?? throw new ArgumentException($"Cannot resolve constructor parameter of type '{parameter.Type}' for '{type}'.");
+            }
+
+            return injectConstructor.Constructor.Invoke(args);
+        }
+        finally
+        {
+            m_Constructing.Remove(key);
+        }
     }
 
     /// <summary>
@@ -425,6 +489,9 @@ public class ApplicationContext : IScopeController, IDependenciesRegistry, ICont
 
         // Add scope.
         m_ScopeMaps.Add(dependencyObject.Key, dependencyObject.Scope);
+
+        // Remember the concrete type for spawner-less constructor injection.
+        m_KeyToType[dependencyObject.Key] = dependencyObject.Type;
 
         // Set type to key mapping.
         if (!m_ActualTypeMaps.TryGetValue(dependencyObject.Type, out var keys))

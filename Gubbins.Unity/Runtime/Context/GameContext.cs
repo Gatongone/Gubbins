@@ -81,6 +81,16 @@ namespace Gubbins.Context
                     m_Context.Inject(target);
                     target.Listen(Resolver, Registry);
                 }
+                else
+                {
+                    var type = listener.ExpectedType;
+                    var ctor = type == null ? null : InjectCache.GetInjectConstructor(type);
+                    if (ctor != null)
+                    {
+                        target = m_Context.InjectByCtor(listener.ExpectedType) as IEventListener;
+                        target?.Listen(Resolver, Registry);
+                    }
+                }
             }
 
             m_HasInit = true;

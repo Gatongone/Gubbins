@@ -54,11 +54,42 @@ public static class DependencyResolverExtensions
         /// <param name="key">Dependency key.</param>
         /// <typeparam name="T">Resolve type.</typeparam>
         /// <returns>The dependence prototype of target key.</returns>
-        public T? Resolve<T>(string key)
-            => (T?) resolver.Resolve(null, key);
+        public T? Resolve<T>(string key) => (T?) resolver.Resolve(null, key);
 
         /// <summary>
-        /// Resolve the fields and properties with InjectAttribute.
+        /// Resolve the constructor with <see cref="InjectAttribute"/> and its dependencies,
+        /// then create an instance of the type and resolve its members with InjectAttribute.
+        /// </summary>
+        /// <typeparam name="T">Resolve type which has a constructor with <see cref="InjectAttribute"/>.</typeparam>
+        /// <exception cref="InvalidOperationException">Thrown when no constructor with <see cref="InjectAttribute"/> is found for the specified type.</exception>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public T InjectByCtor<T>() where T : class
+        {
+            return (T) resolver.InjectByCtor(typeof(T));
+        }
+
+        /// <summary>
+        /// Resolve the constructor with <see cref="InjectAttribute"/> and its dependencies,
+        /// then create an instance of the type and resolve its members with InjectAttribute.
+        /// </summary>
+        /// <param name="type">Resolve type which has a constructor with <see cref="InjectAttribute"/>.</param>
+        /// <exception cref="InvalidOperationException">Thrown when no constructor with <see cref="InjectAttribute"/> is found for the specified type.</exception>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public object InjectByCtor(Type type)
+        {
+            var ctor = InjectCache.GetInjectConstructor(type);
+            if (ctor == null)
+            {
+                throw new InvalidOperationException($"No constructor with InjectAttribute found for type '{type}'.");
+            }
+
+            var instance = ctor.Constructor.Invoke(resolver.ResolveParameters(ctor.Parameters));
+            resolver.Inject(instance);
+            return instance;
+        }
+
+        /// <summary>
+        /// Resolve the fields, properties and methods with <see cref="InjectAttribute"/> in the type and its base types.
         /// </summary>
         /// <param name="instance">Resolve target.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -67,6 +98,13 @@ public static class DependencyResolverExtensions
             if (instance is IResolvePreprocessing preprocessing)
             {
                 preprocessing.BeforeResolve();
+            }
+
+            var injectMethods = InjectCache.GetInjectMethods(instance.GetType());
+            for (var index = 0; index < injectMethods.Length; index++)
+            {
+                var method = injectMethods[index];
+                method.Method.Invoke(instance, resolver.ResolveParameters(method.Parameters));
             }
 
             resolver.InjectMembers(instance, instance.GetType());
@@ -104,6 +142,46 @@ public static class DependencyResolverExtensions
 
                 member.Member.SetValue(instance, value);
             }
+
+            var methods = InjectCache.GetInjectMethods(type);
+            for (var index = 0; index < methods.Length; index++)
+            {
+                var method = methods[index];
+                method.Method.Invoke(instance, resolver.ResolveParameters(method.Parameters));
+            }
+        }
+
+        /// <summary>
+        /// Resolve the arguments for an injected constructor or method.
+        /// </summary>
+        /// <param name="parameters">The parameter descriptors to resolve.</param>
+        /// <returns>The resolved arguments, positionally aligned with <paramref name="parameters"/>.</returns>
+        private object[] ResolveParameters(InjectCache.InjectParameter[] parameters)
+        {
+            if (parameters.Length == 0)
+            {
+                return [];
+            }
+
+            var args = new object[parameters.Length];
+            for (var index = 0; index < parameters.Length; index++)
+            {
+                var parameter = parameters[index];
+                var value = resolver.Resolve(parameter.Type, parameter.Key);
+                if (value == null)
+                {
+                    throw new ArgumentException($"Got a null argument for parameter of type '{parameter.Type}'.");
+                }
+
+                if (!parameter.Type.IsInstanceOfType(value))
+                {
+                    throw new InvalidCastException($"Cannot set the argument of type '{parameter.Type}' to '{value.GetType()}'.");
+                }
+
+                args[index] = value;
+            }
+
+            return args;
         }
     }
 }

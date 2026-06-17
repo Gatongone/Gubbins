@@ -1,6 +1,6 @@
 ﻿namespace Gubbins.Context;
 
-[AttributeUsage(AttributeTargets.Field | AttributeTargets.Property)]
+[AttributeUsage(AttributeTargets.Field | AttributeTargets.Property | AttributeTargets.Constructor | AttributeTargets.Method | AttributeTargets.Parameter)]
 public class InjectAttribute : Attribute
 {
     public string? Key;
