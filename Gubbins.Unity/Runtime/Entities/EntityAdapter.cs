@@ -693,8 +693,8 @@ namespace Gubbins.Entities
 
                 var job = new ScatterJob<T>
                 {
-                    Entities          = ids.ToNativeArray(),
-                    Components        = components[segment].ToNativeArray(),
+                    Entities          = ids.AsNativeArray(),
+                    Components        = components[segment].AsNativeArray(),
                     SlotByEntityIndex = group.SlotMap,
                     Snapshots         = s_Snapshots,
                 };

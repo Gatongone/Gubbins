@@ -18,7 +18,7 @@ namespace Gubbins.Enhance
         /// bridge here because that bridge allocates a throwaway Temp array on every call.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe NativeArray<T> ToNativeArray<T>(this Span<T> span) where T : unmanaged
+        public static unsafe NativeArray<T> AsNativeArray<T>(this Span<T> span) where T : unmanaged
         {
             var array = NativeArrayUnsafeUtility.ConvertExistingDataToNativeArray<T>(
                 Native.GetFirstElementAddress(span), span.Length, Allocator.None);
@@ -35,7 +35,7 @@ namespace Gubbins.Enhance
         /// bridge here because that bridge allocates a throwaway Temp array on every call.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe NativeArray<T> ToNativeArray<T>(this ReadOnlySpan<T> span) where T : unmanaged
+        public static unsafe NativeArray<T> AsNativeArray<T>(this ReadOnlySpan<T> span) where T : unmanaged
         {
             var array = NativeArrayUnsafeUtility.ConvertExistingDataToNativeArray<T>(
                 Native.GetFirstElementAddress(span), span.Length, Allocator.None);
