@@ -28,7 +28,7 @@ public class EventGenerator : ISourceGenerator
             {Indentation}/// Auto generated.
             {Indentation}/// </summary>
             {Indentation}[global::System.Runtime.CompilerServices.CompilerGenerated]
-            {Indentation}void IEventListener.Listen(IDependenciesResolver resolver, IDependenciesRegistry registry)
+            {Indentation}void global::Gubbins.Context.IEventListener.Listen(global::Gubbins.Context.IDependenciesResolver resolver, global::Gubbins.Context.IDependenciesRegistry registry)
             {Indentation}{
         {ListenEvent}
             {Indentation}}
@@ -37,7 +37,7 @@ public class EventGenerator : ISourceGenerator
             {Indentation}/// Auto generated.
             {Indentation}/// </summary>
             {Indentation}[global::System.Runtime.CompilerServices.CompilerGenerated]
-            {Indentation}void IEventListener.Clear(IDependenciesResolver resolver)
+            {Indentation}void global::Gubbins.Context.IEventListener.Clear(global::Gubbins.Context.IDependenciesResolver resolver)
             {Indentation}{
         {ClearEvent}
             {Indentation}}
@@ -58,7 +58,7 @@ public class EventGenerator : ISourceGenerator
             {Indentation}/// Auto generated.
             {Indentation}/// </summary>
             {Indentation}[global::System.Runtime.CompilerServices.CompilerGenerated]
-            {Indentation}void IEventListener.Listen(IDependenciesResolver resolver, IDependenciesRegistry registry)
+            {Indentation}void global::Gubbins.Context.IEventListener.Listen(IDependenciesResolver resolver, IDependenciesRegistry registry)
             {Indentation}{
         {ListenEvent}
             {Indentation}}
@@ -67,24 +67,24 @@ public class EventGenerator : ISourceGenerator
             {Indentation}/// Auto generated.
             {Indentation}/// </summary>
             {Indentation}[global::System.Runtime.CompilerServices.CompilerGenerated]
-            {Indentation}void IEventListener.Clear(IDependenciesResolver resolver)
+            {Indentation}void global::Gubbins.Context.IEventListener.Clear(IDependenciesResolver resolver)
             {Indentation}{
         {ClearEvent}
             {Indentation}}
         {TypeEnd}
         """;
 
-    private const string CLEAR_BODY = "{Indentation}resolver.Resolve<{EventName}>(nameof({EventName})).Clear();";
+    private const string CLEAR_BODY = "{Indentation}resolver.Resolve<{EventName}>(\"{EventName}\").{Unsubscribe}({MethodName});";
 
     private const string LISTEN_BODY =
         """
-        {Indentation}var event{Index} = resolver.Resolve<{EventName}>(nameof({EventName}));
+        {Indentation}var event{Index} = resolver.Resolve<{EventName}>("{EventName}");
         {Indentation}if (event{Index} == null)
         {Indentation}{
         {Indentation}    event{Index} = new {EventName}();
         {Indentation}    registry.Register(event{Index})
         {Indentation}            .BindTo<{Bindings}>()
-        {Indentation}            .WithKey(nameof({EventName}))
+        {Indentation}            .WithKey("{EventName}")
         {Indentation}            .AsSingleton();
         {Indentation}}
         {Indentation}event{Index}.{Subscribe}({MethodName});
@@ -130,9 +130,9 @@ public class EventGenerator : ISourceGenerator
             if (!ValidateEventInfo(context, eventInfo, methodInfo)) continue;
             var eventName = eventInfo.Symbol.ToDisplayString();
             listenBody.AppendLine(FormatListenBody(eventInfo, methodInfo, typeInfo, index, containsNamespace));
-            if (registeredEvent.Add(eventName))
+            if (registeredEvent.Add(eventName) && eventInfo.CanBeSubscribed)
             {
-                clearBody.AppendLine(FormatClearBody(eventInfo, typeInfo, containsNamespace));
+                clearBody.AppendLine(FormatClearBody(eventInfo, methodInfo, typeInfo, containsNamespace));
             }
 
             index++;
@@ -152,9 +152,17 @@ public class EventGenerator : ISourceGenerator
             && eventInfo.ParameterTypes.Length == 1
             && eventInfo.ParameterTypes[0].Equals("Gubbins.Enhance.Unit")))
         {
-            if (!eventInfo.ParameterTypes.SequenceEqual(methodInfo.ParameterTypes))
+            var returnType = string.IsNullOrEmpty(eventInfo.Result) ? "void" : eventInfo.Result;
+            var parameterType = returnType == "void" ? methodInfo.ParameterTypes : methodInfo.ParameterTypes.Take(methodInfo.ParameterTypes.Length - 1).ToArray();
+            if (!eventInfo.ParameterTypes.SequenceEqual(parameterType) || !returnType.Equals(methodInfo.ReturnType))
             {
-                context.ReportDiagnostic(ErrorDiagnostic.Descriptor.ParametersNotMatch, methodInfo.Location, eventInfo.Symbol.ToDisplayString(), string.Join(", ", eventInfo.ParameterTypes));
+                context.ReportDiagnostic(ErrorDiagnostic.Descriptor.EventSignatureNotMatch,
+                    methodInfo.Location,
+                    eventInfo.Symbol.ToDisplayString(),
+                    string.Join(", ", methodInfo.ParameterTypes),
+                    methodInfo.ReturnType,
+                    string.Join(", ", eventInfo.ParameterTypes.Concat(string.IsNullOrEmpty(eventInfo.Result) ? Array.Empty<string>() : new[] {eventInfo.Result})),
+                    returnType);
                 return false;
             }
         }
@@ -168,7 +176,7 @@ public class EventGenerator : ISourceGenerator
         return true;
     }
 
-    private string FormatClearBody(EventInfo eventInfo, TypeInfo typeInfo, bool containsNamespace)
+    private string FormatClearBody(EventInfo eventInfo, MethodInfo methodInfo, TypeInfo typeInfo, bool containsNamespace)
     {
         var clearBody = CLEAR_BODY;
         var indentation = containsNamespace ? typeInfo.NestedTypes.Length : typeInfo.NestedTypes.Length - 1;
@@ -178,7 +186,9 @@ public class EventGenerator : ISourceGenerator
         return clearBody.Format
         (
             Indentation => new string('\t', indentation + 2),
-            EventName => eventName
+            EventName => eventName,
+            Unsubscribe => Implements(eventInfo.Symbol, "IWeakEventSubscriable") ? "UnsubscribeWeakly" : "Unsubscribe",
+            MethodName => methodInfo.Name
         );
     }
 
@@ -194,9 +204,8 @@ public class EventGenerator : ISourceGenerator
             Index => index.ToString(),
             EventName => eventName,
             MethodName => methodInfo.Name,
-            Bindings => BuildBindings(eventInfo.Symbol, eventInfo.Notification),
-            // Prefer strong subscription; fall back to weak when the event is weak-only.
-            Subscribe => Implements(eventInfo.Symbol, "IEventSubscriable", generic: true) ? "Subscribe" : "SubscribeWeakly"
+            Bindings => BuildBindings(eventInfo.Symbol, eventInfo.Notification, eventInfo.Result),
+            Subscribe => Implements(eventInfo.Symbol, "IWeakEventSubscriable") ? "SubscribeWeakly" : "Subscribe"
         );
     }
 
@@ -204,21 +213,23 @@ public class EventGenerator : ISourceGenerator
     /// Builds the <c>BindTo&lt;...&gt;</c> type-argument list from the event interfaces the target type
     /// actually implements, so e.g. a subscribe-only event is not bound to <c>IEventBroadcastable&lt;T&gt;</c>.
     /// </summary>
-    private static string BuildBindings(ITypeSymbol type, string notification)
+    private static string BuildBindings(ITypeSymbol type, string notification, string result)
     {
         var bindings = new List<string>();
 
         // Generic interfaces carrying the notification type.
-        if (Implements(type, "IEvent", generic: true)) bindings.Add($"IEvent<{notification}>");
-        if (Implements(type, "IEventBroadcastable", generic: true)) bindings.Add($"IEventBroadcastable<{notification}>");
-        if (Implements(type, "IEventSubscriable", generic: true)) bindings.Add($"IEventSubscriable<{notification}>");
-        if (Implements(type, "IWeakEventSubscriable", generic: true)) bindings.Add($"IWeakEventSubscriable<{notification}>");
+        if (Implements(type, "IEvent", 1)) bindings.Add($"IEvent<{notification}>");
+        if (Implements(type, "IEventBroadcastable", 1)) bindings.Add($"IEventBroadcastable<{notification}>");
+        if (Implements(type, "IEventSubscriable", 1)) bindings.Add($"IEventSubscriable<{notification}>");
+        if (Implements(type, "IWeakEventSubscriable", 1)) bindings.Add($"IWeakEventSubscriable<{notification}>");
+        if (Implements(type, "ILinkableEventSubscriable", 1)) bindings.Add($"ILinkableEventSubscriable<{result}>");
 
         // Non-generic (Unit) interfaces, only present on parameterless events.
-        if (Implements(type, "IEvent", generic: false)) bindings.Add("IEvent");
-        if (Implements(type, "IEventBroadcastable", generic: false)) bindings.Add("IEventBroadcastable");
-        if (Implements(type, "IEventSubscriable", generic: false)) bindings.Add("IEventSubscriable");
-        if (Implements(type, "IWeakEventSubscriable", generic: false)) bindings.Add("IWeakEventSubscriable");
+        if (Implements(type, "IEvent", 0)) bindings.Add("IEvent");
+        if (Implements(type, "IEventBroadcastable", 0)) bindings.Add("IEventBroadcastable");
+        if (Implements(type, "IEventSubscriable", 0)) bindings.Add("IEventSubscriable");
+        if (Implements(type, "IWeakEventSubscriable", 0)) bindings.Add("IWeakEventSubscriable");
+        if (Implements(type, "ILinkableEventSubscriable", 2)) bindings.Add($"ILinkableEventSubscriable<{notification}, {result}>");
 
         return string.Join(", ", bindings);
     }
@@ -227,11 +238,20 @@ public class EventGenerator : ISourceGenerator
     /// Whether <paramref name="type"/> implements the given <c>Gubbins.Events</c> interface,
     /// distinguishing the generic (<c>I...&lt;T&gt;</c>) and non-generic (Unit) variants by arity.
     /// </summary>
-    private static bool Implements(ITypeSymbol type, string interfaceName, bool generic) =>
+    private static bool Implements(ITypeSymbol type, string interfaceName, int genericCount) =>
         type.AllInterfaces.Any(symbol =>
             symbol.ContainingNamespace.ToDisplayString().Equals(EVENT_BUS_NAMESPACE) &&
             symbol.Name.Equals(interfaceName) &&
-            symbol.TypeArguments.Length == (generic ? 1 : 0));
+            symbol.TypeArguments.Length == genericCount);
+
+    /// <summary>
+    /// Whether <paramref name="type"/> implements the given <c>Gubbins.Events</c> interface,
+    /// distinguishing the generic (<c>I...&lt;T&gt;</c>).
+    /// </summary>
+    private static bool Implements(ITypeSymbol type, string interfaceName) =>
+        type.AllInterfaces.Any(symbol =>
+            symbol.ContainingNamespace.ToDisplayString().Equals(EVENT_BUS_NAMESPACE) &&
+            symbol.Name.Equals(interfaceName));
 
     // ReSharper disable InconsistentNaming
     private string FormatBody(string bodyTemplate, TypeInfo typeInfo, bool containsNamespace, string indentation, StringBuilder listenBody, StringBuilder clearBody) => bodyTemplate.Format
@@ -304,6 +324,7 @@ public class EventGenerator : ISourceGenerator
 
             return new MethodInfo
             {
+                ReturnType     = method.ReturnType.ToDisplayString(),
                 ParameterTypes = method.Parameters.Select(p => p.Type.ToDisplayString()).ToArray(),
                 Events         = events.ToArray(),
                 Name           = method.Name,
@@ -336,16 +357,18 @@ public class EventGenerator : ISourceGenerator
             {
                 Symbol          = type,
                 Location        = type.Locations.First(),
-                CanBeSubscribed = TryGetEventBusInfo(type, out var notification, out var parameterTypes),
+                CanBeSubscribed = TryGetEventBusInfo(type, out var notification, out var result, out var parameterTypes),
                 Notification    = notification,
+                Result          = result,
                 ParameterTypes  = parameterTypes
             };
 
             return eventInfo;
         }
 
-        private static bool TryGetEventBusInfo(ITypeSymbol type, out string notification, out string[] parameterTypes)
+        private static bool TryGetEventBusInfo(ITypeSymbol type, out string notification, out string result, out string[] parameterTypes)
         {
+            result         = string.Empty;
             notification   = string.Empty;
             parameterTypes = [];
 
@@ -355,19 +378,34 @@ public class EventGenerator : ISourceGenerator
             }
 
             var genericArg = (INamedTypeSymbol) interfaceSymbol!.TypeArguments.First();
-            notification   = genericArg.ToDisplayString();
-            parameterTypes = DetermineParameterTypes(genericArg);
+            notification = genericArg.ToDisplayString();
+            if (interfaceSymbol.Name.Equals("ILinkableEventSubscriable"))
+            {
+                result = ((INamedTypeSymbol) interfaceSymbol.TypeArguments[1]).ToDisplayString();
+                if (interfaceSymbol.TypeArguments.Length == 1)
+                {
+                    parameterTypes = Array.Empty<string>();
+                }
+                else
+                {
+                    parameterTypes = DetermineParameterTypes(genericArg);
+                }
+            }
+            else
+            {
+                parameterTypes = DetermineParameterTypes(genericArg);
+            }
+
             return true;
 
             bool MatchEventBus(INamedTypeSymbol symbol) =>
                 symbol.ContainingNamespace.ToDisplayString().Equals(EVENT_BUS_NAMESPACE) &&
-                (symbol.Name.Equals("IEventSubscriable") || symbol.Name.Equals("IWeakEventSubscriable")) &&
-                symbol.TypeArguments.Length == 1;
+                (symbol.Name.Equals("IEventSubscriable") || symbol.Name.Equals("IWeakEventSubscriable") || symbol.Name.Equals("ILinkableEventSubscriable"));
         }
 
         private static string[] DetermineParameterTypes(INamedTypeSymbol genericArg)
         {
-            if (genericArg.ContainingNamespace.ToDisplayString().Equals($"{nameof(Gubbins)}.Enhance") && genericArg.Name.Equals("Void"))
+            if (genericArg.ContainingNamespace.ToDisplayString().Equals($"{nameof(Gubbins)}.Enhance") && genericArg.Name.Equals("Unit"))
             {
                 return [];
             }
@@ -394,6 +432,7 @@ public class EventGenerator : ISourceGenerator
         public string      Name;
         public EventInfo[] Events;
         public string[]    ParameterTypes;
+        public string      ReturnType;
         public Location    Location;
     }
 
@@ -402,6 +441,7 @@ public class EventGenerator : ISourceGenerator
         public ITypeSymbol Symbol;
         public string[]    ParameterTypes;
         public string      Notification;
+        public string      Result;
         public bool        CanBeSubscribed;
         public Location    Location;
     }

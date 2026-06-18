@@ -6,7 +6,6 @@ namespace Gubbins.Events;
 /// <summary>
 /// Event handler with <see cref="System.Action"/>.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("ReSharper", "UnusedType.Global")]
 public sealed class ActionEventHandler : IEventHandler, IEquatable<Action>, IEquatable<ActionEventHandler>
 {
     /// <summary>
@@ -15,7 +14,7 @@ public sealed class ActionEventHandler : IEventHandler, IEquatable<Action>, IEqu
     private readonly Action m_Invocation;
 
     /// <summary>
-    /// Create a event handler from a Action.
+    /// Create an event handler from a Action.
     /// </summary>
     /// <param name="delegation">Delegation for creating EventHandler.</param>   
     public ActionEventHandler(Action delegation) => m_Invocation = delegation;
@@ -59,7 +58,6 @@ public sealed class ActionEventHandler : IEventHandler, IEquatable<Action>, IEqu
 /// <summary>
 /// Event handler with <see cref="System.Action{TArg}"/>.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("ReSharper", "UnusedType.Global")]
 public sealed class ActionEventHandler<TArg> : IEventHandler<TArg>, IEquatable<Action<TArg>>, IEquatable<ActionEventHandler<TArg>>
 {
     /// <summary>
@@ -117,7 +115,6 @@ public sealed class ActionEventHandler<TArg> : IEventHandler<TArg>, IEquatable<A
 /// <summary>
 /// Event handler with <see cref="System.Action{<#= genericTypes #>}"/>.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("ReSharper", "UnusedType.Global")]
 public sealed class ActionEventHandler<<#= genericTypes #>> : IEventHandler<<#= $"({genericTypes})" #>>, IEquatable<Action<<#= genericTypes #>>>, IEquatable<ActionEventHandler<<#= genericTypes #>>>
 {
     /// <summary>

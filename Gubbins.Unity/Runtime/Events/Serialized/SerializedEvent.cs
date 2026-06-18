@@ -50,6 +50,8 @@ namespace Gubbins.Events
         /// <inheritdoc/>
         public bool Unsubscribe(IEventHandler<Unit> handler) => m_EventBus?.Unsubscribe(handler) ?? false;
 
+        public void UnsubscribeWeakly(IWeakEventHandler<Unit> handler) => m_EventBus?.UnsubscribeWeakly(handler);
+
         /// <inheritdoc/>
         public void Clear() => m_Handlers.RemoveAllListeners();
 

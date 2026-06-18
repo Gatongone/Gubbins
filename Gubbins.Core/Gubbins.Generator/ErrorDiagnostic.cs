@@ -70,11 +70,11 @@ internal static class ErrorDiagnostic
             defaultSeverity: DiagnosticSeverity.Error,
             isEnabledByDefault: true);
 
-        // Message:
-        public static readonly DiagnosticDescriptor ParametersNotMatch = new(
+        // Events:
+        public static readonly DiagnosticDescriptor EventSignatureNotMatch = new(
             id: Id.PARAMETERS_NOT_MATCH,
             title: "Parameters not match.",
-            messageFormat: "Event parameter can't be matched event \"{0}\" with parameters: ({1}).",
+            messageFormat: "Event signature \"({1}) : {2}\" can't be matched event \"{0}\" . Expected: \"({3}) : {4}\"",
             category: "DiagnosticsGenerator",
             defaultSeverity: DiagnosticSeverity.Error,
             isEnabledByDefault: true);
@@ -82,7 +82,7 @@ internal static class ErrorDiagnostic
         public static readonly DiagnosticDescriptor TypeCantBeSubscribed = new(
             id: Id.TYPE_IS_NOT_EVENT_BUS,
             title: "Event can't be subscribed.",
-            messageFormat: "Type must be assignable from Gubbins.Events.IEventSubscriable<TNotification> or Gubbins.Events.IWeakEventSubscriable<TNotification>. Type: {0}.",
+            messageFormat: "Type must be assignable from IEventSubscriable<TNotification> or IWeakEventSubscriable<TNotification> or ILinkableEventSubscriable<TNotification, TResult>. Type: {0}.",
             category: "DiagnosticsGenerator",
             defaultSeverity: DiagnosticSeverity.Error,
             isEnabledByDefault: true);

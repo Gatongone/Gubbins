@@ -28,6 +28,14 @@
         <Generator>TextTemplatingFileGenerator</Generator>
         <LastGenOutput>ActionEventHandler.cs</LastGenOutput>
       </None>
+      <None Update="Handlers\LinkableEventHandler.tt">
+        <Generator>TextTemplatingFileGenerator</Generator>
+        <LastGenOutput>LinkableEventHandler.cs</LastGenOutput>
+      </None>
+      <None Update="Extensions\LinkableEventSubscribeExtensions.tt">
+        <Generator>TextTemplatingFileGenerator</Generator>
+        <LastGenOutput>LinkableEventSubscribeExtensions.cs</LastGenOutput>
+      </None>
     </ItemGroup>
 
     <ItemGroup>
@@ -45,6 +53,16 @@
       </Compile>
       <Compile Update="Handlers\ActionEventHandler.cs">
         <DependentUpon>ActionEventHandler.tt</DependentUpon>
+      </Compile>
+      <Compile Update="Handlers\LinkableEventHandler.cs">
+        <AutoGen>True</AutoGen>
+        <DesignTime>True</DesignTime>
+        <DependentUpon>LinkableEventHandler.tt</DependentUpon>
+      </Compile>
+      <Compile Update="Extensions\LinkableEventSubscribeExtensions.cs">
+        <AutoGen>True</AutoGen>
+        <DesignTime>True</DesignTime>
+        <DependentUpon>LinkableEventSubscribeExtensions.tt</DependentUpon>
       </Compile>
     </ItemGroup>
 

@@ -1,0 +1,69 @@
+<#@ template language="C#" #>
+<#@ import namespace="System.Linq" #>
+using Gubbins.Enhance;
+namespace Gubbins.Events;
+
+/// <summary>
+/// Extensions for <see cref="IEventSubscriable{TNotification}"/>.
+/// </summary>
+public static class LinkableEventSubscribeExtensions
+{
+    #region Subscribe
+
+    /// <summary>
+    /// <inheritdoc cref="ILinkableEventSubscriable{Unit, TResult}.Subscribe(ILinkableEventHandler{TNotification})"/>
+    /// </summary>
+    public static void Subscribe<TResult>(this ILinkableEventSubscriable<Unit, TResult> subscriber, Func<TResult, TResult> delegation)
+        => subscriber.Subscribe(new LinkableEventHandler<TResult>(delegation));
+
+    /// <summary>
+    /// <inheritdoc cref="ILinkableEventSubscriable{TNotification, TResult}.Subscribe(ILinkableEventHandler{TNotification})"/>
+    /// </summary>
+    public static void Subscribe<TArg, TResult>(this ILinkableEventSubscriable<TArg, TResult> subscriber, Func<TArg, TResult, TResult> delegation)
+        => subscriber.Subscribe(new LinkableEventHandler<TArg, TResult>(delegation));
+<#
+    for (var i = 2; i <= 14; i++)
+    {
+        var genericTypes = string.Join(", ", from index in Enumerable.Range(1, i) select $"TArg{index}");
+#>
+
+    /// <summary>
+    /// <inheritdoc cref="ILinkableEventSubscriable{TNotification, TResult}.Subscribe(ILinkableEventHandler{TNotification, TResult})"/>
+    /// </summary>
+    public static void Subscribe<<#= genericTypes #>, TResult>(this ILinkableEventSubscriable<(<#= genericTypes #>), TResult> subscriber, Func<<#= genericTypes #>, TResult, TResult> delegation)
+        => subscriber.Subscribe(new LinkableEventHandler<<#= genericTypes #>, TResult>(delegation));
+<#
+    }
+#>
+    #endregion
+
+    #region Unsubscribe
+
+    /// <summary>
+    /// <inheritdoc cref="ILinkableEventSubscriable{Unit, TResult}.Unsubscribe(ILinkableEventHandler{Unit, TResult})"/>
+    /// </summary>
+    public static void Unsubscribe<TResult>(this ILinkableEventSubscriable<Unit, TResult> subscriber, Func<TResult, TResult> delegation)
+        => subscriber.Unsubscribe(new LinkableEventHandler<TResult>(delegation));
+
+    /// <summary>
+    /// <inheritdoc cref="ILinkableEventSubscriable{TNotification, TResult}.Unsubscribe(ILinkableEventHandler{TNotification, TResult})"/>
+    /// </summary>
+    public static void Unsubscribe<TArg, TResult>(this ILinkableEventSubscriable<TArg, TResult> subscriber, Func<TArg, TResult, TResult> delegation)
+        => subscriber.Unsubscribe(new LinkableEventHandler<TArg, TResult>(delegation));
+<#
+    for (var i = 2; i <= 14; i++)
+    {
+        var genericTypes = string.Join(", ", from index in Enumerable.Range(1, i) select $"TArg{index}");
+#>
+
+    /// <summary>
+    /// <inheritdoc cref="ILinkableEventSubscriable{TNotification, TResult}.Unsubscribe(ILinkableEventHandler{TNotification, TResult})"/>
+    /// </summary>
+    public static void Unsubscribe<<#= genericTypes #>, TResult>(this ILinkableEventSubscriable<(<#= genericTypes #>), TResult> subscriber, Func<<#= genericTypes #>, TResult, TResult> delegation)
+        => subscriber.Unsubscribe(new LinkableEventHandler<<#= genericTypes #>, TResult>(delegation));
+<#
+    }
+#>
+
+    #endregion
+}

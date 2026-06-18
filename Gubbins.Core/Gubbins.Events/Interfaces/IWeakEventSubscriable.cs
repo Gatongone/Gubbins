@@ -18,4 +18,15 @@ public interface IWeakEventSubscriable<out TNotification>
     /// </summary>
     /// <param name="handler">The event handler with notification.</param>
     void SubscribeWeakly(IWeakEventHandler<TNotification> handler);
+
+    /// <summary>
+    /// Unsubscribe handler by weak reference.
+    /// </summary>
+    /// <param name="handler">The event handler with notification.</param>
+    void UnsubscribeWeakly(IWeakEventHandler<TNotification> handler);
+
+    /// <summary>
+    /// Remove all handlers from bus.
+    /// </summary>
+    void Clear();
 }

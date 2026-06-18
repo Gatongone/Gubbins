@@ -5,7 +5,6 @@ namespace Gubbins.Events;
 /// <summary>
 /// Extensions for <see cref="IWeakEventSubscriable{TNotification}"/>.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("ReSharper", "UnusedType.Global")]
 public static class EventSubscribeWeaklyExtensions
 {
     /// <summary>

@@ -6,13 +6,12 @@ namespace Gubbins.Events;
 /// <summary>
 /// Extensions for <see cref="IEventSubscriable{TNotification}"/>.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("ReSharper", "UnusedType.Global")]
 public static class EventSubscribeExtensions
 {
     #region Subscribe
 
     /// <summary>
-    /// <inheritdoc cref="IEventSubscriable{TNotification}.Subscribe(IEventHandler{TNotification})"/>
+    /// <inheritdoc cref="IEventSubscriable{Unit}.Subscribe(IEventHandler{Unit})"/>
     /// </summary>
     public static void Subscribe(this IEventSubscriable<Unit> subscriber, Action delegation)
         => subscriber.Subscribe(new ActionEventHandler(delegation));
@@ -41,7 +40,7 @@ public static class EventSubscribeExtensions
     #region Unsubscribe
 
     /// <summary>
-    /// <inheritdoc cref="IEventSubscriable{TNotification}.Unsubscribe(IEventHandler{TNotification})"/>
+    /// <inheritdoc cref="IEventSubscriable{Unit}.Unsubscribe(IEventHandler{Unit})"/>
     /// </summary>
     public static void Unsubscribe(this IEventSubscriable<Unit> subscriber, Action delegation)
         => subscriber.Unsubscribe(new ActionEventHandler(delegation));

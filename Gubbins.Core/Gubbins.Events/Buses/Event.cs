@@ -17,6 +17,27 @@ public class Event<TNotification> : IEvent<TNotification>
     /// </summary>
     private readonly List<IWeakEventHandler<TNotification>> m_WeakHandlers = [];
 
+    public void UnsubscribeWeakly(IWeakEventHandler<TNotification> handler)
+    {
+        if (null! == handler) return;
+
+        //  Dispatch all weak handlers.
+        for (var index = m_WeakHandlers.Count - 1; index >= 0; index--)
+        {
+            var weakTarget = m_WeakHandlers[index];
+            // Check the target is alive.
+            if (weakTarget.IsAlive)
+            {
+                if (weakTarget.Equals(handler)) continue;
+                m_WeakHandlers.RemoveAt(index);
+                return;
+            }
+
+            // The reference is dead.
+            m_WeakHandlers.RemoveAt(index);
+        }
+    }
+
     /// <inheritdoc/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Clear()

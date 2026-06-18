@@ -6,13 +6,12 @@ namespace Gubbins.Events;
 /// <summary>
 /// Extensions for <see cref="IEventBroadcastable{TNotification}"/>.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("ReSharper", "UnusedType.Global")]
 public static class EventBroadcastExtensions
 {
     /// <summary>
-    /// <inheritdoc cref="IEventBroadcastable{TNotification}.Broadcast(TNotification)"/>
+    /// <inheritdoc cref="IEventBroadcastable{Unit}.Broadcast(Unit)"/>
     /// </summary>
-    public static void Broadcast(this IEventBroadcastable<Enhance.Unit> publisher)
+    public static void Broadcast(this IEventBroadcastable<Unit> publisher)
         => publisher.Broadcast(Unit.Instance);
 <#
     for (var i = 2; i <= 16; i++)

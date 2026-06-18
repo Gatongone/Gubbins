@@ -1,19 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
-using Gubbins.Enhance;
-using UnityEngine.LowLevel;
+using Unity.Jobs;
 
 namespace Gubbins.Events
 {
-    /// <summary>
-    /// Provides strongly-typed wrappers for Unity PlayerLoop phase events.
-    /// </summary>
-    public static class LoopEvents
+    public static class JobLoopEvents
     {
         /// <summary>
         /// Event for the Initialization phase of the PlayerLoop.
         /// </summary>
-        public class Initialization : LoopEvent
+        public class Initialization : JobLoopEvent
         {
             public Initialization() : base(UnityLoop.Kind.Initialization) { }
         }
@@ -21,7 +17,7 @@ namespace Gubbins.Events
         /// <summary>
         /// Event for the EarlyUpdate phase of the PlayerLoop.
         /// </summary>
-        public class EarlyUpdate : LoopEvent
+        public class EarlyUpdate : JobLoopEvent
         {
             public EarlyUpdate() : base(UnityLoop.Kind.EarlyUpdate) { }
         }
@@ -29,7 +25,7 @@ namespace Gubbins.Events
         /// <summary>
         /// Event for the Update phase of the PlayerLoop.
         /// </summary>
-        public class Update : LoopEvent
+        public class Update : JobLoopEvent
         {
             public Update() : base(UnityLoop.Kind.Update) { }
         }
@@ -37,7 +33,7 @@ namespace Gubbins.Events
         /// <summary>
         /// Event for the FixedUpdate phase of the PlayerLoop.
         /// </summary>
-        public class FixedUpdate : LoopEvent
+        public class FixedUpdate : JobLoopEvent
         {
             public FixedUpdate() : base(UnityLoop.Kind.FixedUpdate) { }
         }
@@ -45,7 +41,7 @@ namespace Gubbins.Events
         /// <summary>
         /// Event for the PreUpdate phase of the PlayerLoop.
         /// </summary>
-        public class PreUpdate : LoopEvent
+        public class PreUpdate : JobLoopEvent
         {
             public PreUpdate() : base(UnityLoop.Kind.PreUpdate) { }
         }
@@ -53,7 +49,7 @@ namespace Gubbins.Events
         /// <summary>
         /// Event for the PreLateUpdate phase of the PlayerLoop.
         /// </summary>
-        public class PreLateUpdate : LoopEvent
+        public class PreLateUpdate : JobLoopEvent
         {
             public PreLateUpdate() : base(UnityLoop.Kind.PreLateUpdate) { }
         }
@@ -61,50 +57,48 @@ namespace Gubbins.Events
         /// <summary>
         /// Event for the PostLateUpdate phase of the PlayerLoop.
         /// </summary>
-        public class PostLateUpdate : LoopEvent
+        public class PostLateUpdate : JobLoopEvent
         {
             public PostLateUpdate() : base(UnityLoop.Kind.PostLateUpdate) { }
         }
     }
 
-    /// <summary>
-    /// Base class for PlayerLoop event wrappers.
-    /// </summary>
-    public class LoopEvent : IEventSubscriable<Unit>
+    public class JobLoopEvent : ILinkableEventSubscriable<float, JobHandle>
     {
-        private readonly UnityLoop.Kind                                                   m_Kind;
-        private readonly Dictionary<IEventHandler<Unit>, Action> m_HandlerMap = new();
+        private readonly UnityLoop.Kind                                                                         m_Kind;
+        private readonly Dictionary<ILinkableEventHandler<float, JobHandle>, Func<float, JobHandle, JobHandle>> m_Handlers = new();
 
-        internal LoopEvent(UnityLoop.Kind kind)
-        {
-            m_Kind = kind;
-        }
+        internal JobLoopEvent(UnityLoop.Kind kind) => m_Kind = kind;
 
-        /// <inheritdoc/>
-        public void Subscribe(IEventHandler<Unit> handler)
+        public void Subscribe(ILinkableEventHandler<float, JobHandle> handler)
         {
-            Action wrap = () => handler.Handle(Unit.Instance);
-            m_HandlerMap.Add(handler, wrap);
+            if (m_Handlers.ContainsKey(handler))
+                return;
+
+            Func<float, JobHandle, JobHandle> wrap = (delta, jobHandle) =>
+            {
+                handler.Handle(delta, jobHandle);
+                return jobHandle;
+            };
+
+            m_Handlers.Add(handler, wrap);
             UnityLoop.RegisterUpdate(m_Kind, wrap);
         }
 
-        /// <inheritdoc/>
-        public bool Unsubscribe(IEventHandler<Unit> handler)
+        public void Unsubscribe(ILinkableEventHandler<float, JobHandle> handler)
         {
-            if (!m_HandlerMap.Remove(handler, out var wrap)) return false;
+            if (!m_Handlers.TryGetValue(handler, out var wrap))
+                return;
+
             UnityLoop.UnregisterUpdate(m_Kind, wrap);
-            return true;
+            m_Handlers.Remove(handler);
         }
 
-        /// <inheritdoc/>
         public void Clear()
         {
-            foreach (var wrap in m_HandlerMap.Values)
-            {
-                UnityLoop.UnregisterUpdate(m_Kind, wrap);
-            }
-
-            m_HandlerMap.Clear();
+            foreach (var wrap in m_Handlers)
+                UnityLoop.UnregisterUpdate(m_Kind, wrap.Value);
+            m_Handlers.Clear();
         }
     }
 }

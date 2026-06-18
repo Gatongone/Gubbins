@@ -1,4 +1,5 @@
 ﻿using Gubbins.Enhance;
+
 namespace Gubbins.Events;
 
 /// <summary>
@@ -49,8 +50,8 @@ public sealed class ActionEventHandler : IEventHandler, IEquatable<Action>, IEqu
     public override bool Equals(object? other) => other switch
     {
         ActionEventHandler handler => Equals(handler),
-        Action action                => Equals(action),
-        _                            => false
+        Action action              => Equals(action),
+        _                          => false
     };
 }
 
@@ -99,8 +100,8 @@ public sealed class ActionEventHandler<TArg> : IEventHandler<TArg>, IEquatable<A
     public override bool Equals(object? other) => other switch
     {
         ActionEventHandler<TArg> handler => Equals(handler),
-        Action<TArg> action                => Equals(action),
-        _                                  => false
+        Action<TArg> action              => Equals(action),
+        _                                => false
     };
 }
 
@@ -152,8 +153,8 @@ public sealed class ActionEventHandler<TArg1, TArg2> : IEventHandler<(TArg1, TAr
     public override bool Equals(object? other) => other switch
     {
         ActionEventHandler<TArg1, TArg2> handler => Equals(handler),
-        Action<TArg1, TArg2> action                => Equals(action),
-        _                                                 => false
+        Action<TArg1, TArg2> action              => Equals(action),
+        _                                        => false
     };
 }
 
@@ -205,8 +206,8 @@ public sealed class ActionEventHandler<TArg1, TArg2, TArg3> : IEventHandler<(TAr
     public override bool Equals(object? other) => other switch
     {
         ActionEventHandler<TArg1, TArg2, TArg3> handler => Equals(handler),
-        Action<TArg1, TArg2, TArg3> action                => Equals(action),
-        _                                                 => false
+        Action<TArg1, TArg2, TArg3> action              => Equals(action),
+        _                                               => false
     };
 }
 
@@ -258,8 +259,8 @@ public sealed class ActionEventHandler<TArg1, TArg2, TArg3, TArg4> : IEventHandl
     public override bool Equals(object? other) => other switch
     {
         ActionEventHandler<TArg1, TArg2, TArg3, TArg4> handler => Equals(handler),
-        Action<TArg1, TArg2, TArg3, TArg4> action                => Equals(action),
-        _                                                 => false
+        Action<TArg1, TArg2, TArg3, TArg4> action              => Equals(action),
+        _                                                      => false
     };
 }
 
@@ -311,8 +312,8 @@ public sealed class ActionEventHandler<TArg1, TArg2, TArg3, TArg4, TArg5> : IEve
     public override bool Equals(object? other) => other switch
     {
         ActionEventHandler<TArg1, TArg2, TArg3, TArg4, TArg5> handler => Equals(handler),
-        Action<TArg1, TArg2, TArg3, TArg4, TArg5> action                => Equals(action),
-        _                                                 => false
+        Action<TArg1, TArg2, TArg3, TArg4, TArg5> action              => Equals(action),
+        _                                                             => false
     };
 }
 
@@ -364,8 +365,8 @@ public sealed class ActionEventHandler<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6>
     public override bool Equals(object? other) => other switch
     {
         ActionEventHandler<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6> handler => Equals(handler),
-        Action<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6> action                => Equals(action),
-        _                                                 => false
+        Action<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6> action              => Equals(action),
+        _                                                                    => false
     };
 }
 
@@ -417,8 +418,8 @@ public sealed class ActionEventHandler<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6,
     public override bool Equals(object? other) => other switch
     {
         ActionEventHandler<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6, TArg7> handler => Equals(handler),
-        Action<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6, TArg7> action                => Equals(action),
-        _                                                 => false
+        Action<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6, TArg7> action              => Equals(action),
+        _                                                                           => false
     };
 }
 
@@ -470,8 +471,8 @@ public sealed class ActionEventHandler<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6,
     public override bool Equals(object? other) => other switch
     {
         ActionEventHandler<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6, TArg7, TArg8> handler => Equals(handler),
-        Action<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6, TArg7, TArg8> action                => Equals(action),
-        _                                                 => false
+        Action<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6, TArg7, TArg8> action              => Equals(action),
+        _                                                                                  => false
     };
 }
 
@@ -523,8 +524,8 @@ public sealed class ActionEventHandler<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6,
     public override bool Equals(object? other) => other switch
     {
         ActionEventHandler<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6, TArg7, TArg8, TArg9> handler => Equals(handler),
-        Action<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6, TArg7, TArg8, TArg9> action                => Equals(action),
-        _                                                 => false
+        Action<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6, TArg7, TArg8, TArg9> action              => Equals(action),
+        _                                                                                         => false
     };
 }
 
@@ -576,8 +577,8 @@ public sealed class ActionEventHandler<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6,
     public override bool Equals(object? other) => other switch
     {
         ActionEventHandler<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6, TArg7, TArg8, TArg9, TArg10> handler => Equals(handler),
-        Action<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6, TArg7, TArg8, TArg9, TArg10> action                => Equals(action),
-        _                                                 => false
+        Action<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6, TArg7, TArg8, TArg9, TArg10> action              => Equals(action),
+        _                                                                                                 => false
     };
 }
 
@@ -629,8 +630,8 @@ public sealed class ActionEventHandler<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6,
     public override bool Equals(object? other) => other switch
     {
         ActionEventHandler<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6, TArg7, TArg8, TArg9, TArg10, TArg11> handler => Equals(handler),
-        Action<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6, TArg7, TArg8, TArg9, TArg10, TArg11> action                => Equals(action),
-        _                                                 => false
+        Action<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6, TArg7, TArg8, TArg9, TArg10, TArg11> action              => Equals(action),
+        _                                                                                                         => false
     };
 }
 
@@ -682,8 +683,8 @@ public sealed class ActionEventHandler<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6,
     public override bool Equals(object? other) => other switch
     {
         ActionEventHandler<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6, TArg7, TArg8, TArg9, TArg10, TArg11, TArg12> handler => Equals(handler),
-        Action<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6, TArg7, TArg8, TArg9, TArg10, TArg11, TArg12> action                => Equals(action),
-        _                                                 => false
+        Action<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6, TArg7, TArg8, TArg9, TArg10, TArg11, TArg12> action              => Equals(action),
+        _                                                                                                                 => false
     };
 }
 
@@ -735,8 +736,8 @@ public sealed class ActionEventHandler<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6,
     public override bool Equals(object? other) => other switch
     {
         ActionEventHandler<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6, TArg7, TArg8, TArg9, TArg10, TArg11, TArg12, TArg13> handler => Equals(handler),
-        Action<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6, TArg7, TArg8, TArg9, TArg10, TArg11, TArg12, TArg13> action                => Equals(action),
-        _                                                 => false
+        Action<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6, TArg7, TArg8, TArg9, TArg10, TArg11, TArg12, TArg13> action              => Equals(action),
+        _                                                                                                                         => false
     };
 }
 
@@ -788,8 +789,8 @@ public sealed class ActionEventHandler<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6,
     public override bool Equals(object? other) => other switch
     {
         ActionEventHandler<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6, TArg7, TArg8, TArg9, TArg10, TArg11, TArg12, TArg13, TArg14> handler => Equals(handler),
-        Action<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6, TArg7, TArg8, TArg9, TArg10, TArg11, TArg12, TArg13, TArg14> action                => Equals(action),
-        _                                                 => false
+        Action<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6, TArg7, TArg8, TArg9, TArg10, TArg11, TArg12, TArg13, TArg14> action              => Equals(action),
+        _                                                                                                                                 => false
     };
 }
 
@@ -841,8 +842,8 @@ public sealed class ActionEventHandler<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6,
     public override bool Equals(object? other) => other switch
     {
         ActionEventHandler<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6, TArg7, TArg8, TArg9, TArg10, TArg11, TArg12, TArg13, TArg14, TArg15> handler => Equals(handler),
-        Action<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6, TArg7, TArg8, TArg9, TArg10, TArg11, TArg12, TArg13, TArg14, TArg15> action                => Equals(action),
-        _                                                 => false
+        Action<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6, TArg7, TArg8, TArg9, TArg10, TArg11, TArg12, TArg13, TArg14, TArg15> action              => Equals(action),
+        _                                                                                                                                         => false
     };
 }
 
@@ -894,7 +895,7 @@ public sealed class ActionEventHandler<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6,
     public override bool Equals(object? other) => other switch
     {
         ActionEventHandler<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6, TArg7, TArg8, TArg9, TArg10, TArg11, TArg12, TArg13, TArg14, TArg15, TArg16> handler => Equals(handler),
-        Action<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6, TArg7, TArg8, TArg9, TArg10, TArg11, TArg12, TArg13, TArg14, TArg15, TArg16> action                => Equals(action),
-        _                                                 => false
+        Action<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6, TArg7, TArg8, TArg9, TArg10, TArg11, TArg12, TArg13, TArg14, TArg15, TArg16> action              => Equals(action),
+        _                                                                                                                                                 => false
     };
 }

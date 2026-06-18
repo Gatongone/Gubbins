@@ -188,8 +188,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new AddJob
             {
-                Src     = src.ToNativeArray(),
-                Dst     = result.ToNativeArray(),
+                Src     = src.AsNativeArray(),
+                Dst     = result.AsNativeArray(),
                 Operand = operand
             }, src.Length);
         }
@@ -198,8 +198,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new SubtractJob
             {
-                Src     = src.ToNativeArray(),
-                Dst     = result.ToNativeArray(),
+                Src     = src.AsNativeArray(),
+                Dst     = result.AsNativeArray(),
                 Operand = operand
             }, src.Length);
         }
@@ -208,8 +208,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new MultiplyJob
             {
-                Src     = src.ToNativeArray(),
-                Dst     = result.ToNativeArray(),
+                Src     = src.AsNativeArray(),
+                Dst     = result.AsNativeArray(),
                 Operand = operand
             }, src.Length);
         }
@@ -218,8 +218,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new DivideJob
             {
-                Src     = src.ToNativeArray(),
-                Dst     = result.ToNativeArray(),
+                Src     = src.AsNativeArray(),
+                Dst     = result.AsNativeArray(),
                 Operand = operand
             }, src.Length);
         }
@@ -228,8 +228,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new ModuloJob
             {
-                Src     = src.ToNativeArray(),
-                Dst     = result.ToNativeArray(),
+                Src     = src.AsNativeArray(),
+                Dst     = result.AsNativeArray(),
                 Operand = operand
             }, src.Length);
         }
@@ -238,8 +238,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new ShiftLeftJob
             {
-                Src   = src.ToNativeArray(),
-                Dst   = result.ToNativeArray(),
+                Src   = src.AsNativeArray(),
+                Dst   = result.AsNativeArray(),
                 Count = count
             }, src.Length);
         }
@@ -248,8 +248,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new ShiftRightJob
             {
-                Src   = src.ToNativeArray(),
-                Dst   = result.ToNativeArray(),
+                Src   = src.AsNativeArray(),
+                Dst   = result.AsNativeArray(),
                 Count = count
             }, src.Length);
         }
@@ -258,9 +258,9 @@ namespace Gubbins.Span
         {
             RunAndComplete(new MaxJob
             {
-                Left   = left.ToNativeArray(),
-                Right  = right.ToNativeArray(),
-                Result = result.ToNativeArray()
+                Left   = left.AsNativeArray(),
+                Right  = right.AsNativeArray(),
+                Result = result.AsNativeArray()
             }, left.Length);
         }
 
@@ -269,7 +269,7 @@ namespace Gubbins.Span
             if (src.Length == 0)
                 throw new ArgumentException("Source span must not be empty.", nameof(src));
 
-            var srcArray = src.ToNativeArray();
+            var srcArray = src.AsNativeArray();
             var partitionCount = Math.Min(src.Length, Math.Max(1, s_JobBatchSize));
             var partials = new NativeArray<int>(partitionCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
 
@@ -300,9 +300,9 @@ namespace Gubbins.Span
         {
             RunAndComplete(new MinJob
             {
-                Left   = left.ToNativeArray(),
-                Right  = right.ToNativeArray(),
-                Result = result.ToNativeArray()
+                Left   = left.AsNativeArray(),
+                Right  = right.AsNativeArray(),
+                Result = result.AsNativeArray()
             }, left.Length);
         }
 
@@ -311,7 +311,7 @@ namespace Gubbins.Span
             if (src.Length == 0)
                 throw new ArgumentException("Source span must not be empty.", nameof(src));
 
-            var srcArray = src.ToNativeArray();
+            var srcArray = src.AsNativeArray();
             var partitionCount = Math.Min(src.Length, Math.Max(1, s_JobBatchSize));
             var partials = new NativeArray<int>(partitionCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
 
@@ -518,8 +518,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new AddJob
             {
-                Src     = src.ToNativeArray(),
-                Dst     = result.ToNativeArray(),
+                Src     = src.AsNativeArray(),
+                Dst     = result.AsNativeArray(),
                 Operand = operand
             }, src.Length);
         }
@@ -528,8 +528,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new SubtractJob
             {
-                Src     = src.ToNativeArray(),
-                Dst     = result.ToNativeArray(),
+                Src     = src.AsNativeArray(),
+                Dst     = result.AsNativeArray(),
                 Operand = operand
             }, src.Length);
         }
@@ -538,8 +538,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new MultiplyJob
             {
-                Src     = src.ToNativeArray(),
-                Dst     = result.ToNativeArray(),
+                Src     = src.AsNativeArray(),
+                Dst     = result.AsNativeArray(),
                 Operand = operand
             }, src.Length);
         }
@@ -548,8 +548,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new DivideJob
             {
-                Src     = src.ToNativeArray(),
-                Dst     = result.ToNativeArray(),
+                Src     = src.AsNativeArray(),
+                Dst     = result.AsNativeArray(),
                 Operand = operand
             }, src.Length);
         }
@@ -558,8 +558,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new ModuloJob
             {
-                Src     = src.ToNativeArray(),
-                Dst     = result.ToNativeArray(),
+                Src     = src.AsNativeArray(),
+                Dst     = result.AsNativeArray(),
                 Operand = operand
             }, src.Length);
         }
@@ -568,8 +568,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new ShiftLeftJob
             {
-                Src   = src.ToNativeArray(),
-                Dst   = result.ToNativeArray(),
+                Src   = src.AsNativeArray(),
+                Dst   = result.AsNativeArray(),
                 Count = count
             }, src.Length);
         }
@@ -578,8 +578,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new ShiftRightJob
             {
-                Src   = src.ToNativeArray(),
-                Dst   = result.ToNativeArray(),
+                Src   = src.AsNativeArray(),
+                Dst   = result.AsNativeArray(),
                 Count = count
             }, src.Length);
         }
@@ -588,9 +588,9 @@ namespace Gubbins.Span
         {
             RunAndComplete(new MaxJob
             {
-                Left   = left.ToNativeArray(),
-                Right  = right.ToNativeArray(),
-                Result = result.ToNativeArray()
+                Left   = left.AsNativeArray(),
+                Right  = right.AsNativeArray(),
+                Result = result.AsNativeArray()
             }, left.Length);
         }
 
@@ -599,7 +599,7 @@ namespace Gubbins.Span
             if (src.Length == 0)
                 throw new ArgumentException("Source span must not be empty.", nameof(src));
 
-            var srcArray = src.ToNativeArray();
+            var srcArray = src.AsNativeArray();
             var partitionCount = Math.Min(src.Length, Math.Max(1, s_JobBatchSize));
             var partials = new NativeArray<uint>(partitionCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
 
@@ -630,9 +630,9 @@ namespace Gubbins.Span
         {
             RunAndComplete(new MinJob
             {
-                Left   = left.ToNativeArray(),
-                Right  = right.ToNativeArray(),
-                Result = result.ToNativeArray()
+                Left   = left.AsNativeArray(),
+                Right  = right.AsNativeArray(),
+                Result = result.AsNativeArray()
             }, left.Length);
         }
 
@@ -641,7 +641,7 @@ namespace Gubbins.Span
             if (src.Length == 0)
                 throw new ArgumentException("Source span must not be empty.", nameof(src));
 
-            var srcArray = src.ToNativeArray();
+            var srcArray = src.AsNativeArray();
             var partitionCount = Math.Min(src.Length, Math.Max(1, s_JobBatchSize));
             var partials = new NativeArray<uint>(partitionCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
 
@@ -848,8 +848,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new AddJob
             {
-                Src     = src.ToNativeArray(),
-                Dst     = result.ToNativeArray(),
+                Src     = src.AsNativeArray(),
+                Dst     = result.AsNativeArray(),
                 Operand = operand
             }, src.Length);
         }
@@ -858,8 +858,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new SubtractJob
             {
-                Src     = src.ToNativeArray(),
-                Dst     = result.ToNativeArray(),
+                Src     = src.AsNativeArray(),
+                Dst     = result.AsNativeArray(),
                 Operand = operand
             }, src.Length);
         }
@@ -868,8 +868,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new MultiplyJob
             {
-                Src     = src.ToNativeArray(),
-                Dst     = result.ToNativeArray(),
+                Src     = src.AsNativeArray(),
+                Dst     = result.AsNativeArray(),
                 Operand = operand
             }, src.Length);
         }
@@ -878,8 +878,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new DivideJob
             {
-                Src     = src.ToNativeArray(),
-                Dst     = result.ToNativeArray(),
+                Src     = src.AsNativeArray(),
+                Dst     = result.AsNativeArray(),
                 Operand = operand
             }, src.Length);
         }
@@ -888,8 +888,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new ModuloJob
             {
-                Src     = src.ToNativeArray(),
-                Dst     = result.ToNativeArray(),
+                Src     = src.AsNativeArray(),
+                Dst     = result.AsNativeArray(),
                 Operand = operand
             }, src.Length);
         }
@@ -898,8 +898,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new ShiftLeftJob
             {
-                Src   = src.ToNativeArray(),
-                Dst   = result.ToNativeArray(),
+                Src   = src.AsNativeArray(),
+                Dst   = result.AsNativeArray(),
                 Count = count
             }, src.Length);
         }
@@ -908,8 +908,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new ShiftRightJob
             {
-                Src   = src.ToNativeArray(),
-                Dst   = result.ToNativeArray(),
+                Src   = src.AsNativeArray(),
+                Dst   = result.AsNativeArray(),
                 Count = count
             }, src.Length);
         }
@@ -918,9 +918,9 @@ namespace Gubbins.Span
         {
             RunAndComplete(new MaxJob
             {
-                Left   = left.ToNativeArray(),
-                Right  = right.ToNativeArray(),
-                Result = result.ToNativeArray()
+                Left   = left.AsNativeArray(),
+                Right  = right.AsNativeArray(),
+                Result = result.AsNativeArray()
             }, left.Length);
         }
 
@@ -929,7 +929,7 @@ namespace Gubbins.Span
             if (src.Length == 0)
                 throw new ArgumentException("Source span must not be empty.", nameof(src));
 
-            var srcArray = src.ToNativeArray();
+            var srcArray = src.AsNativeArray();
             var partitionCount = Math.Min(src.Length, Math.Max(1, s_JobBatchSize));
             var partials = new NativeArray<long>(partitionCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
 
@@ -960,9 +960,9 @@ namespace Gubbins.Span
         {
             RunAndComplete(new MinJob
             {
-                Left   = left.ToNativeArray(),
-                Right  = right.ToNativeArray(),
-                Result = result.ToNativeArray()
+                Left   = left.AsNativeArray(),
+                Right  = right.AsNativeArray(),
+                Result = result.AsNativeArray()
             }, left.Length);
         }
 
@@ -971,7 +971,7 @@ namespace Gubbins.Span
             if (src.Length == 0)
                 throw new ArgumentException("Source span must not be empty.", nameof(src));
 
-            var srcArray = src.ToNativeArray();
+            var srcArray = src.AsNativeArray();
             var partitionCount = Math.Min(src.Length, Math.Max(1, s_JobBatchSize));
             var partials = new NativeArray<long>(partitionCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
 
@@ -1178,8 +1178,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new AddJob
             {
-                Src     = src.ToNativeArray(),
-                Dst     = result.ToNativeArray(),
+                Src     = src.AsNativeArray(),
+                Dst     = result.AsNativeArray(),
                 Operand = operand
             }, src.Length);
         }
@@ -1188,8 +1188,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new SubtractJob
             {
-                Src     = src.ToNativeArray(),
-                Dst     = result.ToNativeArray(),
+                Src     = src.AsNativeArray(),
+                Dst     = result.AsNativeArray(),
                 Operand = operand
             }, src.Length);
         }
@@ -1198,8 +1198,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new MultiplyJob
             {
-                Src     = src.ToNativeArray(),
-                Dst     = result.ToNativeArray(),
+                Src     = src.AsNativeArray(),
+                Dst     = result.AsNativeArray(),
                 Operand = operand
             }, src.Length);
         }
@@ -1208,8 +1208,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new DivideJob
             {
-                Src     = src.ToNativeArray(),
-                Dst     = result.ToNativeArray(),
+                Src     = src.AsNativeArray(),
+                Dst     = result.AsNativeArray(),
                 Operand = operand
             }, src.Length);
         }
@@ -1218,8 +1218,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new ModuloJob
             {
-                Src     = src.ToNativeArray(),
-                Dst     = result.ToNativeArray(),
+                Src     = src.AsNativeArray(),
+                Dst     = result.AsNativeArray(),
                 Operand = operand
             }, src.Length);
         }
@@ -1228,8 +1228,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new ShiftLeftJob
             {
-                Src   = src.ToNativeArray(),
-                Dst   = result.ToNativeArray(),
+                Src   = src.AsNativeArray(),
+                Dst   = result.AsNativeArray(),
                 Count = count
             }, src.Length);
         }
@@ -1238,8 +1238,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new ShiftRightJob
             {
-                Src   = src.ToNativeArray(),
-                Dst   = result.ToNativeArray(),
+                Src   = src.AsNativeArray(),
+                Dst   = result.AsNativeArray(),
                 Count = count
             }, src.Length);
         }
@@ -1248,9 +1248,9 @@ namespace Gubbins.Span
         {
             RunAndComplete(new MaxJob
             {
-                Left   = left.ToNativeArray(),
-                Right  = right.ToNativeArray(),
-                Result = result.ToNativeArray()
+                Left   = left.AsNativeArray(),
+                Right  = right.AsNativeArray(),
+                Result = result.AsNativeArray()
             }, left.Length);
         }
 
@@ -1259,7 +1259,7 @@ namespace Gubbins.Span
             if (src.Length == 0)
                 throw new ArgumentException("Source span must not be empty.", nameof(src));
 
-            var srcArray = src.ToNativeArray();
+            var srcArray = src.AsNativeArray();
             var partitionCount = Math.Min(src.Length, Math.Max(1, s_JobBatchSize));
             var partials = new NativeArray<ulong>(partitionCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
 
@@ -1290,9 +1290,9 @@ namespace Gubbins.Span
         {
             RunAndComplete(new MinJob
             {
-                Left   = left.ToNativeArray(),
-                Right  = right.ToNativeArray(),
-                Result = result.ToNativeArray()
+                Left   = left.AsNativeArray(),
+                Right  = right.AsNativeArray(),
+                Result = result.AsNativeArray()
             }, left.Length);
         }
 
@@ -1301,7 +1301,7 @@ namespace Gubbins.Span
             if (src.Length == 0)
                 throw new ArgumentException("Source span must not be empty.", nameof(src));
 
-            var srcArray = src.ToNativeArray();
+            var srcArray = src.AsNativeArray();
             var partitionCount = Math.Min(src.Length, Math.Max(1, s_JobBatchSize));
             var partials = new NativeArray<ulong>(partitionCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
 
@@ -1824,8 +1824,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new AddJob
             {
-                Src     = src.ToNativeArray(),
-                Dst     = result.ToNativeArray(),
+                Src     = src.AsNativeArray(),
+                Dst     = result.AsNativeArray(),
                 Operand = operand
             }, src.Length);
         }
@@ -1834,8 +1834,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new SubtractJob
             {
-                Src     = src.ToNativeArray(),
-                Dst     = result.ToNativeArray(),
+                Src     = src.AsNativeArray(),
+                Dst     = result.AsNativeArray(),
                 Operand = operand
             }, src.Length);
         }
@@ -1844,8 +1844,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new MultiplyJob
             {
-                Src     = src.ToNativeArray(),
-                Dst     = result.ToNativeArray(),
+                Src     = src.AsNativeArray(),
+                Dst     = result.AsNativeArray(),
                 Operand = operand
             }, src.Length);
         }
@@ -1854,8 +1854,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new DivideJob
             {
-                Src     = src.ToNativeArray(),
-                Dst     = result.ToNativeArray(),
+                Src     = src.AsNativeArray(),
+                Dst     = result.AsNativeArray(),
                 Operand = operand
             }, src.Length);
         }
@@ -1864,8 +1864,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new ModuloJob
             {
-                Src     = src.ToNativeArray(),
-                Dst     = result.ToNativeArray(),
+                Src     = src.AsNativeArray(),
+                Dst     = result.AsNativeArray(),
                 Operand = operand
             }, src.Length);
         }
@@ -1874,9 +1874,9 @@ namespace Gubbins.Span
         {
             RunAndComplete(new MaxJob
             {
-                Left   = left.ToNativeArray(),
-                Right  = right.ToNativeArray(),
-                Result = result.ToNativeArray()
+                Left   = left.AsNativeArray(),
+                Right  = right.AsNativeArray(),
+                Result = result.AsNativeArray()
             }, left.Length);
         }
 
@@ -1885,7 +1885,7 @@ namespace Gubbins.Span
             if (src.Length == 0)
                 throw new ArgumentException("Source span must not be empty.", nameof(src));
 
-            var srcArray = src.ToNativeArray();
+            var srcArray = src.AsNativeArray();
             var partitionCount = Math.Min(src.Length, Math.Max(1, s_JobBatchSize));
             var partials = new NativeArray<float>(partitionCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
 
@@ -1916,9 +1916,9 @@ namespace Gubbins.Span
         {
             RunAndComplete(new MinJob
             {
-                Left   = left.ToNativeArray(),
-                Right  = right.ToNativeArray(),
-                Result = result.ToNativeArray()
+                Left   = left.AsNativeArray(),
+                Right  = right.AsNativeArray(),
+                Result = result.AsNativeArray()
             }, left.Length);
         }
 
@@ -1927,7 +1927,7 @@ namespace Gubbins.Span
             if (src.Length == 0)
                 throw new ArgumentException("Source span must not be empty.", nameof(src));
 
-            var srcArray = src.ToNativeArray();
+            var srcArray = src.AsNativeArray();
             var partitionCount = Math.Min(src.Length, Math.Max(1, s_JobBatchSize));
             var partials = new NativeArray<float>(partitionCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
 
@@ -1958,10 +1958,10 @@ namespace Gubbins.Span
         {
             RunAndComplete(new ClampJob
             {
-                Src = src.ToNativeArray(),
-                Min = min.ToNativeArray(),
-                Max = max.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Min = min.AsNativeArray(),
+                Max = max.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -1969,8 +1969,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new ClampScalarJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray(),
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray(),
                 Min = min,
                 Max = max
             }, src.Length);
@@ -1980,10 +1980,10 @@ namespace Gubbins.Span
         {
             RunAndComplete(new LerpJob
             {
-                X      = x.ToNativeArray(),
-                Y      = y.ToNativeArray(),
-                Amount = amount.ToNativeArray(),
-                Dst    = result.ToNativeArray()
+                X      = x.AsNativeArray(),
+                Y      = y.AsNativeArray(),
+                Amount = amount.AsNativeArray(),
+                Dst    = result.AsNativeArray()
             }, x.Length);
         }
 
@@ -1991,9 +1991,9 @@ namespace Gubbins.Span
         {
             RunAndComplete(new LerpScalarYJob
             {
-                X      = x.ToNativeArray(),
-                Amount = amount.ToNativeArray(),
-                Dst    = result.ToNativeArray(),
+                X      = x.AsNativeArray(),
+                Amount = amount.AsNativeArray(),
+                Dst    = result.AsNativeArray(),
                 Y      = y
             }, x.Length);
         }
@@ -2002,9 +2002,9 @@ namespace Gubbins.Span
         {
             RunAndComplete(new HypotJob
             {
-                X   = x.ToNativeArray(),
-                Y   = y.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                X   = x.AsNativeArray(),
+                Y   = y.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, x.Length);
         }
 
@@ -2012,8 +2012,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new HypotScalarYJob
             {
-                X        = x.ToNativeArray(),
-                Dst      = result.ToNativeArray(),
+                X        = x.AsNativeArray(),
+                Dst      = result.AsNativeArray(),
                 YSquared = y * y
             }, x.Length);
         }
@@ -2022,8 +2022,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new PowScalarExponentJob
             {
-                Src      = src.ToNativeArray(),
-                Dst      = result.ToNativeArray(),
+                Src      = src.AsNativeArray(),
+                Dst      = result.AsNativeArray(),
                 Exponent = exponent
             }, src.Length);
         }
@@ -2032,9 +2032,9 @@ namespace Gubbins.Span
         {
             RunAndComplete(new PowJob
             {
-                Src      = src.ToNativeArray(),
-                Exponent = exponent.ToNativeArray(),
-                Dst      = result.ToNativeArray()
+                Src      = src.AsNativeArray(),
+                Exponent = exponent.AsNativeArray(),
+                Dst      = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -2042,8 +2042,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new SinJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -2051,8 +2051,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new CosJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -2060,8 +2060,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new TanJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -2069,8 +2069,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new SinhJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -2078,8 +2078,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new CoshJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -2087,8 +2087,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new TanhJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -2096,8 +2096,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new AsinJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -2105,8 +2105,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new AcosJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -2114,8 +2114,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new AtanJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -2123,8 +2123,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new AsinhJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -2132,8 +2132,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new AcoshJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -2141,8 +2141,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new AtanhJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -2150,8 +2150,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new SqrtJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -2159,8 +2159,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new RoundJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -2168,8 +2168,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new ExpJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -2177,8 +2177,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new LogJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -2186,8 +2186,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new FloorJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -2195,8 +2195,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new CeilingJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -2204,8 +2204,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new TruncateJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
     }
@@ -2705,8 +2705,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new AddJob
             {
-                Src     = src.ToNativeArray(),
-                Dst     = result.ToNativeArray(),
+                Src     = src.AsNativeArray(),
+                Dst     = result.AsNativeArray(),
                 Operand = operand
             }, src.Length);
         }
@@ -2715,8 +2715,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new SubtractJob
             {
-                Src     = src.ToNativeArray(),
-                Dst     = result.ToNativeArray(),
+                Src     = src.AsNativeArray(),
+                Dst     = result.AsNativeArray(),
                 Operand = operand
             }, src.Length);
         }
@@ -2725,8 +2725,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new MultiplyJob
             {
-                Src     = src.ToNativeArray(),
-                Dst     = result.ToNativeArray(),
+                Src     = src.AsNativeArray(),
+                Dst     = result.AsNativeArray(),
                 Operand = operand
             }, src.Length);
         }
@@ -2735,8 +2735,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new DivideJob
             {
-                Src     = src.ToNativeArray(),
-                Dst     = result.ToNativeArray(),
+                Src     = src.AsNativeArray(),
+                Dst     = result.AsNativeArray(),
                 Operand = operand
             }, src.Length);
         }
@@ -2745,8 +2745,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new ModuloJob
             {
-                Src     = src.ToNativeArray(),
-                Dst     = result.ToNativeArray(),
+                Src     = src.AsNativeArray(),
+                Dst     = result.AsNativeArray(),
                 Operand = operand
             }, src.Length);
         }
@@ -2755,9 +2755,9 @@ namespace Gubbins.Span
         {
             RunAndComplete(new MaxJob
             {
-                Left   = left.ToNativeArray(),
-                Right  = right.ToNativeArray(),
-                Result = result.ToNativeArray()
+                Left   = left.AsNativeArray(),
+                Right  = right.AsNativeArray(),
+                Result = result.AsNativeArray()
             }, left.Length);
         }
 
@@ -2766,7 +2766,7 @@ namespace Gubbins.Span
             if (src.Length == 0)
                 throw new ArgumentException("Source span must not be empty.", nameof(src));
 
-            var srcArray = src.ToNativeArray();
+            var srcArray = src.AsNativeArray();
             var partitionCount = Math.Min(src.Length, Math.Max(1, s_JobBatchSize));
             var partials = new NativeArray<double>(partitionCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
 
@@ -2797,9 +2797,9 @@ namespace Gubbins.Span
         {
             RunAndComplete(new MinJob
             {
-                Left   = left.ToNativeArray(),
-                Right  = right.ToNativeArray(),
-                Result = result.ToNativeArray()
+                Left   = left.AsNativeArray(),
+                Right  = right.AsNativeArray(),
+                Result = result.AsNativeArray()
             }, left.Length);
         }
 
@@ -2808,7 +2808,7 @@ namespace Gubbins.Span
             if (src.Length == 0)
                 throw new ArgumentException("Source span must not be empty.", nameof(src));
 
-            var srcArray = src.ToNativeArray();
+            var srcArray = src.AsNativeArray();
             var partitionCount = Math.Min(src.Length, Math.Max(1, s_JobBatchSize));
             var partials = new NativeArray<double>(partitionCount, Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
 
@@ -2839,10 +2839,10 @@ namespace Gubbins.Span
         {
             RunAndComplete(new ClampJob
             {
-                Src = src.ToNativeArray(),
-                Min = min.ToNativeArray(),
-                Max = max.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Min = min.AsNativeArray(),
+                Max = max.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -2850,8 +2850,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new ClampScalarJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray(),
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray(),
                 Min = min,
                 Max = max
             }, src.Length);
@@ -2861,10 +2861,10 @@ namespace Gubbins.Span
         {
             RunAndComplete(new LerpJob
             {
-                X      = x.ToNativeArray(),
-                Y      = y.ToNativeArray(),
-                Amount = amount.ToNativeArray(),
-                Dst    = result.ToNativeArray()
+                X      = x.AsNativeArray(),
+                Y      = y.AsNativeArray(),
+                Amount = amount.AsNativeArray(),
+                Dst    = result.AsNativeArray()
             }, x.Length);
         }
 
@@ -2872,9 +2872,9 @@ namespace Gubbins.Span
         {
             RunAndComplete(new LerpScalarYJob
             {
-                X      = x.ToNativeArray(),
-                Amount = amount.ToNativeArray(),
-                Dst    = result.ToNativeArray(),
+                X      = x.AsNativeArray(),
+                Amount = amount.AsNativeArray(),
+                Dst    = result.AsNativeArray(),
                 Y      = y
             }, x.Length);
         }
@@ -2883,9 +2883,9 @@ namespace Gubbins.Span
         {
             RunAndComplete(new HypotJob
             {
-                X   = x.ToNativeArray(),
-                Y   = y.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                X   = x.AsNativeArray(),
+                Y   = y.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, x.Length);
         }
 
@@ -2893,8 +2893,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new HypotScalarYJob
             {
-                X        = x.ToNativeArray(),
-                Dst      = result.ToNativeArray(),
+                X        = x.AsNativeArray(),
+                Dst      = result.AsNativeArray(),
                 YSquared = y * y
             }, x.Length);
         }
@@ -2903,8 +2903,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new PowScalarExponentJob
             {
-                Src      = src.ToNativeArray(),
-                Dst      = result.ToNativeArray(),
+                Src      = src.AsNativeArray(),
+                Dst      = result.AsNativeArray(),
                 Exponent = exponent
             }, src.Length);
         }
@@ -2913,9 +2913,9 @@ namespace Gubbins.Span
         {
             RunAndComplete(new PowJob
             {
-                Src      = src.ToNativeArray(),
-                Exponent = exponent.ToNativeArray(),
-                Dst      = result.ToNativeArray()
+                Src      = src.AsNativeArray(),
+                Exponent = exponent.AsNativeArray(),
+                Dst      = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -2923,8 +2923,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new SinJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -2932,8 +2932,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new CosJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -2941,8 +2941,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new TanJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -2950,8 +2950,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new SinhJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -2959,8 +2959,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new CoshJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -2968,8 +2968,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new TanhJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -2977,8 +2977,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new AsinJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -2986,8 +2986,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new AcosJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -2995,8 +2995,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new AtanJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -3004,8 +3004,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new AsinhJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -3013,8 +3013,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new AcoshJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -3022,8 +3022,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new AtanhJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -3031,8 +3031,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new SqrtJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -3040,8 +3040,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new RoundJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -3049,8 +3049,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new ExpJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -3058,8 +3058,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new LogJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -3067,8 +3067,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new FloorJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -3076,8 +3076,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new CeilingJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
 
@@ -3085,8 +3085,8 @@ namespace Gubbins.Span
         {
             RunAndComplete(new TruncateJob
             {
-                Src = src.ToNativeArray(),
-                Dst = result.ToNativeArray()
+                Src = src.AsNativeArray(),
+                Dst = result.AsNativeArray()
             }, src.Length);
         }
     }

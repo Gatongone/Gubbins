@@ -1,4 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using Unity.Jobs;
+using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.LowLevel;
 
@@ -77,7 +81,7 @@ namespace Gubbins.Events
                 }
 
                 newSysCol[system.subSystemList.Length] = new PlayerLoopSystem();
-                SetLoopSystem(updateKind, new PlayerLoopSystemWrapper(newSysCol, system.subSystemList.Length));
+                SetLoopSystem(updateKind, new PlayerLoopSystemWrapper(newSysCol, system.subSystemList.Length, updateKind));
                 system.subSystemList = newSysCol;
             }
 
@@ -106,36 +110,32 @@ namespace Gubbins.Events
         /// </summary>
         /// <param name="kind">The PlayerLoop phase.</param>
         /// <param name="onUpdate">The delegate to invoke during the phase.</param>
-        internal static void RegisterUpdate(Kind kind, PlayerLoopSystem.UpdateFunction onUpdate)
+        internal static void RegisterUpdate(Kind kind, Action onUpdate)
         {
             Assert.AreNotEqual(kind, Kind.None, $"Not supported update kind: {kind}");
-            switch (kind)
-            {
-                case Kind.Initialization:
-                    s_InitializationSys.AddListener(onUpdate);
-                    break;
-                case Kind.EarlyUpdate:
-                    s_EarlyUpdateSys.AddListener(onUpdate);
-                    break;
-                case Kind.FixedUpdate:
-                    s_FixedUpdateSys.AddListener(onUpdate);
-                    break;
-                case Kind.PreUpdate:
-                    s_PreUpdateSys.AddListener(onUpdate);
-                    break;
-                case Kind.Update:
-                    s_UpdateSys.AddListener(onUpdate);
-                    break;
-                case Kind.PreLateUpdate:
-                    s_PreLateUpdateSys.AddListener(onUpdate);
-                    break;
-                case Kind.PostLateUpdate:
-                    s_PostLateUpdateSys.AddListener(onUpdate);
-                    break;
-                default: throw new ArgumentOutOfRangeException(nameof(kind), kind, null);
-            }
+            GetLoopSystem(kind).AddListener(onUpdate);
+        }
 
-            PlayerLoop.SetPlayerLoop(s_RootLooper);
+        /// <summary>
+        /// Registers a custom job update delegate to the specified PlayerLoop phase.
+        /// </summary>
+        /// <param name="kind">The PlayerLoop phase.</param>
+        /// <param name="onJobUpdate">The delegate to invoke during the phase, which takes deltaTime and a JobHandle for dependencies, and returns a new JobHandle.</param>
+        internal static void RegisterUpdate(Kind kind, Func<float, JobHandle, JobHandle> onJobUpdate)
+        {
+            Assert.AreNotEqual(kind, Kind.None);
+            GetLoopSystem(kind).AddListener(onJobUpdate);
+        }
+
+        /// <summary>
+        /// Unregisters a custom job update delegate from the specified PlayerLoop phase.
+        /// </summary>
+        /// <param name="kind">The PlayerLoop phase.</param>
+        /// <param name="onJobUpdate">The delegate to remove.</param>
+        internal static bool UnregisterUpdate(Kind kind, Func<float, JobHandle, JobHandle> onJobUpdate)
+        {
+            Assert.AreNotEqual(kind, Kind.None);
+            return GetLoopSystem(kind).RemoveListener(onJobUpdate);
         }
 
         /// <summary>
@@ -143,41 +143,36 @@ namespace Gubbins.Events
         /// </summary>
         /// <param name="kind">The PlayerLoop phase.</param>
         /// <param name="onUpdate">The delegate to remove.</param>
-        public static void UnregisterUpdate(Kind kind, PlayerLoopSystem.UpdateFunction onUpdate)
+        internal static bool UnregisterUpdate(Kind kind, Action onUpdate)
         {
             Assert.AreNotEqual(kind, Kind.None, $"Not supported update kind: {kind}");
-            switch (kind)
-            {
-                case Kind.Initialization:
-                    s_InitializationSys.RemoveListener(onUpdate);
-                    break;
-                case Kind.EarlyUpdate:
-                    s_EarlyUpdateSys.RemoveListener(onUpdate);
-                    break;
-                case Kind.FixedUpdate:
-                    s_FixedUpdateSys.RemoveListener(onUpdate);
-                    break;
-                case Kind.PreUpdate:
-                    s_PreUpdateSys.RemoveListener(onUpdate);
-                    break;
-                case Kind.Update:
-                    s_UpdateSys.RemoveListener(onUpdate);
-                    break;
-                case Kind.PreLateUpdate:
-                    s_PreLateUpdateSys.RemoveListener(onUpdate);
-                    break;
-                case Kind.PostLateUpdate:
-                    s_PostLateUpdateSys.RemoveListener(onUpdate);
-                    break;
-                default: throw new ArgumentOutOfRangeException(nameof(kind), kind, null);
-            }
+            return GetLoopSystem(kind).RemoveListener(onUpdate);
         }
+
+        /// <summary>
+        /// Registers a custom job update delegate to the specified PlayerLoop phase.
+        /// </summary>
+        /// <param name="kind">The PlayerLoop phase.</param>
+        /// <returns>The delegate to invoke during the phase, which takes deltaTime and a JobHandle for dependencies, and returns a new JobHandle.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static PlayerLoopSystemWrapper GetLoopSystem(Kind kind) => kind switch
+        {
+            Kind.Initialization => s_InitializationSys,
+            Kind.EarlyUpdate    => s_EarlyUpdateSys,
+            Kind.FixedUpdate    => s_FixedUpdateSys,
+            Kind.PreUpdate      => s_PreUpdateSys,
+            Kind.Update         => s_UpdateSys,
+            Kind.PreLateUpdate  => s_PreLateUpdateSys,
+            Kind.PostLateUpdate => s_PostLateUpdateSys,
+            _                   => throw new ArgumentOutOfRangeException()
+        };
 
         /// <summary>
         /// Sets the PlayerLoopSystemWrapper for a given phase.
         /// </summary>
         /// <param name="kind">The PlayerLoop phase.</param>
         /// <param name="playerLoopSystemWrapper">The wrapper to set.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void SetLoopSystem(Kind kind, PlayerLoopSystemWrapper playerLoopSystemWrapper)
         {
             switch (kind)
@@ -203,6 +198,7 @@ namespace Gubbins.Events
                 case Kind.PostLateUpdate:
                     s_PostLateUpdateSys = playerLoopSystemWrapper;
                     break;
+                case Kind.None:
                 default: throw new ArgumentOutOfRangeException(nameof(kind), kind, null);
             }
         }
@@ -259,38 +255,86 @@ namespace Gubbins.Events
         /// </summary>
         private class PlayerLoopSystemWrapper
         {
-            /// <summary>Array of PlayerLoopSystem objects for the phase.</summary>
-            private readonly PlayerLoopSystem[] m_Loppers;
+            /// <summary>
+            /// List of delegates for the job update phase. Each delegate takes deltaTime and a JobHandle for dependencies, and returns a new JobHandle.
+            /// </summary>
+            private readonly List<Func<float, JobHandle, JobHandle>> m_JobActions = new();
 
-            /// <summary>Index of the custom slot in the array.</summary>
-            private readonly int m_Index;
+            /// <summary>
+            /// List of delegates for the normal update phase. Each delegate is a simple Action with no parameters.
+            /// </summary>
+            private readonly List<Action> m_Actions = new List<Action>();
+
+            /// <summary>
+            /// List of delegates for the normal update phase. Each delegate is a simple UpdateFunction with no parameters.
+            /// </summary>
+            private readonly Kind m_Kind;
 
             /// <summary>
             /// Constructs a wrapper for a PlayerLoopSystem array and index.
             /// </summary>
             /// <param name="sysCol">The PlayerLoopSystem array.</param>
             /// <param name="index">The index of the custom slot.</param>
-            public PlayerLoopSystemWrapper(PlayerLoopSystem[] sysCol, int index) => (m_Loppers, m_Index) = (sysCol, index);
+            public PlayerLoopSystemWrapper(PlayerLoopSystem[] sysCol, int index, Kind kind)
+            {
+                var loppers = sysCol;
+                var index1 = index;
+                m_Kind = kind;
+                ref var lopper = ref loppers[index1];
+                lopper.updateDelegate = UpdateFunction;
+            }
+
+            /// <summary>
+            /// Adds a delegate to the job update phase.
+            /// </summary>
+            /// <param name="onJobUpdate">The delegate to add.</param>
+            public void AddListener(Func<float, JobHandle, JobHandle> onJobUpdate) => m_JobActions.Add(onJobUpdate);
 
             /// <summary>
             /// Adds a delegate to the update phase.
             /// </summary>
             /// <param name="onUpdate">The delegate to add.</param>
-            public void AddListener(PlayerLoopSystem.UpdateFunction onUpdate)
-            {
-                ref var lopper = ref m_Loppers[m_Index];
-                lopper.updateDelegate += onUpdate;
-            }
+            public void AddListener(Action onUpdate) => m_Actions.Add(onUpdate);
+
+            /// <summary>
+            /// Removes a delegate from the job update phase.
+            /// </summary>
+            /// <param name="onJobUpdate">The delegate to remove.</param>
+            public bool RemoveListener(Func<float, JobHandle, JobHandle> onJobUpdate) => m_JobActions.Remove(onJobUpdate);
 
             /// <summary>
             /// Removes a delegate from the update phase.
             /// </summary>
             /// <param name="onUpdate">The delegate to remove.</param>
-            public void RemoveListener(PlayerLoopSystem.UpdateFunction onUpdate)
+            public bool RemoveListener(Action onUpdate) => m_Actions.Remove(onUpdate);
+
+            private void UpdateFunction()
             {
-                ref var lopper = ref m_Loppers[m_Index];
-                lopper.updateDelegate -= onUpdate;
+                // First execute normal update delegates,
+                foreach (var action in m_Actions) action();
+
+                // then execute job update delegates with proper deltaTime and JobHandle chaining.
+                JobHandle currentHandle = default;
+                var deltaTime = GetDeltaTimeForKind(m_Kind);
+                for (var index = 0; index < m_JobActions.Count; index++)
+                {
+                    var jobFunc = m_JobActions[index];
+                    currentHandle = jobFunc(deltaTime, currentHandle);
+                }
             }
+
+            /// <summary>
+            /// Gets the appropriate deltaTime for the given PlayerLoop phase kind.
+            /// </summary>
+            /// <param name="kind">The PlayerLoop phase kind.</param>
+            /// <returns>The deltaTime to use for job updates in that phase.</returns>
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            private static float GetDeltaTimeForKind(Kind kind) => kind switch
+            {
+                Kind.FixedUpdate    => Time.fixedDeltaTime,
+                Kind.Initialization => 0f,
+                _                   => Time.deltaTime
+            };
         }
     }
 }

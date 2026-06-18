@@ -1,16 +1,16 @@
 ﻿using Gubbins.Enhance;
+
 namespace Gubbins.Events;
 
 /// <summary>
 /// Extensions for <see cref="IEventSubscriable{TNotification}"/>.
 /// </summary>
-[System.Diagnostics.CodeAnalysis.SuppressMessage("ReSharper", "UnusedType.Global")]
 public static class EventSubscribeExtensions
 {
     #region Subscribe
 
     /// <summary>
-    /// <inheritdoc cref="IEventSubscriable{TNotification}.Subscribe(IEventHandler{TNotification})"/>
+    /// <inheritdoc cref="IEventSubscriable{Unit}.Subscribe(IEventHandler{Unit})"/>
     /// </summary>
     public static void Subscribe(this IEventSubscriable<Unit> subscriber, Action delegation)
         => subscriber.Subscribe(new ActionEventHandler(delegation));
@@ -110,12 +110,13 @@ public static class EventSubscribeExtensions
     /// </summary>
     public static void Subscribe<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6, TArg7, TArg8, TArg9, TArg10, TArg11, TArg12, TArg13, TArg14, TArg15, TArg16>(this IEventSubscriable<(TArg1, TArg2, TArg3, TArg4, TArg5, TArg6, TArg7, TArg8, TArg9, TArg10, TArg11, TArg12, TArg13, TArg14, TArg15, TArg16)> subscriber, Action<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6, TArg7, TArg8, TArg9, TArg10, TArg11, TArg12, TArg13, TArg14, TArg15, TArg16> delegation)
         => subscriber.Subscribe(new ActionEventHandler<TArg1, TArg2, TArg3, TArg4, TArg5, TArg6, TArg7, TArg8, TArg9, TArg10, TArg11, TArg12, TArg13, TArg14, TArg15, TArg16>(delegation));
+
     #endregion
 
     #region Unsubscribe
 
     /// <summary>
-    /// <inheritdoc cref="IEventSubscriable{TNotification}.Unsubscribe(IEventHandler{TNotification})"/>
+    /// <inheritdoc cref="IEventSubscriable{Unit}.Unsubscribe(IEventHandler{Unit})"/>
     /// </summary>
     public static void Unsubscribe(this IEventSubscriable<Unit> subscriber, Action delegation)
         => subscriber.Unsubscribe(new ActionEventHandler(delegation));
