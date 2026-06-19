@@ -111,7 +111,7 @@ public readonly struct Components<T> : IDisposable
     /// An enumerable that provides access to the contiguous snippets of type <typeparamref name="T"/> across the chunks, allowing iteration over each snippet as a span for efficient processing.
     /// </summary>
     /// <param name="batch"> A batch representing the components of type <typeparamref name="T"/> across multiple chunks, organized into contiguous snippets for efficient access.</param>
-    public readonly ref struct SegmentsEnumerable(Batch<T> batch)
+    public readonly struct SegmentsEnumerable(Batch<T> batch)
 #if NET9_0_OR_GREATER
         : IEnumerable<Span<T>>
 #endif

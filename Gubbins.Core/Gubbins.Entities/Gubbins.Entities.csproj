@@ -4,7 +4,7 @@
         <LangVersion>latestmajor</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <RootNamespace>Gubins.Entity</RootNamespace>
+        <RootNamespace>Gubins.Entities</RootNamespace>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <TargetFrameworks>net9.0;netstandard2.1</TargetFrameworks>
     </PropertyGroup>
@@ -14,9 +14,13 @@
         <Generator>TextTemplatingFileGenerator</Generator>
         <LastGenOutput>EntityCommand.cs</LastGenOutput>
       </None>
-      <None Update="EntityForeach.tt">
+      <None Update="Chunk\ChunksForeach.tt">
         <Generator>TextTemplatingFileGenerator</Generator>
-        <LastGenOutput>EntityForeach.cs</LastGenOutput>
+        <LastGenOutput>ChunksForeach.cs</LastGenOutput>
+      </None>
+      <None Update="Chunk\ChunksForeachAsync.tt">
+        <Generator>TextTemplatingFileGenerator</Generator>
+        <LastGenOutput>ChunksForeachAsync.cs</LastGenOutput>
       </None>
     </ItemGroup>
 
@@ -25,6 +29,21 @@
         <AutoGen>True</AutoGen>
         <DesignTime>True</DesignTime>
         <DependentUpon>EntityCommand.tt</DependentUpon>
+      </Compile>
+      <Compile Update="Chunk\ChunksForeach.cs">
+        <AutoGen>True</AutoGen>
+        <DesignTime>True</DesignTime>
+        <DependentUpon>ChunksForeach.tt</DependentUpon>
+      </Compile>
+      <Compile Update="Chunk\ChunksForeach.cs">
+        <AutoGen>True</AutoGen>
+        <DesignTime>True</DesignTime>
+        <DependentUpon>ChunksForeach.tt</DependentUpon>
+      </Compile>
+      <Compile Update="Chunk\ChunksForeachAsync.cs">
+        <AutoGen>True</AutoGen>
+        <DesignTime>True</DesignTime>
+        <DependentUpon>ChunksForeachAsync.tt</DependentUpon>
       </Compile>
     </ItemGroup>
 
