@@ -173,9 +173,9 @@ namespace Gubbins.Entities
         /// <param name="components">The component instances for the entity (transform components are reseeded from the GameObject).</param>
         public void Configure(IContext context, params IComponent[] components)
         {
-            m_Context ??= new SerializedReference<IContext>();
-            m_Context.Value        = context;
-            m_Components.Components = components;
+            m_Context               ??= new SerializedReference<IContext>();
+            m_Context.Value         =   context;
+            m_Components.Components =   components;
         }
 
         /// <summary>
@@ -476,7 +476,7 @@ namespace Gubbins.Entities
         /// <see cref="Scale"/> components, their axis-subset variants and the quaternion
         /// <see cref="Orientation"/> are synced back; absent axes leave the transform untouched.
         /// </remarks>
-        internal static void SyncTransforms()
+        public static void SyncTransforms()
         {
             if (!Transforms.isCreated)
             {
@@ -559,28 +559,28 @@ namespace Gubbins.Entities
         {
             var a = group.ActiveVariants;
 
-            if ((a & TransformVariants.Position)    != 0) ScatterComponentMain(group, s_CtxPosition);
-            if ((a & TransformVariants.PositionX)   != 0) ScatterComponentMain(group, s_CtxPositionX);
-            if ((a & TransformVariants.PositionY)   != 0) ScatterComponentMain(group, s_CtxPositionY);
-            if ((a & TransformVariants.PositionZ)   != 0) ScatterComponentMain(group, s_CtxPositionZ);
-            if ((a & TransformVariants.PositionXY)  != 0) ScatterComponentMain(group, s_CtxPositionXY);
-            if ((a & TransformVariants.PositionXZ)  != 0) ScatterComponentMain(group, s_CtxPositionXZ);
-            if ((a & TransformVariants.PositionYZ)  != 0) ScatterComponentMain(group, s_CtxPositionYZ);
-            if ((a & TransformVariants.Rotation)    != 0) ScatterComponentMain(group, s_CtxRotation);
-            if ((a & TransformVariants.RotationX)   != 0) ScatterComponentMain(group, s_CtxRotationX);
-            if ((a & TransformVariants.RotationY)   != 0) ScatterComponentMain(group, s_CtxRotationY);
-            if ((a & TransformVariants.RotationZ)   != 0) ScatterComponentMain(group, s_CtxRotationZ);
-            if ((a & TransformVariants.RotationXY)  != 0) ScatterComponentMain(group, s_CtxRotationXY);
-            if ((a & TransformVariants.RotationXZ)  != 0) ScatterComponentMain(group, s_CtxRotationXZ);
-            if ((a & TransformVariants.RotationYZ)  != 0) ScatterComponentMain(group, s_CtxRotationYZ);
-            if ((a & TransformVariants.Orientation) != 0) ScatterComponentMain(group, s_CtxOrientation);
-            if ((a & TransformVariants.Scale)       != 0) ScatterComponentMain(group, s_CtxScale);
-            if ((a & TransformVariants.ScaleX)      != 0) ScatterComponentMain(group, s_CtxScaleX);
-            if ((a & TransformVariants.ScaleY)      != 0) ScatterComponentMain(group, s_CtxScaleY);
-            if ((a & TransformVariants.ScaleZ)      != 0) ScatterComponentMain(group, s_CtxScaleZ);
-            if ((a & TransformVariants.ScaleXY)     != 0) ScatterComponentMain(group, s_CtxScaleXY);
-            if ((a & TransformVariants.ScaleXZ)     != 0) ScatterComponentMain(group, s_CtxScaleXZ);
-            if ((a & TransformVariants.ScaleYZ)     != 0) ScatterComponentMain(group, s_CtxScaleYZ);
+            if ((a & TransformVariants.Position) != 0)    ScatterComponentMain<Position>(group, s_CtxPosition);
+            if ((a & TransformVariants.PositionX) != 0)   ScatterComponentMain<PositionX>(group, s_CtxPositionX);
+            if ((a & TransformVariants.PositionY) != 0)   ScatterComponentMain<PositionY>(group, s_CtxPositionY);
+            if ((a & TransformVariants.PositionZ) != 0)   ScatterComponentMain<PositionZ>(group, s_CtxPositionZ);
+            if ((a & TransformVariants.PositionXY) != 0)  ScatterComponentMain<PositionXY>(group, s_CtxPositionXY);
+            if ((a & TransformVariants.PositionXZ) != 0)  ScatterComponentMain<PositionXZ>(group, s_CtxPositionXZ);
+            if ((a & TransformVariants.PositionYZ) != 0)  ScatterComponentMain<PositionYZ>(group, s_CtxPositionYZ);
+            if ((a & TransformVariants.Rotation) != 0)    ScatterComponentMain<Rotation>(group, s_CtxRotation);
+            if ((a & TransformVariants.RotationX) != 0)   ScatterComponentMain<RotationX>(group, s_CtxRotationX);
+            if ((a & TransformVariants.RotationY) != 0)   ScatterComponentMain<RotationY>(group, s_CtxRotationY);
+            if ((a & TransformVariants.RotationZ) != 0)   ScatterComponentMain<RotationZ>(group, s_CtxRotationZ);
+            if ((a & TransformVariants.RotationXY) != 0)  ScatterComponentMain<RotationXY>(group, s_CtxRotationXY);
+            if ((a & TransformVariants.RotationXZ) != 0)  ScatterComponentMain<RotationXZ>(group, s_CtxRotationXZ);
+            if ((a & TransformVariants.RotationYZ) != 0)  ScatterComponentMain<RotationYZ>(group, s_CtxRotationYZ);
+            if ((a & TransformVariants.Orientation) != 0) ScatterComponentMain<Orientation>(group, s_CtxOrientation);
+            if ((a & TransformVariants.Scale) != 0)       ScatterComponentMain<Scale>(group, s_CtxScale);
+            if ((a & TransformVariants.ScaleX) != 0)      ScatterComponentMain<ScaleX>(group, s_CtxScaleX);
+            if ((a & TransformVariants.ScaleY) != 0)      ScatterComponentMain<ScaleY>(group, s_CtxScaleY);
+            if ((a & TransformVariants.ScaleZ) != 0)      ScatterComponentMain<ScaleZ>(group, s_CtxScaleZ);
+            if ((a & TransformVariants.ScaleXY) != 0)     ScatterComponentMain<ScaleXY>(group, s_CtxScaleXY);
+            if ((a & TransformVariants.ScaleXZ) != 0)     ScatterComponentMain<ScaleXZ>(group, s_CtxScaleXZ);
+            if ((a & TransformVariants.ScaleYZ) != 0)     ScatterComponentMain<ScaleYZ>(group, s_CtxScaleYZ);
         }
 
         /// <summary>
@@ -592,28 +592,28 @@ namespace Gubbins.Entities
         {
             var a = group.ActiveVariants;
 
-            if ((a & TransformVariants.Position)    != 0) dependency = ScatterComponentBurst(group, s_CtxPosition,    dependency);
-            if ((a & TransformVariants.PositionX)   != 0) dependency = ScatterComponentBurst(group, s_CtxPositionX,   dependency);
-            if ((a & TransformVariants.PositionY)   != 0) dependency = ScatterComponentBurst(group, s_CtxPositionY,   dependency);
-            if ((a & TransformVariants.PositionZ)   != 0) dependency = ScatterComponentBurst(group, s_CtxPositionZ,   dependency);
-            if ((a & TransformVariants.PositionXY)  != 0) dependency = ScatterComponentBurst(group, s_CtxPositionXY,  dependency);
-            if ((a & TransformVariants.PositionXZ)  != 0) dependency = ScatterComponentBurst(group, s_CtxPositionXZ,  dependency);
-            if ((a & TransformVariants.PositionYZ)  != 0) dependency = ScatterComponentBurst(group, s_CtxPositionYZ,  dependency);
-            if ((a & TransformVariants.Rotation)    != 0) dependency = ScatterComponentBurst(group, s_CtxRotation,    dependency);
-            if ((a & TransformVariants.RotationX)   != 0) dependency = ScatterComponentBurst(group, s_CtxRotationX,   dependency);
-            if ((a & TransformVariants.RotationY)   != 0) dependency = ScatterComponentBurst(group, s_CtxRotationY,   dependency);
-            if ((a & TransformVariants.RotationZ)   != 0) dependency = ScatterComponentBurst(group, s_CtxRotationZ,   dependency);
-            if ((a & TransformVariants.RotationXY)  != 0) dependency = ScatterComponentBurst(group, s_CtxRotationXY,  dependency);
-            if ((a & TransformVariants.RotationXZ)  != 0) dependency = ScatterComponentBurst(group, s_CtxRotationXZ,  dependency);
-            if ((a & TransformVariants.RotationYZ)  != 0) dependency = ScatterComponentBurst(group, s_CtxRotationYZ,  dependency);
-            if ((a & TransformVariants.Orientation) != 0) dependency = ScatterComponentBurst(group, s_CtxOrientation, dependency);
-            if ((a & TransformVariants.Scale)       != 0) dependency = ScatterComponentBurst(group, s_CtxScale,       dependency);
-            if ((a & TransformVariants.ScaleX)      != 0) dependency = ScatterComponentBurst(group, s_CtxScaleX,      dependency);
-            if ((a & TransformVariants.ScaleY)      != 0) dependency = ScatterComponentBurst(group, s_CtxScaleY,      dependency);
-            if ((a & TransformVariants.ScaleZ)      != 0) dependency = ScatterComponentBurst(group, s_CtxScaleZ,      dependency);
-            if ((a & TransformVariants.ScaleXY)     != 0) dependency = ScatterComponentBurst(group, s_CtxScaleXY,     dependency);
-            if ((a & TransformVariants.ScaleXZ)     != 0) dependency = ScatterComponentBurst(group, s_CtxScaleXZ,     dependency);
-            if ((a & TransformVariants.ScaleYZ)     != 0) dependency = ScatterComponentBurst(group, s_CtxScaleYZ,     dependency);
+            if ((a & TransformVariants.Position) != 0) dependency    = ScatterComponentBurst<Position>(group, s_CtxPosition, dependency);
+            if ((a & TransformVariants.PositionX) != 0) dependency   = ScatterComponentBurst<PositionX>(group, s_CtxPositionX, dependency);
+            if ((a & TransformVariants.PositionY) != 0) dependency   = ScatterComponentBurst<PositionY>(group, s_CtxPositionY, dependency);
+            if ((a & TransformVariants.PositionZ) != 0) dependency   = ScatterComponentBurst<PositionZ>(group, s_CtxPositionZ, dependency);
+            if ((a & TransformVariants.PositionXY) != 0) dependency  = ScatterComponentBurst<PositionXY>(group, s_CtxPositionXY, dependency);
+            if ((a & TransformVariants.PositionXZ) != 0) dependency  = ScatterComponentBurst<PositionXZ>(group, s_CtxPositionXZ, dependency);
+            if ((a & TransformVariants.PositionYZ) != 0) dependency  = ScatterComponentBurst<PositionYZ>(group, s_CtxPositionYZ, dependency);
+            if ((a & TransformVariants.Rotation) != 0) dependency    = ScatterComponentBurst<Rotation>(group, s_CtxRotation, dependency);
+            if ((a & TransformVariants.RotationX) != 0) dependency   = ScatterComponentBurst<RotationX>(group, s_CtxRotationX, dependency);
+            if ((a & TransformVariants.RotationY) != 0) dependency   = ScatterComponentBurst<RotationY>(group, s_CtxRotationY, dependency);
+            if ((a & TransformVariants.RotationZ) != 0) dependency   = ScatterComponentBurst<RotationZ>(group, s_CtxRotationZ, dependency);
+            if ((a & TransformVariants.RotationXY) != 0) dependency  = ScatterComponentBurst<RotationXY>(group, s_CtxRotationXY, dependency);
+            if ((a & TransformVariants.RotationXZ) != 0) dependency  = ScatterComponentBurst<RotationXZ>(group, s_CtxRotationXZ, dependency);
+            if ((a & TransformVariants.RotationYZ) != 0) dependency  = ScatterComponentBurst<RotationYZ>(group, s_CtxRotationYZ, dependency);
+            if ((a & TransformVariants.Orientation) != 0) dependency = ScatterComponentBurst<Orientation>(group, s_CtxOrientation, dependency);
+            if ((a & TransformVariants.Scale) != 0) dependency       = ScatterComponentBurst<Scale>(group, s_CtxScale, dependency);
+            if ((a & TransformVariants.ScaleX) != 0) dependency      = ScatterComponentBurst<ScaleX>(group, s_CtxScaleX, dependency);
+            if ((a & TransformVariants.ScaleY) != 0) dependency      = ScatterComponentBurst<ScaleY>(group, s_CtxScaleY, dependency);
+            if ((a & TransformVariants.ScaleZ) != 0) dependency      = ScatterComponentBurst<ScaleZ>(group, s_CtxScaleZ, dependency);
+            if ((a & TransformVariants.ScaleXY) != 0) dependency     = ScatterComponentBurst<ScaleXY>(group, s_CtxScaleXY, dependency);
+            if ((a & TransformVariants.ScaleXZ) != 0) dependency     = ScatterComponentBurst<ScaleXZ>(group, s_CtxScaleXZ, dependency);
+            if ((a & TransformVariants.ScaleYZ) != 0) dependency     = ScatterComponentBurst<ScaleYZ>(group, s_CtxScaleYZ, dependency);
 
             return dependency;
         }
@@ -623,23 +623,23 @@ namespace Gubbins.Entities
         /// entity's transform slot in contiguous SoA order. Entities with no registered adapter
         /// (slot &lt; 0) or outside the map are skipped.
         /// </summary>
-        private static void ScatterComponentMain<T>(QueryGroup group, EntityQueryContext<T> context)
-            where T : unmanaged, ITransformComponent
+        private static void ScatterComponentMain<T>(QueryGroup group, ComponentFilter context) where T : unmanaged, ITransformComponent
         {
             if (!group.SlotMap.IsCreated)
             {
                 return;
             }
 
-            using var result = group.Query.GetQueryHandle(context).Query();
+            using var chunks = group.Query.Search(context);
+            using var entities = chunks.GetComponents<Entity>();
+            using var components = chunks.GetComponents<T>();
 
-            var (entities, components) = result.Batches;
             var map = group.SlotMap;
 
-            for (var segment = 0; segment < entities.SegmentCount; segment++)
+            for (var segment = 0; segment < chunks.Count; segment++)
             {
-                var ids   = entities[segment];
-                var comps = components[segment];
+                var ids = entities.Segments[segment];
+                var comps = components.Segments[segment];
 
                 for (var j = 0; j < ids.Length; j++)
                 {
@@ -670,21 +670,20 @@ namespace Gubbins.Entities
         /// the query result can be disposed immediately because the chunk — not the result — owns the
         /// pin, and all jobs complete within the frame.
         /// </summary>
-        private static JobHandle ScatterComponentBurst<T>(QueryGroup group, EntityQueryContext<T> context, JobHandle dependency)
-            where T : unmanaged, ITransformComponent
+        private static JobHandle ScatterComponentBurst<T>(QueryGroup group, ComponentFilter context, JobHandle dependency) where T : unmanaged, ITransformComponent
         {
             if (!group.SlotMap.IsCreated)
             {
                 return dependency;
             }
 
-            using var result = group.Query.GetQueryHandle(context).Query();
+            using var chunks = group.Query.Search(context);
+            using var entities = chunks.GetComponents<Entity>();
+            using var components = chunks.GetComponents<T>();
 
-            var (entities, components) = result.Batches;
-
-            for (var segment = 0; segment < entities.SegmentCount; segment++)
+            for (var segment = 0; segment < chunks.Count; segment++)
             {
-                var ids   = entities[segment];
+                var ids = entities.Segments[segment];
                 var count = ids.Length;
                 if (count == 0)
                 {
@@ -694,7 +693,7 @@ namespace Gubbins.Entities
                 var job = new ScatterJob<T>
                 {
                     Entities          = ids.AsNativeArray(),
-                    Components        = components[segment].AsNativeArray(),
+                    Components        = components.Segments[segment].AsNativeArray(),
                     SlotByEntityIndex = group.SlotMap,
                     Snapshots         = s_Snapshots,
                 };
@@ -709,28 +708,28 @@ namespace Gubbins.Entities
 
         // Cached single-component query contexts, one per transform variant. Reused every frame so the
         // scatter never allocates a context.
-        private static readonly EntityQueryContext<Position>    s_CtxPosition    = new();
-        private static readonly EntityQueryContext<PositionX>   s_CtxPositionX   = new();
-        private static readonly EntityQueryContext<PositionY>   s_CtxPositionY   = new();
-        private static readonly EntityQueryContext<PositionZ>   s_CtxPositionZ   = new();
-        private static readonly EntityQueryContext<PositionXY>  s_CtxPositionXY  = new();
-        private static readonly EntityQueryContext<PositionXZ>  s_CtxPositionXZ  = new();
-        private static readonly EntityQueryContext<PositionYZ>  s_CtxPositionYZ  = new();
-        private static readonly EntityQueryContext<Rotation>    s_CtxRotation    = new();
-        private static readonly EntityQueryContext<RotationX>   s_CtxRotationX   = new();
-        private static readonly EntityQueryContext<RotationY>   s_CtxRotationY   = new();
-        private static readonly EntityQueryContext<RotationZ>   s_CtxRotationZ   = new();
-        private static readonly EntityQueryContext<RotationXY>  s_CtxRotationXY  = new();
-        private static readonly EntityQueryContext<RotationXZ>  s_CtxRotationXZ  = new();
-        private static readonly EntityQueryContext<RotationYZ>  s_CtxRotationYZ  = new();
-        private static readonly EntityQueryContext<Orientation> s_CtxOrientation = new();
-        private static readonly EntityQueryContext<Scale>       s_CtxScale       = new();
-        private static readonly EntityQueryContext<ScaleX>      s_CtxScaleX      = new();
-        private static readonly EntityQueryContext<ScaleY>      s_CtxScaleY      = new();
-        private static readonly EntityQueryContext<ScaleZ>      s_CtxScaleZ      = new();
-        private static readonly EntityQueryContext<ScaleXY>     s_CtxScaleXY     = new();
-        private static readonly EntityQueryContext<ScaleXZ>     s_CtxScaleXZ     = new();
-        private static readonly EntityQueryContext<ScaleYZ>     s_CtxScaleYZ     = new();
+        private static readonly ComponentFilter s_CtxPosition    = new ComponentFilter().Include<Position>();
+        private static readonly ComponentFilter s_CtxPositionX   = new ComponentFilter().Include<PositionX>();
+        private static readonly ComponentFilter s_CtxPositionY   = new ComponentFilter().Include<PositionY>();
+        private static readonly ComponentFilter s_CtxPositionZ   = new ComponentFilter().Include<PositionZ>();
+        private static readonly ComponentFilter s_CtxPositionXY  = new ComponentFilter().Include<PositionXY>();
+        private static readonly ComponentFilter s_CtxPositionXZ  = new ComponentFilter().Include<PositionXZ>();
+        private static readonly ComponentFilter s_CtxPositionYZ  = new ComponentFilter().Include<PositionYZ>();
+        private static readonly ComponentFilter s_CtxRotation    = new ComponentFilter().Include<Rotation>();
+        private static readonly ComponentFilter s_CtxRotationX   = new ComponentFilter().Include<RotationX>();
+        private static readonly ComponentFilter s_CtxRotationY   = new ComponentFilter().Include<RotationY>();
+        private static readonly ComponentFilter s_CtxRotationZ   = new ComponentFilter().Include<RotationZ>();
+        private static readonly ComponentFilter s_CtxRotationXY  = new ComponentFilter().Include<RotationXY>();
+        private static readonly ComponentFilter s_CtxRotationXZ  = new ComponentFilter().Include<RotationXZ>();
+        private static readonly ComponentFilter s_CtxRotationYZ  = new ComponentFilter().Include<RotationYZ>();
+        private static readonly ComponentFilter s_CtxOrientation = new ComponentFilter().Include<Orientation>();
+        private static readonly ComponentFilter s_CtxScale       = new ComponentFilter().Include<Scale>();
+        private static readonly ComponentFilter s_CtxScaleX      = new ComponentFilter().Include<ScaleX>();
+        private static readonly ComponentFilter s_CtxScaleY      = new ComponentFilter().Include<ScaleY>();
+        private static readonly ComponentFilter s_CtxScaleZ      = new ComponentFilter().Include<ScaleZ>();
+        private static readonly ComponentFilter s_CtxScaleXY     = new ComponentFilter().Include<ScaleXY>();
+        private static readonly ComponentFilter s_CtxScaleXZ     = new ComponentFilter().Include<ScaleXZ>();
+        private static readonly ComponentFilter s_CtxScaleYZ     = new ComponentFilter().Include<ScaleYZ>();
 
         /// <summary>
         /// Per-repository scatter state: the resolved query, an entity-index → transform-slot map (a
@@ -751,8 +750,8 @@ namespace Gubbins.Entities
             {
                 if (!SlotMap.IsCreated || entityIndex >= SlotMap.Length)
                 {
-                    var old   = SlotMap.IsCreated ? SlotMap.Length : 0;
-                    var size  = Mathf.Max(entityIndex + 1, old == 0 ? 16 : old * 2);
+                    var old = SlotMap.IsCreated ? SlotMap.Length : 0;
+                    var size = Mathf.Max(entityIndex + 1, old == 0 ? 16 : old * 2);
                     var grown = new NativeArray<int>(size, Allocator.Persistent, NativeArrayOptions.UninitializedMemory);
 
                     for (var i = 0; i < size; i++)

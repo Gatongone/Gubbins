@@ -11,7 +11,7 @@ public class EntityCommandTests
         var repository = new EntityRepository();
 
         var entity = repository.Insert(new CompA {Value = 7});
-        var record = repository.Get(entity.Index);
+        var record = repository.GetRecord(entity.Index);
         var value = record.Chunk.Get<CompA>(record.IndexInChunk).Value;
 
         Assert.Multiple(() =>
@@ -32,7 +32,7 @@ public class EntityCommandTests
         var second = repository.Insert(new CompA {Value = 11});
 
         var deleted = repository.Delete(first.Index);
-        var secondRecord = repository.Get(second.Index);
+        var secondRecord = repository.GetRecord(second.Index);
 
         Assert.Multiple(() =>
         {
@@ -117,7 +117,7 @@ public class EntityCommandTests
         var entity = repository.Insert(new CompA {Value = 1});
 
         repository.Update(entity, new CompA {Value = 9});
-        var record = repository.Get(entity.Index);
+        var record = repository.GetRecord(entity.Index);
         var value = record.Chunk.Get<CompA>(record.IndexInChunk).Value;
 
         Assert.That(value, Is.EqualTo(9));

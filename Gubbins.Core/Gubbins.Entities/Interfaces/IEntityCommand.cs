@@ -1,5 +1,8 @@
 ﻿namespace Gubbins.Entities;
 
+/// <summary>
+/// Commands for modifying entities in the repository.
+/// </summary>
 public interface IEntityCommand
 {
     /// <summary>

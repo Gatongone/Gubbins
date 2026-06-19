@@ -4,7 +4,7 @@
 /// Represents a record that contains an entity along with its storage location information within the entity-component system.
 /// This structure provides a complete reference to an entity, including which chunk it resides in and its position within that chunk.
 /// </summary>
-public struct EntityRecord
+internal struct EntityRecord
 {
     /// <summary>
     /// The entity instance that this record represents.

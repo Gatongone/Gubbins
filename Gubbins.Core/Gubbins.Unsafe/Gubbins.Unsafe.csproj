@@ -9,6 +9,10 @@
         <TargetFrameworks>net9.0;netstandard2.1</TargetFrameworks>
     </PropertyGroup>
 
+    <PropertyGroup Condition="'$(PublishAot)' == 'true'">
+        <DefineConstants>$(DefineConstants);NATIVEAOT</DefineConstants>
+    </PropertyGroup>
+
     <Target Name="PostBuild" BeforeTargets="PostBuildEvent">
         <PropertyGroup>
             <UnitySupportVer>netstandard2.1</UnitySupportVer>

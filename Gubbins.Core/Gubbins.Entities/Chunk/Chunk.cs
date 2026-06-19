@@ -11,7 +11,7 @@ namespace Gubbins.Entities;
 /// The motivation for using SoA primarily revolves around optimizing performance in scenarios involving large collections of data,
 /// particularly when leveraging modern CPU architectures, and their features like SIMD instructions and caching.
 /// </remarks>
-public sealed class Chunk : IDisposable
+internal sealed class Chunk : IDisposable
 {
     private const string AddInputTypeCountMismatchMessage = "Input type count does not match chunk components.";
     private const string AddValueLengthMismatchMessage = "Value length does not match components' size.";
@@ -133,7 +133,7 @@ public sealed class Chunk : IDisposable
     /// <returns>The entity index in the chunk.</returns>
     /// <exception cref="ArgumentOutOfRangeException">The chunk is full, or the value length does not match components' size.</exception>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public unsafe int Add(Span<byte> value, Span<Type> types)
+    internal unsafe int Add(Span<byte> value, Span<Type> types)
     {
         if (types.Length != m_Types.Length - 1)
         {
@@ -199,7 +199,7 @@ public sealed class Chunk : IDisposable
     /// <param name="index">Entity index in chunk.</param>
     /// <returns>True if entity was successfully removed, false otherwise.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public bool Remove(int index)
+    internal bool Remove(int index)
     {
         return Remove(index, out _, out _);
     }
@@ -262,7 +262,7 @@ public sealed class Chunk : IDisposable
     }
 
     /// <summary>
-    /// Get component reference of the specified type.
+    /// GetRecord component reference of the specified type.
     /// </summary>
     /// <typeparam name="T">Component or Entity type.</typeparam>
     /// <param name="index">Entity index in chunk.</param>
@@ -293,7 +293,7 @@ public sealed class Chunk : IDisposable
     }
 
     /// <summary>
-    /// Get all component references of the specified type.
+    /// GetRecord all component references of the specified type.
     /// </summary>
     /// <typeparam name="T">Component or Entity type.</typeparam>
     /// <returns>Component value.</returns>

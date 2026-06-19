@@ -578,7 +578,7 @@ public class UstringTests
     public void Extension_Contains_Char_Found()
     {
         // Arrange
-        var ustr = new Ustring("Contains a");
+        var ustr = new Ustring("MayContains a");
         Assert.Multiple(() =>
         {
             // Act & Assert
@@ -592,7 +592,7 @@ public class UstringTests
     public void Extension_Contains_Span_Found()
     {
         // Arrange
-        var ustr = new Ustring("Contains this");
+        var ustr = new Ustring("MayContains this");
         Assert.Multiple(() =>
         {
             // Act & Assert

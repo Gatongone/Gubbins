@@ -318,7 +318,7 @@ internal class Device
     }
 
     /// <summary>
-    /// Contains information about the relationships of logical processors and related hardware.
+    /// MayContains information about the relationships of logical processors and related hardware.
     /// This structure is used by the GetLogicalProcessorInformation function.
     /// </summary>
     private struct SystemLogicalProcessorInformation

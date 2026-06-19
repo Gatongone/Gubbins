@@ -10,10 +10,6 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <None Update="EntitiesQueryHandle.tt">
-        <Generator>TextTemplatingFileGenerator</Generator>
-        <LastGenOutput>EntitiesQueryHandle.cs</LastGenOutput>
-      </None>
       <None Update="EntityCommand.tt">
         <Generator>TextTemplatingFileGenerator</Generator>
         <LastGenOutput>EntityCommand.cs</LastGenOutput>
@@ -22,38 +18,13 @@
         <Generator>TextTemplatingFileGenerator</Generator>
         <LastGenOutput>EntityForeach.cs</LastGenOutput>
       </None>
-      <None Update="EntityQuery.tt">
-        <Generator>TextTemplatingFileGenerator</Generator>
-        <LastGenOutput>EntityQuery.cs</LastGenOutput>
-      </None>
-      <None Update="EntityQueryContext.tt">
-        <Generator>TextTemplatingFileGenerator</Generator>
-        <LastGenOutput>EntityQueryContext.cs</LastGenOutput>
-      </None>
-      <None Update="EntityQueryResult.tt">
-        <Generator>TextTemplatingFileGenerator</Generator>
-        <LastGenOutput>EntityQueryResult.cs</LastGenOutput>
-      </None>
     </ItemGroup>
 
     <ItemGroup>
-      <Compile Update="EntitiesQueryHandle.cs">
-        <AutoGen>True</AutoGen>
-        <DesignTime>True</DesignTime>
-        <DependentUpon>EntitiesQueryHandle.tt</DependentUpon>
-      </Compile>
       <Compile Update="EntityCommand.cs">
         <AutoGen>True</AutoGen>
         <DesignTime>True</DesignTime>
         <DependentUpon>EntityCommand.tt</DependentUpon>
-      </Compile>
-      <Compile Update="EntityQuery.cs">
-        <AutoGen>True</AutoGen>
-        <DesignTime>True</DesignTime>
-        <DependentUpon>EntityQuery.tt</DependentUpon>
-      </Compile>
-      <Compile Update="EntityQueryResult.cs">
-        <DependentUpon>EntityQueryResult.tt</DependentUpon>
       </Compile>
     </ItemGroup>
 

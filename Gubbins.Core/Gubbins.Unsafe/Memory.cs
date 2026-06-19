@@ -9,12 +9,12 @@ namespace Gubbins.Unsafe;
 public unsafe class Memory
 {
 #if !NATIVEAOT
-    private static System.Collections.Concurrent.ConcurrentDictionary<Type, uint> m_SizeOfMaps = new();
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, uint> s_SizeOfMaps = new();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static uint DynamicSizeOf(Type type)
     {
-        if (m_SizeOfMaps.TryGetValue(type, out var size))
+        if (s_SizeOfMaps.TryGetValue(type, out var size))
             return size;
 
         var dynamicSizeOf = new System.Reflection.Emit.DynamicMethod("GetManagedSizeImpl", typeof(uint), null, true);
@@ -25,7 +25,7 @@ public unsafe class Memory
 
         var sizeOfFunc = (Func<uint>) dynamicSizeOf.CreateDelegate(typeof(Func<uint>));
         size = (uint) checked((int) sizeOfFunc());
-        m_SizeOfMaps.TryAdd(type, size);
+        s_SizeOfMaps.TryAdd(type, size);
         return size;
     }
 #endif
