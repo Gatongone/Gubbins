@@ -1,4 +1,4 @@
-﻿namespace Gubbins.Context;
+﻿namespace Gubbins.Pipeline;
 
 /// <summary>
 /// Indicates that the decorated method is an event handler that should be registered with the specified event bus.

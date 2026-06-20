@@ -1,4 +1,6 @@
-namespace Gubbins.Context;
+using Gubbins.Context;
+
+namespace Gubbins.Pipeline;
 
 /// <summary>
 /// When Gubbins.Generator was imported, it would generate an implementation of this interface for each method marked with the <see cref="EventAttribute"/>.

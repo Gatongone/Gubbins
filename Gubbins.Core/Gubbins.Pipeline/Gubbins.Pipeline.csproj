@@ -9,7 +9,9 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\Gubbins.Context\Gubbins.Context.csproj" />
       <ProjectReference Include="..\Gubbins.Enhance\Gubbins.Enhance.csproj" />
+        <ProjectReference Include="..\Gubbins.Events\Gubbins.Events.csproj" />
     </ItemGroup>
 
     <Target Name="PostBuild" BeforeTargets="PostBuildEvent">

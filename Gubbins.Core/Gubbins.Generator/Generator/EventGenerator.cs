@@ -9,7 +9,7 @@ namespace Gubbins.Generator;
 [Generator]
 public class EventGenerator : ISourceGenerator
 {
-    private const string EVENT_NAMESPACE     = "Gubbins.Context";
+    private const string EVENT_NAMESPACE     = "Gubbins.Pipeline";
     private const string EVENT_BUS_NAMESPACE = "Gubbins.Events";
     private const string FILE_NAME           = "EventListener.g.cs";
 
@@ -20,7 +20,8 @@ public class EventGenerator : ISourceGenerator
 
         using Gubbins.Events;
         using Gubbins.Context;
-
+        using Gubbins.Pipeline;
+        
         namespace {Namespace}
         {
         {TypeStart}
@@ -28,7 +29,7 @@ public class EventGenerator : ISourceGenerator
             {Indentation}/// Auto generated.
             {Indentation}/// </summary>
             {Indentation}[global::System.Runtime.CompilerServices.CompilerGenerated]
-            {Indentation}void global::Gubbins.Context.IEventListener.Listen(global::Gubbins.Context.IDependenciesResolver resolver, global::Gubbins.Context.IDependenciesRegistry registry)
+            {Indentation}void global::Gubbins.Pipeline.IEventListener.Listen(global::Gubbins.Context.IDependenciesResolver resolver, global::Gubbins.Context.IDependenciesRegistry registry)
             {Indentation}{
         {ListenEvent}
             {Indentation}}
@@ -37,7 +38,7 @@ public class EventGenerator : ISourceGenerator
             {Indentation}/// Auto generated.
             {Indentation}/// </summary>
             {Indentation}[global::System.Runtime.CompilerServices.CompilerGenerated]
-            {Indentation}void global::Gubbins.Context.IEventListener.Clear(global::Gubbins.Context.IDependenciesResolver resolver)
+            {Indentation}void global::Gubbins.Pipeline.IEventListener.Clear(global::Gubbins.Context.IDependenciesResolver resolver)
             {Indentation}{
         {ClearEvent}
             {Indentation}}
@@ -50,6 +51,7 @@ public class EventGenerator : ISourceGenerator
         // Generator: {Generator}
         // Created On: {CreateTime}
 
+        using Gubbins.Pipeline;
         using Gubbins.Events;
         using Gubbins.Context;
 
@@ -58,7 +60,7 @@ public class EventGenerator : ISourceGenerator
             {Indentation}/// Auto generated.
             {Indentation}/// </summary>
             {Indentation}[global::System.Runtime.CompilerServices.CompilerGenerated]
-            {Indentation}void global::Gubbins.Context.IEventListener.Listen(IDependenciesResolver resolver, IDependenciesRegistry registry)
+            {Indentation}void global::Gubbins.Pipeline.IEventListener.Listen(IDependenciesResolver resolver, IDependenciesRegistry registry)
             {Indentation}{
         {ListenEvent}
             {Indentation}}
@@ -67,7 +69,7 @@ public class EventGenerator : ISourceGenerator
             {Indentation}/// Auto generated.
             {Indentation}/// </summary>
             {Indentation}[global::System.Runtime.CompilerServices.CompilerGenerated]
-            {Indentation}void global::Gubbins.Context.IEventListener.Clear(IDependenciesResolver resolver)
+            {Indentation}void global::Gubbins.Pipeline.IEventListener.Clear(IDependenciesResolver resolver)
             {Indentation}{
         {ClearEvent}
             {Indentation}}

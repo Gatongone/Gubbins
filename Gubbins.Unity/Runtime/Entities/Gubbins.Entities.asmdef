@@ -6,7 +6,7 @@
         "GUID:05bb661b1e8a3c64ca7826c86481f58c",
         "GUID:e0cd26848372d4e5c891c569017e11f1",
         "GUID:2665a8d13d1b3f18800f46e256720795",
-        "GUID:1cb90f33e0c5d96409cc629622b53391"
+        "GUID:aa6f970150f05344897296ee0d03b4cf"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
@@ -17,7 +17,8 @@
         "Gubbins.Enhance.dll",
         "Gubbins.Entities.dll",
         "Gubbins.Events.dll",
-        "Gubbins.Unsafe.dll"
+        "Gubbins.Unsafe.dll",
+        "Gubbins.Pipeline.dll"
     ],
     "autoReferenced": true,
     "defineConstraints": [],
