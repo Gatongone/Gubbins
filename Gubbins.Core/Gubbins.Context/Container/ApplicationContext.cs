@@ -7,7 +7,7 @@ namespace Gubbins.Context;
 /// <summary>
 /// The dependence information collection with scope management and dependency injection/resolution.
 /// </summary>
-public class ApplicationContext : IScopeController, IDependenciesRegistry, IContext
+public class ApplicationContext : IScopeController, IContext
 {
     public static readonly IContext Global = new ApplicationContext();
 
@@ -65,7 +65,7 @@ public class ApplicationContext : IScopeController, IDependenciesRegistry, ICont
     private readonly Queue<DependencyInfo> m_InstallQueue = new();
 
     /// <inheritdoc/>
-    public IContext? Parent { get; }
+    public IReadOnlyContext? Parent { get; }
 
     /// <summary>
     /// Disposed flag for deconstruct method.
@@ -74,7 +74,7 @@ public class ApplicationContext : IScopeController, IDependenciesRegistry, ICont
 
     private ApplicationContext() { }
 
-    public ApplicationContext(IEnumerable<IDependenciesInstaller> installers, IContext? parent = null)
+    public ApplicationContext(IEnumerable<IDependenciesInstaller> installers, IReadOnlyContext? parent = null)
     {
         Parent = parent;
         foreach (var installer in installers)

@@ -1,7 +1,9 @@
 {
     "name": "Gubbins.Unity.Enhance",
     "rootNamespace": "",
-    "references": [],
+    "references": [
+        "GUID:b7466a10e85b4f14884217f39dc29a66"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": true,

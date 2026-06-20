@@ -1,4 +1,11 @@
-﻿/// <summary>
+﻿using Gubbins.Enhance;
+
+/// <summary>
+/// Represents a processing phase that does not require any input and does not produce any output, effectively serving as a placeholder or a no-operation phase in a pipeline.
+/// </summary>
+public interface IPhase : IPhase<Unit, Unit>;
+
+/// <summary>
 /// Represents a single phase in a processing pipeline, where an input of type <see cref="TIn"/> is transformed into an output of type <see cref="TOut"/>.
 /// </summary>
 /// <typeparam name="TIn">The type of the input to the phase.</typeparam>
@@ -20,8 +27,18 @@ public interface IPhase<in TIn, out TOut>
 /// <typeparam name="TOut">The type of the output from the pipeline.</typeparam>
 public interface IPipeline<in TIn, out TOut> : IPhase<TIn, TOut>
 {
-    /// <summary>
-    /// Gets the number of phases in the pipeline.
-    /// </summary>
-    int Count { get; }
+    PipeLineState State { get; }
+}
+
+/// <summary>
+/// Represents a processing pipeline that does not require any input and does not produce any output, effectively serving as a placeholder or a no-operation pipeline in a processing sequence.
+/// </summary>
+public interface IPipeline : IPipeline<Unit, Unit>;
+
+public enum PipeLineState
+{
+    NotStarted,
+    Running,
+    Completed,
+    Failed
 }

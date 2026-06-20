@@ -1,13 +1,9 @@
 ﻿namespace Gubbins.Context;
 
 /// <summary>
-/// ApplicationContext for the dependencies.
+/// Represents a read-only context that provides dependency resolution and access to its parent context.
 /// </summary>
-/// <remarks>
-/// Basically, the context is a dependencies installer collection and IOC container proxy
-/// that provides configuration for an application.
-/// </remarks>
-public interface IContext : IDependenciesResolver, IDisposable
+public interface IReadOnlyContext : IDependenciesResolver, IDisposable
 {
     /// <summary>
     /// The parent context.
@@ -15,5 +11,10 @@ public interface IContext : IDependenciesResolver, IDisposable
     /// <remarks>
     /// When resolve failed, the context would resolve from its parent context.
     /// </remarks>
-    IContext? Parent { get; }
+    IReadOnlyContext? Parent { get; }
 }
+
+/// <summary>
+/// Represents a context that provides dependency resolution, registration, and access to its parent context.
+/// </summary>
+public interface IContext : IReadOnlyContext, IDependenciesRegistry;

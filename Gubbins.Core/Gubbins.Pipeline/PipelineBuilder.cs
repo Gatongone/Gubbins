@@ -1,4 +1,6 @@
-﻿namespace Gubbins.Pipeline;
+﻿using Gubbins.Enhance;
+
+namespace Gubbins.Pipeline;
 
 /// <summary>
 /// Provides extension methods for building pipelines in a fluent manner, allowing for the chaining
@@ -10,6 +12,33 @@
 /// </summary>
 public static class PipelineBuilderExtensions
 {
+    /// <summary>
+    /// Adds a new phase to the pipeline using a simple function that transforms the output of the current phase into the input of the next phase.
+    /// </summary>
+    /// <param name="builder">The current pipeline builder to which the new phase will be added.</param>
+    /// <param name="onPhase">A function that takes the output of the current phase and produces the input for the next phase.</param>
+    /// <typeparam name="TCurrent">The type of the output from the current phase, which will be the input to the next phase.</typeparam>
+    /// <returns>A new <see cref="PipelineBuilder{TInitial, TNext}"/> that includes the newly added phase.</returns>
+    public static PipelineBuilder<TInitial, Unit> Next<TInitial>(this PipelineBuilder<TInitial, Unit> builder, Action onPhase)
+    {
+        var phase = new ImplicitPhase(onPhase);
+        return builder.Next(phase);
+    }
+
+    /// <summary>
+    /// Adds a new phase to the pipeline using a simple function that transforms the output of the current phase into the input of the next phase.
+    /// </summary>
+    /// <param name="builder">The current pipeline builder to which the new phase will be added.</param>
+    /// <param name="onPhase">A function that takes the output of the current phase and produces the input for the next phase.</param>
+    /// <typeparam name="TInitial">The type of the initial input to the pipeline.</typeparam>
+    /// <typeparam name="TCurrent">The type of the output from the current phase, which will be the input to the next phase.</typeparam>
+    /// <returns>A new <see cref="PipelineBuilder{TInitial, TNext}"/> that includes the newly added phase.</returns>
+    public static PipelineBuilder<TInitial, Unit> Next<TInitial, TCurrent>(this PipelineBuilder<TInitial, TCurrent> builder, Action<TCurrent> onPhase)
+    {
+        var phase = new ImplicitPhase<TCurrent>(onPhase);
+        return builder.Next(phase);
+    }
+
     /// <summary>
     /// Adds a new phase to the pipeline using a simple function that transforms the output of the current phase into the input of the next phase.
     /// </summary>
@@ -128,6 +157,62 @@ public static class PipelineBuilderExtensions
     {
         var phase = new ImplicitPhase<TCurrent1, TCurrent2, TCurrent3, TCurrent4, TCurrent5, TCurrent6, TCurrent7, TCurrent8, TNext>(onPhase);
         return builder.Next(phase);
+    }
+
+    /// <summary>
+    /// Represents a phase in the processing pipeline that is defined by a simple function, allowing for a concise way to create phases
+    /// without needing to implement the <see cref="IPhase{TIn, TOut}"/> interface explicitly.
+    /// </summary>
+    /// <typeparam name="TIn">The type of the input to the phase, which will be transformed by the function provided in the constructor.</typeparam>
+    /// <typeparam name="TOut">The type of the output from the phase, which will be the result of applying the function to the input.</typeparam>
+    private sealed class ImplicitPhase : IPhase<Unit, Unit>
+    {
+        /// <summary>
+        /// The function that defines the transformation from the input of type <see cref="TIn"/> to the output of type <see cref="TOut"/>.
+        /// </summary>
+        private readonly Action m_Func;
+
+        /// <param name="func">The function that will be used to transform the input to the output for this phase.</param>
+        public ImplicitPhase(Action func) => m_Func = func;
+
+        /// <summary>
+        /// Starts the phase by applying the function to the given input, producing the output for this phase.
+        /// </summary>
+        /// <param name="input">The input to be processed by this phase, which will be transformed by the function provided in the constructor.</param>
+        /// <returns>The output produced by applying the function to the input, which will be the result of this phase in the pipeline.</returns>
+        public Unit Start(Unit input)
+        {
+            m_Func();
+            return Unit.Instance;
+        }
+    }
+
+    /// <summary>
+    /// Represents a phase in the processing pipeline that is defined by a simple function, allowing for a concise way to create phases
+    /// without needing to implement the <see cref="IPhase{TIn, TOut}"/> interface explicitly.
+    /// </summary>
+    /// <typeparam name="TIn">The type of the input to the phase, which will be transformed by the function provided in the constructor.</typeparam>
+    /// <typeparam name="TOut">The type of the output from the phase, which will be the result of applying the function to the input.</typeparam>
+    private sealed class ImplicitPhase<TIn> : IPhase<TIn, Unit>
+    {
+        /// <summary>
+        /// The function that defines the transformation from the input of type <see cref="TIn"/> to the output of type <see cref="TOut"/>.
+        /// </summary>
+        private readonly Action<TIn> m_Func;
+
+        /// <param name="func">The function that will be used to transform the input to the output for this phase.</param>
+        public ImplicitPhase(Action<TIn> func) => m_Func = func;
+
+        /// <summary>
+        /// Starts the phase by applying the function to the given input, producing the output for this phase.
+        /// </summary>
+        /// <param name="input">The input to be processed by this phase, which will be transformed by the function provided in the constructor.</param>
+        /// <returns>The output produced by applying the function to the input, which will be the result of this phase in the pipeline.</returns>
+        public Unit Start(TIn input)
+        {
+            m_Func(input);
+            return Unit.Instance;
+        }
     }
 
     /// <summary>
@@ -384,6 +469,9 @@ public readonly struct PipelineBuilder<TInitial, TCurrent>
 /// <typeparam name="TOut">The type of the final output produced by the current phase, which will be the result of processing the initial input through the previous pipeline and then transforming it with the current phase.</typeparam>
 public sealed class PipelineStep<TIn, TMid, TOut> : IPipeline<TIn, TOut>
 {
+    /// <inheritdoc/>
+    public PipeLineState State { get; private set; }
+
     /// <summary>
     /// The previous pipeline that produces an output of type <see cref="TMid"/>, which will be the input to the current phase.
     /// This allows for the chaining of multiple phases in the pipeline, where each phase takes the output of the previous phase as its input and produces a new output that can be further processed by subsequent phases.
@@ -397,10 +485,21 @@ public sealed class PipelineStep<TIn, TMid, TOut> : IPipeline<TIn, TOut>
     private readonly IPhase<TMid, TOut> m_Phase;
 
     /// <inheritdoc/>
-    public int Count => m_Previous.Count + 1;
-
-    /// <inheritdoc/>
-    public TOut Start(TIn input) => m_Phase.Start(m_Previous.Start(input));
+    public TOut Start(TIn input)
+    {
+        State = PipeLineState.Running;
+        try
+        {
+            var result = m_Phase.Start(m_Previous.Start(input));
+            State = PipeLineState.Completed;
+            return result;
+        }
+        catch
+        {
+            State = PipeLineState.Failed;
+            throw;
+        }
+    }
 
     /// <param name="previous">The previous pipeline that produces an output of type <see cref="TMid"/>, which will be the input to the current phase.</param>
     /// <param name="phase">The phase that defines the transformation from the output of the previous pipeline to the output of the current step.</param>

@@ -8,6 +8,10 @@
         <LangVersion>latestmajor</LangVersion>
     </PropertyGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\Gubbins.Enhance\Gubbins.Enhance.csproj" />
+    </ItemGroup>
+
     <Target Name="PostBuild" BeforeTargets="PostBuildEvent">
         <PropertyGroup>
             <UnitySupportVer>netstandard2.1</UnitySupportVer>

@@ -31,7 +31,7 @@ namespace Gubbins.Unsafe
         public override T ConvertToStructure<T>(void* ptr) => UnsafeUtility.ReadArrayElement<T>(ptr, 0);
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ReplaceInstance() => Native.Operation = new UnityMemory();
+        internal static void ReplaceInstance() => Native.Operation = new UnityMemory();
 
         /// <remarks>
         /// Prevent preload phase call but <see cref="ReplaceInstance"/> not called.
