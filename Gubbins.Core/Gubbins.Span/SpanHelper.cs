@@ -161,7 +161,7 @@ internal static class VectorMath
 
         // Reduce the mantissa to [+2/3, +4/3]
         var vx = Native.BitCast<Vector<float>, Vector<uint>>(x) - new Vector<uint>(vOff);
-#if NET7_0_OR_GREATER
+#if NET9_0_OR_GREATER
         var n = Vector.ConvertToSingle(Native.ShiftRightArithmetic(Native.BitCast<Vector<ulong>, Vector<long>>(vx), 23));
 #else
         var longN = Native.BitCast<Vector<uint>, Vector<int>>(vx);
@@ -295,7 +295,7 @@ internal static class VectorMath
 
         // Reduce the mantissa to [+2/3, +4/3]
         var vx = Native.BitCast<Vector<double>, Vector<ulong>>(x) - new Vector<ulong>(vOff);
-#if NET7_0_OR_GREATER
+#if NET9_0_OR_GREATER
         var n = Vector.ConvertToDouble(Native.ShiftRightArithmetic(Native.BitCast<Vector<ulong>, Vector<long>>(vx), 52));
 #else
         var longN = Native.BitCast<Vector<ulong>, Vector<long>>(vx);
@@ -775,7 +775,7 @@ internal static class VectorMath
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Vector<float> Sin(Vector<float> x)
     {
-#if NET7_0_OR_GREATER
+#if NET9_0_OR_GREATER
         return Vector.Sin(x);
 #else
         // This code is based on `sinf` from amd/aocl-libm-ose
@@ -912,7 +912,7 @@ internal static class VectorMath
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Vector<double> Sin(Vector<double> x)
     {
-#if NET7_0_OR_GREATER
+#if NET9_0_OR_GREATER
         return Vector.Sin(x);
 #else
         // This code is based on `cosf` from amd/aocl-libm-ose
@@ -1042,7 +1042,7 @@ internal static class VectorMath
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Vector<float> Cos(Vector<float> x)
     {
-#if NET7_0_OR_GREATER
+#if NET9_0_OR_GREATER
         return Vector.Cos(x);
 #else
         // This code is based on `cosf` from amd/aocl-libm-ose
@@ -1174,7 +1174,7 @@ internal static class VectorMath
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static Vector<double> Cos(Vector<double> x)
     {
-#if NET7_0_OR_GREATER
+#if NET9_0_OR_GREATER
         return Vector.Cos(x);
 #else
         // This code is based on `cos` from amd/aocl-libm-ose

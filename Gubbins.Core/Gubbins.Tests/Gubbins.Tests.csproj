@@ -7,7 +7,7 @@
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <IsPackable>false</IsPackable>
         <IsTestProject>true</IsTestProject>
-        <TargetFrameworks>netstandard2.1;net9.0</TargetFrameworks>
+        <TargetFrameworks>netstandard2.1;net8.0;net10.0</TargetFrameworks>
         <OutputType>Library</OutputType>
     </PropertyGroup>
 

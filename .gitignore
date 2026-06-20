@@ -2,6 +2,7 @@
 */*.DotSettings.user
 */.idea
 */.vs
+*/.godot
 /.idea
 /.vs
 

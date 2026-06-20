@@ -6,7 +6,7 @@
         <Nullable>enable</Nullable>
         <RootNamespace>Gubins.Entities</RootNamespace>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-        <TargetFrameworks>net9.0;netstandard2.1</TargetFrameworks>
+        <TargetFrameworks>netstandard2.1;net8.0;net10.0;</TargetFrameworks>
     </PropertyGroup>
 
     <ItemGroup>
@@ -55,16 +55,19 @@
 
     <Target Name="PostBuild" BeforeTargets="PostBuildEvent">
         <PropertyGroup>
-            <UnitySupportVer>netstandard2.1</UnitySupportVer>
             <DotNetVer>$(TargetFramework)</DotNetVer>
+            <UnitySupportVer>netstandard2.1</UnitySupportVer>
+            <GodotSupportVer>net8.0</GodotSupportVer>
             <UnityOutDir>$(ProjectDir)..\..\Gubbins.Unity\Plugins</UnityOutDir>
+            <GodotOutDir>$(ProjectDir)..\..\Gubbins.Godot\Plugins</GodotOutDir>
         </PropertyGroup>
         <ItemGroup>
-            <OutputFiles Include="$(OutputPath)$(ProjectName).dll" />
-            <OutputFiles Include="$(OutputPath)$(ProjectName).pdb" Condition="Exists('$(OutputPath)$(ProjectName).pdb')" />
-            <OutputFiles Include="$(OutputPath)$(ProjectName).mdb" Condition="Exists('$(OutputPath)$(ProjectName).mdb')" />
+            <OutputFiles Include="$(OutputPath)$(ProjectName).dll"/>
+            <OutputFiles Include="$(OutputPath)$(ProjectName).pdb" Condition="Exists('$(OutputPath)$(ProjectName).pdb')"/>
+            <OutputFiles Include="$(OutputPath)$(ProjectName).mdb" Condition="Exists('$(OutputPath)$(ProjectName).mdb')"/>
         </ItemGroup>
         <Copy SourceFiles="@(OutputFiles)" DestinationFolder="$(UnityOutDir)" SkipUnchangedFiles="true" Condition=" '$(UnityOutDir)' != '' and '$(DotNetVer)' == '$(UnitySupportVer)' "/>
+        <Copy SourceFiles="@(OutputFiles)" DestinationFolder="$(GodotOutDir)" SkipUnchangedFiles="true" Condition=" '$(GodotOutDir)' != '' and '$(DotNetVer)' == '$(GodotSupportVer)' "/>
     </Target>
     
 </Project>

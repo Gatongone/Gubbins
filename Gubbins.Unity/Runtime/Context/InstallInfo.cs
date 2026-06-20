@@ -8,7 +8,8 @@ namespace Gubbins.Context
     [Serializable]
     public struct SerializedInstallInfo
     {
-        public Scope  Scope;
+        public Scope Scope;
+
         public string Key;
 
         [TypeFrom(TypeKind.NotAbstract | TypeKind.NotInterface | TypeKind.NotGeneric)]
@@ -20,7 +21,8 @@ namespace Gubbins.Context
         public SerializedReference<ISpawner> Spawner;
 
         public SerializedReference<IScopeController> Controller;
-        public uint                                  Prewarm;
+
+        public uint Prewarm;
 
         public static implicit operator InstallInfo(SerializedInstallInfo info) => info.ToInstallInfo();
 
@@ -50,9 +52,11 @@ namespace Gubbins.Context
                     {
                         array[i] = spawner.Value.Spawn();
                     }
+
                     result.Instances = array;
                 }
             }
+
             return result;
         }
     }

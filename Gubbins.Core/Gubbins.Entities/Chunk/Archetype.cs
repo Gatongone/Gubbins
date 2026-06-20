@@ -16,13 +16,13 @@ internal sealed class Archetype(Type[] componentTypes)
     public IReadOnlyList<Chunk> Chunks => m_Chunks;
     public ReadOnlySpan<Type> Types => m_ComponentTypes;
     private readonly BloomFilter m_ComponentFilter = new(componentTypes);
-#if NET8_0_OR_GREATER
+#if NET9_0_OR_GREATER
     private readonly System.Collections.Frozen.FrozenSet<Type> m_FrozenSet = System.Collections.Frozen.FrozenSet.Create(componentTypes);
 #endif
 
     internal bool MatchComponents(ComponentFilter filter)
     {
-#if !NET8_0_OR_GREATER
+#if !NET9_0_OR_GREATER
         // Quick check using Bloom filter to determine if the archetype may contain all included components and none of the excluded components.
         if (!m_ComponentFilter.MayContainsAll(filter.Includes) || m_ComponentFilter.MayContainsAny(filter.Excludes))
         {
@@ -32,7 +32,7 @@ internal sealed class Archetype(Type[] componentTypes)
 
         // Final check to ensure that the archetype contains all included components and none of the excluded components.
         return ContainsTypes(filter.Includes) && NotContainsTypes(filter.Excludes);
-#if NET8_0_OR_GREATER
+#if NET9_0_OR_GREATER
         bool ContainsTypes(ReadOnlySpan<Type> componentTypes)
         {
             for (var i = 0; i < componentTypes.Length; i++)
@@ -98,7 +98,7 @@ internal sealed class Archetype(Type[] componentTypes)
         {
             return false;
         }
-#if NET8_0_OR_GREATER
+#if NET9_0_OR_GREATER
         for (var i = 0; i < componentTypes.Length; i++)
         {
             if (!m_FrozenSet.Contains(componentTypes[i]))

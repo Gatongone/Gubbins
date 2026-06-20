@@ -1,4 +1,3 @@
-using Gubbins.Context;
 using Gubbins.Enhance;
 using Gubbins.Spawner;
 
@@ -179,6 +178,6 @@ public sealed class DependencyExtensionsTests
         var instance = new ServiceA();
         var spawner = new FakeNewable(instance).ToSpawner();
 
-        Assert.That(spawner.Spawn(), Is.SameAs(instance));
+        Assert.That(spawner.Spawn() as ServiceA, Is.SameAs(instance));
     }
 }

@@ -26,7 +26,6 @@ namespace Gubbins.Editor
         private static readonly Type[]                                       s_AllTypes         = LoadAllTypes();
         private static readonly Dictionary<FilterCacheKey, List<TypeOption>> s_OptionCache      = new();
         private static readonly Dictionary<Type, Type[]>                     s_SubTypeCache     = new();
-        private static readonly Dictionary<Type, bool>                       s_IsUnmanagedCache = new();
         private static readonly Dictionary<Type, bool>                       s_IsNewableCache   = new();
         private static readonly Dictionary<string, Type>                     s_WrapperTypeCache = new();
 
