@@ -1,6 +1,10 @@
 ﻿namespace Gubbins.Enhance;
 
-public static class ReflectionCache
+internal static class ReflectionCache
 {
-    public static readonly Type[] AllTypes = AppDomain.CurrentDomain.GetAssemblies().SelectMany(assembly => assembly.GetTypes()).ToArray();
+    public static readonly Type[] AllTypes = AppDomain.CurrentDomain
+                                                      .GetAssemblies()
+                                                      .SelectMany(static assembly => assembly.GetTypes())
+                                                      .Where(static t => t.IsPublic && !(t.IsSealed && t.IsAbstract))
+                                                      .ToArray();
 }
