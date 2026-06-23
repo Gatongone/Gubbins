@@ -6,7 +6,6 @@ using System.Runtime.CompilerServices;
 using Gubbins.Enhance;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEditor;
-using UnityEditor.IMGUI.Controls;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -442,14 +441,10 @@ namespace Gubbins.Editor
                 return cachedOptions;
 
             var excludedTypeSet = new HashSet<Type>(excludedTypes);
-            var candidateTypes = includeTypes.Length == 0
-                ? s_AllTypes
-                : includeTypes.SelectMany(GetAllSubTypesCached).Distinct().ToArray();
+            var candidateTypes = s_AllTypes;
 
-            var builtOptions = candidateTypes.Where(type => type != null)
-                                             .Where(IsSelectableTypeCandidate)
-                                             .Where(type => !excludedTypeSet.Contains(type))
-                                             .Where(type => VerifyTypeKind(typeKind, type))
+            var builtOptions = candidateTypes.Where(type => type != null && IsSelectableTypeCandidate(type) && !excludedTypeSet.Contains(type) && VerifyTypeKind(typeKind, type))
+                                             .Union(includeTypes)
                                              .GroupBy(type => type.ToString())
                                              .Select(group => group.First())
                                              .ToArray();

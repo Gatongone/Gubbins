@@ -1,0 +1,14 @@
+﻿<Project Sdk="Godot.NET.Sdk/4.7.0">
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <TargetFramework Condition=" '$(GodotTargetPlatform)' == 'android' ">net9.0</TargetFramework>
+        <LangVersion>latestmajor</LangVersion>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>disable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Reference Include="../Plugins/*.dll"/>
+        <ProjectReference Include="../Runtime/Gubbins.Godot.csproj"/>
+    </ItemGroup>
+</Project>

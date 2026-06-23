@@ -4,14 +4,10 @@
         <TargetFramework Condition=" '$(GodotTargetPlatform)' == 'android' ">net9.0</TargetFramework>
         <LangVersion>latestmajor</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
-        <RootNamespace>Gubbins</RootNamespace>
         <Nullable>disable</Nullable>
     </PropertyGroup>
+
     <ItemGroup>
-        <Folder Include="Runtime\" />
-      <Folder Include="Plugins\" />
-    </ItemGroup>
-    <ItemGroup>
-        <Reference Include="Plugins/*.dll"/>
+        <Reference Include="../Plugins/*.dll"/>
     </ItemGroup>
 </Project>
