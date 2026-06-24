@@ -1,6 +1,6 @@
 ﻿namespace Gubbins.Enhance;
 
-internal static class ReflectionCache
+internal static class AssemblyCache
 {
     public static readonly Type[] AllTypes = AppDomain.CurrentDomain
                                                       .GetAssemblies()

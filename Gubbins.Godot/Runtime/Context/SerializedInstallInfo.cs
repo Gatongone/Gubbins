@@ -1,0 +1,450 @@
+﻿using Godot;
+using Godot.Collections;
+using Gubbins.Enhance;
+using Gubbins.Spawner;
+using Gubbins.Unsafe;
+
+namespace Gubbins.Context;
+
+[GlobalClass, Tool]
+public partial class SerializedInstallInfo : global::Godot.Resource
+{
+    private Scope         m_Scope;
+    private string        m_Key;
+    private string        m_Type;
+    private uint          m_Prewarm;
+    private Array<string> m_Binding;
+    private string        m_SpawnerType;
+    private string        m_ControllerType;
+    private GodotObject   m_Spawner;
+    private GodotObject   m_Controller;
+
+    private Type SpawnerType => string.IsNullOrEmpty(m_SpawnerType) ? null : Type.GetType(m_SpawnerType, Reflection.LoadAssemblyResolver, Reflection.DomainTypeResolver);
+    private Type ControllerType => string.IsNullOrEmpty(m_ControllerType) ? null : Type;
+    public Type Type => string.IsNullOrEmpty(m_Type) ? null : Type.GetType(m_Type, Reflection.LoadAssemblyResolver, Reflection.DomainTypeResolver);
+    public Scope Scope => m_Scope;
+    public string Key => m_Key;
+    public uint Prewarm => m_Prewarm;
+    public Array<string> Binding => m_Binding;
+    public ISpawner Spawner => m_Spawner as ISpawner ?? (typeof(GodotObject).IsAssignableFrom(SpawnerType) ? null : Activator.CreateInstance(SpawnerType) as ISpawner);
+    public IScopeController Controller => m_Controller as IScopeController ?? (typeof(GodotObject).IsAssignableFrom(ControllerType) ? null : Activator.CreateInstance(ControllerType) as IScopeController);
+    public HashSet<Type> Bindings => [..Binding.Select(static item => Type.GetType(item, Reflection.LoadAssemblyResolver, Reflection.DomainTypeResolver)).Where(static item => item != null)];
+
+    public InstallInfo ToInstallInfo()
+    {
+        var spawner = Spawner;
+        var result = new InstallInfo
+        {
+            Scope      = Scope,
+            Key        = Key,
+            Type       = Type,
+            Bindings   = Bindings,
+            Spawner    = spawner,
+            Controller = Controller,
+            BakeCount  = Prewarm
+        };
+        if (Prewarm > 0 && spawner != null)
+        {
+            if (Scope != Scope.Multiton)
+            {
+                result.Instance = spawner.Spawn();
+            }
+            else
+            {
+                var array = new object[Prewarm];
+                for (var i = 0; i < Prewarm; i++)
+                {
+                    array[i] = spawner.Spawn();
+                }
+                result.Instances = array;
+            }
+        }
+        return result;
+    }
+
+    public override Array<Dictionary> _GetPropertyList()
+    {
+        var properties = new Array<Dictionary>();
+        BuildScope(properties);
+        BuildKey(properties);
+        BuildType(properties);
+        BuildPrewarm(properties);
+        BuildController(properties);
+        BuildSpawner(properties);
+        BuildBinding(properties);
+        return properties;
+    }
+
+    public override Variant _Get(StringName property)
+    {
+        if (property == "Key")
+        {
+            return m_Key;
+        }
+
+        if (property == "Scope")
+        {
+            return (int) m_Scope;
+        }
+
+        if (property == "Type")
+        {
+            return m_Type;
+        }
+
+        if (property == "Binding")
+        {
+            return m_Binding;
+        }
+
+        if (property == "Prewarm")
+        {
+            return m_Prewarm;
+        }
+
+        if (property == "Spawner" || property == "Spawner_Type")
+        {
+            return m_SpawnerType;
+        }
+
+        if (property == "Spawner_Instance")
+        {
+            return m_Spawner;
+        }
+
+        if (property == "Controller")
+        {
+            return m_ControllerType;
+        }
+
+        return default;
+    }
+
+    public override bool _Set(StringName property, Variant value)
+    {
+        if (property == "Key")
+        {
+            m_Key = value.AsString();
+            return true;
+        }
+
+        if (property == "Scope")
+        {
+            m_Scope = (Scope) value.AsInt32();
+            if (m_Scope is not Scope.Multiton)
+            {
+                if (m_Prewarm > 1)
+                {
+                    m_Prewarm = 1;
+                }
+            }
+
+            NotifyPropertyListChanged();
+            return true;
+        }
+
+        if (property == "Type")
+        {
+            m_Type = value.AsString();
+            if (!string.IsNullOrEmpty(m_Type))
+            {
+                m_Key = m_Type;
+            }
+
+            m_ControllerType = null;
+            m_Controller     = null;
+            m_SpawnerType    = null;
+            m_Spawner        = null;
+
+            NotifyPropertyListChanged();
+            return true;
+        }
+
+        if (property == "Binding")
+        {
+            m_Binding = value.AsGodotArray<string>();
+            return true;
+        }
+
+        if (property == "Prewarm")
+        {
+            if (value.Obj is bool)
+            {
+                m_Prewarm = value.AsBool() ? 1u : 0u;
+            }
+            else
+            {
+                m_Prewarm = value.AsUInt32();
+            }
+
+            return true;
+        }
+
+        if (property == "Spawner" || property == "Spawner_Type")
+        {
+            m_SpawnerType = value.AsString();
+            NotifyPropertyListChanged();
+            return true;
+        }
+
+        if (property == "Spawner_Instance")
+        {
+            m_Spawner = value.AsGodotObject();
+            return true;
+        }
+
+        if (property == "Controller" || property == "Controller_Type")
+        {
+            m_ControllerType = value.AsString();
+            NotifyPropertyListChanged();
+            return true;
+        }
+
+        if (property == "Controller_Instance")
+        {
+            m_Controller = value.AsGodotObject();
+            return true;
+        }
+
+        return false;
+    }
+
+    private void BuildScope(Array<Dictionary> properties)
+    {
+        properties.Add(new Dictionary
+        {
+            {"name", "Scope"},
+            {"type", (int) Variant.Type.Int},
+            {"hint", (int) PropertyHint.Enum},
+            {"hint_string", string.Join(",", Enum.GetNames(typeof(Scope)))},
+            {"usage", (int) PropertyUsageFlags.Default}
+        });
+    }
+
+    private void BuildKey(Array<Dictionary> properties)
+    {
+        properties.Add(new Dictionary
+        {
+            {"name", "Key"},
+            {"type", (int) Variant.Type.String},
+            {"hint", (int) PropertyHint.None},
+            {"usage", (int) PropertyUsageFlags.Default}
+        });
+    }
+
+    private void BuildType(Array<Dictionary> properties)
+    {
+        var implementingTypes = AssemblyCache.AllTypes
+                                             .Where(t => !t.IsInterface && !t.IsAbstract && t.IsPublic && !t.ContainsGenericParameters)
+                                             .ToList();
+        var hintString = string.Join(",", implementingTypes.Select(t => t.ToString()));
+        properties.Add(new Dictionary
+        {
+            {"name", "Type"},
+            {"type", (int) Variant.Type.String},
+            {"hint", (int) PropertyHint.Enum},
+            {"hint_string", hintString},
+            {"usage", (int) PropertyUsageFlags.Default}
+        });
+    }
+
+    private void BuildBinding(Array<Dictionary> properties)
+    {
+        if (m_Type == null)
+        {
+            return;
+        }
+
+        var type = Type;
+        var bindings = new List<Type>();
+        GetAllBaseTypes(type, bindings);
+        GetAllInterfaces(type, bindings);
+        var hintString = string.Join(",", bindings.Select(t => t.ToString()));
+        properties.Add(new Dictionary
+        {
+            {"name", "Binding"},
+            {"type", (int) Variant.Type.Array},
+            {"hint", (int) PropertyHint.TypeString},
+            {"hint_string", $"2/2:{hintString}"},
+            {"usage", (int) PropertyUsageFlags.Default}
+        });
+
+        void GetAllBaseTypes(Type t, List<Type> baseTypes)
+        {
+            var baseType = t.BaseType;
+            if (baseType != null && baseType != typeof(object))
+            {
+                baseTypes.Add(baseType);
+                GetAllBaseTypes(baseType, baseTypes);
+            }
+        }
+
+        void GetAllInterfaces(Type t, List<Type> interfaces)
+        {
+            if (t == null)
+            {
+                return;
+            }
+
+            var typeInterfaces = t.GetInterfaces();
+            interfaces.AddRange(typeInterfaces);
+            foreach (var typeInterface in typeInterfaces)
+            {
+                GetAllInterfaces(typeInterface, interfaces);
+            }
+        }
+    }
+
+    private void BuildPrewarm(Array<Dictionary> properties)
+    {
+        if (m_Scope == Scope.Multiton)
+        {
+            properties.Add(new Dictionary
+            {
+                {"name", "Prewarm"},
+                {"type", (int) Variant.Type.Int},
+                {"hint", (int) PropertyHint.None},
+                {"hint_string", (int) PropertyHint.None},
+                {"usage", (int) PropertyUsageFlags.Default}
+            });
+        }
+        else
+        {
+            properties.Add(new Dictionary
+            {
+                {"name", "Prewarm"},
+                {"type", (int) Variant.Type.Bool},
+                {"hint", (int) PropertyHint.None},
+                {"usage", (int) PropertyUsageFlags.Default}
+            });
+        }
+    }
+
+    private void BuildSpawner(Array<Dictionary> properties)
+    {
+        if (m_Type == null)
+        {
+            return;
+        }
+
+        var spawnerTypes = GenericTypeResolver.GetConstrainedImplementations(typeof(ISpawner<>).MakeGenericType(Type), Type);
+        var hintString = string.Join(",", spawnerTypes.Select(t => t.ToString()));
+        if (string.IsNullOrEmpty(m_SpawnerType))
+        {
+            properties.Add(new Dictionary
+            {
+                {"name", "Spawner"},
+                {"type", (int) Variant.Type.String},
+                {"hint", (int) PropertyHint.Enum},
+                {"hint_string", hintString},
+                {"usage", (int) PropertyUsageFlags.Default}
+            });
+            return;
+        }
+
+        var spawnerType = Type.GetType(m_SpawnerType, Reflection.LoadAssemblyResolver, Reflection.DomainTypeResolver);
+        if (spawnerType == null || !typeof(GodotObject).IsAssignableFrom(spawnerType))
+        {
+            properties.Add(new Dictionary
+            {
+                {"name", "Spawner"},
+                {"type", (int) Variant.Type.String},
+                {"hint", (int) PropertyHint.Enum},
+                {"hint_string", hintString},
+                {"usage", (int) PropertyUsageFlags.Default}
+            });
+            return;
+        }
+
+        properties.Add(new Dictionary
+        {
+            {"name", "Spawner"},
+            {"type", (int) Variant.Type.Nil},
+            {"hint", (int) PropertyHint.None},
+            {"hint_string", "Spawner_"},
+            {"usage", (int) PropertyUsageFlags.Group}
+        });
+
+        properties.Add(new Dictionary
+        {
+            {"name", "Spawner_Type"},
+            {"type", (int) Variant.Type.String},
+            {"hint", (int) PropertyHint.Enum},
+            {"hint_string", hintString},
+            {"usage", (int) PropertyUsageFlags.Default}
+        });
+
+        properties.Add(new Dictionary
+        {
+            {"name", "Spawner_Instance"},
+            {"type", (int) Variant.Type.Object},
+            {"hint", (int) PropertyHint.ResourceType},
+            {"hint_string", spawnerType.Name},
+            {"usage", (int) PropertyUsageFlags.Default}
+        });
+    }
+
+    private void BuildController(Array<Dictionary> properties)
+    {
+        if (m_Type == null || m_Scope != Scope.Custom)
+        {
+            return;
+        }
+
+        var controllerTypes = AssemblyCache.AllTypes.Where(t => typeof(IScopeController).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract).ToList();
+        var hintString = string.Join(",", controllerTypes.Select(t => t.ToString()));
+        if (string.IsNullOrEmpty(m_ControllerType))
+        {
+            properties.Add(new Dictionary
+            {
+                {"name", "Controller"},
+                {"type", (int) Variant.Type.String},
+                {"hint", (int) PropertyHint.Enum},
+                {"hint_string", hintString},
+                {"usage", (int) PropertyUsageFlags.Default}
+            });
+            return;
+        }
+
+        var controllerType = Type.GetType(m_ControllerType, Reflection.LoadAssemblyResolver, Reflection.DomainTypeResolver);
+        if (controllerType == null || !typeof(GodotObject).IsAssignableFrom(controllerType))
+        {
+            properties.Add(new Dictionary
+            {
+                {"name", "Controller"},
+                {"type", (int) Variant.Type.String},
+                {"hint", (int) PropertyHint.Enum},
+                {"hint_string", hintString},
+                {"usage", (int) PropertyUsageFlags.Default}
+            });
+            return;
+        }
+
+        properties.Add(new Dictionary
+        {
+            {"name", "Controller"},
+            {"type", (int) Variant.Type.Nil},
+            {"hint", (int) PropertyHint.None},
+            {"hint_string", "Spawner_"},
+            {"usage", (int) PropertyUsageFlags.Group}
+        });
+
+        properties.Add(new Dictionary
+        {
+            {"name", "Controller_Type"},
+            {"type", (int) Variant.Type.String},
+            {"hint", (int) PropertyHint.Enum},
+            {"hint_string", hintString},
+            {"usage", (int) PropertyUsageFlags.Default}
+        });
+
+        properties.Add(new Dictionary
+        {
+            {"name", "Controller_Instance"},
+            {"type", (int) Variant.Type.Object},
+            {"hint", (int) PropertyHint.ResourceType},
+            {"hint_string", controllerType.Name},
+            {"usage", (int) PropertyUsageFlags.Default}
+        });
+    }
+}
