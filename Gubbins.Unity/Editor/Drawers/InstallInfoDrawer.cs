@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using Gubbins.Context;
 using Gubbins.Enhance;
 using Gubbins.Spawner;
@@ -73,7 +74,7 @@ namespace Gubbins.Editor
                     return CreatePropertyField(properties.Prewarm, "Prewarm");
                 }
 
-                var choices  = new List<string> {"Lazy", "Eager"};
+                var choices = new List<string> {"Lazy", "Eager"};
                 var dropdown = new DropdownField("Prewarm", choices, Math.Clamp(properties.Prewarm.intValue, 0, 1));
                 dropdown.AddToClassList(ObjectField.alignedFieldUssClassName);
                 dropdown.RegisterValueChangedCallback(evt =>
@@ -91,8 +92,8 @@ namespace Gubbins.Editor
             void RelayoutDynamic()
             {
                 if (root.Contains(controller)) root.Remove(controller);
-                if (root.Contains(prewarm))    root.Remove(prewarm);
-                if (root.Contains(spawner))    root.Remove(spawner);
+                if (root.Contains(prewarm)) root.Remove(prewarm);
+                if (root.Contains(spawner)) root.Remove(spawner);
                 if (bindings != null && root.Contains(bindings)) root.Remove(bindings);
 
                 if (properties.Type.GetValue() is not SerializedType currentType || currentType.Type == null)
@@ -156,14 +157,21 @@ namespace Gubbins.Editor
             void OnTypeChanged(SerializedPropertyChangeEvent evt)
             {
                 var changedType = (SerializedType) evt.changedProperty.GetValue();
-                var hasType     = changedType.Type != null;
+                var hasType = changedType.Type != null;
+                var hasInjectConstructor = hasType && ContainsInjectConstructor(changedType.Type);
 
                 properties.Key.stringValue = hasType ? changedType.Type.ToString() : string.Empty;
 
-                // 1) Update the underlying data.
+                // Update the underlying data.
                 properties.Bindings.Clear();
-#if UNITY_2023_2_OR_NEWER
-                AssignSpawner(properties.Spawner, SelectSpawnerType(changedType.Type));
+#if UNITY_2023_2_OR_NEWER // Only Unity 2023.2+ supports generic SerializedReference fields.
+                Type spawnerType = null;
+                // If the product type has an [Inject] constructor, we don't want to override the spawner type with a default one.
+                if (hasInjectConstructor)
+                {
+                    spawnerType = SelectSpawnerType(changedType.Type);
+                }
+                AssignSpawner(properties.Spawner, spawnerType);
 #endif
                 if (!hasType)
                 {
@@ -172,13 +180,13 @@ namespace Gubbins.Editor
                     properties.Prewarm.intValue = 0;
                 }
 
-                // 2) Commit so the fields recreated below see the up-to-date serialized state — CreateSpawnerProperty's
-                //    initial RebuildChildren calls serializedObject.Update(), which would otherwise revert the changes.
+                // Commit so the fields recreated below see the up-to-date serialized state — CreateSpawnerProperty's
+                // initial RebuildChildren calls serializedObject.Update(), which would otherwise revert the changes.
                 property.serializedObject.ApplyModifiedProperties();
 
-                // 3) Recreate the type-dependent fields against the new data. The spawner must be rebuilt rather than
-                //    just re-attached: its child fields and type selector are wired up inside CreateSpawnerProperty,
-                //    and a stale element re-attached after the data changed never re-runs RebuildChildren.
+                // Recreate the type-dependent fields against the new data. The spawner must be rebuilt rather than
+                // just re-attached: its child fields and type selector are wired up inside CreateSpawnerProperty,
+                // and a stale element re-attached after the data changed never re-runs RebuildChildren.
                 if (bindings != null && root.Contains(bindings)) root.Remove(bindings);
                 if (root.Contains(spawner)) root.Remove(spawner);
 
@@ -250,6 +258,23 @@ namespace Gubbins.Editor
             {
                 return null;
             }
+        }
+
+        /// <summary>
+        /// Returns true if <paramref name="type"/> has a constructor marked with <see cref="InjectAttribute"/>.
+        /// </summary>
+        private static bool ContainsInjectConstructor(Type type)
+        {
+            var constructors = type.GetConstructors();
+            foreach (var constructor in constructors)
+            {
+                if (constructor.GetCustomAttribute(typeof(InjectAttribute)) != null)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>

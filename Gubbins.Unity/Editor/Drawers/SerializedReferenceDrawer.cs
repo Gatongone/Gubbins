@@ -108,10 +108,7 @@ namespace Gubbins.Editor
         /// </summary>
         private Type GetFieldTypeInHierarchy(Type currentType, string fieldName)
         {
-            const System.Reflection.BindingFlags flags =
-                System.Reflection.BindingFlags.Instance |
-                System.Reflection.BindingFlags.Public |
-                System.Reflection.BindingFlags.NonPublic;
+            const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
 
             while (currentType != null)
             {
