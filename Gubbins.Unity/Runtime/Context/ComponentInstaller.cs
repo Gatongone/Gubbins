@@ -9,7 +9,7 @@ namespace Gubbins.Context
     /// of <see cref="SerializedInstallInfo"/> entries. Attach to any GameObject in the scene to
     /// contribute bindings to the context at install time.
     /// </summary>
-    public class GameObjectInstaller : MonoBehaviour, IDependenciesInstaller
+    public class ComponentInstaller : MonoBehaviour, IDependenciesInstaller
     {
         /// <summary>
         /// Serialized install info array.
@@ -20,11 +20,11 @@ namespace Gubbins.Context
         public void Install(IDependenciesRegistry registry) => registry.RegisterAll(InstallInfos.Select(static item => item.ToInstallInfo()));
 
 #if UNITY_EDITOR
-        [UnityEditor.MenuItem("GameObject/Context/GameObjectInstaller", priority = 11)]
-        private static GameObject CreatePrefab()
+        [UnityEditor.MenuItem("GameObject/Context/ComponentInstaller", priority = 11)]
+        private static GameObject CreateInstance()
         {
-            var go = new GameObject("GameObjectInstaller");
-            go.AddComponent<GameObjectInstaller>();
+            var go = new GameObject("ComponentInstaller");
+            go.AddComponent<ComponentInstaller>();
             return go;
         }
 #endif
