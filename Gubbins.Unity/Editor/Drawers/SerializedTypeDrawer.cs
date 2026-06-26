@@ -169,7 +169,6 @@ namespace Gubbins.Editor
         {
             if (typeKind == TypeKind.All)
                 return true;
-
             if ((typeKind & TypeKind.Interface) != 0 && !type.IsInterface)
                 return false;
             if ((typeKind & TypeKind.Abstract) != 0 && !type.IsAbstract)
@@ -468,6 +467,8 @@ namespace Gubbins.Editor
             s_OptionCache[cacheKey] = typedOptions;
             return typedOptions;
         }
+
+        private static bool IsStatic(Type type) => type.Attributes.HasFlag(TypeAttributes.Abstract | TypeAttributes.Sealed);
 
         #endregion
 

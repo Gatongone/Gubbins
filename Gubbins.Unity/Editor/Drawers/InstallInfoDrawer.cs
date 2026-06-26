@@ -14,6 +14,9 @@ using Object = UnityEngine.Object;
 
 namespace Gubbins.Editor
 {
+    /// <summary>
+    /// Custom property drawer for <see cref="SerializedInstallInfo"/>, providing a dynamic UI that adapts to the selected product type and scope.
+    /// </summary>
     [CustomPropertyDrawer(typeof(SerializedInstallInfo))]
     public class InstallInfoDrawer : PropertyDrawer
     {
@@ -24,6 +27,7 @@ namespace Gubbins.Editor
             public readonly SerializedProperty Type;
             public readonly SerializedProperty Bindings;
             public readonly SerializedProperty Controller;
+            public readonly SerializedProperty Instance;
             public readonly SerializedProperty Spawner;
             public readonly SerializedProperty Prewarm;
 
@@ -36,34 +40,53 @@ namespace Gubbins.Editor
                 Controller = property.FindPropertyRelative(nameof(SerializedInstallInfo.Controller));
                 Spawner    = property.FindPropertyRelative(nameof(SerializedInstallInfo.Spawner));
                 Prewarm    = property.FindPropertyRelative(nameof(SerializedInstallInfo.Prewarm));
+                Instance   = property.FindPropertyRelative(nameof(SerializedInstallInfo.Instance));
             }
+        }
+
+        private class UIElements
+        {
+            public VisualElement Root;
+            public PropertyField Scope;
+            public PropertyField Key;
+            public PropertyField Type;
+            public PropertyField Controller;
+            public VisualElement Prewarm;
+            public VisualElement Bindings;
+            public VisualElement Instance;
+            public VisualElement Spawner;
         }
 
         public override VisualElement CreatePropertyGUI(SerializedProperty property)
         {
             // Create a container for the property fields
-            var root = new VisualElement();
             var properties = new Properties(property);
-            var scope = CreatePropertyField(properties.Scope);
-            var key = CreatePropertyField(properties.Key);
-            var type = CreatePropertyField(properties.Type);
-            var bindings = CreateBindingProperty(properties.Bindings, properties.Type);
-            var controller = CreatePropertyField(properties.Controller);
-            var spawner = CreateSpawnerProperty(properties.Spawner);
             var currentScope = (Scope) properties.Scope.enumValueIndex;
-            var prewarm = CreatePrewarmField();
+            var elements = new UIElements
+            {
+                Root = new VisualElement()
+            };
+            elements.Scope      = CreatePropertyField(properties.Scope);
+            elements.Key        = CreatePropertyField(properties.Key);
+            elements.Type       = CreatePropertyField(properties.Type);
+            elements.Controller = CreatePropertyField(properties.Controller);
+            elements.Bindings   = CreateBindingProperty(properties.Bindings, properties.Type);
+            elements.Prewarm    = CreatePrewarmField();
+            elements.Spawner    = CreateSpawnerProperty(properties.Spawner, OnSpawnerChanged);
+            elements.Instance   = CreateInstanceProperty(properties.Instance, properties.Type.GetValue() is SerializedType serializedType ? serializedType.Type : null, OnInstanceChanged);
+
 
             // Build root. key/scope/type are always present; everything below Type is laid out by
             // RelayoutDynamic based on the current product Type and Scope.
-            root.Add(key);
-            root.Add(scope);
-            root.Add(type);
+            elements.Root.Add(elements.Key);
+            elements.Root.Add(elements.Scope);
+            elements.Root.Add(elements.Type);
             RelayoutDynamic();
 
             // Register callbacks.
-            scope.RegisterValueChangeCallback(OnScopeChanged);
-            type.RegisterValueChangeCallback(OnTypeChanged);
-            return root;
+            elements.Scope.RegisterValueChangeCallback(OnScopeChanged);
+            elements.Type.RegisterValueChangeCallback(OnTypeChanged);
+            return elements.Root;
 
             // Prewarm means different things per scope: for Multiton it's a preallocation count (numeric field);
             // for every other scope it's a binary load strategy — 1 = eager, 0 = lazy.
@@ -91,27 +114,41 @@ namespace Gubbins.Editor
             // Type is set, everything below Type stays detached (its data is cleared by the callers).
             void RelayoutDynamic()
             {
-                if (root.Contains(controller)) root.Remove(controller);
-                if (root.Contains(prewarm)) root.Remove(prewarm);
-                if (root.Contains(spawner)) root.Remove(spawner);
-                if (bindings != null && root.Contains(bindings)) root.Remove(bindings);
+                TryRemove(elements.Controller);
+                TryRemove(elements.Prewarm);
+                TryRemove(elements.Instance);
+                TryRemove(elements.Spawner);
+                TryRemove(elements.Bindings);
 
                 if (properties.Type.GetValue() is not SerializedType currentType || currentType.Type == null)
                 {
                     return;
                 }
 
-                if (currentScope is not (Scope.Singleton or Scope.Multiton))
+                var instance = properties.Instance.GetValue() as Object;
+                var spawner = (properties.Spawner.GetValue() as SerializedReference<ISpawner>)?.Value;
+
+                if (currentScope is Scope.Custom)
                 {
-                    root.Add(controller);
+                    TryAdd(elements.Controller);
                 }
 
-                root.Add(prewarm);
-                root.Add(spawner);
-                if (bindings != null)
+                if (instance != null)
                 {
-                    root.Add(bindings);
+                    TryAdd(elements.Prewarm);
                 }
+
+                if (spawner == null && currentScope is not Scope.Multiton)
+                {
+                    TryAdd(elements.Instance);
+                }
+
+                if (instance == null)
+                {
+                    TryAdd(elements.Spawner);
+                }
+
+                TryAdd(elements.Bindings);
             }
 
             void OnScopeChanged(SerializedPropertyChangeEvent evt)
@@ -123,7 +160,7 @@ namespace Gubbins.Editor
                 }
 
                 // Switching into or out of Multiton swaps the prewarm control (numeric ↔ binary).
-                var multitonChanged = (currentScope is Scope.Multiton) != (newScope is Scope.Multiton);
+                var multitonChanged = currentScope is Scope.Multiton != newScope is Scope.Multiton;
                 currentScope = newScope;
 
                 if (newScope is Scope.Singleton or Scope.Multiton)
@@ -138,8 +175,8 @@ namespace Gubbins.Editor
 
                 if (multitonChanged)
                 {
-                    if (root.Contains(prewarm)) root.Remove(prewarm);
-                    prewarm = CreatePrewarmField();
+                    TryRemove(elements.Prewarm);
+                    elements.Prewarm = CreatePrewarmField();
                 }
 
                 RelayoutDynamic();
@@ -148,7 +185,7 @@ namespace Gubbins.Editor
                 // no-op for the binary DropdownField, which syncs Prewarm.intValue manually.
                 if (multitonChanged)
                 {
-                    prewarm.Bind(property.serializedObject);
+                    elements.Prewarm.Bind(property.serializedObject);
                 }
 
                 property.serializedObject.ApplyModifiedProperties();
@@ -159,19 +196,28 @@ namespace Gubbins.Editor
                 var changedType = (SerializedType) evt.changedProperty.GetValue();
                 var hasType = changedType.Type != null;
                 var hasInjectConstructor = hasType && ContainsInjectConstructor(changedType.Type);
+                var isUnityEngineObject = hasType && typeof(Object).IsAssignableFrom(changedType.Type);
+                var canRegisterInstance = isUnityEngineObject && currentScope is Scope.Singleton or Scope.Custom;
+                Type spawnerType = null;
 
                 properties.Key.stringValue = hasType ? changedType.Type.ToString() : string.Empty;
-
-                // Update the underlying data.
+                properties.Instance.Clear();
                 properties.Bindings.Clear();
+                TryRemove(elements.Spawner);
+                TryRemove(elements.Instance);
+                TryRemove(elements.Bindings);
+                TryRemove(elements.Controller);
+
 #if UNITY_2023_2_OR_NEWER // Only Unity 2023.2+ supports generic SerializedReference fields.
-                Type spawnerType = null;
                 // If the product type has an [Inject] constructor, we don't want to override the spawner type with a default one.
                 if (hasInjectConstructor)
                 {
                     spawnerType = SelectSpawnerType(changedType.Type);
                 }
+
                 AssignSpawner(properties.Spawner, spawnerType);
+#else
+                AssignSpawner(properties.Spawner, null);
 #endif
                 if (!hasType)
                 {
@@ -180,34 +226,100 @@ namespace Gubbins.Editor
                     properties.Prewarm.intValue = 0;
                 }
 
-                // Commit so the fields recreated below see the up-to-date serialized state — CreateSpawnerProperty's
-                // initial RebuildChildren calls serializedObject.Update(), which would otherwise revert the changes.
-                property.serializedObject.ApplyModifiedProperties();
+                elements.Bindings = hasType ? CreateBindingProperty(properties.Bindings, properties.Type) : null;
 
-                // Recreate the type-dependent fields against the new data. The spawner must be rebuilt rather than
-                // just re-attached: its child fields and type selector are wired up inside CreateSpawnerProperty,
-                // and a stale element re-attached after the data changed never re-runs RebuildChildren.
-                if (bindings != null && root.Contains(bindings)) root.Remove(bindings);
-                if (root.Contains(spawner)) root.Remove(spawner);
+                if (hasType && properties.Instance.GetValue() == null)
+                {
+                    elements.Spawner = CreateSpawnerProperty(properties.Spawner, OnSpawnerChanged);
+                }
+                else
+                {
+                    elements.Spawner = null;
+                }
 
-                bindings = hasType ? CreateBindingProperty(properties.Bindings, properties.Type) : null;
+                if (canRegisterInstance && spawnerType == null && currentScope is not Scope.Multiton)
+                {
+                    elements.Instance = CreateInstanceProperty(properties.Instance, changedType.Type, OnInstanceChanged);
+                }
+                else
+                {
+                    elements.Instance = null;
+                }
+
                 if (hasType)
                 {
-                    spawner = CreateSpawnerProperty(properties.Spawner);
+                    elements.Spawner?.Bind(property.serializedObject);
+                    elements.Bindings?.Bind(property.serializedObject);
                 }
 
                 RelayoutDynamic();
 
-                // The root is already bound, so these freshly created fields won't auto-bind — bind them
-                // explicitly or their PropertyFields (e.g. the spawner's type selector) render empty.
-                if (hasType)
+                // Commit so the fields recreated below see the up-to-date serialized state — CreateSpawnerProperty's
+                // initial RebuildChildren calls serializedObject.Update(), which would otherwise revert the changes.
+                property.serializedObject.ApplyModifiedProperties();
+            }
+
+            void OnInstanceChanged(object previousValue, object newValue, Type currentType)
+            {
+                var value = newValue;
+                if (previousValue == value)
                 {
-                    spawner.Bind(property.serializedObject);
-                    bindings?.Bind(property.serializedObject);
+                    return;
+                }
+
+                TryRemove(elements.Spawner);
+                if (value != null)
+                {
+                    properties.Spawner.Clear();
+                    elements.Spawner = null;
+                }
+                else
+                {
+                    elements.Spawner = CreateSpawnerProperty(properties.Spawner, OnSpawnerChanged);
+                }
+
+                properties.Instance.SetValue(value);
+                properties.Instance.serializedObject.ApplyModifiedProperties();
+                RelayoutDynamic();
+            }
+
+            void OnSpawnerChanged(SerializedPropertyChangeEvent evt)
+            {
+                var value = (evt.changedProperty.GetValue() as SerializedReference<ISpawner>)?.Value;
+                TryRemove(elements.Instance);
+                if (value != null)
+                {
+                    properties.Instance.Clear();
+                    elements.Instance = null;
+                }
+                else
+                {
+                    elements.Instance = CreateInstanceProperty(properties.Instance, properties.Type.GetValue() is SerializedType t ? t.Type : null, OnInstanceChanged);
+                }
+
+                properties.Instance.serializedObject.ApplyModifiedProperties();
+                RelayoutDynamic();
+            }
+
+            void TryRemove(VisualElement element)
+            {
+                if (element != null && elements.Root.Contains(element))
+                {
+                    elements.Root.Remove(element);
+                }
+            }
+            void TryAdd(VisualElement element)
+            {
+                if (element != null && !elements.Root.Contains(element))
+                {
+                    elements.Root.Add(element);
                 }
             }
         }
 
+        /// <summary>
+        /// Creates a <see cref="PropertyField"/> for the given <paramref name="property"/>, optionally overriding its label with <paramref name="name"/>.
+        /// </summary>
         private PropertyField CreatePropertyField(SerializedProperty property, string name = "")
         {
             if (property == null)
@@ -310,7 +422,37 @@ namespace Gubbins.Editor
             if (typeName != null) typeName.stringValue          = spawnerType.AssemblyQualifiedName;
         }
 
-        private VisualElement CreateSpawnerProperty(SerializedProperty property)
+        /// <summary>
+        /// Creates an <see cref="ObjectField"/> for the given <paramref name="property"/>.
+        /// </summary>
+        private ObjectField CreateInstanceProperty(SerializedProperty property, Type type, Action<object, object, Type> onInstanceChanged = null)
+        {
+            if (type == null || property == null)
+            {
+                return null;
+            }
+
+            if (!typeof(Object).IsAssignableFrom(type))
+            {
+                return null;
+            }
+
+            var isComponent = typeof(Component).IsAssignableFrom(type);
+            var container = new ObjectField(property.displayName)
+            {
+                objectType        = type,
+                allowSceneObjects = isComponent,
+                bindingPath = property.propertyPath
+            };
+            container.AddToClassList(ObjectField.alignedFieldUssClassName);
+            container.RegisterValueChangedCallback(evt => { onInstanceChanged?.Invoke(evt.previousValue, evt.newValue, type); });
+            return container;
+        }
+
+        /// <summary>
+        /// Creates a foldout containing the spawner property and its child properties, rebuilding the children when the spawner type changes.
+        /// </summary>
+        private VisualElement CreateSpawnerProperty(SerializedProperty property, Action<SerializedPropertyChangeEvent> onSpawnerChanged = null)
         {
             const string pureProperty = nameof(SerializedReference<object>.pureReference);
             const string unityProperty = nameof(SerializedReference<object>.unityReference);
@@ -329,7 +471,11 @@ namespace Gubbins.Editor
 
             string lastBuiltType = null;
             RebuildChildren();
-            propField.RegisterValueChangeCallback(_ => RebuildChildren());
+            propField.RegisterValueChangeCallback(evt =>
+            {
+                RebuildChildren();
+                onSpawnerChanged?.Invoke(evt);
+            });
 
             return foldout;
 
@@ -573,6 +719,9 @@ namespace Gubbins.Editor
             }
         }
 
+        /// <summary>
+        /// Creates a foldout with a border and padding, suitable for grouping related properties together.
+        /// </summary>
         private static Foldout CreateFoldout(SerializedProperty property)
         {
             var borderCol = new Color(0.1f, 0.1f, 0.1f);

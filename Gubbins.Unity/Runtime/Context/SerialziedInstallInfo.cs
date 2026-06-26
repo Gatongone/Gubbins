@@ -2,6 +2,7 @@
 using System.Linq;
 using Gubbins.Enhance;
 using Gubbins.Spawner;
+using UnityEngine.Serialization;
 
 namespace Gubbins.Context
 {
@@ -26,6 +27,11 @@ namespace Gubbins.Context
         /// </summary>
         [TypeFrom(TypeKind.Implementation | TypeKind.NotGeneric)]
         public SerializedType Type;
+
+        /// <summary>
+        /// Gets or sets the prototype object associated with the type to be installed.
+        /// </summary>
+        [FormerlySerializedAs("Prototype")] public UnityEngine.Object Instance;
 
         /// <summary>
         /// Gets or sets the serialized types that are bound to the type being installed.

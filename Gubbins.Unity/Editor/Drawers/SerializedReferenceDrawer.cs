@@ -197,7 +197,7 @@ namespace Gubbins.Editor
         /// <summary>
         /// Get all implementations assignable to <paramref name="closedExpected"/>, closing single-parameter generic
         /// definitions with <paramref name="argument"/> so the dropdown offers concrete, type-matched spawners
-        /// (e.g. <c>AutoSpawner&lt;Foo&gt;</c>) rather than open definitions requiring a manual type argument.
+        /// (e.g. <c>CommonSpawner&lt;Foo&gt;</c>) rather than open definitions requiring a manual type argument.
         /// </summary>
         private List<Type> GetConstrainedImplementations(Type closedExpected, Type argument)
         {

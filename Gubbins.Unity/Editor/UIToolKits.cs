@@ -6,6 +6,9 @@ using UnityEditor;
 
 namespace Gubbins.Editor
 {
+    /// <summary>
+    /// A collection of utility methods for working with Unity's <see cref="SerializedProperty"/> class.
+    /// </summary>
     internal static class UIToolKits
     {
         /// <summary>
@@ -84,16 +87,25 @@ namespace Gubbins.Editor
         }
 
 #if UNITY_2022_2_OR_NEWER
+        /// <summary>
+        /// Get the value of <paramref name="property"/> as an object.
+        /// </summary>
         internal static object GetValue(this SerializedProperty property)
         {
             return property.boxedValue;
         }
 
+        /// <summary>
+        /// Set the value of <paramref name="property"/> to <paramref name="value"/>.
+        /// </summary>
         internal static void SetValue(this SerializedProperty property, object value)
         {
             property.boxedValue = value;
         }
 #else
+        /// <summary>
+        /// Get the value of <paramref name="property"/> as an object.
+        /// </summary>
         internal static object GetValue(this SerializedProperty property)
         {
             var path = property.propertyPath.Replace(".Array.data[", "[");
@@ -116,6 +128,9 @@ namespace Gubbins.Editor
             return obj;
         }
 
+        /// <summary>
+        /// Set the value of <paramref name="property"/> to <paramref name="value"/>.
+        /// </summary>
         internal static void SetValue(this SerializedProperty property, object value)
         {
             var path = property.propertyPath.Replace(".Array.data[", "[");

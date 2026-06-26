@@ -4,11 +4,11 @@ using UnityEngine;
 namespace Gubbins.Spawner
 {
     [Serializable]
-    public class AutoSpawner<T> : ISpawner<T>
+    public class CommonSpawner<T> : ISpawner<T>
     {
         private static readonly ISpawner<T> s_Instance;
 
-        static AutoSpawner()
+        static CommonSpawner()
         {
             if (typeof(T).IsAssignableFrom(typeof(ScriptableObject)))
             {

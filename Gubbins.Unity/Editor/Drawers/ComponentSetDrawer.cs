@@ -10,6 +10,9 @@ using UnityEngine.UIElements;
 
 namespace Gubbins.Editor
 {
+    /// <summary>
+    /// Custom property drawer for the ComponentSet class, providing both IMGUI and UI Toolkit implementations.
+    /// </summary>
     [CustomPropertyDrawer(typeof(ComponentSet))]
     internal class ComponentSetDrawer : PropertyDrawer
     {

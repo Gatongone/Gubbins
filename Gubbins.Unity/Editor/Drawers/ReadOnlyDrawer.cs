@@ -5,6 +5,9 @@ using UnityEngine.UIElements;
 
 namespace Gubbins.Editor
 {
+    /// <summary>
+    /// A custom property drawer for the ReadOnlyAttribute, which makes fields in the Unity Inspector read-only.
+    /// </summary>
     [CustomPropertyDrawer(typeof(Enhance.ReadOnlyAttribute))]
     internal class ReadOnlyDrawer : PropertyDrawer
     {

@@ -4,10 +4,19 @@ using System.Reflection;
 
 namespace Gubbins.Editor
 {
+    /// <summary>
+    /// Caches all types from all loaded assemblies to avoid repeated reflection calls.
+    /// </summary>
     internal static class AssemblyCache
     {
+        /// <summary>
+        /// Gets all types from all loaded assemblies.
+        /// </summary>
         internal static readonly Type[] AllTypes = GetAllTypes();
 
+        /// <summary>
+        /// Gets all types from all loaded assemblies, handling any exceptions that may occur during type loading.
+        /// </summary>
         private static Type[] GetAllTypes()
         {
             var assemblies = GetAllAssemblies();
@@ -25,6 +34,10 @@ namespace Gubbins.Editor
             }
             return types.ToArray();
         }
+
+        /// <summary>
+        /// Gets all loaded assemblies in the current application domain, with special handling for Unity.
+        /// </summary>
         private static IReadOnlyList<Assembly> GetAllAssemblies()
         {
 #if UNITY_6000_5_OR_NEWER

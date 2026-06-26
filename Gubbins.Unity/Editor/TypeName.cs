@@ -3,6 +3,9 @@ using System.Linq;
 
 namespace Gubbins.Editor
 {
+    /// <summary>
+    /// Utility methods for generating friendly type names for display in the editor.
+    /// </summary>
     public static class TypeName
     {
         /// <summary>
