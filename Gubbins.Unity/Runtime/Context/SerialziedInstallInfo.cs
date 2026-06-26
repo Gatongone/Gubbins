@@ -94,6 +94,10 @@ namespace Gubbins.Context
                     result.Instances = array;
                 }
             }
+            else if (Instance != null)
+            {
+                result.Instance = Instance;
+            }
 
             return result;
         }
