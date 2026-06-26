@@ -30,7 +30,7 @@ public partial class SerializedInstallInfo : global::Godot.Resource
     /// <summary>
     /// Gets the Type of the controller based on the stored controller type string. If the string is null or empty, it returns null. Otherwise, it attempts to resolve the type using reflection.
     /// </summary>
-    private Type ControllerType => string.IsNullOrEmpty(m_ControllerType) ? null : Type;
+    private Type ControllerType => string.IsNullOrEmpty(m_ControllerType) ? null : Type.GetType(m_ControllerType, Reflection.LoadAssemblyResolver, Reflection.DomainTypeResolver);
 
     /// <summary>
     /// Gets the Type of the main type based on the stored type string. If the string is null or empty, it returns null. Otherwise, it attempts to resolve the type using reflection.
@@ -398,21 +398,8 @@ public partial class SerializedInstallInfo : global::Godot.Resource
 
         var spawnerTypes = GenericTypeResolver.GetConstrainedImplementations(typeof(ISpawner<>).MakeGenericType(Type), Type);
         var hintString = string.Join(",", spawnerTypes.Select(t => t.ToString()));
-        if (string.IsNullOrEmpty(m_SpawnerType))
-        {
-            properties.Add(new Dictionary
-            {
-                {"name", "Spawner"},
-                {"type", (int) Variant.Type.String},
-                {"hint", (int) PropertyHint.Enum},
-                {"hint_string", hintString},
-                {"usage", (int) PropertyUsageFlags.Default}
-            });
-            return;
-        }
-
-        var spawnerType = Type.GetType(m_SpawnerType, Reflection.LoadAssemblyResolver, Reflection.DomainTypeResolver);
-        if (spawnerType == null || !typeof(GodotObject).IsAssignableFrom(spawnerType))
+        var spawnerType = SpawnerType;
+        if (string.IsNullOrEmpty(m_SpawnerType) || spawnerType == null || !typeof(GodotObject).IsAssignableFrom(spawnerType))
         {
             properties.Add(new Dictionary
             {
@@ -467,21 +454,8 @@ public partial class SerializedInstallInfo : global::Godot.Resource
 
         var controllerTypes = AssemblyCache.AllTypes.Where(t => typeof(IScopeController).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract).ToList();
         var hintString = string.Join(",", controllerTypes.Select(t => t.ToString()));
-        if (string.IsNullOrEmpty(m_ControllerType))
-        {
-            properties.Add(new Dictionary
-            {
-                {"name", "Controller"},
-                {"type", (int) Variant.Type.String},
-                {"hint", (int) PropertyHint.Enum},
-                {"hint_string", hintString},
-                {"usage", (int) PropertyUsageFlags.Default}
-            });
-            return;
-        }
-
-        var controllerType = Type.GetType(m_ControllerType, Reflection.LoadAssemblyResolver, Reflection.DomainTypeResolver);
-        if (controllerType == null || !typeof(GodotObject).IsAssignableFrom(controllerType))
+        var controllerType = ControllerType;
+        if (string.IsNullOrEmpty(m_ControllerType) || controllerType == null || !typeof(GodotObject).IsAssignableFrom(controllerType))
         {
             properties.Add(new Dictionary
             {

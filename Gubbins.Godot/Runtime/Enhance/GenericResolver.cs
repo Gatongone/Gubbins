@@ -2,8 +2,14 @@
 
 namespace Gubbins.Enhance;
 
+/// <summary>
+/// A utility class for resolving generic types and their implementations, particularly for use with serialized references in Godot.
+/// </summary>
 internal static class GenericTypeResolver
 {
+    /// <summary>
+    /// A cache for storing previously resolved constrained implementations to improve performance on repeated lookups.
+    /// </summary>
     private static readonly Dictionary<(Type expected, Type arg), List<Type>> s_ConstrainedCache = new();
 
     /// <summary>
@@ -57,6 +63,18 @@ internal static class GenericTypeResolver
         }
     }
 
-    private static bool IsInstantiableMatch(Type t, Type expectedType) => expectedType.IsAssignableFrom(t) && (ContainsDefaultConstructor(t) || typeof(GodotObject).IsAssignableFrom(t));
+    /// <summary>
+    /// Check if the type is assignable to the expected type and has a default constructor or is a GodotObject.
+    /// </summary>
+    /// <param name="type">The type to check.</param>
+    /// <param name="expectedType".">The expected type to match against.</param>
+    /// <returns></returns>
+    private static bool IsInstantiableMatch(Type type, Type expectedType) => expectedType.IsAssignableFrom(type) && (ContainsDefaultConstructor(type) || typeof(GodotObject).IsAssignableFrom(type));
+
+    /// <summary>
+    /// Check if the type has a default constructor.
+    /// </summary>
+    /// <param name="type"></param>
+    /// <returns></returns>
     private static bool ContainsDefaultConstructor(Type type) => type.GetConstructor(Type.EmptyTypes) != null;
 }

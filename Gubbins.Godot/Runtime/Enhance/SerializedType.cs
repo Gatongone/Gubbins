@@ -4,26 +4,45 @@ using Gubbins.Unsafe;
 
 namespace Gubbins.Enhance;
 
+/// <summary>
+/// A serialized reference to a Type object, allowing for easy serialization and deserialization of types in Godot.
+/// </summary>
+/// <param name="assignableType">The type that the serialized type must be assignable to. If null, any type is allowed.</param>
+/// <param name="kind">The kind of type to serialize. This can be a combination of TypeKind flags.</param>
 [GlobalClass, Tool]
 public partial class SerializedType(Type assignableType = null, TypeKind kind = TypeKind.All) : global::Godot.Resource
 {
+    /// <summary>
+    /// The string representation of the type. This is used for serialization and deserialization.
+    /// </summary>
     private string m_TypeString = "";
 
+    /// <summary>
+    /// Gets the Type represented by this serialized reference. If the type string is null or empty, this will return null.
+    /// </summary>
     public Type Type => string.IsNullOrEmpty(m_TypeString) ? null : Type.GetType(m_TypeString, Reflection.LoadAssemblyResolver, Reflection.DomainTypeResolver);
+
+    /// <summary>
+    /// The type that the serialized type must be assignable to. If null, any type is allowed.
+    /// </summary>
     private TypeKind m_TypeKindFlags = kind;
 
+    /// <summary>
+    /// Initializes a new instance of the SerializedType class with the specified assignable type and kind.
+    /// </summary>
     public SerializedType() : this(null) { }
 
+    /// <inheritdoc/>
     public override Array<Dictionary> _GetPropertyList()
     {
         var properties = new Array<Dictionary>();
         var implementingTypes = assignableType != null
             ? AssemblyCache.AllTypes
-                             .Where(t => assignableType.IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract && VerifyTypeKind(m_TypeKindFlags, t))
-                             .ToList()
+                           .Where(t => assignableType.IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract && VerifyTypeKind(m_TypeKindFlags, t))
+                           .ToList()
             : AssemblyCache.AllTypes
-                             .Where(t => VerifyTypeKind(m_TypeKindFlags, t))
-                             .ToList();
+                           .Where(t => VerifyTypeKind(m_TypeKindFlags, t))
+                           .ToList();
 
         var hintString = string.Join(",", implementingTypes.Select(t => t.ToString()));
 
@@ -94,6 +113,7 @@ public partial class SerializedType(Type assignableType = null, TypeKind kind = 
         }
     }
 
+    /// <inheritdoc/>
     public override bool _Set(StringName property, Variant value)
     {
         if (property == nameof(Type))
@@ -105,6 +125,7 @@ public partial class SerializedType(Type assignableType = null, TypeKind kind = 
         return false;
     }
 
+    /// <inheritdoc/>
     public override Variant _Get(StringName property)
     {
         if (property == nameof(Type)) return m_TypeString;
