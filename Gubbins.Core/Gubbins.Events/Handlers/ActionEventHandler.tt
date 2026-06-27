@@ -11,24 +11,24 @@ public sealed class ActionEventHandler : IEventHandler, IEquatable<Action>, IEqu
     /// <summary>
     /// Action with method provider.
     /// </summary>
-    private readonly Action m_Invocation;
+    public readonly Action Invocation;
 
     /// <summary>
     /// Create an event handler from a Action.
     /// </summary>
     /// <param name="delegation">Delegation for creating EventHandler.</param>   
-    public ActionEventHandler(Action delegation) => m_Invocation = delegation;
+    public ActionEventHandler(Action delegation) => Invocation = delegation;
 
     /// <summary>
     /// <inheritdoc cref="IEventHandler{TNotification}.Handle"/>
     /// </summary>
-    public void Handle() => m_Invocation.Invoke();
+    public void Handle() => Invocation.Invoke();
 
     /// <inheritdoc/>
     void IEventHandler<Unit>.Handle(Unit arg) => Handle();
 
     /// <inheritdoc/>
-    public override int GetHashCode() => m_Invocation.GetHashCode();
+    public override int GetHashCode() => Invocation.GetHashCode();
 
     /// <summary>
     /// Verify if the target equals to event handler.
@@ -41,10 +41,10 @@ public sealed class ActionEventHandler : IEventHandler, IEquatable<Action>, IEqu
     public static bool operator !=(ActionEventHandler left, object right) => !(left == right);
 
     /// <inheritdoc/>
-    public bool Equals(ActionEventHandler other) => m_Invocation.Equals(other.m_Invocation);
+    public bool Equals(ActionEventHandler other) => Invocation.Equals(other.Invocation);
 
     /// <inheritdoc/>
-    public bool Equals(Action other) => m_Invocation.Equals(other);
+    public bool Equals(Action other) => Invocation.Equals(other);
 
     /// <inheritdoc/>
     public override bool Equals(object? other) => other switch
@@ -63,21 +63,21 @@ public sealed class ActionEventHandler<TArg> : IEventHandler<TArg>, IEquatable<A
     /// <summary>
     /// Action with method provider.
     /// </summary>
-    private readonly Action<TArg> m_Invocation;
+    public readonly Action<TArg> Invocation;
 
     /// <summary>
     /// Create a event handler from a Action.
     /// </summary>
     /// <param name="delegation">Delegation for creating EventHandler.</param>   
-    public ActionEventHandler(Action<TArg> delegation) => m_Invocation = delegation;
+    public ActionEventHandler(Action<TArg> delegation) => Invocation = delegation;
 
     /// <summary>
     /// <inheritdoc cref="IEventHandler{TNotification}.Handle"/>
     /// </summary>
-    public void Handle(TArg arg) => m_Invocation.Invoke(arg);
+    public void Handle(TArg arg) => Invocation.Invoke(arg);
 
     /// <inheritdoc/>
-    public override int GetHashCode() => m_Invocation.GetHashCode();
+    public override int GetHashCode() => Invocation.GetHashCode();
 
     /// <summary>
     /// Verify if the target equals to event handler.
@@ -90,10 +90,10 @@ public sealed class ActionEventHandler<TArg> : IEventHandler<TArg>, IEquatable<A
     public static bool operator !=(ActionEventHandler<TArg> left, object right) => !(left == right);
 
     /// <inheritdoc/>
-    public bool Equals(ActionEventHandler<TArg> other) => m_Invocation.Equals(other.m_Invocation);
+    public bool Equals(ActionEventHandler<TArg> other) => Invocation.Equals(other.Invocation);
 
     /// <inheritdoc/>
-    public bool Equals(Action<TArg> other) => m_Invocation.Equals(other);
+    public bool Equals(Action<TArg> other) => Invocation.Equals(other);
 
     /// <inheritdoc/>
     public override bool Equals(object? other) => other switch
@@ -120,24 +120,24 @@ public sealed class ActionEventHandler<<#= genericTypes #>> : IEventHandler<<#= 
     /// <summary>
     /// Action with method provider.
     /// </summary>
-    private readonly Action<<#= genericTypes #>> m_Invocation;
+    public readonly Action<<#= genericTypes #>> Invocation;
 
     /// <summary>
     /// Create a event handler from a Action.
     /// </summary>
     /// <param name="delegation">Delegation for creating EventHandler.</param>
-    public ActionEventHandler(Action<<#= genericTypes #>> delegation) => m_Invocation = delegation;
+    public ActionEventHandler(Action<<#= genericTypes #>> delegation) => Invocation = delegation;
 
     /// <summary>
     /// <inheritdoc cref="IEventHandler{TNotification}.Handle"/>
     /// </summary>
-    public void Handle(<#= parameterDefs #>) => m_Invocation(<#= parameters #>);
+    public void Handle(<#= parameterDefs #>) => Invocation(<#= parameters #>);
 
     /// <inheritdoc/>
     void IEventHandler<<#= $"({genericTypes})" #>>.Handle(<#= $"({genericTypes})" #> arg) => Handle(<#= items #>);
 
     /// <inheritdoc/>
-    public override int GetHashCode() => m_Invocation.GetHashCode();
+    public override int GetHashCode() => Invocation.GetHashCode();
 
     /// <summary>
     /// Verify if the target equals to event handler.
@@ -150,10 +150,10 @@ public sealed class ActionEventHandler<<#= genericTypes #>> : IEventHandler<<#= 
     public static bool operator !=(ActionEventHandler<<#= genericTypes #>> left, object right) => !(left == right);
 
     /// <inheritdoc/>
-    public bool Equals(ActionEventHandler<<#= genericTypes #>> other) => m_Invocation.Equals(other.m_Invocation);
+    public bool Equals(ActionEventHandler<<#= genericTypes #>> other) => Invocation.Equals(other.Invocation);
 
     /// <inheritdoc/>
-    public bool Equals(Action<<#= genericTypes #>> other) => m_Invocation.Equals(other);
+    public bool Equals(Action<<#= genericTypes #>> other) => Invocation.Equals(other);
 
     /// <inheritdoc/>
     public override bool Equals(object? other) => other switch
