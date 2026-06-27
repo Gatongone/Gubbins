@@ -7,7 +7,7 @@ using UnityEngine.Events;
 namespace Gubbins.Events
 {
     /// <summary>
-    /// Provides strongly-typed wrappers for Unity Application events.
+    /// Provides strongly-typed application for Unity Application events.
     /// </summary>
     public static class ApplicationEvents
     {
@@ -21,25 +21,25 @@ namespace Gubbins.Events
             /// <inheritdoc/>
             public void Subscribe(IEventHandler<bool> handler)
             {
-                Action<bool> wrap = handler.Handle;
-                Application.focusChanged += wrap;
-                m_Handlers.Add(handler, wrap);
+                Action<bool> action = handler.Handle;
+                Application.focusChanged += action;
+                m_Handlers.Add(handler, action);
             }
 
             /// <inheritdoc/>
             public bool Unsubscribe(IEventHandler<bool> handler)
             {
-                if (!m_Handlers.Remove(handler, out var wrap)) return false;
-                Application.focusChanged -= wrap;
+                if (!m_Handlers.Remove(handler, out var action)) return false;
+                Application.focusChanged -= action;
                 return true;
             }
 
             /// <inheritdoc/>
             public void Clear()
             {
-                foreach (var wrap in m_Handlers.Values)
+                foreach (var action in m_Handlers.Values)
                 {
-                    Application.focusChanged -= wrap;
+                    Application.focusChanged -= action;
                 }
 
                 m_Handlers.Clear();
@@ -56,25 +56,34 @@ namespace Gubbins.Events
             /// <inheritdoc/>
             public void Subscribe(IEventHandler<Unit> handler)
             {
-                Action wrap = () => handler.Handle(Unit.Instance);
-                Application.quitting += wrap;
-                m_Handlers.Add(handler, wrap);
+                Action action;
+                if (handler is ActionEventHandler actionHandler)
+                {
+                    action = actionHandler.Invocation;
+                }
+                else
+                {
+                    action = () => handler.Handle(Unit.Instance);
+                }
+
+                Application.quitting += action;
+                m_Handlers.Add(handler, action);
             }
 
             /// <inheritdoc/>
             public bool Unsubscribe(IEventHandler<Unit> handler)
             {
-                if (!m_Handlers.Remove(handler, out var wrap)) return false;
-                Application.quitting -= wrap;
+                if (!m_Handlers.Remove(handler, out var action)) return false;
+                Application.quitting -= action;
                 return true;
             }
 
             /// <inheritdoc/>
             public void Clear()
             {
-                foreach (var wrap in m_Handlers.Values)
+                foreach (var action in m_Handlers.Values)
                 {
-                    Application.quitting -= wrap;
+                    Application.quitting -= action;
                 }
 
                 m_Handlers.Clear();
@@ -91,25 +100,25 @@ namespace Gubbins.Events
             /// <inheritdoc/>
             public void Subscribe(IEventHandler<string> handler)
             {
-                Action<string> wrap = handler.Handle;
-                Application.deepLinkActivated += wrap;
-                m_Handlers.Add(handler, wrap);
+                Action<string> action = handler.Handle;
+                Application.deepLinkActivated += action;
+                m_Handlers.Add(handler, action);
             }
 
             /// <inheritdoc/>
             public bool Unsubscribe(IEventHandler<string> handler)
             {
-                if (!m_Handlers.Remove(handler, out var wrap)) return false;
-                Application.deepLinkActivated -= wrap;
+                if (!m_Handlers.Remove(handler, out var action)) return false;
+                Application.deepLinkActivated -= action;
                 return true;
             }
 
             /// <inheritdoc/>
             public void Clear()
             {
-                foreach (var wrap in m_Handlers.Values)
+                foreach (var action in m_Handlers.Values)
                 {
-                    Application.deepLinkActivated -= wrap;
+                    Application.deepLinkActivated -= action;
                 }
 
                 m_Handlers.Clear();
@@ -126,25 +135,34 @@ namespace Gubbins.Events
             /// <inheritdoc/>
             public void Subscribe(IEventHandler<(string condition, string stackTrace, LogType type)> handler)
             {
-                Application.LogCallback wrap = (condition, stackTrace, type) => handler.Handle((condition, stackTrace, type));
-                Application.logMessageReceived += wrap;
-                m_Handlers.Add(handler, wrap);
+                Application.LogCallback action;
+                if (handler is ActionEventHandler<(string condition, string stackTrace, LogType type)> actionHandler)
+                {
+                    action = (condition, stackTrace, type) => actionHandler.Invocation((condition, stackTrace, type));
+                }
+                else
+                {
+                    action = (condition, stackTrace, type) => handler.Handle((condition, stackTrace, type));
+                }
+
+                Application.logMessageReceived += action;
+                m_Handlers.Add(handler, action);
             }
 
             /// <inheritdoc/>
             public bool Unsubscribe(IEventHandler<(string condition, string stackTrace, LogType type)> handler)
             {
-                if (!m_Handlers.Remove(handler, out var wrap)) return false;
-                Application.logMessageReceived -= wrap;
+                if (!m_Handlers.Remove(handler, out var action)) return false;
+                Application.logMessageReceived -= action;
                 return true;
             }
 
             /// <inheritdoc/>
             public void Clear()
             {
-                foreach (var wrap in m_Handlers.Values)
+                foreach (var action in m_Handlers.Values)
                 {
-                    Application.logMessageReceived -= wrap;
+                    Application.logMessageReceived -= action;
                 }
 
                 m_Handlers.Clear();
@@ -161,25 +179,34 @@ namespace Gubbins.Events
             /// <inheritdoc/>
             public void Subscribe(IEventHandler<(string condition, string stackTrace, LogType type)> handler)
             {
-                Application.LogCallback wrap = (condition, stackTrace, type) => handler.Handle((condition, stackTrace, type));
-                Application.logMessageReceivedThreaded += wrap;
-                m_Handlers.Add(handler, wrap);
+                Application.LogCallback action;
+                if (handler is ActionEventHandler<string, string, LogType> actionHandler)
+                {
+                    action = actionHandler.Invocation.Invoke;
+                }
+                else
+                {
+                    action = (condition, stackTrace, type) => handler.Handle((condition, stackTrace, type));
+                }
+
+                Application.logMessageReceivedThreaded += action;
+                m_Handlers.Add(handler, action);
             }
 
             /// <inheritdoc/>
             public bool Unsubscribe(IEventHandler<(string condition, string stackTrace, LogType type)> handler)
             {
-                if (!m_Handlers.Remove(handler, out var wrap)) return false;
-                Application.logMessageReceivedThreaded -= wrap;
+                if (!m_Handlers.Remove(handler, out var action)) return false;
+                Application.logMessageReceivedThreaded -= action;
                 return true;
             }
 
             /// <inheritdoc/>
             public void Clear()
             {
-                foreach (var wrap in m_Handlers.Values)
+                foreach (var action in m_Handlers.Values)
                 {
-                    Application.logMessageReceivedThreaded -= wrap;
+                    Application.logMessageReceivedThreaded -= action;
                 }
 
                 m_Handlers.Clear();
@@ -196,25 +223,34 @@ namespace Gubbins.Events
             /// <inheritdoc/>
             public void Subscribe(IEventHandler<Unit> handler)
             {
-                Application.LowMemoryCallback wrap = () => handler.Handle(Unit.Instance);
-                Application.lowMemory += wrap;
-                m_Handlers.Add(handler, wrap);
+                Application.LowMemoryCallback action;
+                if (handler is ActionEventHandler actionHandler)
+                {
+                    action = actionHandler.Invocation.Invoke;
+                }
+                else
+                {
+                    action = () => handler.Handle(Unit.Instance);
+                }
+
+                Application.lowMemory += action;
+                m_Handlers.Add(handler, action);
             }
 
             /// <inheritdoc/>
             public bool Unsubscribe(IEventHandler<Unit> handler)
             {
-                if (!m_Handlers.Remove(handler, out var wrap)) return false;
-                Application.lowMemory -= wrap;
+                if (!m_Handlers.Remove(handler, out var action)) return false;
+                Application.lowMemory -= action;
                 return true;
             }
 
             /// <inheritdoc/>
             public void Clear()
             {
-                foreach (var wrap in m_Handlers.Values)
+                foreach (var action in m_Handlers.Values)
                 {
-                    Application.lowMemory -= wrap;
+                    Application.lowMemory -= action;
                 }
 
                 m_Handlers.Clear();
@@ -231,25 +267,33 @@ namespace Gubbins.Events
             /// <inheritdoc/>
             public void Subscribe(IEventHandler<Unit> handler)
             {
-                UnityAction wrap = () => handler.Handle(Unit.Instance);
-                Application.onBeforeRender += wrap;
-                m_Handlers.Add(handler, wrap);
+                UnityAction action;
+                if (handler is ActionEventHandler actionHandler)
+                {
+                    action = actionHandler.Invocation.Invoke;
+                }
+                else
+                {
+                    action = () => handler.Handle(Unit.Instance);
+                }
+                Application.onBeforeRender += action;
+                m_Handlers.Add(handler, action);
             }
 
             /// <inheritdoc/>
             public bool Unsubscribe(IEventHandler<Unit> handler)
             {
-                if (!m_Handlers.Remove(handler, out var wrap)) return false;
-                Application.onBeforeRender -= wrap;
+                if (!m_Handlers.Remove(handler, out var action)) return false;
+                Application.onBeforeRender -= action;
                 return true;
             }
 
             /// <inheritdoc/>
             public void Clear()
             {
-                foreach (var wrap in m_Handlers.Values)
+                foreach (var action in m_Handlers.Values)
                 {
-                    Application.onBeforeRender -= wrap;
+                    Application.onBeforeRender -= action;
                 }
 
                 m_Handlers.Clear();
@@ -266,25 +310,33 @@ namespace Gubbins.Events
             /// <inheritdoc/>
             public void Subscribe(IEventHandler<Unit> handler)
             {
-                Action wrap = () => handler.Handle(Unit.Instance);
-                Application.unloading += wrap;
-                m_Handlers.Add(handler, wrap);
+                Action action;
+                if (handler is ActionEventHandler actionHandler)
+                {
+                    action = actionHandler.Invocation;
+                }
+                else
+                {
+                    action = () => handler.Handle(Unit.Instance);
+                }
+                Application.unloading += action;
+                m_Handlers.Add(handler, action);
             }
 
             /// <inheritdoc/>
             public bool Unsubscribe(IEventHandler<Unit> handler)
             {
-                if (!m_Handlers.Remove(handler, out var wrap)) return false;
-                Application.unloading -= wrap;
+                if (!m_Handlers.Remove(handler, out var action)) return false;
+                Application.unloading -= action;
                 return true;
             }
 
             /// <inheritdoc/>
             public void Clear()
             {
-                foreach (var wrap in m_Handlers.Values)
+                foreach (var action in m_Handlers.Values)
                 {
-                    Application.unloading -= wrap;
+                    Application.unloading -= action;
                 }
 
                 m_Handlers.Clear();

@@ -1,12 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using Gubbins.Enhance;
-using UnityEngine.LowLevel;
 
 namespace Gubbins.Events
 {
     /// <summary>
-    /// Provides strongly-typed wrappers for Unity PlayerLoop phase events.
+    /// Provides strongly-typed actionpers for Unity PlayerLoop phase events.
     /// </summary>
     public static class LoopEvents
     {
@@ -68,12 +66,12 @@ namespace Gubbins.Events
     }
 
     /// <summary>
-    /// Base class for PlayerLoop event wrappers.
+    /// Base class for PlayerLoop event actionpers.
     /// </summary>
-    public class LoopEvent : IEventSubscriable<Unit>
+    public class LoopEvent : IEventSubscriable<float>
     {
-        private readonly UnityLoop.Kind                                                   m_Kind;
-        private readonly Dictionary<IEventHandler<Unit>, Action> m_HandlerMap = new();
+        private readonly UnityLoop.Kind                                  m_Kind;
+        private readonly Dictionary<IEventHandler<float>, Action<float>> m_HandlerMap = new();
 
         internal LoopEvent(UnityLoop.Kind kind)
         {
@@ -81,27 +79,36 @@ namespace Gubbins.Events
         }
 
         /// <inheritdoc/>
-        public void Subscribe(IEventHandler<Unit> handler)
+        public void Subscribe(IEventHandler<float> handler)
         {
-            Action wrap = () => handler.Handle(Unit.Instance);
-            m_HandlerMap.Add(handler, wrap);
-            UnityLoop.RegisterUpdate(m_Kind, wrap);
+            Action<float> action;
+            if (handler is ActionEventHandler<float> actionHandler)
+            {
+                action = actionHandler.Invocation;
+            }
+            else
+            {
+                action = handler.Handle;
+            }
+
+            m_HandlerMap.Add(handler, action);
+            UnityLoop.RegisterUpdate(m_Kind, action);
         }
 
         /// <inheritdoc/>
-        public bool Unsubscribe(IEventHandler<Unit> handler)
+        public bool Unsubscribe(IEventHandler<float> handler)
         {
-            if (!m_HandlerMap.Remove(handler, out var wrap)) return false;
-            UnityLoop.UnregisterUpdate(m_Kind, wrap);
+            if (!m_HandlerMap.Remove(handler, out var action)) return false;
+            UnityLoop.UnregisterUpdate(m_Kind, action);
             return true;
         }
 
         /// <inheritdoc/>
         public void Clear()
         {
-            foreach (var wrap in m_HandlerMap.Values)
+            foreach (var action in m_HandlerMap.Values)
             {
-                UnityLoop.UnregisterUpdate(m_Kind, wrap);
+                UnityLoop.UnregisterUpdate(m_Kind, action);
             }
 
             m_HandlerMap.Clear();

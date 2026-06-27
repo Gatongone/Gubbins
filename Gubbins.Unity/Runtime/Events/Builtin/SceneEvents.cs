@@ -1,11 +1,12 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using UnityEngine.Events;
 using UnityEngine.SceneManagement;
 
 namespace Gubbins.Events
 {
     /// <summary>
-    /// Provides strongly-typed wrappers for Unity SceneManager events.
+    /// Provides strongly-typed actionpers for Unity SceneManager events.
     /// </summary>
     public static class SceneEvents
     {
@@ -19,25 +20,34 @@ namespace Gubbins.Events
             /// <inheritdoc/>
             public void Subscribe(IEventHandler<(Scene scene, LoadSceneMode mode)> handler)
             {
-                UnityAction<Scene, LoadSceneMode> wrap = (scene, mode) => handler.Handle((scene, mode));
-                SceneManager.sceneLoaded += wrap;
-                m_Handlers.Add(handler, wrap);
+                UnityAction<Scene, LoadSceneMode> action;
+                if (handler is ActionEventHandler<Scene, LoadSceneMode> actionHandler)
+                {
+                    action = actionHandler.Invocation.Invoke;
+                }
+                else
+                {
+                    action = (scene, mode) => handler.Handle((scene, mode));
+                }
+
+                SceneManager.sceneLoaded += action;
+                m_Handlers.Add(handler, action);
             }
 
             /// <inheritdoc/>
             public bool Unsubscribe(IEventHandler<(Scene scene, LoadSceneMode mode)> handler)
             {
-                if (!m_Handlers.Remove(handler, out var wrap)) return false;
-                SceneManager.sceneLoaded -= wrap;
+                if (!m_Handlers.Remove(handler, out var action)) return false;
+                SceneManager.sceneLoaded -= action;
                 return true;
             }
 
             /// <inheritdoc/>
             public void Clear()
             {
-                foreach (var wrap in m_Handlers.Values)
+                foreach (var action in m_Handlers.Values)
                 {
-                    SceneManager.sceneLoaded -= wrap;
+                    SceneManager.sceneLoaded -= action;
                 }
 
                 m_Handlers.Clear();
@@ -54,25 +64,25 @@ namespace Gubbins.Events
             /// <inheritdoc/>
             public void Subscribe(IEventHandler<Scene> handler)
             {
-                UnityAction<Scene> wrap = scene => handler.Handle((scene));
-                SceneManager.sceneUnloaded += wrap;
-                m_Handlers.Add(handler, wrap);
+                UnityAction<Scene> action = handler.Handle;
+                SceneManager.sceneUnloaded += action;
+                m_Handlers.Add(handler, action);
             }
 
             /// <inheritdoc/>
             public bool Unsubscribe(IEventHandler<Scene> handler)
             {
-                if (!m_Handlers.Remove(handler, out var wrap)) return false;
-                SceneManager.sceneUnloaded -= wrap;
+                if (!m_Handlers.Remove(handler, out var action)) return false;
+                SceneManager.sceneUnloaded -= action;
                 return true;
             }
 
             /// <inheritdoc/>
             public void Clear()
             {
-                foreach (var wrap in m_Handlers.Values)
+                foreach (var action in m_Handlers.Values)
                 {
-                    SceneManager.sceneUnloaded -= wrap;
+                    SceneManager.sceneUnloaded -= action;
                 }
 
                 m_Handlers.Clear();
@@ -90,25 +100,34 @@ namespace Gubbins.Events
             /// <inheritdoc/>
             public void Subscribe(IEventHandler<(Scene oldScene, Scene newScene)> handler)
             {
-                UnityAction<Scene, Scene> wrap = (oldScene, newScene) => handler.Handle((oldScene, newScene));
-                SceneManager.activeSceneChanged += wrap;
-                m_Handlers.Add(handler, wrap);
+                UnityAction<Scene, Scene> action;
+                if (handler is ActionEventHandler<Scene, Scene> actionHandler)
+                {
+                    action = actionHandler.Invocation.Invoke;
+                }
+                else
+                {
+                    action = (oldScene, newScene) => handler.Handle((oldScene, newScene));
+                }
+
+                SceneManager.activeSceneChanged += action;
+                m_Handlers.Add(handler, action);
             }
 
             /// <inheritdoc/>
             public bool Unsubscribe(IEventHandler<(Scene oldScene, Scene newScene)> handler)
             {
-                if (!m_Handlers.Remove(handler, out var wrap)) return false;
-                SceneManager.activeSceneChanged -= wrap;
+                if (!m_Handlers.Remove(handler, out var action)) return false;
+                SceneManager.activeSceneChanged -= action;
                 return true;
             }
 
             /// <inheritdoc/>
             public void Clear()
             {
-                foreach (var wrap in m_Handlers.Values)
+                foreach (var action in m_Handlers.Values)
                 {
-                    SceneManager.activeSceneChanged -= wrap;
+                    SceneManager.activeSceneChanged -= action;
                 }
 
                 m_Handlers.Clear();

@@ -4,7 +4,7 @@ using Unity.Jobs;
 
 namespace Gubbins.Events
 {
-    public static class JobLoopEvents
+    public static class JobEvents
     {
         /// <summary>
         /// Event for the Initialization phase of the PlayerLoop.
@@ -63,13 +63,17 @@ namespace Gubbins.Events
         }
     }
 
+    /// <summary>
+    /// Base class for PlayerLoop event wrappers.
+    /// </summary>
     public class JobLoopEvent : ILinkableEventSubscriable<float, JobHandle>
     {
-        private readonly UnityLoop.Kind                                                                         m_Kind;
+        private readonly UnityLoop.Kind m_Kind;
         private readonly Dictionary<ILinkableEventHandler<float, JobHandle>, Func<float, JobHandle, JobHandle>> m_Handlers = new();
 
         internal JobLoopEvent(UnityLoop.Kind kind) => m_Kind = kind;
 
+        /// <inheritdoc/>
         public void Subscribe(ILinkableEventHandler<float, JobHandle> handler)
         {
             if (m_Handlers.ContainsKey(handler))
@@ -85,6 +89,7 @@ namespace Gubbins.Events
             UnityLoop.RegisterUpdate(m_Kind, wrap);
         }
 
+        /// <inheritdoc/>
         public void Unsubscribe(ILinkableEventHandler<float, JobHandle> handler)
         {
             if (!m_Handlers.TryGetValue(handler, out var wrap))
@@ -94,6 +99,7 @@ namespace Gubbins.Events
             m_Handlers.Remove(handler);
         }
 
+        /// <inheritdoc/>
         public void Clear()
         {
             foreach (var wrap in m_Handlers)

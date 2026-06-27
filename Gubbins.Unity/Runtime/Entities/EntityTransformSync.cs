@@ -101,6 +101,6 @@ namespace Gubbins.Entities
     internal sealed partial class EntityTransformSyncRunner : IEventListener
     {
         [Event(typeof(LoopEvents.PostLateUpdate))]
-        private void LateUpdate() => EntityAdapter.SyncTransforms();
+        private void LateUpdate(float _) => EntityAdapter.SyncTransforms();
     }
 }

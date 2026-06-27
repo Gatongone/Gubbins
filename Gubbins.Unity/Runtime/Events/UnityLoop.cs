@@ -73,7 +73,6 @@ namespace Gubbins.Events
             {
                 ref var system = ref loop.subSystemList[index];
                 var updateKind = GetUpdateKind(system);
-                if (updateKind == Kind.None) continue;
                 var newSysCol = new PlayerLoopSystem[system.subSystemList.Length + 1];
                 for (var i = 0; i < system.subSystemList.Length; i++)
                 {
@@ -110,9 +109,8 @@ namespace Gubbins.Events
         /// </summary>
         /// <param name="kind">The PlayerLoop phase.</param>
         /// <param name="onUpdate">The delegate to invoke during the phase.</param>
-        internal static void RegisterUpdate(Kind kind, Action onUpdate)
+        internal static void RegisterUpdate(Kind kind, Action<float> onUpdate)
         {
-            Assert.AreNotEqual(kind, Kind.None, $"Not supported update kind: {kind}");
             GetLoopSystem(kind).AddListener(onUpdate);
         }
 
@@ -123,7 +121,6 @@ namespace Gubbins.Events
         /// <param name="onJobUpdate">The delegate to invoke during the phase, which takes deltaTime and a JobHandle for dependencies, and returns a new JobHandle.</param>
         internal static void RegisterUpdate(Kind kind, Func<float, JobHandle, JobHandle> onJobUpdate)
         {
-            Assert.AreNotEqual(kind, Kind.None);
             GetLoopSystem(kind).AddListener(onJobUpdate);
         }
 
@@ -134,7 +131,6 @@ namespace Gubbins.Events
         /// <param name="onJobUpdate">The delegate to remove.</param>
         internal static bool UnregisterUpdate(Kind kind, Func<float, JobHandle, JobHandle> onJobUpdate)
         {
-            Assert.AreNotEqual(kind, Kind.None);
             return GetLoopSystem(kind).RemoveListener(onJobUpdate);
         }
 
@@ -143,9 +139,8 @@ namespace Gubbins.Events
         /// </summary>
         /// <param name="kind">The PlayerLoop phase.</param>
         /// <param name="onUpdate">The delegate to remove.</param>
-        internal static bool UnregisterUpdate(Kind kind, Action onUpdate)
+        internal static bool UnregisterUpdate(Kind kind, Action<float> onUpdate)
         {
-            Assert.AreNotEqual(kind, Kind.None, $"Not supported update kind: {kind}");
             return GetLoopSystem(kind).RemoveListener(onUpdate);
         }
 
@@ -198,7 +193,6 @@ namespace Gubbins.Events
                 case Kind.PostLateUpdate:
                     s_PostLateUpdateSys = playerLoopSystemWrapper;
                     break;
-                case Kind.None:
                 default: throw new ArgumentOutOfRangeException(nameof(kind), kind, null);
             }
         }
@@ -217,7 +211,7 @@ namespace Gubbins.Events
             SYS_NAME_UPDATE           => Kind.Update,
             SYS_NAME_PRE_LATE_UPDATE  => Kind.PreLateUpdate,
             SYS_NAME_POST_LATE_UPDATE => Kind.PostLateUpdate,
-            _                         => Kind.None
+            _                         => throw new ArgumentOutOfRangeException()
         };
 
         /// <summary>
@@ -225,9 +219,6 @@ namespace Gubbins.Events
         /// </summary>
         public enum Kind
         {
-            /// <summary>No phase (invalid).</summary>
-            None,
-
             /// <summary>Initialization phase.</summary>
             Initialization,
 
@@ -263,7 +254,7 @@ namespace Gubbins.Events
             /// <summary>
             /// List of delegates for the normal update phase. Each delegate is a simple Action with no parameters.
             /// </summary>
-            private readonly List<Action> m_Actions = new List<Action>();
+            private readonly List<Action<float>> m_Actions = new List<Action<float>>();
 
             /// <summary>
             /// List of delegates for the normal update phase. Each delegate is a simple UpdateFunction with no parameters.
@@ -294,7 +285,7 @@ namespace Gubbins.Events
             /// Adds a delegate to the update phase.
             /// </summary>
             /// <param name="onUpdate">The delegate to add.</param>
-            public void AddListener(Action onUpdate) => m_Actions.Add(onUpdate);
+            public void AddListener(Action<float> onUpdate) => m_Actions.Add(onUpdate);
 
             /// <summary>
             /// Removes a delegate from the job update phase.
@@ -306,16 +297,15 @@ namespace Gubbins.Events
             /// Removes a delegate from the update phase.
             /// </summary>
             /// <param name="onUpdate">The delegate to remove.</param>
-            public bool RemoveListener(Action onUpdate) => m_Actions.Remove(onUpdate);
+            public bool RemoveListener(Action<float> onUpdate) => m_Actions.Remove(onUpdate);
 
             private void UpdateFunction()
             {
-                // First execute normal update delegates,
-                foreach (var action in m_Actions) action();
-
-                // then execute job update delegates with proper deltaTime and JobHandle chaining.
                 JobHandle currentHandle = default;
                 var deltaTime = GetDeltaTimeForKind(m_Kind);
+                // First execute normal update delegates,
+                foreach (var action in m_Actions) action(deltaTime);
+                // Then execute job update delegates with proper deltaTime and JobHandle chaining.
                 for (var index = 0; index < m_JobActions.Count; index++)
                 {
                     var jobFunc = m_JobActions[index];
