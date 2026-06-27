@@ -14,21 +14,17 @@ namespace Gubbins.Pipeline
     public class ScenePipeline : MonoBehaviour, IPipeline
     {
         /// <summary>
-        /// Indicates whether the GamePipeline has started. This property returns true if the Start method has been called, and false otherwise.
-        /// </summary>
-        private bool m_HasStarted;
-
-        /// <summary>
         /// The context reference for the Scene. This context will be used to register the event listeners defined in the pipeline. If not set, it will default to the global application context.
         /// </summary>
         [Tooltip("The context reference for the Scene. This context will be used to register the event listeners defined in the pipeline. If not set, it will default to the global application context."), SerializeField]
         private SerializedReference<IContext> m_Context;
 
         /// <summary>
-        /// The list of event listeners to register with the context.
-        /// These listeners will be executed in the order they are defined in the array.
+        /// The list of event listeners to register with the context. These listeners will be executed in the order they are defined in the array.
+        /// When the listener type contains a constructor with parameters, the context will attempt to resolve the dependencies and inject them into the constructor.
+        /// Else, it will be instantiated using the default constructor an inject by fields/properties or method.
         /// </summary>
-        [Tooltip("The list of event listeners to register with the context. These listeners will be executed in the order they are defined in the array."), SerializeField]
+        [Tooltip("The list of event listeners to register with the context. These listeners will be executed in the order they are defined in the array. When the listener type contains a constructor with parameters, the context will attempt to resolve the dependencies and inject them into the constructor. Else, it will be instantiated using the default constructor an inject by fields/properties or method."), SerializeField, AllowDefaultConstructorMissing]
         private SerializedReference<IEventListener>[] m_Listeners;
 
         /// <inheritdoc/>
@@ -48,18 +44,16 @@ namespace Gubbins.Pipeline
         private static readonly Dictionary<string, WeakReference<ScenePipeline>> s_PipelineCache = new();
 
         /// <summary>
+        /// A list of instantiated event listeners that have been registered with the context.
+        /// </summary>
+        private readonly List<IEventListener> m_ListenerInstances = new();
+
+        /// <summary>
         /// Initializes the ScenePipeline instance and sets up the application context with the specified installers and listeners.
         /// </summary>
         private void Awake()
         {
             Current = this;
-
-            if (m_Context.Value == null)
-            {
-                m_Context.Value = ApplicationContext.Global;
-                Debug.LogWarning("The context reference for the GamePipeline is not set. Defaulting to the global application context. Please assign a valid context reference to ensure proper functionality.");
-            }
-
             StartPipeline();
         }
 
@@ -71,9 +65,9 @@ namespace Gubbins.Pipeline
         /// <exception cref="InvalidOperationException">Thrown if the Start method is called more than once during its lifecycle.</exception>
         private void StartPipeline()
         {
-            if (m_HasStarted)
+            if (State == PipeLineState.Running)
             {
-                throw new InvalidOperationException("The GamePipeline has already been started. Please ensure that the Start method is called only once during the application lifecycle.");
+                throw new InvalidOperationException("The ScenePipeline has already been started. Please ensure that the Start method is called only once during the application lifecycle.");
             }
 
             if (m_Listeners.Length == 0)
@@ -82,35 +76,64 @@ namespace Gubbins.Pipeline
                 return;
             }
 
-            State = PipeLineState.Running;
             var context = m_Context.Value;
+            if (context == null)
+            {
+                context = m_Context.Value = ApplicationContext.Global;
+                Debug.LogWarning("The context reference for the GamePipeline is not set. Defaulting to the global application context. Please assign a valid context reference to ensure proper functionality.");
+            }
 
             try
             {
-                foreach (var listener in m_Listeners)
+                if (State == PipeLineState.NotStarted)
                 {
-                    var target = listener.Value;
-                    if (target != null)
+                    State = PipeLineState.Running;
+                    RegisterListeners(context);
+                }
+                else
+                {
+                    foreach (var listener in m_ListenerInstances)
                     {
-                        context.Inject(target);
-                        target.Listen(context, context);
-                    }
-                    else
-                    {
-                        var type = listener.ExpectedType;
-                        var ctor = type == null ? null : InjectCache.GetInjectConstructor(type);
-                        if (ctor == null) continue;
-                        target = context.InjectByCtor(listener.ExpectedType) as IEventListener;
-                        target?.Listen(context, context);
+                        listener.Listen(context, context);
                     }
                 }
-
-                m_HasStarted = true;
             }
             catch
             {
                 State = PipeLineState.Failed;
                 throw;
+            }
+        }
+
+        /// <summary>
+        /// Registers the event listeners defined in the GamePipeline with the provided context.
+        /// </summary>
+        private void RegisterListeners(IContext context)
+        {
+            foreach (var listener in m_Listeners)
+            {
+                var targetType = listener.ExpectedType;
+                // Try inject by ctor first.
+                if (targetType != null && InjectCache.GetInjectConstructor(targetType) != null)
+                {
+                    var item = context.InjectByCtor(targetType) as IEventListener;
+                    listener.Value = item;
+                    if (item != null)
+                    {
+                        item.Listen(context, context);
+                        m_ListenerInstances.Add(item);
+                    }
+                }
+                else
+                {
+                    var item = listener.Value;
+                    if (item != null)
+                    {
+                        context.Inject(item);
+                        item.Listen(context, context);
+                        m_ListenerInstances.Add(item);
+                    }
+                }
             }
         }
 
@@ -124,18 +147,17 @@ namespace Gubbins.Pipeline
                 Current = null;
             }
 
-            if (!m_HasStarted)
+            if (State != PipeLineState.Running)
             {
                 return;
             }
 
             var context = m_Context.Value;
-            foreach (var listener in m_Listeners)
+            if (context != null)
             {
-                var target = listener.Value;
-                if (target != null)
+                foreach (var listener in m_ListenerInstances)
                 {
-                    target.Clear(context);
+                    listener?.Clear(context);
                 }
             }
 

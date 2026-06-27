@@ -45,13 +45,12 @@ namespace Gubbins.Editor
         /// - Does not contain generic parameters.
         /// - Is an unmanaged type (value type without reference type fields).
         /// </summary>
-        private static Type[] GetComponentTypes() => AppDomain.CurrentDomain.GetAssemblies()
-                                                              .SelectMany(asm => asm.GetTypes())
-                                                              .Where(t => typeof(IComponent).IsAssignableFrom(t) &&
-                                                                  !t.IsAbstract &&
-                                                                  !t.ContainsGenericParameters &&
-                                                                  CheckIsTypeUnmanaged(t))
-                                                              .ToArray();
+        private static Type[] GetComponentTypes() => AssemblyCache.AllTypes
+                                                                  .Where(t => typeof(IComponent).IsAssignableFrom(t) &&
+                                                                      !t.IsAbstract &&
+                                                                      !t.ContainsGenericParameters &&
+                                                                      CheckIsTypeUnmanaged(t))
+                                                                  .ToArray();
 
         /// <summary>
         /// Checks if the provided type is unmanaged, which means it is a value type that does not contain any reference type fields.

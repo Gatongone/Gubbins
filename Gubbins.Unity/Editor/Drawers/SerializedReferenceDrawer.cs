@@ -216,7 +216,7 @@ namespace Gubbins.Editor
                     if (closed != null && IsInstantiableMatch(closed, closedExpected))
                         result.Add(closed);
                 }
-                else if (!type.ContainsGenericParameters && IsInstantiableMatch(type, closedExpected))
+                else if (IsInstantiableMatch(type, closedExpected))
                 {
                     result.Add(type);
                 }
@@ -227,8 +227,7 @@ namespace Gubbins.Editor
         }
 
         private bool IsInstantiableMatch(Type t, Type expectedType) =>
-            expectedType.IsAssignableFrom(t) &&
-            (ContainsDefaultConstructor(t) || typeof(UnityEngine.Object).IsAssignableFrom(t));
+            expectedType.IsAssignableFrom(t) && (IsTypeSerializable(t) || typeof(UnityEngine.Object).IsAssignableFrom(t));
 
         /// <summary>
         /// Get all implementations of the given interface type across all loaded assemblies,
@@ -253,7 +252,7 @@ namespace Gubbins.Editor
                 return CanOpenGenericImplement(t, expectedType);
             return !t.ContainsGenericParameters &&
                 expectedType.IsAssignableFrom(t) &&
-                (ContainsDefaultConstructor(t) || typeof(UnityEngine.Object).IsAssignableFrom(t));
+                (IsTypeSerializable(t) || typeof(UnityEngine.Object).IsAssignableFrom(t));
         }
 
         /// <summary>
@@ -281,8 +280,6 @@ namespace Gubbins.Editor
 
             return false;
         }
-
-        private bool ContainsDefaultConstructor(Type type) => type.GetConstructor(Type.EmptyTypes) != null;
 
         /// <summary>
         /// UIElement version.
@@ -425,9 +422,10 @@ namespace Gubbins.Editor
                 // If it's not a Unity Object, draw the managed reference property field.
                 if (!typeof(UnityEngine.Object).IsAssignableFrom(effectiveType))
                 {
-                    if (pureProp.GetValue() != null)
+                    // If the type is serializable, show the properties of the pure C# object.
+                    if (IsTypeSerializable(GetCurrentType()) && pureProp.GetValue() != null && GetCurrentType()?.GetConstructor(Type.EmptyTypes) != null)
                     {
-                        var propertyField = new PropertyField(pureProp, " ");
+                        var propertyField = new PropertyField(pureProp, "Properties");
                         propertyField.SetEnabled(pureProp.managedReferenceValue != null);
                         propertyField.RegisterValueChangeCallback(_ => { property.serializedObject.ApplyModifiedProperties(); });
                         contentContainer.Add(propertyField);
@@ -438,7 +436,7 @@ namespace Gubbins.Editor
 
                 // Unity Object.
                 var objectType = typeof(ScriptableObject).IsAssignableFrom(effectiveType) ? effectiveType : typeof(GameObject);
-                var objectField = new ObjectField(" ")
+                var objectField = new ObjectField("Asset")
                 {
                     objectType        = objectType,
                     value             = unityProp.objectReferenceValue,
@@ -602,10 +600,10 @@ namespace Gubbins.Editor
                 {
                     DrawUnityObjectField(fieldRect, unityProp, effectiveType, typeNameProp);
                 }
-                else
+                else if (effectiveType.GetConstructor(Type.EmptyTypes) != null) // Only draw the pure C# object if it has a default constructor.
                 {
                     // Expands all serializable fields for the pure C# object.
-                    EditorGUI.PropertyField(fieldRect, pureProp, new GUIContent(" "), true);
+                    EditorGUI.PropertyField(fieldRect, pureProp, new GUIContent("Properties"), true);
                 }
 
                 EditorGUI.indentLevel--;
@@ -622,7 +620,7 @@ namespace Gubbins.Editor
                 var currentObj = unityProp.objectReferenceValue;
 
                 EditorGUI.BeginChangeCheck();
-                var newObj = EditorGUI.ObjectField(rect, new GUIContent(" "), currentObj, objectFieldType, true);
+                var newObj = EditorGUI.ObjectField(rect, new GUIContent("Asset"), currentObj, objectFieldType, true);
                 if (!EditorGUI.EndChangeCheck()) return;
                 if (newObj == null)
                 {
@@ -728,10 +726,7 @@ namespace Gubbins.Editor
 
             try
             {
-                // Only *open* generics (with unbound type parameters) can't be instantiated. Closed generics
-                // such as ComponentSpawner<Sample> are concrete and, on Unity 2023.2+/Unity 6, serialize fine
-                // as managed references — instantiate them so their fields are editable in the inspector.
-                if (!type.ContainsGenericParameters)
+                if (IsTypeSerializable(type) && type.GetConstructor(Type.EmptyTypes) != null)
                 {
                     pureProp.managedReferenceValue = Activator.CreateInstance(type);
                 }
@@ -747,6 +742,22 @@ namespace Gubbins.Editor
             {
                 Debug.LogError($"Failed to create instance of {type.Name}: {e.Message}");
             }
+        }
+
+        /// <summary>
+        /// Check if the type required for Unity's managed reference serialization to work properly.
+        /// </summary>
+        private bool IsTypeSerializable(Type type)
+        {
+            var allowEmptyCtorMissing = fieldInfo?.GetCustomAttribute<AllowDefaultConstructorMissingAttribute>() != null;
+#if UNITY_2023_2_OR_NEWER
+            return allowEmptyCtorMissing || type.GetConstructor(Type.EmptyTypes) != null;
+#else
+            // Only *open* generics (with unbound type parameters) can't be instantiated. Closed generics
+            // such as ComponentSpawner<Sample> are concrete and, on Unity 2023.2+/Unity 6, serialize fine
+            // as managed references — instantiate them so their fields are editable in the inspector.
+            return (allowEmptyCtorMissing || type.GetConstructor(Type.EmptyTypes) != null) && !type.ContainsGenericParameters;
+#endif
         }
 
         /// <summary>

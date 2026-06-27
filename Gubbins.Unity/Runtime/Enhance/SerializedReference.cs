@@ -4,6 +4,14 @@ using Object = UnityEngine.Object;
 
 namespace Gubbins.Enhance
 {
+    /// <summary>
+    /// A serializable reference to an object of type T, which can be either a pure C# object or a UnityEngine.Object
+    /// which's class allows for easy serialization and deserialization of references to objects in Unity, while also providing support for polymorphic types and generic constraints.
+    /// The field can be appended with the <see cref="GenericArgumentFromAttribute"/> to constrain the selectable implementations to a closed generic type, where the type argument is taken from a sibling field at draw time.
+    /// One can also use the <see cref="AllowDefaultConstructorMissingAttribute"/> to indicate that the field is allowed to be null or have a type that does not have a default constructor. In this case, the field will be
+    /// only serialized type information, and the value will be null. This is useful for cases where the field may be assigned a value at runtime or through other means, and the default constructor is not required.
+    /// </summary>
+    /// <typeparam name="T">The type of the object that this serialized reference points to. Must be a class.</typeparam>
     [Serializable]
     public class SerializedReference<T> where T : class
     {
@@ -90,5 +98,15 @@ namespace Gubbins.Enhance
         public string TypeMember { get; }
 
         public GenericArgumentFromAttribute(Type openGeneric, string typeMember) => (OpenGeneric, TypeMember) = (openGeneric, typeMember);
+    }
+
+    /// <summary>
+    /// Indicates that a <see cref="SerializedReference{T}"/> field is allowed to be null or have a type that does not have a default constructor.
+    /// This is useful for cases where the field may be assigned a value at runtime or through other means, and the default constructor is not required.
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Field)]
+    public sealed class AllowDefaultConstructorMissingAttribute : Attribute
+    {
+        public AllowDefaultConstructorMissingAttribute() { }
     }
 }

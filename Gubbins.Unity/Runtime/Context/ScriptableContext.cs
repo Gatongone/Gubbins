@@ -12,9 +12,9 @@ namespace Gubbins.Context
     public class ScriptableContext : ScriptableObject, IContext
     {
         /// <summary>
-        /// Proxy to the actual application context.
+        /// The parent context for the ScriptableContext, which is a special context that is initialized on preload phase.
         /// </summary>
-        private ApplicationContext m_Context;
+        [SerializeField] private SerializedReference<IContext> m_Parent;
 
         /// <summary>
         /// The list of dependencies installers to initialize the context with.
@@ -23,19 +23,9 @@ namespace Gubbins.Context
         [SerializeField] private SerializedReference<IDependenciesInstaller>[] m_Installers;
 
         /// <summary>
-        /// The parent context for the ScriptableContext, which is a special context that is initialized on preload phase.
+        /// Proxy to the actual application context.
         /// </summary>
-        [SerializeField] private SerializedReference<IContext> m_Parent;
-
-        /// <summary>
-        /// Gets the dependencies registry of the context.
-        /// </summary>
-        private IDependenciesRegistry Registry => m_Context;
-
-        /// <summary>
-        /// Gets the dependencies resolver of the context.
-        /// </summary>
-        private IDependenciesResolver Resolver => m_Context;
+        private IContext m_Context;
 
         /// <inheritdoc cref="m_Parent"/>
         public IReadOnlyContext Parent => m_Parent.Value;
@@ -73,18 +63,18 @@ namespace Gubbins.Context
         public void Dispose() => m_Context.Dispose();
 
         /// <inheritdoc/>
-        object IDependenciesResolver.Resolve(Type type, string key) => Resolver.Resolve(type, key);
+        object IDependenciesResolver.Resolve(Type type, string key) => m_Context.Resolve(type, key);
 
         /// <inheritdoc/>
-        object[] IDependenciesResolver.ResolveAll(Type type) => Resolver.ResolveAll(type);
+        object[] IDependenciesResolver.ResolveAll(Type type) => m_Context.ResolveAll(type);
 
         /// <inheritdoc/>
-        public IBindingDecorator Register(Type type) => Registry.Register(type);
+        public IBindingDecorator Register(Type type) => m_Context.Register(type);
 
         /// <inheritdoc/>
-        INotMultitonBindingDecorator IDependenciesRegistry.Register(object instance) => Registry.Register(instance);
+        INotMultitonBindingDecorator IDependenciesRegistry.Register(object instance) => m_Context.Register(instance);
 
         /// <inheritdoc/>
-        IMultitonBindingDecorator IDependenciesRegistry.Register(object[] instances) => Registry.Register(instances);
+        IMultitonBindingDecorator IDependenciesRegistry.Register(object[] instances) => m_Context.Register(instances);
     }
 }
