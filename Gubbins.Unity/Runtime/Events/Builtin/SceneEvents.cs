@@ -1,12 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine.Events;
 using UnityEngine.SceneManagement;
 
 namespace Gubbins.Events
 {
     /// <summary>
-    /// Provides strongly-typed actionpers for Unity SceneManager events.
+    /// Provides strongly-typed wrapper for Unity SceneManager events.
     /// </summary>
     public static class SceneEvents
     {

@@ -54,15 +54,15 @@
       <Compile Update="Handlers\ActionEventHandler.cs">
         <DependentUpon>ActionEventHandler.tt</DependentUpon>
       </Compile>
-      <Compile Update="Handlers\LinkableEventHandler.cs">
-        <AutoGen>True</AutoGen>
-        <DesignTime>True</DesignTime>
-        <DependentUpon>LinkableEventHandler.tt</DependentUpon>
-      </Compile>
       <Compile Update="Extensions\LinkableEventSubscribeExtensions.cs">
         <AutoGen>True</AutoGen>
         <DesignTime>True</DesignTime>
         <DependentUpon>LinkableEventSubscribeExtensions.tt</DependentUpon>
+      </Compile>
+      <Compile Update="Handlers\LinkableEventHandler.cs">
+        <AutoGen>True</AutoGen>
+        <DesignTime>True</DesignTime>
+        <DependentUpon>LinkableEventHandler.tt</DependentUpon>
       </Compile>
     </ItemGroup>
 

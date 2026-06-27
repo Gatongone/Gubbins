@@ -22,7 +22,8 @@ public interface ILinkableEventSubscriable<out TNotification, TResult>
     /// Append a handler to linked event list.
     /// </summary>
     /// <param name="handler">The handler to append.</param>
-    void Unsubscribe(ILinkableEventHandler<TNotification, TResult> handler);
+    /// <returns>Is removed succeed.</returns>
+    bool Unsubscribe(ILinkableEventHandler<TNotification, TResult> handler);
 
     /// <summary>
     /// Remove all handlers from bus.

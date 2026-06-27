@@ -4,6 +4,9 @@ using Unity.Jobs;
 
 namespace Gubbins.Events
 {
+    /// <summary>
+    /// Static class containing events for the different phases of the Unity PlayerLoop with JobSystem.
+    /// </summary>
     public static class JobEvents
     {
         /// <summary>
@@ -64,11 +67,11 @@ namespace Gubbins.Events
     }
 
     /// <summary>
-    /// Base class for PlayerLoop event wrappers.
+    /// Base class for PlayerLoop event wrapper.
     /// </summary>
     public class JobLoopEvent : ILinkableEventSubscriable<float, JobHandle>
     {
-        private readonly UnityLoop.Kind m_Kind;
+        private readonly UnityLoop.Kind                                                                         m_Kind;
         private readonly Dictionary<ILinkableEventHandler<float, JobHandle>, Func<float, JobHandle, JobHandle>> m_Handlers = new();
 
         internal JobLoopEvent(UnityLoop.Kind kind) => m_Kind = kind;
@@ -78,32 +81,35 @@ namespace Gubbins.Events
         {
             if (m_Handlers.ContainsKey(handler))
                 return;
-
-            Func<float, JobHandle, JobHandle> wrap = (delta, jobHandle) =>
+            Func<float, JobHandle, JobHandle> action;
+            if (handler is LinkableEventHandler<float, JobHandle> linkableHandler)
             {
-                handler.Handle(delta, jobHandle);
-                return jobHandle;
-            };
+                action = linkableHandler.Invocation;
+            }
+            else
+            {
+                action = handler.Handle;
+            }
 
-            m_Handlers.Add(handler, wrap);
-            UnityLoop.RegisterUpdate(m_Kind, wrap);
+            m_Handlers.Add(handler, action);
+            UnityLoop.RegisterUpdate(m_Kind, action);
         }
 
         /// <inheritdoc/>
-        public void Unsubscribe(ILinkableEventHandler<float, JobHandle> handler)
+        public bool Unsubscribe(ILinkableEventHandler<float, JobHandle> handler)
         {
-            if (!m_Handlers.TryGetValue(handler, out var wrap))
-                return;
+            if (!m_Handlers.TryGetValue(handler, out var action))
+                return false;
 
-            UnityLoop.UnregisterUpdate(m_Kind, wrap);
-            m_Handlers.Remove(handler);
+            UnityLoop.UnregisterUpdate(m_Kind, action);
+            return m_Handlers.Remove(handler);
         }
 
         /// <inheritdoc/>
         public void Clear()
         {
-            foreach (var wrap in m_Handlers)
-                UnityLoop.UnregisterUpdate(m_Kind, wrap.Value);
+            foreach (var action in m_Handlers)
+                UnityLoop.UnregisterUpdate(m_Kind, action.Value);
             m_Handlers.Clear();
         }
     }

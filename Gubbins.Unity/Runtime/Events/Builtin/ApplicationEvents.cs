@@ -7,7 +7,7 @@ using UnityEngine.Events;
 namespace Gubbins.Events
 {
     /// <summary>
-    /// Provides strongly-typed application for Unity Application events.
+    /// Provides strongly-typed wrapper for Unity Application events.
     /// </summary>
     public static class ApplicationEvents
     {

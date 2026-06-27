@@ -27,7 +27,7 @@ public class LinkableEvent<TNotification, TResult>(TResult defaultResult) : ILin
     public void Subscribe(ILinkableEventHandler<TNotification, TResult> handler) => m_Handlers.Add(handler);
 
     /// <inheritdoc/>
-    public void Unsubscribe(ILinkableEventHandler<TNotification, TResult> handler) => m_Handlers.Remove(handler);
+    public bool Unsubscribe(ILinkableEventHandler<TNotification, TResult> handler) => m_Handlers.Remove(handler);
 
     /// <inheritdoc/>
     public void Clear() => m_Handlers.Clear();

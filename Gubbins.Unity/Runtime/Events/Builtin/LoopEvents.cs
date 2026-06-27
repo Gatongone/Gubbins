@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace Gubbins.Events
 {
     /// <summary>
-    /// Provides strongly-typed actionpers for Unity PlayerLoop phase events.
+    /// Provides strongly-typed wrapper for Unity PlayerLoop phase events.
     /// </summary>
     public static class LoopEvents
     {
@@ -66,7 +66,7 @@ namespace Gubbins.Events
     }
 
     /// <summary>
-    /// Base class for PlayerLoop event actionpers.
+    /// Base class for PlayerLoop event wrapper.
     /// </summary>
     public class LoopEvent : IEventSubscriable<float>
     {
