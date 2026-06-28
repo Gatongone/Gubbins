@@ -187,6 +187,7 @@ namespace Gubbins.Pipeline
 
             new GameObject("SceneContext").AddComponent<ScenePipeline>();
         }
+#endif
 
         /// <summary>
         /// Get scene context by name.
@@ -231,7 +232,6 @@ namespace Gubbins.Pipeline
             s_PipelineCache.Remove(scene.name);
             return null;
         }
-#endif
     }
 
     /// <summary>
