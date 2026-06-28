@@ -1,0 +1,81 @@
+<#@ template language="C#" #>
+<#@ import namespace="System.Linq" #>
+using Gubbins.Enhance;
+using Unity.Collections;
+
+namespace Gubbins.Entities
+{
+
+    public delegate void NativeForeach(NativeArray<Entity> entity);
+<#
+    for (var i = 1; i <= 16; i++)
+    {
+        var genericTypes = string.Join(", ", from index in Enumerable.Range(1, i) select $"T{index}");
+        var spanArgs = string.Join(", ", from index in Enumerable.Range(1, i) select $"NativeArray<T{index}> arg{index}");
+        var constraints = string.Join(" ", from index in Enumerable.Range(1, i) select $"where T{index} : unmanaged");
+#>
+    public delegate void NativeForeach<#= $"<{genericTypes}>" #>(NativeArray<Entity> entity, <#= spanArgs #>) <#= constraints #>;
+<#
+    }
+#>
+
+
+    public static class ChunksForeachExtensions
+    {
+        /// <summary>
+        /// Iterates over each chunk in the collection and applies the specified action to it.
+        /// </summary>
+        /// <param name="action">The action to perform on each chunk.</param>
+        public static void ForEach(this Chunks chunks, NativeForeach action)
+        {
+            using var entities = chunks.GetComponents<Entity>();
+            var segments = entities.Segments;
+            for (var i = 0; i < segments.Count; i++)
+            {
+                action(segments[0].AsNativeArray());
+            }
+        }
+
+        /// <summary>
+        /// Iterates over each chunk in the collection and applies the specified action to it.
+        /// </summary>
+        /// <param name="action">The action to perform on each chunk.</param>
+        public static void ForEach<T>(this Chunks chunks, NativeForeach<T> action) where T : unmanaged
+        {
+            using var entities = chunks.GetComponents<Entity>();
+            using var components = chunks.GetComponents<T>();
+            var segment0 = entities.Segments;
+            var segment1 = components.Segments;
+            for (var i = 0; i < segment0.Count; i++)
+            {
+                action(segment0[0].AsNativeArray(), segment1[1].AsNativeArray());
+            }
+        }
+<#
+    for (var i = 2; i <= 16; i++)
+    {
+        var genericTypes = string.Join(", ", from index in Enumerable.Range(1, i) select $"T{index}");
+        var genericConstraints = string.Join(" ", from index in Enumerable.Range(1, i) select $"where T{index} : unmanaged");
+        var componentStatements = string.Join(Environment.NewLine, from index in Enumerable.Range(1, i) select $"using var components{index} = chunks.GetComponents<T{index}>();");
+        var componentSegments = string.Join(Environment.NewLine, from index in Enumerable.Range(1, i) select $"var segment{index} = components{index}.Segments;");
+#>
+        /// <summary>
+        /// Iterates over each chunk in the collection and applies the specified action to it.
+        /// </summary>
+        /// <param name="action">The action to perform on each chunk.</param>
+        public static void ForEach<#= $"<{genericTypes}>" #>(this Chunks chunks, NativeForeach<#= $"<{genericTypes}>" #> action) <#= genericConstraints #>
+        {
+            using var entities = chunks.GetComponents<Entity>();
+            <#= componentStatements #>
+            var segment0 = entities.Segments;
+            <#= componentSegments #>
+            for (var i = 0; i < segment0.Count; i++)
+            {
+                action(segment0[0].AsNativeArray(), <#= string.Join(", ", from index in Enumerable.Range(1, i) select $"segment{index}[{index}].AsNativeArray()") #>);
+            }
+        }
+<#
+    }
+#>
+    }
+}
