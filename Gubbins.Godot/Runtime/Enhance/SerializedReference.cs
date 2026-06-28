@@ -18,7 +18,7 @@ public partial class SerializedReference<T> : Godot.Resource where T : class
     {
         get
         {
-            var type = Type;
+            var type = ExpectedType;
             if (m_ReferenceObject != null && type != null && typeof(T).IsAssignableFrom(type))
             {
                 return m_ReferenceObject as T;
@@ -59,7 +59,7 @@ public partial class SerializedReference<T> : Godot.Resource where T : class
     /// <summary>
     /// Gets the Type represented by this serialized reference. If the reference type string is null or empty, this will return null.
     /// </summary>
-    private Type Type => string.IsNullOrEmpty(m_ReferenceType) ? null : Type.GetType(m_ReferenceType, Reflection.LoadAssemblyResolver, Reflection.DomainTypeResolver);
+    public Type ExpectedType => string.IsNullOrEmpty(m_ReferenceType) ? null : Type.GetType(m_ReferenceType, Reflection.LoadAssemblyResolver, Reflection.DomainTypeResolver);
 
     /// <inheritdoc/>
     public override Array<Dictionary> _GetPropertyList()
@@ -71,7 +71,7 @@ public partial class SerializedReference<T> : Godot.Resource where T : class
             !t.IsAbstract &&
             (typeof(GodotObject).IsAssignableFrom(t) || t.GetConstructor([]) != null)).ToList();
         var hintString = string.Join(",", referenceTypes.Select(t => t.ToString()));
-        var type = Type;
+        var type = ExpectedType;
         if (string.IsNullOrEmpty(m_ReferenceType) || type == null || !typeof(GodotObject).IsAssignableFrom(type))
         {
             properties.Add(new Dictionary

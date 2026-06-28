@@ -6,6 +6,7 @@ namespace Gubbins.Context;
 /// <summary>
 /// A resource that represents a context in the application.
 /// </summary>
+[GlobalClass, Tool]
 public partial class ResourceContext : Godot.Resource, IContext
 {
     /// <summary>
@@ -43,6 +44,7 @@ public partial class ResourceContext : Godot.Resource, IContext
         {
             m_Context.Dispose();
         }
+        base.Dispose(disposing);
     }
 
     /// <inheritdoc/>

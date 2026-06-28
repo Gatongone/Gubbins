@@ -6,7 +6,7 @@ namespace Gubbins.Context;
 /// <summary>
 /// A node that represents a context in the application.
 /// </summary>
-[GlobalClass]
+[GlobalClass, Tool]
 public partial class NodeContext : Node, IContext
 {
     /// <summary>
