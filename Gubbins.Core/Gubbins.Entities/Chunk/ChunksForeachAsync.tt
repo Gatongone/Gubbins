@@ -351,9 +351,14 @@ public static class ChunksForeachAsync
     }
 #>
 }
-
+/// <summary>
+/// Specifies the kind of task to be executed in the ForEachAsync method.
+/// </summary>
 public enum TaskKind
 {
+    /// <summary>Indicates that the task is expected to be short-running and may benefit from a busy-wait loop.</summary>
     Short,
+
+    /// <summary>Indicates that the task is expected to be long-running and should use a cancellation token registration to avoid blocking the thread pool.</summary>
     Long
 }
