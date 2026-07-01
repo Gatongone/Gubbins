@@ -31,4 +31,4 @@ Adapts Gubbins for Godot, integrating the Core modules with the engine's C# runt
 
 ## License
 
-Gubbins is released under the [BSD 3-Clause License](LICENSE). Copyright (c) 2023, Gatongone.
+Gubbins is released under the [BSD 3-Clause License](LICENSE). Copyright (c) 2025, Gatongone.
