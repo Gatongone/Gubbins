@@ -1,4 +1,8 @@
 #IDE configs
+*/*.DotSettings.user
+*/.idea
+*/.vs
+*/.godot
 /.idea
 /.vs
 

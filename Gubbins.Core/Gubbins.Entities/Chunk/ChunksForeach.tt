@@ -1,0 +1,145 @@
+<#@ template language="C#" #>
+<#@ import namespace="System.Linq" #>
+namespace Gubbins.Entities;
+
+public delegate void ElementForeach(in Entity entity);
+<#
+    for (var i = 1; i <= 16; i++)
+    {
+        var genericTypes = string.Join(", ", from index in Enumerable.Range(1, i) select $"T{index}");
+        var refArgs = string.Join(", ", from index in Enumerable.Range(1, i) select $"ref T{index} arg{index}");
+#>
+public delegate void ElementForeach<#= $"<{genericTypes}>" #>(in Entity entity, <#= refArgs #>);
+<#
+    }
+#>
+
+public delegate void SegmentForeach(ReadOnlySpan<Entity> entity);
+<#
+    for (var i = 1; i <= 16; i++)
+    {
+        var genericTypes = string.Join(", ", from index in Enumerable.Range(1, i) select $"T{index}");
+        var spanArgs = string.Join(", ", from index in Enumerable.Range(1, i) select $"Span<T{index}> arg{index}");
+#>
+public delegate void SegmentForeach<#= $"<{genericTypes}>" #>(ReadOnlySpan<Entity> entity, <#= spanArgs #>);
+<#
+    }
+#>
+
+
+public static class ChunksForeachExtensions
+{
+    extension(Chunks chunks)
+    {
+        /// <summary>
+        /// Iterates over each element in chunks in the collection and applies the specified action to it.
+        /// </summary>
+        /// <param name="action">The action to perform on each element in chunks.</param>
+        public void ForEach(ElementForeach action)
+        {
+            using var entities = chunks.GetComponents<Entity>();
+            var elements = entities.Elements;
+            for (var i = 0; i < elements.Count; i++)
+            {
+                action(in elements[0]);
+            }
+        }
+
+        /// <summary>
+        /// Iterates over each element in chunks in the collection and applies the specified action to it.
+        /// </summary>
+        /// <param name="action">The action to perform on each element in chunk.</param>
+        public void ForEach<T>(ElementForeach<T> action) where T : unmanaged
+        {
+            using var entities = chunks.GetComponents<Entity>();
+            using var components = chunks.GetComponents<T>();
+            var elements0 = entities.Elements;
+            var elements1 = components.Elements;
+            for (var i = 0; i < elements0.Count; i++)
+            {
+                action(in elements0[0], ref elements1[1]);
+            }
+        }
+<#
+    for (var i = 2; i <= 16; i++)
+    {
+        var genericTypes = string.Join(", ", from index in Enumerable.Range(1, i) select $"T{index}");
+        var genericConstraints = string.Join(" ", from index in Enumerable.Range(1, i) select $"where T{index} : unmanaged");
+        var componentStatements = string.Join(Environment.NewLine, from index in Enumerable.Range(1, i) select $"using var components{index} = chunks.GetComponents<T{index}>();");
+        var componentElements = string.Join(Environment.NewLine, from index in Enumerable.Range(1, i) select $"var elements{index} = components{index}.Elements;");
+#>
+        /// <summary>
+        /// Iterates over each element in chunks in the collection and applies the specified action to it.
+        /// </summary>
+        /// <param name="action">The action to perform on each element in chunk.</param>
+        public void ForEach<#= $"<{genericTypes}>" #>(ElementForeach<#= $"<{genericTypes}>" #> action) <#= genericConstraints #>
+        {
+            using var entities = chunks.GetComponents<Entity>();
+            <#= componentStatements #>
+            var elements0 = entities.Elements;
+            <#= componentElements #>
+            for (var i = 0; i < elements0.Count; i++)
+            {
+                action(in elements0[0], <#= string.Join(", ", from index in Enumerable.Range(1, i) select $"ref elements{index}[{index}]") #>);
+            }
+        }
+<#
+    }
+#>
+        /// <summary>
+        /// Iterates over each chunk in the collection and applies the specified action to it.
+        /// </summary>
+        /// <param name="action">The action to perform on each chunk.</param>
+        public void ForEach(SegmentForeach action)
+        {
+            using var entities = chunks.GetComponents<Entity>();
+            var segments = entities.Segments;
+            for (var i = 0; i < segments.Count; i++)
+            {
+                action(segments[0]);
+            }
+        }
+
+        /// <summary>
+        /// Iterates over each chunk in the collection and applies the specified action to it.
+        /// </summary>
+        /// <param name="action">The action to perform on each chunk.</param>
+        public void ForEach<T>(SegmentForeach<T> action) where T : unmanaged
+        {
+            using var entities = chunks.GetComponents<Entity>();
+            using var components = chunks.GetComponents<T>();
+            var segment0 = entities.Segments;
+            var segment1 = components.Segments;
+            for (var i = 0; i < segment0.Count; i++)
+            {
+                action(segment0[0], segment1[1]);
+            }
+        }
+<#
+    for (var i = 2; i <= 16; i++)
+    {
+        var genericTypes = string.Join(", ", from index in Enumerable.Range(1, i) select $"T{index}");
+        var genericConstraints = string.Join(" ", from index in Enumerable.Range(1, i) select $"where T{index} : unmanaged");
+        var componentStatements = string.Join(Environment.NewLine, from index in Enumerable.Range(1, i) select $"using var components{index} = chunks.GetComponents<T{index}>();");
+        var componentSegments = string.Join(Environment.NewLine, from index in Enumerable.Range(1, i) select $"var segment{index} = components{index}.Segments;");
+#>
+        /// <summary>
+        /// Iterates over each chunk in the collection and applies the specified action to it.
+        /// </summary>
+        /// <param name="action">The action to perform on each chunk.</param>
+        public void ForEach<#= $"<{genericTypes}>" #>(SegmentForeach<#= $"<{genericTypes}>" #> action) <#= genericConstraints #>
+        {
+            using var entities = chunks.GetComponents<Entity>();
+            <#= componentStatements #>
+            var segment0 = entities.Segments;
+            <#= componentSegments #>
+            for (var i = 0; i < segment0.Count; i++)
+            {
+                action(segment0[0], <#= string.Join(", ", from index in Enumerable.Range(1, i) select $"segment{index}[{index}]") #>);
+            }
+        }
+<#
+    }
+#>
+    }
+}

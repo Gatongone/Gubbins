@@ -1,0 +1,54 @@
+<#@ template language="C#" #>
+<#@ import namespace="System.Linq" #>
+using Gubbins.Enhance;
+
+namespace Gubbins.Events;
+
+/// <summary>
+/// Extensions for <see cref="IWeakEventSubscriable{TNotification}"/>.
+/// </summary>
+public static class EventSubscribeWeaklyExtensions
+{
+    /// <summary>
+    /// Convert action delegate to ActionEventHandler, then register to event bus.
+    /// </summary>
+    /// <param name="eventBus">Event bus.</param>
+    /// <param name="eventHandler">The handler that would be referenced weakly by the event bus.</param>
+    public static void SubscribeWeakly<TNotification>(this IWeakEventSubscriable<TNotification> eventBus, IEventHandler<TNotification> eventHandler)
+        => eventBus.SubscribeWeakly(new WeakEventHandler<TNotification>(eventHandler));
+<#
+    for (var i = 0; i < 16; i++)
+    {
+        var genericArgs = string.Empty;
+        var genericArgsWithAngleBrackets = string.Empty;
+        if (i > 0)
+        {
+            genericArgs = i == 1 ? "T" : string.Join(", ", from index in Enumerable.Range(1, i) select $"T{index}");
+            genericArgsWithAngleBrackets = i == 1 ? "<T>" : $"<{string.Join(", ", from index in Enumerable.Range(1, i) select $"T{index}")}>";
+        }
+        var parameterNotification = i == 0 ? "Unit" : i == 1 ? "T" : $"({genericArgs})";
+        var action = i == 0 ? "Action" : $"Action<{genericArgs}>";
+        var evenHandler = $"WeakActionEventHandler{(i == 0 ? string.Empty : $"<{genericArgs}>")}";
+        var eventBus = $"IWeakEventSubscriable{(i == 0 ? "<Unit>" : $"<{parameterNotification}>")}";
+#>
+
+    /// <summary>
+    /// Convert action delegate to ActionEventHandler, then register to event bus.
+    /// </summary>
+    /// <param name="eventBus">Event bus.</param>
+    /// <param name="provider">The event provider which should contains the delegation that from instance method.</param>
+    /// <param name="action">The delegate which convert to ActionEventHandler.</param>
+    public static void SubscribeWeakly<#=genericArgsWithAngleBrackets#>(this <#=eventBus#> eventBus, IEquatable<DBNull> provider, <#=action#> action)
+        => eventBus.SubscribeWeakly(new <#=evenHandler#>(action, provider));
+
+    /// <summary>
+    /// Convert action delegate to ActionEventHandler, then register to event bus.
+    /// </summary>
+    /// <param name="eventBus">Event bus.</param>
+    /// <param name="action">The delegate which convert to ActionEventHandler.</param>
+    public static void SubscribeWeakly<#=genericArgsWithAngleBrackets#>(this <#=eventBus#> eventBus, <#=action#> action)
+        => eventBus.SubscribeWeakly(new <#=evenHandler#>(action, action.Target as IEquatable<DBNull> ?? throw new ArgumentException($"Delegate {nameof(action.Target)} is not a IEquatable<DBNull>")));
+<#
+    }
+#>
+}

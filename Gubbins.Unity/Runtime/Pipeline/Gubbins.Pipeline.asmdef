@@ -1,0 +1,23 @@
+{
+    "name": "Gubbins.Unity.Pipeline",
+    "rootNamespace": "Gubbins.Pipeline",
+    "references": [
+        "GUID:aa6f970150f05344897296ee0d03b4cf",
+        "GUID:cd3ce3f81e0cc0c4d868a09411ec9632",
+        "GUID:05bb661b1e8a3c64ca7826c86481f58c"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "Gubbins.Pipeline.dll",
+        "Gubbins.Context.dll",
+        "Gubbins.Events.dll",
+        "Gubbins.Enhance.dll"
+    ],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

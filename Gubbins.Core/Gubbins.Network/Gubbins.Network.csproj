@@ -1,0 +1,27 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <LangVersion>latestmajor</LangVersion>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <TargetFrameworks>netstandard2.1;net8.0;net10.0</TargetFrameworks>
+    </PropertyGroup>
+
+    <Target Name="PostBuild" BeforeTargets="PostBuildEvent">
+        <PropertyGroup>
+            <DotNetVer>$(TargetFramework)</DotNetVer>
+            <UnitySupportVer>netstandard2.1</UnitySupportVer>
+            <GodotSupportVer>net8.0</GodotSupportVer>
+            <UnityOutDir>$(ProjectDir)..\..\Gubbins.Unity\Plugins</UnityOutDir>
+            <GodotOutDir>$(ProjectDir)..\..\Gubbins.Godot\Plugins</GodotOutDir>
+        </PropertyGroup>
+        <ItemGroup>
+            <OutputFiles Include="$(OutputPath)$(ProjectName).dll"/>
+            <OutputFiles Include="$(OutputPath)$(ProjectName).pdb" Condition="Exists('$(OutputPath)$(ProjectName).pdb')"/>
+            <OutputFiles Include="$(OutputPath)$(ProjectName).mdb" Condition="Exists('$(OutputPath)$(ProjectName).mdb')"/>
+        </ItemGroup>
+        <Copy SourceFiles="@(OutputFiles)" DestinationFolder="$(UnityOutDir)" SkipUnchangedFiles="true" Condition=" '$(UnityOutDir)' != '' and '$(DotNetVer)' == '$(UnitySupportVer)' "/>
+        <Copy SourceFiles="@(OutputFiles)" DestinationFolder="$(GodotOutDir)" SkipUnchangedFiles="true" Condition=" '$(GodotOutDir)' != '' and '$(DotNetVer)' == '$(GodotSupportVer)' "/>
+    </Target>
+
+</Project>

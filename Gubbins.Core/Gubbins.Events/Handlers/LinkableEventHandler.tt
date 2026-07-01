@@ -1,0 +1,168 @@
+<#@ template language="C#" #>
+<#@ import namespace="System.Linq" #>
+using Gubbins.Enhance;
+namespace Gubbins.Events;
+
+/// <summary>
+/// Event handler with <see cref="System.Func<TResult, TResult>"/>.
+/// </summary>
+public sealed class LinkableEventHandler<TResult> : ILinkableEventHandler<TResult>, IEquatable<Func<TResult, TResult>>, IEquatable<LinkableEventHandler<TResult>>
+{
+    /// <summary>
+    /// Action with method provider.
+    /// </summary>
+    public readonly Func<TResult, TResult> Invocation;
+
+    /// <summary>
+    /// Create an event handler from a Func.
+    /// </summary>
+    /// <param name="delegation">Delegation for creating EventHandler.</param>
+    public LinkableEventHandler(Func<TResult, TResult> delegation) => Invocation = delegation;
+
+    /// <summary>
+    /// <inheritdoc cref="ILinkableEventHandler{TNotification, TResult}.Handle"/>
+    /// </summary>
+    public TResult Handle(TResult previousResult) => Invocation.Invoke(previousResult);
+
+    /// <inheritdoc/>
+    TResult ILinkableEventHandler<Unit, TResult>.Handle(Unit arg, TResult previousResult) => Handle(previousResult);
+
+    /// <inheritdoc/>
+    public override int GetHashCode() => Invocation.GetHashCode();
+
+    /// <summary>
+    /// Verify if the target equals to event handler.
+    /// </summary>
+    public static bool operator ==(LinkableEventHandler<TResult> left, object right) => !Equals(left, null) && left.Equals(right);
+
+    /// <summary>
+    /// Verify if the target not equals to event handler.
+    /// </summary>
+    public static bool operator !=(LinkableEventHandler<TResult> left, object right) => !(left == right);
+
+    /// <inheritdoc/>
+    public bool Equals(LinkableEventHandler<TResult> other) => Invocation.Equals(other.Invocation);
+
+    /// <inheritdoc/>
+    public bool Equals(Func<TResult, TResult> other) => Invocation.Equals(other);
+
+    /// <inheritdoc/>
+    public override bool Equals(object? other) => other switch
+    {
+        LinkableEventHandler<TResult> handler => Equals(handler),
+        Func<TResult, TResult> action         => Equals(action),
+        _                                     => false
+    };
+}
+
+/// <summary>
+/// Event handler with <see cref="System.Func{TArg, TResult, TResult}"/>.
+/// </summary>
+public sealed class LinkableEventHandler<TArg, TResult> : ILinkableEventHandler<TArg, TResult>, IEquatable<Func<TArg, TResult, TResult>>, IEquatable<LinkableEventHandler<TArg, TResult>>
+{
+    /// <summary>
+    /// Action with method provider.
+    /// </summary>
+    public readonly Func<TArg, TResult, TResult> Invocation;
+
+    /// <summary>
+    /// Create a event handler from a Func.
+    /// </summary>
+    /// <param name="delegation">Delegation for creating EventHandler.</param>   
+    public LinkableEventHandler(Func<TArg, TResult, TResult> delegation) => Invocation = delegation;
+
+    /// <summary>
+    /// <inheritdoc cref="ILinkableEventHandler{TNotification, TResult}.Handle"/>
+    /// </summary>
+    public TResult Handle(TArg arg, TResult previousResult) => Invocation.Invoke(arg, previousResult);
+
+    /// <inheritdoc/>
+    public override int GetHashCode() => Invocation.GetHashCode();
+
+    /// <summary>
+    /// Verify if the target equals to event handler.
+    /// </summary>
+    public static bool operator ==(LinkableEventHandler<TArg, TResult> left, object right) => !Equals(left, null) && left.Equals(right);
+
+    /// <summary>
+    /// Verify if the target not equals to event handler.
+    /// </summary>
+    public static bool operator !=(LinkableEventHandler<TArg, TResult> left, object right) => !(left == right);
+
+    /// <inheritdoc/>
+    public bool Equals(LinkableEventHandler<TArg, TResult> other) => Invocation.Equals(other.Invocation);
+
+    /// <inheritdoc/>
+    public bool Equals(Func<TArg, TResult, TResult> other) => Invocation.Equals(other);
+
+    /// <inheritdoc/>
+    public override bool Equals(object? other) => other switch
+    {
+        LinkableEventHandler<TArg, TResult> handler => Equals(handler),
+        Func<TArg, TResult, TResult> action                => Equals(action),
+        _                                  => false
+    };
+}
+<#
+    for (var i = 2; i <= 14; i++)
+    {
+        var genericTypes = string.Join(", ", from index in Enumerable.Range(1, i) select $"TArg{index}");
+        var parameterDefs = string.Join(", ", from index in Enumerable.Range(1, i) select $"TArg{index} arg{index}");
+        var parameters = string.Join(", ", from index in Enumerable.Range(1, i) select $"arg{index}");
+        var items = string.Join(", ", from index in Enumerable.Range(1, i) select $"arg.Item{index}");
+#>
+
+/// <summary>
+/// Event handler with <see cref="System.Func{<#= genericTypes #>, TResult, TResult}"/>.
+/// </summary>
+public sealed class LinkableEventHandler<<#= genericTypes #>, TResult> : ILinkableEventHandler<<#= $"({genericTypes})" #>, TResult>, IEquatable<Func<<#= genericTypes #>, TResult, TResult>>, IEquatable<LinkableEventHandler<<#= genericTypes #>, TResult>>
+{
+    /// <summary>
+    /// Action with method provider.
+    /// </summary>
+    public readonly Func<<#= genericTypes #>, TResult, TResult> Invocation;
+
+    /// <summary>
+    /// Create a event handler from a Func.
+    /// </summary>
+    /// <param name="delegation">Delegation for creating EventHandler.</param>
+    public LinkableEventHandler(Func<<#= genericTypes #>, TResult, TResult> delegation) => Invocation = delegation;
+
+    /// <summary>
+    /// <inheritdoc cref="IEventHandler{TNotification}.Handle"/>
+    /// </summary>
+    public TResult Handle(<#= parameterDefs #>, TResult previousResult) => Invocation(<#= parameters #>, previousResult);
+
+    /// <inheritdoc/>
+    TResult ILinkableEventHandler<<#= $"({genericTypes})" #>, TResult>.Handle(<#= $"({genericTypes})" #> arg, TResult previousResult) => Handle(<#= items #>, previousResult);
+
+    /// <inheritdoc/>
+    public override int GetHashCode() => Invocation.GetHashCode();
+
+    /// <summary>
+    /// Verify if the target equals to event handler.
+    /// </summary>
+    public static bool operator ==(LinkableEventHandler<<#= genericTypes #>, TResult> left, object right) => !Equals(left, null) && left.Equals(right);
+
+    /// <summary>
+    /// Verify if the target not equals to event handler.
+    /// </summary>
+    public static bool operator !=(LinkableEventHandler<<#= genericTypes #>, TResult> left, object right) => !(left == right);
+
+    /// <inheritdoc/>
+    public bool Equals(LinkableEventHandler<<#= genericTypes #>, TResult> other) => Invocation.Equals(other.Invocation);
+
+    /// <inheritdoc/>
+    public bool Equals(Func<<#= genericTypes #>, TResult, TResult> other) => Invocation.Equals(other);
+
+    /// <inheritdoc/>
+    public override bool Equals(object? other) => other switch
+    {
+        ActionEventHandler<<#= genericTypes #>> handler => Equals(handler),
+        Func<<#= genericTypes #>, TResult, TResult> action => Equals(action),
+        _                                                 => false
+    };
+}
+<#
+    }
+#>

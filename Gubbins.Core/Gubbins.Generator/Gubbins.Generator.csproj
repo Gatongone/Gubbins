@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>netstandard2.0</TargetFramework>
+        <IsPackable>false</IsPackable>
+        <Nullable>enable</Nullable>
+        <LangVersion>latest</LangVersion>
+
+        <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+        <IsRoslynComponent>true</IsRoslynComponent>
+
+        <RootNamespace>Gubbins.Generator</RootNamespace>
+        <PackageId>Gubbins.Generator</PackageId>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(PublishAot)' == 'true'">
+        <DefineConstants>$(DefineConstants);NATIVEAOT</DefineConstants>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="3.9.0"/>
+        <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.4"/>
+    </ItemGroup>
+
+    <Target Name="PostBuild" BeforeTargets="PostBuildEvent">
+        <PropertyGroup>
+            <DotNetVer>$(TargetFramework)</DotNetVer>
+            <UnitySupportVer>netstandard2.0</UnitySupportVer>
+            <GodotSupportVer>netstandard2.0</GodotSupportVer>
+            <UnityOutDir>$(ProjectDir)..\..\Gubbins.Unity\Plugins</UnityOutDir>
+            <GodotOutDir>$(ProjectDir)..\..\Gubbins.Godot\Plugins</GodotOutDir>
+        </PropertyGroup>
+        <ItemGroup>
+            <OutputFiles Include="$(OutputPath)$(ProjectName).dll"/>
+            <OutputFiles Include="$(OutputPath)$(ProjectName).pdb" Condition="Exists('$(OutputPath)$(ProjectName).pdb')"/>
+            <OutputFiles Include="$(OutputPath)$(ProjectName).mdb" Condition="Exists('$(OutputPath)$(ProjectName).mdb')"/>
+        </ItemGroup>
+        <Copy SourceFiles="@(OutputFiles)" DestinationFolder="$(UnityOutDir)" SkipUnchangedFiles="true" Condition=" '$(UnityOutDir)' != '' and '$(DotNetVer)' == '$(UnitySupportVer)' "/>
+        <Copy SourceFiles="@(OutputFiles)" DestinationFolder="$(GodotOutDir)" SkipUnchangedFiles="true" Condition=" '$(GodotOutDir)' != '' and '$(DotNetVer)' == '$(GodotSupportVer)' "/>
+    </Target>
+
+</Project>
