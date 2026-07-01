@@ -5,6 +5,9 @@ using Gubbins.Enhance;
 
 namespace Gubbins.Pipeline;
 
+/// <summary>
+/// Represents a pipeline that manages the execution of event listeners within a scene. The ScenePipeline class allows for the registration and execution of event listeners in a defined order, providing a structured approach to handling events in a scene.
+/// </summary>
 public partial class ScenePipeline : Node, IPipeline
 {
     /// <summary>

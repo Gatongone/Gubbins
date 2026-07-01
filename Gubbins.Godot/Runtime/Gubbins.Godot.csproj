@@ -4,10 +4,17 @@
         <TargetFramework Condition=" '$(GodotTargetPlatform)' == 'android' ">net9.0</TargetFramework>
         <LangVersion>latestmajor</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <Nullable>disable</Nullable>
     </PropertyGroup>
 
     <ItemGroup>
         <Reference Include="../Plugins/*.dll"/>
+        <Reference Remove="../Plugins/Gubbins.Generator.dll"/>
+        <Analyzer Include="../Plugins/Gubbins.Generator.dll"/>
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Entities\Components\" />
     </ItemGroup>
 </Project>

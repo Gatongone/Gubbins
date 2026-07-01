@@ -10,7 +10,7 @@ public static class LoopEvents
     /// </summary>
     public sealed class Preprocess : LoopEvent
     {
-        internal Preprocess() : base(GodotLoop.Kind.Preprocess) { }
+        public Preprocess() : base(GodotLoop.Kind.Preprocess) { }
     }
 
     /// <summary>
@@ -18,7 +18,7 @@ public static class LoopEvents
     /// </summary>
     public sealed class Process : LoopEvent
     {
-        internal Process() : base(GodotLoop.Kind.Process) { }
+        public Process() : base(GodotLoop.Kind.Process) { }
     }
 
     /// <summary>
@@ -26,7 +26,7 @@ public static class LoopEvents
     /// </summary>
     public sealed class Postprocess : LoopEvent
     {
-        internal Postprocess() : base(GodotLoop.Kind.Postprocess) { }
+        public Postprocess() : base(GodotLoop.Kind.Postprocess) { }
     }
 
     /// <summary>
@@ -34,7 +34,7 @@ public static class LoopEvents
     /// </summary>
     public sealed class Physics : LoopEvent
     {
-        internal Physics() : base(GodotLoop.Kind.Physics) { }
+        public Physics() : base(GodotLoop.Kind.Physics) { }
     }
 }
 
