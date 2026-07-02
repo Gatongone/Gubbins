@@ -71,7 +71,7 @@ public partial class SerializedInstallInfo : global::Godot.Resource
     /// Converts the <see cref="SerializedInstallInfo"/> to an <see cref="InstallInfo"/> instance.
     /// </summary>
     /// <returns>An <see cref="InstallInfo"/> instance representing the serialized install info.</returns>
-    public InstallInfo ToInstallInfo()
+    internal InstallInfo ToInstallInfo()
     {
         var spawner = Spawner;
         var result = new InstallInfo

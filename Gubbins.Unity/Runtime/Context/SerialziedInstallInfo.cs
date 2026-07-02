@@ -55,17 +55,10 @@ namespace Gubbins.Context
         public uint Prewarm;
 
         /// <summary>
-        /// Implicitly converts a <see cref="SerializedInstallInfo"/> to an <see cref="InstallInfo"/>.
-        /// </summary>
-        /// <param name="info">The serialized install info to convert.</param>
-        /// <returns>An <see cref="InstallInfo"/> instance representing the serialized install info.</returns>
-        public static implicit operator InstallInfo(SerializedInstallInfo info) => info.ToInstallInfo();
-
-        /// <summary>
         /// Converts the <see cref="SerializedInstallInfo"/> to an <see cref="InstallInfo"/> instance.
         /// </summary>
         /// <returns>An <see cref="InstallInfo"/> instance representing the serialized install info.</returns>
-        public InstallInfo ToInstallInfo()
+        internal InstallInfo ToInstallInfo()
         {
             var result = new InstallInfo
             {
