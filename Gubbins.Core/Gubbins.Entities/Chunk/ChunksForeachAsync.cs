@@ -15,7 +15,7 @@ public static class ChunksForeachAsync
         /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
         /// <exception cref="InvalidOperationException">Thrown when a work item cannot be queued for execution.</exception>
         /// <exception cref="AggregateException">Thrown when one or more exceptions occur during the execution of the action on the elements.</exception>
-        public async Task ForEachAsync(ElementForeach action, TaskKind taskKind, CancellationToken cancellationToken = default)
+        public async ValueTask ForEachAsync(ElementForeach action, TaskKind taskKind, CancellationToken cancellationToken = default)
         {
             if (cancellationToken.IsCancellationRequested) return;
             using var entities = chunks.GetComponents<Entity>();
@@ -88,7 +88,7 @@ public static class ChunksForeachAsync
         /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
         /// <exception cref="InvalidOperationException">Thrown when a work item cannot be queued for execution.</exception>
         /// <exception cref="AggregateException">Thrown when one or more exceptions occur during the execution of the action on the elements.</exception>
-        public async Task ForEachAsync<T>(ElementForeach<T> action, TaskKind taskKind, CancellationToken cancellationToken = default) where T : unmanaged
+        public async ValueTask ForEachAsync<T>(ElementForeach<T> action, TaskKind taskKind, CancellationToken cancellationToken = default) where T : unmanaged
         {
             if (cancellationToken.IsCancellationRequested) return;
             using var entities = chunks.GetComponents<Entity>();
@@ -165,7 +165,7 @@ public static class ChunksForeachAsync
         /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
         /// <exception cref="InvalidOperationException">Thrown when a work item cannot be queued for execution.</exception>
         /// <exception cref="AggregateException">Thrown when one or more exceptions occur during the execution of the action on the elements.</exception>
-        public async Task ForEachAsync<T1, T2>(ElementForeach<T1, T2> action, TaskKind taskKind, CancellationToken cancellationToken = default) where T1 : unmanaged where T2 : unmanaged
+        public async ValueTask ForEachAsync<T1, T2>(ElementForeach<T1, T2> action, TaskKind taskKind, CancellationToken cancellationToken = default) where T1 : unmanaged where T2 : unmanaged
         {
             if (cancellationToken.IsCancellationRequested) return;
             using var entities = chunks.GetComponents<Entity>();
@@ -246,7 +246,7 @@ public static class ChunksForeachAsync
         /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
         /// <exception cref="InvalidOperationException">Thrown when a work item cannot be queued for execution.</exception>
         /// <exception cref="AggregateException">Thrown when one or more exceptions occur during the execution of the action on the elements.</exception>
-        public async Task ForEachAsync<T1, T2, T3>(ElementForeach<T1, T2, T3> action, TaskKind taskKind, CancellationToken cancellationToken = default) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged
+        public async ValueTask ForEachAsync<T1, T2, T3>(ElementForeach<T1, T2, T3> action, TaskKind taskKind, CancellationToken cancellationToken = default) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged
         {
             if (cancellationToken.IsCancellationRequested) return;
             using var entities = chunks.GetComponents<Entity>();
@@ -331,7 +331,7 @@ public static class ChunksForeachAsync
         /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
         /// <exception cref="InvalidOperationException">Thrown when a work item cannot be queued for execution.</exception>
         /// <exception cref="AggregateException">Thrown when one or more exceptions occur during the execution of the action on the elements.</exception>
-        public async Task ForEachAsync<T1, T2, T3, T4>(ElementForeach<T1, T2, T3, T4> action, TaskKind taskKind, CancellationToken cancellationToken = default) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged
+        public async ValueTask ForEachAsync<T1, T2, T3, T4>(ElementForeach<T1, T2, T3, T4> action, TaskKind taskKind, CancellationToken cancellationToken = default) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged
         {
             if (cancellationToken.IsCancellationRequested) return;
             using var entities = chunks.GetComponents<Entity>();
@@ -420,7 +420,7 @@ public static class ChunksForeachAsync
         /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
         /// <exception cref="InvalidOperationException">Thrown when a work item cannot be queued for execution.</exception>
         /// <exception cref="AggregateException">Thrown when one or more exceptions occur during the execution of the action on the elements.</exception>
-        public async Task ForEachAsync<T1, T2, T3, T4, T5>(ElementForeach<T1, T2, T3, T4, T5> action, TaskKind taskKind, CancellationToken cancellationToken = default) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where T5 : unmanaged
+        public async ValueTask ForEachAsync<T1, T2, T3, T4, T5>(ElementForeach<T1, T2, T3, T4, T5> action, TaskKind taskKind, CancellationToken cancellationToken = default) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where T5 : unmanaged
         {
             if (cancellationToken.IsCancellationRequested) return;
             using var entities = chunks.GetComponents<Entity>();
@@ -513,7 +513,7 @@ public static class ChunksForeachAsync
         /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
         /// <exception cref="InvalidOperationException">Thrown when a work item cannot be queued for execution.</exception>
         /// <exception cref="AggregateException">Thrown when one or more exceptions occur during the execution of the action on the elements.</exception>
-        public async Task ForEachAsync<T1, T2, T3, T4, T5, T6>(ElementForeach<T1, T2, T3, T4, T5, T6> action, TaskKind taskKind, CancellationToken cancellationToken = default) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where T5 : unmanaged where T6 : unmanaged
+        public async ValueTask ForEachAsync<T1, T2, T3, T4, T5, T6>(ElementForeach<T1, T2, T3, T4, T5, T6> action, TaskKind taskKind, CancellationToken cancellationToken = default) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where T5 : unmanaged where T6 : unmanaged
         {
             if (cancellationToken.IsCancellationRequested) return;
             using var entities = chunks.GetComponents<Entity>();
@@ -610,7 +610,7 @@ public static class ChunksForeachAsync
         /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
         /// <exception cref="InvalidOperationException">Thrown when a work item cannot be queued for execution.</exception>
         /// <exception cref="AggregateException">Thrown when one or more exceptions occur during the execution of the action on the elements.</exception>
-        public async Task ForEachAsync<T1, T2, T3, T4, T5, T6, T7>(ElementForeach<T1, T2, T3, T4, T5, T6, T7> action, TaskKind taskKind, CancellationToken cancellationToken = default) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where T5 : unmanaged where T6 : unmanaged where T7 : unmanaged
+        public async ValueTask ForEachAsync<T1, T2, T3, T4, T5, T6, T7>(ElementForeach<T1, T2, T3, T4, T5, T6, T7> action, TaskKind taskKind, CancellationToken cancellationToken = default) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where T5 : unmanaged where T6 : unmanaged where T7 : unmanaged
         {
             if (cancellationToken.IsCancellationRequested) return;
             using var entities = chunks.GetComponents<Entity>();
@@ -711,7 +711,7 @@ public static class ChunksForeachAsync
         /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
         /// <exception cref="InvalidOperationException">Thrown when a work item cannot be queued for execution.</exception>
         /// <exception cref="AggregateException">Thrown when one or more exceptions occur during the execution of the action on the elements.</exception>
-        public async Task ForEachAsync<T1, T2, T3, T4, T5, T6, T7, T8>(ElementForeach<T1, T2, T3, T4, T5, T6, T7, T8> action, TaskKind taskKind, CancellationToken cancellationToken = default) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where T5 : unmanaged where T6 : unmanaged where T7 : unmanaged where T8 : unmanaged
+        public async ValueTask ForEachAsync<T1, T2, T3, T4, T5, T6, T7, T8>(ElementForeach<T1, T2, T3, T4, T5, T6, T7, T8> action, TaskKind taskKind, CancellationToken cancellationToken = default) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where T5 : unmanaged where T6 : unmanaged where T7 : unmanaged where T8 : unmanaged
         {
             if (cancellationToken.IsCancellationRequested) return;
             using var entities = chunks.GetComponents<Entity>();
@@ -816,7 +816,7 @@ public static class ChunksForeachAsync
         /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
         /// <exception cref="InvalidOperationException">Thrown when a work item cannot be queued for execution.</exception>
         /// <exception cref="AggregateException">Thrown when one or more exceptions occur during the execution of the action on the elements.</exception>
-        public async Task ForEachAsync<T1, T2, T3, T4, T5, T6, T7, T8, T9>(ElementForeach<T1, T2, T3, T4, T5, T6, T7, T8, T9> action, TaskKind taskKind, CancellationToken cancellationToken = default) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where T5 : unmanaged where T6 : unmanaged where T7 : unmanaged where T8 : unmanaged where T9 : unmanaged
+        public async ValueTask ForEachAsync<T1, T2, T3, T4, T5, T6, T7, T8, T9>(ElementForeach<T1, T2, T3, T4, T5, T6, T7, T8, T9> action, TaskKind taskKind, CancellationToken cancellationToken = default) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where T5 : unmanaged where T6 : unmanaged where T7 : unmanaged where T8 : unmanaged where T9 : unmanaged
         {
             if (cancellationToken.IsCancellationRequested) return;
             using var entities = chunks.GetComponents<Entity>();
@@ -925,7 +925,7 @@ public static class ChunksForeachAsync
         /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
         /// <exception cref="InvalidOperationException">Thrown when a work item cannot be queued for execution.</exception>
         /// <exception cref="AggregateException">Thrown when one or more exceptions occur during the execution of the action on the elements.</exception>
-        public async Task ForEachAsync<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(ElementForeach<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> action, TaskKind taskKind, CancellationToken cancellationToken = default) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where T5 : unmanaged where T6 : unmanaged where T7 : unmanaged where T8 : unmanaged where T9 : unmanaged where T10 : unmanaged
+        public async ValueTask ForEachAsync<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(ElementForeach<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> action, TaskKind taskKind, CancellationToken cancellationToken = default) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where T5 : unmanaged where T6 : unmanaged where T7 : unmanaged where T8 : unmanaged where T9 : unmanaged where T10 : unmanaged
         {
             if (cancellationToken.IsCancellationRequested) return;
             using var entities = chunks.GetComponents<Entity>();
@@ -1038,7 +1038,7 @@ public static class ChunksForeachAsync
         /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
         /// <exception cref="InvalidOperationException">Thrown when a work item cannot be queued for execution.</exception>
         /// <exception cref="AggregateException">Thrown when one or more exceptions occur during the execution of the action on the elements.</exception>
-        public async Task ForEachAsync<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11>(ElementForeach<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> action, TaskKind taskKind, CancellationToken cancellationToken = default) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where T5 : unmanaged where T6 : unmanaged where T7 : unmanaged where T8 : unmanaged where T9 : unmanaged where T10 : unmanaged where T11 : unmanaged
+        public async ValueTask ForEachAsync<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11>(ElementForeach<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> action, TaskKind taskKind, CancellationToken cancellationToken = default) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where T5 : unmanaged where T6 : unmanaged where T7 : unmanaged where T8 : unmanaged where T9 : unmanaged where T10 : unmanaged where T11 : unmanaged
         {
             if (cancellationToken.IsCancellationRequested) return;
             using var entities = chunks.GetComponents<Entity>();
@@ -1155,7 +1155,7 @@ public static class ChunksForeachAsync
         /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
         /// <exception cref="InvalidOperationException">Thrown when a work item cannot be queued for execution.</exception>
         /// <exception cref="AggregateException">Thrown when one or more exceptions occur during the execution of the action on the elements.</exception>
-        public async Task ForEachAsync<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12>(ElementForeach<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> action, TaskKind taskKind, CancellationToken cancellationToken = default) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where T5 : unmanaged where T6 : unmanaged where T7 : unmanaged where T8 : unmanaged where T9 : unmanaged where T10 : unmanaged where T11 : unmanaged where T12 : unmanaged
+        public async ValueTask ForEachAsync<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12>(ElementForeach<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> action, TaskKind taskKind, CancellationToken cancellationToken = default) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where T5 : unmanaged where T6 : unmanaged where T7 : unmanaged where T8 : unmanaged where T9 : unmanaged where T10 : unmanaged where T11 : unmanaged where T12 : unmanaged
         {
             if (cancellationToken.IsCancellationRequested) return;
             using var entities = chunks.GetComponents<Entity>();
@@ -1276,7 +1276,7 @@ public static class ChunksForeachAsync
         /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
         /// <exception cref="InvalidOperationException">Thrown when a work item cannot be queued for execution.</exception>
         /// <exception cref="AggregateException">Thrown when one or more exceptions occur during the execution of the action on the elements.</exception>
-        public async Task ForEachAsync<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13>(ElementForeach<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> action, TaskKind taskKind, CancellationToken cancellationToken = default) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where T5 : unmanaged where T6 : unmanaged where T7 : unmanaged where T8 : unmanaged where T9 : unmanaged where T10 : unmanaged where T11 : unmanaged where T12 : unmanaged where T13 : unmanaged
+        public async ValueTask ForEachAsync<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13>(ElementForeach<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> action, TaskKind taskKind, CancellationToken cancellationToken = default) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where T5 : unmanaged where T6 : unmanaged where T7 : unmanaged where T8 : unmanaged where T9 : unmanaged where T10 : unmanaged where T11 : unmanaged where T12 : unmanaged where T13 : unmanaged
         {
             if (cancellationToken.IsCancellationRequested) return;
             using var entities = chunks.GetComponents<Entity>();
@@ -1401,7 +1401,7 @@ public static class ChunksForeachAsync
         /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
         /// <exception cref="InvalidOperationException">Thrown when a work item cannot be queued for execution.</exception>
         /// <exception cref="AggregateException">Thrown when one or more exceptions occur during the execution of the action on the elements.</exception>
-        public async Task ForEachAsync<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14>(ElementForeach<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> action, TaskKind taskKind, CancellationToken cancellationToken = default) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where T5 : unmanaged where T6 : unmanaged where T7 : unmanaged where T8 : unmanaged where T9 : unmanaged where T10 : unmanaged where T11 : unmanaged where T12 : unmanaged where T13 : unmanaged where T14 : unmanaged
+        public async ValueTask ForEachAsync<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14>(ElementForeach<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> action, TaskKind taskKind, CancellationToken cancellationToken = default) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where T5 : unmanaged where T6 : unmanaged where T7 : unmanaged where T8 : unmanaged where T9 : unmanaged where T10 : unmanaged where T11 : unmanaged where T12 : unmanaged where T13 : unmanaged where T14 : unmanaged
         {
             if (cancellationToken.IsCancellationRequested) return;
             using var entities = chunks.GetComponents<Entity>();
@@ -1530,7 +1530,7 @@ public static class ChunksForeachAsync
         /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
         /// <exception cref="InvalidOperationException">Thrown when a work item cannot be queued for execution.</exception>
         /// <exception cref="AggregateException">Thrown when one or more exceptions occur during the execution of the action on the elements.</exception>
-        public async Task ForEachAsync<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15>(ElementForeach<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> action, TaskKind taskKind, CancellationToken cancellationToken = default) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where T5 : unmanaged where T6 : unmanaged where T7 : unmanaged where T8 : unmanaged where T9 : unmanaged where T10 : unmanaged where T11 : unmanaged where T12 : unmanaged where T13 : unmanaged where T14 : unmanaged where T15 : unmanaged
+        public async ValueTask ForEachAsync<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15>(ElementForeach<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> action, TaskKind taskKind, CancellationToken cancellationToken = default) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where T5 : unmanaged where T6 : unmanaged where T7 : unmanaged where T8 : unmanaged where T9 : unmanaged where T10 : unmanaged where T11 : unmanaged where T12 : unmanaged where T13 : unmanaged where T14 : unmanaged where T15 : unmanaged
         {
             if (cancellationToken.IsCancellationRequested) return;
             using var entities = chunks.GetComponents<Entity>();
@@ -1663,7 +1663,7 @@ public static class ChunksForeachAsync
         /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
         /// <exception cref="InvalidOperationException">Thrown when a work item cannot be queued for execution.</exception>
         /// <exception cref="AggregateException">Thrown when one or more exceptions occur during the execution of the action on the elements.</exception>
-        public async Task ForEachAsync<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16>(ElementForeach<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> action, TaskKind taskKind, CancellationToken cancellationToken = default) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where T5 : unmanaged where T6 : unmanaged where T7 : unmanaged where T8 : unmanaged where T9 : unmanaged where T10 : unmanaged where T11 : unmanaged where T12 : unmanaged where T13 : unmanaged where T14 : unmanaged where T15 : unmanaged where T16 : unmanaged
+        public async ValueTask ForEachAsync<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16>(ElementForeach<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> action, TaskKind taskKind, CancellationToken cancellationToken = default) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where T5 : unmanaged where T6 : unmanaged where T7 : unmanaged where T8 : unmanaged where T9 : unmanaged where T10 : unmanaged where T11 : unmanaged where T12 : unmanaged where T13 : unmanaged where T14 : unmanaged where T15 : unmanaged where T16 : unmanaged
         {
             if (cancellationToken.IsCancellationRequested) return;
             using var entities = chunks.GetComponents<Entity>();

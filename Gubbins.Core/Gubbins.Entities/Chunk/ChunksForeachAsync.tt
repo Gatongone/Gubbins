@@ -17,7 +17,7 @@ public static class ChunksForeachAsync
         /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
         /// <exception cref="InvalidOperationException">Thrown when a work item cannot be queued for execution.</exception>
         /// <exception cref="AggregateException">Thrown when one or more exceptions occur during the execution of the action on the elements.</exception>
-        public async Task ForEachAsync(ElementForeach action, TaskKind taskKind, CancellationToken cancellationToken = default)
+        public async ValueTask ForEachAsync(ElementForeach action, TaskKind taskKind, CancellationToken cancellationToken = default)
         {
             if (cancellationToken.IsCancellationRequested) return;
             using var entities = chunks.GetComponents<Entity>();
@@ -90,7 +90,7 @@ public static class ChunksForeachAsync
         /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
         /// <exception cref="InvalidOperationException">Thrown when a work item cannot be queued for execution.</exception>
         /// <exception cref="AggregateException">Thrown when one or more exceptions occur during the execution of the action on the elements.</exception>
-        public async Task ForEachAsync<T>(ElementForeach<T> action, TaskKind taskKind, CancellationToken cancellationToken = default) where T : unmanaged
+        public async ValueTask ForEachAsync<T>(ElementForeach<T> action, TaskKind taskKind, CancellationToken cancellationToken = default) where T : unmanaged
         {
             if (cancellationToken.IsCancellationRequested) return;
             using var entities = chunks.GetComponents<Entity>();
@@ -177,7 +177,7 @@ public static class ChunksForeachAsync
         /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
         /// <exception cref="InvalidOperationException">Thrown when a work item cannot be queued for execution.</exception>
         /// <exception cref="AggregateException">Thrown when one or more exceptions occur during the execution of the action on the elements.</exception>
-        public async Task ForEachAsync<<#= genericTypes #>>(ElementForeach<<#= genericTypes #>> action, TaskKind taskKind, CancellationToken cancellationToken = default) <#= genericConstraints #>
+        public async ValueTask ForEachAsync<<#= genericTypes #>>(ElementForeach<<#= genericTypes #>> action, TaskKind taskKind, CancellationToken cancellationToken = default) <#= genericConstraints #>
         {
             if (cancellationToken.IsCancellationRequested) return;
             using var entities = chunks.GetComponents<Entity>();
