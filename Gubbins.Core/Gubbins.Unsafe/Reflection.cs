@@ -5,7 +5,10 @@ using System.Text;
 
 namespace Gubbins.Unsafe;
 
-internal static class Reflection
+/// <summary>
+/// Provides utility methods for reflection-based type and member resolution, including assembly loading, type parsing, and delegate creation from reflected members.
+/// </summary>
+public static class Reflection
 {
     /// <summary>
     /// Loads an assembly by its name. This method is used as the assembly resolver callback for type resolution,
@@ -13,7 +16,7 @@ internal static class Reflection
     /// </summary>
     /// <param name="assemblyName">The name of the assembly to load, provided as an AssemblyName object.</param>
     /// <returns>The loaded Assembly object if the assembly is successfully loaded; otherwise, null if the assembly cannot be found or loaded.</returns>
-    internal static Assembly? LoadAssemblyResolver(AssemblyName assemblyName) => Assembly.Load(assemblyName);
+    public static Assembly? LoadAssemblyResolver(AssemblyName assemblyName) => Assembly.Load(assemblyName);
 
     /// <summary>
     /// Get the type from the domain assemblies.
@@ -24,7 +27,7 @@ internal static class Reflection
     /// <returns>Type from the domain assemblies or null if not found.</returns>
     /// <exception cref="ArgumentNullException">AssemblyName cannot be null or empty.</exception>
     /// <exception cref="TypeLoadException">Assembly was not found.</exception>
-    internal static Type? DomainTypeResolver(Assembly? assembly, string typeName, bool ignoreCase)
+    public static Type? DomainTypeResolver(Assembly? assembly, string typeName, bool ignoreCase)
     {
         if (string.IsNullOrWhiteSpace(typeName))
         {

@@ -8,7 +8,7 @@ namespace Gubbins.Context;
 /// and can be removed from the context when it is not needed anymore.
 /// </summary>
 [Serializable]
-internal struct InstallInfo
+public struct InstallInfo
 {
     /// <summary>
     /// The unique identifier for the dependency.

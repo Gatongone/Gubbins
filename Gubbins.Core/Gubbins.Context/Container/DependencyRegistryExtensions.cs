@@ -3,7 +3,7 @@
 /// <summary>
 /// Extension methods for <see cref="IDependenciesRegistry"/> to register dependencies based on <see cref="InstallInfo"/> collections.
 /// </summary>
-internal static class DependencyRegistryExtensions
+public static class DependencyRegistryExtensions
 {
     /// <param name="registry">Dependencies registry.</param>
     extension(IDependenciesRegistry registry)
@@ -33,7 +33,7 @@ internal static class DependencyRegistryExtensions
         /// </summary>
         /// <param name="installInfos">Install info collections.</param>
         /// <exception cref="ArgumentOutOfRangeException">Throw when scope is invalid.</exception>
-        internal void RegisterAll(IEnumerable<InstallInfo> installInfos)
+        public void RegisterAll(IEnumerable<InstallInfo> installInfos)
         {
             foreach (var info in installInfos)
             {
