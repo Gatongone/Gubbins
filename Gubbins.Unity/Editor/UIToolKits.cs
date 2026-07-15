@@ -184,7 +184,10 @@ namespace Gubbins.Editor
             }
 
             var result = enumerator.Current;
-            ((IDisposable) enumerator).Dispose();
+            if (enumerator is IDisposable disposable)
+            {
+                disposable.Dispose();
+            }
             return result;
         }
 

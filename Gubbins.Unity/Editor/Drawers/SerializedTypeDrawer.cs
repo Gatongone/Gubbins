@@ -28,7 +28,7 @@ namespace Gubbins.Editor
         private static readonly Dictionary<Type, bool>                       s_IsNewableCache   = new();
         private static readonly Dictionary<string, Type>                     s_WrapperTypeCache = new();
 
-        #region Common
+        #region Helpers
 
         /// <summary>
         /// Resolve the actual serialized wrapper type for direct fields and collection elements.
@@ -364,49 +364,6 @@ namespace Gubbins.Editor
             }
         }
 
-        #endregion
-
-        #region IMGUI
-
-        /// <summary>
-        /// IMGUI version.
-        /// </summary>
-        public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
-        {
-            EditorGUI.BeginProperty(position, label, property);
-
-            var typeString = property.FindPropertyRelative(TYPE_STRING_PROPERTY_NAME);
-            if (typeString == null)
-            {
-                EditorGUI.EndProperty();
-                return;
-            }
-
-            if (!TryBuildOptions(property, typeString.stringValue, out var options))
-            {
-                options = new List<TypeOption>();
-            }
-
-            var currentIndex = GetCurrentIndex(options, typeString.stringValue);
-            var currentDisplay = currentIndex <= 0 ? NULL_OPTION_LABEL : options[currentIndex - 1].DisplayName;
-            var buttonRect = EditorGUI.PrefixLabel(position, new GUIContent(property.displayName));
-            if (EditorGUI.DropdownButton(buttonRect, new GUIContent(currentDisplay), FocusType.Keyboard))
-            {
-                var screenRect = GUIUtility.GUIToScreenRect(buttonRect);
-                var dropdown = new TypeAdvancedDropdown(options, newIndex =>
-                {
-                    ApplySelection(typeString, options, newIndex);
-                    property.serializedObject.ApplyModifiedProperties();
-                });
-                dropdown.Show(screenRect);
-            }
-
-            EditorGUI.EndProperty();
-        }
-
-        /// <inheritdoc/>
-        public override float GetPropertyHeight(SerializedProperty property, GUIContent label) => EditorGUIUtility.singleLineHeight;
-
         /// <summary>
         /// Build the selectable type list for the current property.
         /// </summary>
@@ -467,8 +424,6 @@ namespace Gubbins.Editor
             s_OptionCache[cacheKey] = typedOptions;
             return typedOptions;
         }
-
-        private static bool IsStatic(Type type) => type.Attributes.HasFlag(TypeAttributes.Abstract | TypeAttributes.Sealed);
 
         #endregion
 

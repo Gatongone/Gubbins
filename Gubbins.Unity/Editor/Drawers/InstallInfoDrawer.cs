@@ -658,7 +658,7 @@ namespace Gubbins.Editor
                 RefreshList(listView);
             }
 
-            void RefreshList(BaseListView list)
+            void RefreshList(ListView list)
             {
                 list.itemsSource = ExtractArrayProperties(property);
                 list.Rebuild();
