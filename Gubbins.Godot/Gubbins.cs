@@ -17,6 +17,10 @@ public partial class Gubbins : EditorPlugin
 
     public override void _ExitTree() => ModifyCsproj(inject: false);
 
+    /// <summary>
+    /// Modifies the main .csproj file to inject or remove references to Gubbins assemblies.
+    /// </summary>
+    /// <param name="inject">If true, injects references; if false, removes them.</param>
     private void ModifyCsproj(bool inject)
     {
         var path = FindMainCsproj();
@@ -39,12 +43,11 @@ public partial class Gubbins : EditorPlugin
 
             if (inject)
             {
-                var pluginsDir = ProjectSettings.GlobalizePath("res://addons/gubbins/Plugins");
+                var addonDir = ProjectSettings.GlobalizePath(((Script) GetScript()).ResourcePath).GetBaseDir();
+                var pluginsDir = Path.Combine(addonDir, "Plugins");
                 var baseDir = Path.GetDirectoryName(path)!;
-
                 var dlls = Directory.GetFiles(pluginsDir, "*.dll")
-                                    .Where(d => !Path.GetFileName(d).Equals(
-                                        "Gubbins.Generator.dll", StringComparison.OrdinalIgnoreCase))
+                                    .Where(d => !Path.GetFileName(d).Equals("Gubbins.Generator.dll", StringComparison.OrdinalIgnoreCase))
                                     .ToList();
 
                 var generator = Path.Combine(pluginsDir, "Gubbins.Generator.dll");
@@ -60,7 +63,9 @@ public partial class Gubbins : EditorPlugin
                     itemGroup.Add(new XElement(ns + "Analyzer", new XAttribute("Include", Relative(baseDir, generator))));
                 }
 
-                var propGroup = new XElement(ns + "PropertyGroup", new XAttribute("Label", XML_LABEL),
+                var propGroup = new XElement(
+                    ns + "PropertyGroup",
+                    new XAttribute("Label", XML_LABEL),
                     new XElement(ns + "DefineConstants", $"$(DefineConstants);{ENABLED_DEFINE}"),
                     new XElement(ns + "AllowUnsafeBlocks", "true"));
 
@@ -79,6 +84,10 @@ public partial class Gubbins : EditorPlugin
         }
     }
 
+    /// <summary>
+    /// Finds the main .csproj file for the Godot project. It checks the project settings for a specified project directory or assembly name,
+    /// and falls back to searching for any .csproj file in the root directory that is not inside an "addons/" folder.
+    /// </summary>
     private static string FindMainCsproj()
     {
         var root = ProjectSettings.GlobalizePath("res://");
@@ -110,6 +119,9 @@ public partial class Gubbins : EditorPlugin
         return Directory.GetFiles(root, "*.csproj").FirstOrDefault(f => !f.Replace('\\', '/').Contains("/addons/"));
     }
 
+    /// <summary>
+    /// Calculates the relative path from baseDir to target.
+    /// </summary>
     private static string Relative(string baseDir, string target)
     {
         var baseUri = new Uri(baseDir.TrimEnd('/', '\\') + "/");

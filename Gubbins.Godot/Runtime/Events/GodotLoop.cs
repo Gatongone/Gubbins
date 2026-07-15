@@ -22,22 +22,22 @@ internal static class GodotLoop
     /// <summary>
     /// Event that is invoked during the ProcessFrame phase of the Godot main loop, passing the delta time since the last frame as a parameter.
     /// </summary>
-    private static event Action<double> s_ProcessFrame;
+    private static event Action<float> s_ProcessFrame;
 
     /// <summary>
     /// Event that is invoked during the PhysicsFrame phase of the Godot main loop, passing the delta time since the last physics frame as a parameter.
     /// </summary>
-    private static event Action<double> s_PhysicsFrame;
+    private static event Action<float> s_PhysicsFrame;
 
     /// <summary>
     /// Event that is invoked during the Preprocess phase of the Godot main loop, passing the delta time since the last frame as a parameter.
     /// </summary>
-    private static event Action<double> s_PreFrame;
+    private static event Action<float> s_PreFrame;
 
     /// <summary>
     /// Event that is invoked during the Postprocess phase of the Godot main loop, passing the delta time since the last frame as a parameter.
     /// </summary>
-    private static event Action<double> s_PostFrame;
+    private static event Action<float> s_PostFrame;
 
     static GodotLoop()
     {
@@ -57,7 +57,7 @@ internal static class GodotLoop
     /// </summary>
     /// <param name="kind">The WindowLoop phase.</param>
     /// <param name="onUpdate">The delegate to invoke during the phase.</param>
-    internal static void RegisterUpdate(Kind kind, Action<double> onUpdate)
+    internal static void RegisterUpdate(Kind kind, Action<float> onUpdate)
     {
         if (s_Looper == null || s_Window == null)
         {
@@ -89,7 +89,7 @@ internal static class GodotLoop
     /// <param name="kind">The WindowLoop phase.</param>
     /// <param name="onUpdate">The delegate to remove from the phase.</param>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when the specified kind is not a valid WindowLoop phase.</exception>
-    internal static void UnregisterUpdate(Kind kind, Action<double> onUpdate)
+    internal static void UnregisterUpdate(Kind kind, Action<float> onUpdate)
     {
         if (s_Looper == null || s_Window == null)
         {
@@ -121,15 +121,15 @@ internal static class GodotLoop
     private static void OnProcessFrame()
     {
         var deltaTime = s_Window.GetProcessDeltaTime();
-        s_PreFrame?.Invoke(deltaTime);
-        s_ProcessFrame?.Invoke(deltaTime);
-        s_PostFrame?.Invoke(deltaTime);
+        s_PreFrame?.Invoke((float) deltaTime);
+        s_ProcessFrame?.Invoke((float) deltaTime);
+        s_PostFrame?.Invoke((float) deltaTime);
     }
 
     /// <summary>
     /// Invokes the registered PhysicsFrame delegates with the delta time since the last physics frame.
     /// </summary>
-    private static void OnPhysicsFrame() => s_PhysicsFrame?.Invoke(s_Window.GetPhysicsProcessDeltaTime());
+    private static void OnPhysicsFrame() => s_PhysicsFrame?.Invoke((float) s_Window.GetPhysicsProcessDeltaTime());
 
     /// <summary>
     /// Enumerates supported WindowLoop phases.

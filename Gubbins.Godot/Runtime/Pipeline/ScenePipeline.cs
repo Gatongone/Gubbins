@@ -31,7 +31,7 @@ public partial class ScenePipeline : Node, IPipeline
     /// The list of event listeners to register with the context.
     /// These listeners will be executed in the order they are defined in the array.
     /// </summary>
-    [Export] private Array<SerializedReference<IEventListener>> Listeners;
+    [Export] private Array<SerializedEventListener> Listeners;
 
     /// <summary>
     /// A list of instantiated event listeners that have been registered with the context.
@@ -141,6 +141,10 @@ public partial class ScenePipeline : Node, IPipeline
                     item.Listen(context, context);
                     m_ListenerInstances.Add(item);
                 }
+                else
+                {
+                    GD.PushWarning($"The event listener of type {targetType?.Name ?? "Unknown"} is not set and cannot be instantiated. Please ensure that the listener is properly configured in the ScenePipeline.");
+                }
             }
         }
     }
@@ -190,7 +194,7 @@ public partial class ScenePipeline : Node, IPipeline
     {
         foreach (var constructor in type.GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
         {
-            if (constructor.GetCustomAttribute<InjectAttribute>() is null)
+            if (constructor.GetCustomAttribute<InjectAttribute>() is not null)
             {
                 return true;
             }

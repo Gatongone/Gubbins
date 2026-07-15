@@ -156,7 +156,7 @@ internal static class EntityTransformSystem
 
         // Clear the active slots so nodes whose entity supplies no data this frame are left untouched by
         // the writeback (Flags == 0). The scatter re-populates the live slots.
-        System.Array.Clear(s_Snapshots, 0, count);
+        Array.Clear(s_Snapshots, 0, count);
 
         foreach (var group in s_Groups.Values)
         {

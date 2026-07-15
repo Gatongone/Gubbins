@@ -45,10 +45,10 @@ public static class LoopEvents
 /// <summary>
 /// Base class for WindowLoop event wrappers.
 /// </summary>
-public class LoopEvent : IEventSubscriable<double>
+public class LoopEvent : IEventSubscriable<float>
 {
     private readonly GodotLoop.Kind                                    m_Kind;
-    private readonly Dictionary<IEventHandler<double>, Action<double>> m_HandlerMap = new();
+    private readonly Dictionary<IEventHandler<float>, Action<float>> m_HandlerMap = new();
 
     internal LoopEvent(GodotLoop.Kind kind)
     {
@@ -56,10 +56,10 @@ public class LoopEvent : IEventSubscriable<double>
     }
 
     /// <inheritdoc/>
-    public void Subscribe(IEventHandler<double> handler)
+    public void Subscribe(IEventHandler<float> handler)
     {
-        Action<double> action;
-        if (handler is ActionEventHandler<double> actionHandler)
+        Action<float> action;
+        if (handler is ActionEventHandler<float> actionHandler)
         {
             action = actionHandler.Invocation;
         }
@@ -73,7 +73,7 @@ public class LoopEvent : IEventSubscriable<double>
     }
 
     /// <inheritdoc/>
-    public bool Unsubscribe(IEventHandler<double> handler)
+    public bool Unsubscribe(IEventHandler<float> handler)
     {
         if (!m_HandlerMap.Remove(handler, out var action)) return false;
         GodotLoop.UnregisterUpdate(m_Kind, action);

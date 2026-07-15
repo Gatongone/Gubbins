@@ -27,21 +27,9 @@ public partial class ResourceContext : global::Godot.Resource, IContext
     private IReadOnlyContext m_Parent;
 
     /// <inheritdoc/>
-    IReadOnlyContext IReadOnlyContext.Parent
-    {
-        get { return m_Parent ??= Parent?.Value; }
-    }
+    IReadOnlyContext IReadOnlyContext.Parent => m_Parent ??= Parent?.Value;
 
-    /// <summary>
-    /// Initializes the context when the node is ready.
-    /// </summary>
-    public override void _Notification(int what)
-    {
-        if (what == NotificationPostinitialize)
-        {
-            m_Context = new ApplicationContext(Installers.Select(static item => item.Value), ((IReadOnlyContext) this).Parent);
-        }
-    }
+    private IContext Context => m_Context ??= new ApplicationContext(Installers.Select(static item => item.Value), ((IReadOnlyContext) this).Parent);
 
     /// <summary>
     /// Releases any resources held by the context.
@@ -50,13 +38,14 @@ public partial class ResourceContext : global::Godot.Resource, IContext
     {
         if (disposing)
         {
-            m_Context.Dispose();
+            m_Context?.Dispose();
         }
+
         base.Dispose(disposing);
     }
 
     /// <inheritdoc/>
-    object IDependenciesResolver.Resolve(Type type, string key) => m_Context.Resolve(type, key);
+    object IDependenciesResolver.Resolve(Type type, string key) => Context.Resolve(type, key);
 
     /// <inheritdoc/>
     object[] IDependenciesResolver.ResolveAll(Type type) => m_Context.ResolveAll(type);

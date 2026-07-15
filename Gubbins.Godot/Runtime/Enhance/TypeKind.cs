@@ -1,7 +1,6 @@
-﻿using System;
-using Godot;
+﻿#if GUBBINS_ENABLED
+using System;
 
-#if GUBBINS_ENABLED
 namespace Gubbins.Enhance;
 
 [Flags]

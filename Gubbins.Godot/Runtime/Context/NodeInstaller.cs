@@ -10,7 +10,7 @@ namespace Gubbins.Context;
 /// of <see cref="SerializedInstallInfo"/> entries. Attach to any Node in the scene to
 /// contribute bindings to the context at install time.
 /// </summary>>
-[GlobalClass]
+[GlobalClass, Tool]
 public partial class NodeInstaller  : Node, IDependenciesInstaller
 {
     /// <summary>

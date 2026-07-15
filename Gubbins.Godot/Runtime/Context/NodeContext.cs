@@ -44,7 +44,7 @@ public partial class NodeContext : Node, IContext
     {
         if (disposing)
         {
-            m_Context.Dispose();
+            m_Context?.Dispose();
         }
     }
 

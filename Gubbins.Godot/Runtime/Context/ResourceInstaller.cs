@@ -1,4 +1,5 @@
 ﻿#if GUBBINS_ENABLED
+using System.Diagnostics;
 using System.Linq;
 using Godot;
 using Godot.Collections;
@@ -9,7 +10,7 @@ namespace Gubbins.Context;
 /// A <see cref="Resource"/> installer that registers dependencies from a serialized
 /// list of <see cref="SerializedInstallInfo"/> entries.
 /// </summary>
-[GlobalClass]
+[GlobalClass, Tool]
 public partial class ResourceInstaller : global::Godot.Resource, IDependenciesInstaller
 {
     /// <summary>

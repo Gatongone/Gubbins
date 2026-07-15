@@ -18,7 +18,7 @@ namespace Gubbins.Entities;
 public partial class EntityAdapter2D : Node2D, ITransformBinding
 {
     /// <summary>The context resolving <see cref="IEntityCommand"/>/<see cref="IEntityQuery"/>.</summary>
-    [Export] public SerializedReference<IContext> Context;
+    [Export] public SerializedContext Context;
 
     /// <summary>The component types this entity is constructed from.</summary>
     [Export] public ComponentSet Components;
@@ -61,7 +61,7 @@ public partial class EntityAdapter2D : Node2D, ITransformBinding
     /// <param name="components">The component instances for the entity.</param>
     public void Configure(IContext context, params IComponent[] components)
     {
-        Context ??= new SerializedReference<IContext>();
+        Context ??= new SerializedContext();
         Context.Value = context;
         Components ??= new ComponentSet();
         Components.SetComponents(components);

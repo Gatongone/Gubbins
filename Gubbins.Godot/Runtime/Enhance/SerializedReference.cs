@@ -24,6 +24,12 @@ public partial class SerializedReference<T> : global::Godot.Resource where T : c
             var type = ExpectedType;
             if (m_ReferenceObject != null && type != null && typeof(T).IsAssignableFrom(type))
             {
+                if (m_ReferenceObject is global::Godot.Resource r && !string.IsNullOrEmpty(r.ResourcePath))
+                {
+                    var cached = ResourceLoader.Load(r.ResourcePath);
+                    return cached as T ?? m_ReferenceObject as T;
+                }
+
                 return m_ReferenceObject as T;
             }
 
@@ -31,8 +37,8 @@ public partial class SerializedReference<T> : global::Godot.Resource where T : c
             {
                 return null;
             }
-
-            return Activator.CreateInstance(type) as T;
+            var containEmptyCtor = type.GetConstructor(Type.EmptyTypes) != null;
+            return containEmptyCtor ? Activator.CreateInstance(type) as T : null;
         }
         set
         {
@@ -71,8 +77,7 @@ public partial class SerializedReference<T> : global::Godot.Resource where T : c
         var referenceTypes = AssemblyCache.AllTypes.Where(t =>
             typeof(T).IsAssignableFrom(t) &&
             !t.IsInterface &&
-            !t.IsAbstract &&
-            (typeof(GodotObject).IsAssignableFrom(t) || t.GetConstructor([]) != null)).ToList();
+            !t.IsAbstract).ToList();
         var hintString = string.Join(",", referenceTypes.Select(t => t.ToString()));
         var type = ExpectedType;
         if (string.IsNullOrEmpty(m_ReferenceType) || type == null || !typeof(GodotObject).IsAssignableFrom(type))

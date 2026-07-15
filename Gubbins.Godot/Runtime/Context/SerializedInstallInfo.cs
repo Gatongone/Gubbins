@@ -13,7 +13,7 @@ namespace Gubbins.Context;
 /// <summary>
 /// SerializedInstallInfo is a Godot Resource that encapsulates the installation information for a specific type within a given scope.
 /// </summary>
-[Tool]
+[GlobalClass, Tool]
 public partial class SerializedInstallInfo : global::Godot.Resource
 {
     private Scope         m_Scope;
@@ -29,17 +29,17 @@ public partial class SerializedInstallInfo : global::Godot.Resource
     /// <summary>
     /// Gets the Type of the spawner based on the stored spawner type string. If the string is null or empty, it returns null. Otherwise, it attempts to resolve the type using reflection.
     /// </summary>
-    private Type SpawnerType => string.IsNullOrEmpty(m_SpawnerType) ? null : System.Type.GetType(m_SpawnerType, Reflection.LoadAssemblyResolver, Reflection.DomainTypeResolver);
+    private Type SpawnerType => string.IsNullOrEmpty(m_SpawnerType) ? null : Type.GetType(m_SpawnerType, Reflection.LoadAssemblyResolver, Reflection.DomainTypeResolver);
 
     /// <summary>
     /// Gets the Type of the controller based on the stored controller type string. If the string is null or empty, it returns null. Otherwise, it attempts to resolve the type using reflection.
     /// </summary>
-    private Type ControllerType => string.IsNullOrEmpty(m_ControllerType) ? null : System.Type.GetType(m_ControllerType, Reflection.LoadAssemblyResolver, Reflection.DomainTypeResolver);
+    private Type ControllerType => string.IsNullOrEmpty(m_ControllerType) ? null : Type.GetType(m_ControllerType, Reflection.LoadAssemblyResolver, Reflection.DomainTypeResolver);
 
     /// <summary>
     /// Gets the Type of the main type based on the stored type string. If the string is null or empty, it returns null. Otherwise, it attempts to resolve the type using reflection.
     /// </summary>
-    public Type Type => string.IsNullOrEmpty(m_Type) ? null : System.Type.GetType(m_Type, Reflection.LoadAssemblyResolver, Reflection.DomainTypeResolver);
+    public Type Type => string.IsNullOrEmpty(m_Type) ? null : Type.GetType(m_Type, Reflection.LoadAssemblyResolver, Reflection.DomainTypeResolver);
 
     /// <summary>
     /// Gets the scope of the installation information. This indicates how instances of the type should be managed (e.g., singleton, multiton, Custom.).
@@ -59,17 +59,17 @@ public partial class SerializedInstallInfo : global::Godot.Resource
     /// <summary>
     /// Gets the spawner instance. If the spawner is not already instantiated, it attempts to create an instance of the spawner type using reflection. If the spawner type is a GodotObject, it returns null.
     /// </summary>
-    public ISpawner Spawner => m_Spawner as ISpawner ?? (typeof(GodotObject).IsAssignableFrom(SpawnerType) ? null : Activator.CreateInstance(SpawnerType) as ISpawner);
+    public ISpawner Spawner => m_Spawner as ISpawner ?? (typeof(GodotObject).IsAssignableFrom(SpawnerType) ? Activator.CreateInstance(SpawnerType) as ISpawner : null);
 
     /// <summary>
     /// Gets the controller instance. If the controller is not already instantiated, it attempts to create an instance of the controller type using reflection. If the controller type is a GodotObject, it returns null.
     /// </summary>
-    public IScopeController Controller => m_Controller as IScopeController ?? (typeof(GodotObject).IsAssignableFrom(ControllerType) ? null : Activator.CreateInstance(ControllerType) as IScopeController);
+    public IScopeController Controller => m_Controller as IScopeController ?? (typeof(GodotObject).IsAssignableFrom(ControllerType) ? Activator.CreateInstance(ControllerType) as IScopeController : null);
 
     /// <summary>
     /// Gets the set of types that the main type binds to. This is determined by resolving each type string in the binding array using reflection and filtering out any null results.
     /// </summary>
-    public HashSet<Type> Bindings => [..m_Binding.Select(static item => System.Type.GetType(item, Reflection.LoadAssemblyResolver, Reflection.DomainTypeResolver)).Where(static item => item != null)];
+    public HashSet<Type> Bindings => [..m_Binding.Select(static item => Type.GetType(item, Reflection.LoadAssemblyResolver, Reflection.DomainTypeResolver)).Where(static item => item != null)];
 
     /// <summary>
     /// Converts the <see cref="SerializedInstallInfo"/> to an <see cref="InstallInfo"/> instance.
@@ -206,13 +206,39 @@ public partial class SerializedInstallInfo : global::Godot.Resource
             m_SpawnerType    = null;
             m_Spawner        = null;
 
+            var type = Type;
+            if (type != null && type.GetConstructor(Type.EmptyTypes) != null)
+            {
+                m_SpawnerType = typeof(NewableSpawner<>).MakeGenericType(type).ToString();
+            }
+
             NotifyPropertyListChanged();
             return true;
         }
 
         if (property == "Binding")
         {
-            m_Binding = value.AsGodotArray<string>();
+            var array = value.AsGodotArray();
+            if (array.Count > 0 && array[0].VariantType == Variant.Type.Int)
+            {
+                var typeNames = GetBindingTypeNames();
+                m_Binding = [];
+                for (int i = 0; i < array.Count; i++)
+                {
+                    var idx = array[i].AsInt32();
+                    if (idx >= 0 && idx < typeNames.Count)
+                        m_Binding.Add(typeNames[idx]);
+                }
+            }
+            else
+            {
+                m_Binding = [];
+                foreach (var item in array)
+                {
+                    m_Binding.Add(item.AsString());
+                }
+            }
+
             return true;
         }
 
@@ -309,55 +335,66 @@ public partial class SerializedInstallInfo : global::Godot.Resource
         });
     }
 
+    private List<string> GetBindingTypeNames()
+    {
+        var type = Type;
+        if (type == null)
+        {
+            return [];
+        }
+
+        var bindings = new List<Type>();
+        GetAllBaseTypes(type, bindings);
+        GetAllInterfaces(type, bindings);
+        return bindings.Select(t => t.ToString()).ToList();
+    }
+
+    private static void GetAllBaseTypes(Type t, List<Type> baseTypes)
+    {
+        var baseType = t.BaseType;
+        if (baseType != null && baseType != typeof(object))
+        {
+            baseTypes.Add(baseType);
+            GetAllBaseTypes(baseType, baseTypes);
+        }
+    }
+
+    private static void GetAllInterfaces(Type t, List<Type> interfaces)
+    {
+        if (t == null)
+        {
+            return;
+        }
+
+        var typeInterfaces = t.GetInterfaces();
+        interfaces.AddRange(typeInterfaces);
+        foreach (var typeInterface in typeInterfaces)
+        {
+            GetAllInterfaces(typeInterface, interfaces);
+        }
+    }
+
     /// <summary>
     /// Builds the binding property for the SerializedInstallInfo. If the type is null, it returns early. Otherwise, it retrieves
     /// all base types and interfaces of the specified type and adds them to the property list as a comma-separated string.
     /// </summary>
     private void BuildBinding(Array<Dictionary> properties)
     {
-        if (m_Type == null)
+        var typeNames = GetBindingTypeNames();
+        if (typeNames.Count == 0)
         {
             return;
         }
 
-        var type = Type;
-        var bindings = new List<Type>();
-        GetAllBaseTypes(type, bindings);
-        GetAllInterfaces(type, bindings);
-        var hintString = string.Join(",", bindings.Select(t => t.ToString()));
+        var hintString = string.Join(",", typeNames);
         properties.Add(new Dictionary
         {
             {"name", "Binding"},
             {"type", (int) Variant.Type.Array},
             {"hint", (int) PropertyHint.TypeString},
-            {"hint_string", $"2/2:{hintString}"},
+            {"hint_string", $"4/2:{hintString}"},
             {"usage", (int) PropertyUsageFlags.Default}
         });
-
-        void GetAllBaseTypes(Type t, List<Type> baseTypes)
-        {
-            var baseType = t.BaseType;
-            if (baseType != null && baseType != typeof(object))
-            {
-                baseTypes.Add(baseType);
-                GetAllBaseTypes(baseType, baseTypes);
-            }
-        }
-
-        void GetAllInterfaces(Type t, List<Type> interfaces)
-        {
-            if (t == null)
-            {
-                return;
-            }
-
-            var typeInterfaces = t.GetInterfaces();
-            interfaces.AddRange(typeInterfaces);
-            foreach (var typeInterface in typeInterfaces)
-            {
-                GetAllInterfaces(typeInterface, interfaces);
-            }
-        }
     }
 
     /// <summary>
@@ -395,12 +432,13 @@ public partial class SerializedInstallInfo : global::Godot.Resource
     /// </summary>
     private void BuildSpawner(Array<Dictionary> properties)
     {
-        if (m_Type == null)
+        var type = Type;
+        if (type == null)
         {
             return;
         }
 
-        var spawnerTypes = GenericTypeResolver.GetConstrainedImplementations(typeof(ISpawner<>).MakeGenericType(Type), Type);
+        var spawnerTypes = GenericTypeResolver.GetConstrainedImplementations(typeof(ISpawner<>).MakeGenericType(type), type);
         var hintString = string.Join(",", spawnerTypes.Select(t => t.ToString()));
         var spawnerType = SpawnerType;
         if (string.IsNullOrEmpty(m_SpawnerType) || spawnerType == null || !typeof(GodotObject).IsAssignableFrom(spawnerType))
@@ -451,7 +489,8 @@ public partial class SerializedInstallInfo : global::Godot.Resource
     /// </summary>
     private void BuildController(Array<Dictionary> properties)
     {
-        if (m_Type == null || m_Scope != Scope.Custom)
+        var type = Type;
+        if (type == null || m_Scope != Scope.Custom)
         {
             return;
         }
