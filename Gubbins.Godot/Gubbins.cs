@@ -61,7 +61,8 @@ public partial class Gubbins : EditorPlugin
                 }
 
                 var propGroup = new XElement(ns + "PropertyGroup", new XAttribute("Label", XML_LABEL),
-                    new XElement(ns + "DefineConstants", $"$(DefineConstants);{ENABLED_DEFINE}"));
+                    new XElement(ns + "DefineConstants", $"$(DefineConstants);{ENABLED_DEFINE}"),
+                    new XElement(ns + "AllowUnsafeBlocks", "true"));
 
                 doc.Root.Add(propGroup, itemGroup);
             }
