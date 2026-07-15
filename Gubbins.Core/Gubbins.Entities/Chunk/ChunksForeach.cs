@@ -1,4 +1,4 @@
-namespace Gubbins.Entities;
+﻿namespace Gubbins.Entities;
 
 public delegate void ElementForeach(in Entity entity);
 
@@ -82,7 +82,7 @@ public static class ChunksForeachExtensions
             var elements = entities.Elements;
             for (var i = 0; i < elements.Count; i++)
             {
-                action(in elements[0]);
+                action(in elements[i]);
             }
         }
 
@@ -98,7 +98,7 @@ public static class ChunksForeachExtensions
             var elements1 = components.Elements;
             for (var i = 0; i < elements0.Count; i++)
             {
-                action(in elements0[0], ref elements1[1]);
+                action(in elements0[i], ref elements1[i]);
             }
         }
 
@@ -116,7 +116,7 @@ public static class ChunksForeachExtensions
             var elements2 = components2.Elements;
             for (var i = 0; i < elements0.Count; i++)
             {
-                action(in elements0[0], ref elements1[1], ref elements2[2]);
+                action(in elements0[i], ref elements1[i], ref elements2[i]);
             }
         }
 
@@ -136,7 +136,7 @@ public static class ChunksForeachExtensions
             var elements3 = components3.Elements;
             for (var i = 0; i < elements0.Count; i++)
             {
-                action(in elements0[0], ref elements1[1], ref elements2[2], ref elements3[3]);
+                action(in elements0[i], ref elements1[i], ref elements2[i], ref elements3[i]);
             }
         }
 
@@ -158,7 +158,7 @@ public static class ChunksForeachExtensions
             var elements4 = components4.Elements;
             for (var i = 0; i < elements0.Count; i++)
             {
-                action(in elements0[0], ref elements1[1], ref elements2[2], ref elements3[3], ref elements4[4]);
+                action(in elements0[i], ref elements1[i], ref elements2[i], ref elements3[i], ref elements4[i]);
             }
         }
 
@@ -182,7 +182,7 @@ public static class ChunksForeachExtensions
             var elements5 = components5.Elements;
             for (var i = 0; i < elements0.Count; i++)
             {
-                action(in elements0[0], ref elements1[1], ref elements2[2], ref elements3[3], ref elements4[4], ref elements5[5]);
+                action(in elements0[i], ref elements1[i], ref elements2[i], ref elements3[i], ref elements4[i], ref elements5[i]);
             }
         }
 
@@ -208,7 +208,7 @@ public static class ChunksForeachExtensions
             var elements6 = components6.Elements;
             for (var i = 0; i < elements0.Count; i++)
             {
-                action(in elements0[0], ref elements1[1], ref elements2[2], ref elements3[3], ref elements4[4], ref elements5[5], ref elements6[6]);
+                action(in elements0[i], ref elements1[i], ref elements2[i], ref elements3[i], ref elements4[i], ref elements5[i], ref elements6[i]);
             }
         }
 
@@ -236,7 +236,7 @@ public static class ChunksForeachExtensions
             var elements7 = components7.Elements;
             for (var i = 0; i < elements0.Count; i++)
             {
-                action(in elements0[0], ref elements1[1], ref elements2[2], ref elements3[3], ref elements4[4], ref elements5[5], ref elements6[6], ref elements7[7]);
+                action(in elements0[i], ref elements1[i], ref elements2[i], ref elements3[i], ref elements4[i], ref elements5[i], ref elements6[i], ref elements7[i]);
             }
         }
 
@@ -266,7 +266,7 @@ public static class ChunksForeachExtensions
             var elements8 = components8.Elements;
             for (var i = 0; i < elements0.Count; i++)
             {
-                action(in elements0[0], ref elements1[1], ref elements2[2], ref elements3[3], ref elements4[4], ref elements5[5], ref elements6[6], ref elements7[7], ref elements8[8]);
+                action(in elements0[i], ref elements1[i], ref elements2[i], ref elements3[i], ref elements4[i], ref elements5[i], ref elements6[i], ref elements7[i], ref elements8[i]);
             }
         }
 
@@ -298,7 +298,7 @@ public static class ChunksForeachExtensions
             var elements9 = components9.Elements;
             for (var i = 0; i < elements0.Count; i++)
             {
-                action(in elements0[0], ref elements1[1], ref elements2[2], ref elements3[3], ref elements4[4], ref elements5[5], ref elements6[6], ref elements7[7], ref elements8[8], ref elements9[9]);
+                action(in elements0[i], ref elements1[i], ref elements2[i], ref elements3[i], ref elements4[i], ref elements5[i], ref elements6[i], ref elements7[i], ref elements8[i], ref elements9[i]);
             }
         }
 
@@ -332,7 +332,7 @@ public static class ChunksForeachExtensions
             var elements10 = components10.Elements;
             for (var i = 0; i < elements0.Count; i++)
             {
-                action(in elements0[0], ref elements1[1], ref elements2[2], ref elements3[3], ref elements4[4], ref elements5[5], ref elements6[6], ref elements7[7], ref elements8[8], ref elements9[9], ref elements10[10]);
+                action(in elements0[i], ref elements1[i], ref elements2[i], ref elements3[i], ref elements4[i], ref elements5[i], ref elements6[i], ref elements7[i], ref elements8[i], ref elements9[i], ref elements10[i]);
             }
         }
 
@@ -368,7 +368,7 @@ public static class ChunksForeachExtensions
             var elements11 = components11.Elements;
             for (var i = 0; i < elements0.Count; i++)
             {
-                action(in elements0[0], ref elements1[1], ref elements2[2], ref elements3[3], ref elements4[4], ref elements5[5], ref elements6[6], ref elements7[7], ref elements8[8], ref elements9[9], ref elements10[10], ref elements11[11]);
+                action(in elements0[i], ref elements1[i], ref elements2[i], ref elements3[i], ref elements4[i], ref elements5[i], ref elements6[i], ref elements7[i], ref elements8[i], ref elements9[i], ref elements10[i], ref elements11[i]);
             }
         }
 
@@ -406,7 +406,7 @@ public static class ChunksForeachExtensions
             var elements12 = components12.Elements;
             for (var i = 0; i < elements0.Count; i++)
             {
-                action(in elements0[0], ref elements1[1], ref elements2[2], ref elements3[3], ref elements4[4], ref elements5[5], ref elements6[6], ref elements7[7], ref elements8[8], ref elements9[9], ref elements10[10], ref elements11[11], ref elements12[12]);
+                action(in elements0[i], ref elements1[i], ref elements2[i], ref elements3[i], ref elements4[i], ref elements5[i], ref elements6[i], ref elements7[i], ref elements8[i], ref elements9[i], ref elements10[i], ref elements11[i], ref elements12[i]);
             }
         }
 
@@ -446,7 +446,7 @@ public static class ChunksForeachExtensions
             var elements13 = components13.Elements;
             for (var i = 0; i < elements0.Count; i++)
             {
-                action(in elements0[0], ref elements1[1], ref elements2[2], ref elements3[3], ref elements4[4], ref elements5[5], ref elements6[6], ref elements7[7], ref elements8[8], ref elements9[9], ref elements10[10], ref elements11[11], ref elements12[12], ref elements13[13]);
+                action(in elements0[i], ref elements1[i], ref elements2[i], ref elements3[i], ref elements4[i], ref elements5[i], ref elements6[i], ref elements7[i], ref elements8[i], ref elements9[i], ref elements10[i], ref elements11[i], ref elements12[i], ref elements13[i]);
             }
         }
 
@@ -488,7 +488,7 @@ public static class ChunksForeachExtensions
             var elements14 = components14.Elements;
             for (var i = 0; i < elements0.Count; i++)
             {
-                action(in elements0[0], ref elements1[1], ref elements2[2], ref elements3[3], ref elements4[4], ref elements5[5], ref elements6[6], ref elements7[7], ref elements8[8], ref elements9[9], ref elements10[10], ref elements11[11], ref elements12[12], ref elements13[13], ref elements14[14]);
+                action(in elements0[i], ref elements1[i], ref elements2[i], ref elements3[i], ref elements4[i], ref elements5[i], ref elements6[i], ref elements7[i], ref elements8[i], ref elements9[i], ref elements10[i], ref elements11[i], ref elements12[i], ref elements13[i], ref elements14[i]);
             }
         }
 
@@ -532,7 +532,7 @@ public static class ChunksForeachExtensions
             var elements15 = components15.Elements;
             for (var i = 0; i < elements0.Count; i++)
             {
-                action(in elements0[0], ref elements1[1], ref elements2[2], ref elements3[3], ref elements4[4], ref elements5[5], ref elements6[6], ref elements7[7], ref elements8[8], ref elements9[9], ref elements10[10], ref elements11[11], ref elements12[12], ref elements13[13], ref elements14[14], ref elements15[15]);
+                action(in elements0[i], ref elements1[i], ref elements2[i], ref elements3[i], ref elements4[i], ref elements5[i], ref elements6[i], ref elements7[i], ref elements8[i], ref elements9[i], ref elements10[i], ref elements11[i], ref elements12[i], ref elements13[i], ref elements14[i], ref elements15[i]);
             }
         }
 
@@ -578,7 +578,7 @@ public static class ChunksForeachExtensions
             var elements16 = components16.Elements;
             for (var i = 0; i < elements0.Count; i++)
             {
-                action(in elements0[0], ref elements1[1], ref elements2[2], ref elements3[3], ref elements4[4], ref elements5[5], ref elements6[6], ref elements7[7], ref elements8[8], ref elements9[9], ref elements10[10], ref elements11[11], ref elements12[12], ref elements13[13], ref elements14[14], ref elements15[15], ref elements16[16]);
+                action(in elements0[i], ref elements1[i], ref elements2[i], ref elements3[i], ref elements4[i], ref elements5[i], ref elements6[i], ref elements7[i], ref elements8[i], ref elements9[i], ref elements10[i], ref elements11[i], ref elements12[i], ref elements13[i], ref elements14[i], ref elements15[i], ref elements16[i]);
             }
         }
 
@@ -592,7 +592,7 @@ public static class ChunksForeachExtensions
             var segments = entities.Segments;
             for (var i = 0; i < segments.Count; i++)
             {
-                action(segments[0]);
+                action(segments[i]);
             }
         }
 
@@ -608,7 +608,7 @@ public static class ChunksForeachExtensions
             var segment1 = components.Segments;
             for (var i = 0; i < segment0.Count; i++)
             {
-                action(segment0[0], segment1[1]);
+                action(segment0[i], segment1[i]);
             }
         }
 
@@ -626,7 +626,7 @@ public static class ChunksForeachExtensions
             var segment2 = components2.Segments;
             for (var i = 0; i < segment0.Count; i++)
             {
-                action(segment0[0], segment1[1], segment2[2]);
+                action(segment0[i], segment1[i], segment2[i]);
             }
         }
 
@@ -646,7 +646,7 @@ public static class ChunksForeachExtensions
             var segment3 = components3.Segments;
             for (var i = 0; i < segment0.Count; i++)
             {
-                action(segment0[0], segment1[1], segment2[2], segment3[3]);
+                action(segment0[i], segment1[i], segment2[i], segment3[i]);
             }
         }
 
@@ -668,7 +668,7 @@ public static class ChunksForeachExtensions
             var segment4 = components4.Segments;
             for (var i = 0; i < segment0.Count; i++)
             {
-                action(segment0[0], segment1[1], segment2[2], segment3[3], segment4[4]);
+                action(segment0[i], segment1[i], segment2[i], segment3[i], segment4[i]);
             }
         }
 
@@ -692,7 +692,7 @@ public static class ChunksForeachExtensions
             var segment5 = components5.Segments;
             for (var i = 0; i < segment0.Count; i++)
             {
-                action(segment0[0], segment1[1], segment2[2], segment3[3], segment4[4], segment5[5]);
+                action(segment0[i], segment1[i], segment2[i], segment3[i], segment4[i], segment5[i]);
             }
         }
 
@@ -718,7 +718,7 @@ public static class ChunksForeachExtensions
             var segment6 = components6.Segments;
             for (var i = 0; i < segment0.Count; i++)
             {
-                action(segment0[0], segment1[1], segment2[2], segment3[3], segment4[4], segment5[5], segment6[6]);
+                action(segment0[i], segment1[i], segment2[i], segment3[i], segment4[i], segment5[i], segment6[i]);
             }
         }
 
@@ -746,7 +746,7 @@ public static class ChunksForeachExtensions
             var segment7 = components7.Segments;
             for (var i = 0; i < segment0.Count; i++)
             {
-                action(segment0[0], segment1[1], segment2[2], segment3[3], segment4[4], segment5[5], segment6[6], segment7[7]);
+                action(segment0[i], segment1[i], segment2[i], segment3[i], segment4[i], segment5[i], segment6[i], segment7[i]);
             }
         }
 
@@ -776,7 +776,7 @@ public static class ChunksForeachExtensions
             var segment8 = components8.Segments;
             for (var i = 0; i < segment0.Count; i++)
             {
-                action(segment0[0], segment1[1], segment2[2], segment3[3], segment4[4], segment5[5], segment6[6], segment7[7], segment8[8]);
+                action(segment0[i], segment1[i], segment2[i], segment3[i], segment4[i], segment5[i], segment6[i], segment7[i], segment8[i]);
             }
         }
 
@@ -808,7 +808,7 @@ public static class ChunksForeachExtensions
             var segment9 = components9.Segments;
             for (var i = 0; i < segment0.Count; i++)
             {
-                action(segment0[0], segment1[1], segment2[2], segment3[3], segment4[4], segment5[5], segment6[6], segment7[7], segment8[8], segment9[9]);
+                action(segment0[i], segment1[i], segment2[i], segment3[i], segment4[i], segment5[i], segment6[i], segment7[i], segment8[i], segment9[i]);
             }
         }
 
@@ -842,7 +842,7 @@ public static class ChunksForeachExtensions
             var segment10 = components10.Segments;
             for (var i = 0; i < segment0.Count; i++)
             {
-                action(segment0[0], segment1[1], segment2[2], segment3[3], segment4[4], segment5[5], segment6[6], segment7[7], segment8[8], segment9[9], segment10[10]);
+                action(segment0[i], segment1[i], segment2[i], segment3[i], segment4[i], segment5[i], segment6[i], segment7[i], segment8[i], segment9[i], segment10[i]);
             }
         }
 
@@ -878,7 +878,7 @@ public static class ChunksForeachExtensions
             var segment11 = components11.Segments;
             for (var i = 0; i < segment0.Count; i++)
             {
-                action(segment0[0], segment1[1], segment2[2], segment3[3], segment4[4], segment5[5], segment6[6], segment7[7], segment8[8], segment9[9], segment10[10], segment11[11]);
+                action(segment0[i], segment1[i], segment2[i], segment3[i], segment4[i], segment5[i], segment6[i], segment7[i], segment8[i], segment9[i], segment10[i], segment11[i]);
             }
         }
 
@@ -916,7 +916,7 @@ public static class ChunksForeachExtensions
             var segment12 = components12.Segments;
             for (var i = 0; i < segment0.Count; i++)
             {
-                action(segment0[0], segment1[1], segment2[2], segment3[3], segment4[4], segment5[5], segment6[6], segment7[7], segment8[8], segment9[9], segment10[10], segment11[11], segment12[12]);
+                action(segment0[i], segment1[i], segment2[i], segment3[i], segment4[i], segment5[i], segment6[i], segment7[i], segment8[i], segment9[i], segment10[i], segment11[i], segment12[i]);
             }
         }
 
@@ -956,7 +956,7 @@ public static class ChunksForeachExtensions
             var segment13 = components13.Segments;
             for (var i = 0; i < segment0.Count; i++)
             {
-                action(segment0[0], segment1[1], segment2[2], segment3[3], segment4[4], segment5[5], segment6[6], segment7[7], segment8[8], segment9[9], segment10[10], segment11[11], segment12[12], segment13[13]);
+                action(segment0[i], segment1[i], segment2[i], segment3[i], segment4[i], segment5[i], segment6[i], segment7[i], segment8[i], segment9[i], segment10[i], segment11[i], segment12[i], segment13[i]);
             }
         }
 
@@ -998,7 +998,7 @@ public static class ChunksForeachExtensions
             var segment14 = components14.Segments;
             for (var i = 0; i < segment0.Count; i++)
             {
-                action(segment0[0], segment1[1], segment2[2], segment3[3], segment4[4], segment5[5], segment6[6], segment7[7], segment8[8], segment9[9], segment10[10], segment11[11], segment12[12], segment13[13], segment14[14]);
+                action(segment0[i], segment1[i], segment2[i], segment3[i], segment4[i], segment5[i], segment6[i], segment7[i], segment8[i], segment9[i], segment10[i], segment11[i], segment12[i], segment13[i], segment14[i]);
             }
         }
 
@@ -1042,7 +1042,7 @@ public static class ChunksForeachExtensions
             var segment15 = components15.Segments;
             for (var i = 0; i < segment0.Count; i++)
             {
-                action(segment0[0], segment1[1], segment2[2], segment3[3], segment4[4], segment5[5], segment6[6], segment7[7], segment8[8], segment9[9], segment10[10], segment11[11], segment12[12], segment13[13], segment14[14], segment15[15]);
+                action(segment0[i], segment1[i], segment2[i], segment3[i], segment4[i], segment5[i], segment6[i], segment7[i], segment8[i], segment9[i], segment10[i], segment11[i], segment12[i], segment13[i], segment14[i], segment15[i]);
             }
         }
 
@@ -1088,7 +1088,7 @@ public static class ChunksForeachExtensions
             var segment16 = components16.Segments;
             for (var i = 0; i < segment0.Count; i++)
             {
-                action(segment0[0], segment1[1], segment2[2], segment3[3], segment4[4], segment5[5], segment6[6], segment7[7], segment8[8], segment9[9], segment10[10], segment11[11], segment12[12], segment13[13], segment14[14], segment15[15], segment16[16]);
+                action(segment0[i], segment1[i], segment2[i], segment3[i], segment4[i], segment5[i], segment6[i], segment7[i], segment8[i], segment9[i], segment10[i], segment11[i], segment12[i], segment13[i], segment14[i], segment15[i], segment16[i]);
             }
         }
     }

@@ -41,7 +41,7 @@ public static class ChunksForeachExtensions
             var elements = entities.Elements;
             for (var i = 0; i < elements.Count; i++)
             {
-                action(in elements[0]);
+                action(in elements[i]);
             }
         }
 
@@ -57,7 +57,7 @@ public static class ChunksForeachExtensions
             var elements1 = components.Elements;
             for (var i = 0; i < elements0.Count; i++)
             {
-                action(in elements0[0], ref elements1[1]);
+                action(in elements0[i], ref elements1[i]);
             }
         }
 <#
@@ -80,7 +80,7 @@ public static class ChunksForeachExtensions
             <#= componentElements #>
             for (var i = 0; i < elements0.Count; i++)
             {
-                action(in elements0[0], <#= string.Join(", ", from index in Enumerable.Range(1, i) select $"ref elements{index}[{index}]") #>);
+                action(in elements0[i], <#= string.Join(", ", from index in Enumerable.Range(1, i) select $"ref elements{index}[i]") #>);
             }
         }
 <#
@@ -96,7 +96,7 @@ public static class ChunksForeachExtensions
             var segments = entities.Segments;
             for (var i = 0; i < segments.Count; i++)
             {
-                action(segments[0]);
+                action(segments[i]);
             }
         }
 
@@ -112,7 +112,7 @@ public static class ChunksForeachExtensions
             var segment1 = components.Segments;
             for (var i = 0; i < segment0.Count; i++)
             {
-                action(segment0[0], segment1[1]);
+                action(segment0[i], segment1[i]);
             }
         }
 <#
@@ -135,7 +135,7 @@ public static class ChunksForeachExtensions
             <#= componentSegments #>
             for (var i = 0; i < segment0.Count; i++)
             {
-                action(segment0[0], <#= string.Join(", ", from index in Enumerable.Range(1, i) select $"segment{index}[{index}]") #>);
+                action(segment0[i], <#= string.Join(", ", from index in Enumerable.Range(1, i) select $"segment{index}[i]") #>);
             }
         }
 <#
