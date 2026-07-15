@@ -1,4 +1,7 @@
-﻿using Godot;
+﻿#if GUBBINS_ENABLED
+using System;
+using System.Linq;
+using Godot;
 using Godot.Collections;
 using Gubbins.Unsafe;
 
@@ -8,7 +11,7 @@ namespace Gubbins.Enhance;
 /// A serialized reference to a GodotObject of type <see cref="T"/>, allowing for easy serialization and deserialization of references in Godot.
 /// </summary>
 /// <typeparam name="T">The type of the GodotObject that this serialized reference points to. Must be a class.</typeparam>
-public partial class SerializedReference<T> : Godot.Resource where T : class
+public partial class SerializedReference<T> : global::Godot.Resource where T : class
 {
     /// <summary>
     /// Gets or sets the value of the serialized reference. If the reference is null, this will return null. If the reference type is not assignable to <see cref="T"/>,
@@ -150,3 +153,4 @@ public partial class SerializedReference<T> : Godot.Resource where T : class
         return base._Set(property, value);
     }
 }
+#endif

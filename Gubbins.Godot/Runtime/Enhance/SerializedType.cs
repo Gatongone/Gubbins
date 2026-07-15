@@ -1,4 +1,7 @@
-﻿using Godot;
+﻿#if GUBBINS_ENABLED
+using System;
+using System.Linq;
+using Godot;
 using Godot.Collections;
 using Gubbins.Unsafe;
 
@@ -132,3 +135,4 @@ public partial class SerializedType(Type assignableType = null, TypeKind kind = 
         return default;
     }
 }
+#endif

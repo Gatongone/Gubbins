@@ -1,4 +1,7 @@
-﻿using Godot;
+﻿#if GUBBINS_ENABLED
+using System;
+using System.Collections.Generic;
+using Godot;
 
 namespace Gubbins.Events;
 
@@ -95,3 +98,4 @@ public class SceneEvents
         }
     }
 }
+#endif

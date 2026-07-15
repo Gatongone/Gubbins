@@ -1,4 +1,8 @@
-﻿using Godot;
+﻿#if GUBBINS_ENABLED
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Godot;
 using Godot.Collections;
 using Gubbins.Enhance;
 using Gubbins.Spawner;
@@ -25,17 +29,17 @@ public partial class SerializedInstallInfo : global::Godot.Resource
     /// <summary>
     /// Gets the Type of the spawner based on the stored spawner type string. If the string is null or empty, it returns null. Otherwise, it attempts to resolve the type using reflection.
     /// </summary>
-    private Type SpawnerType => string.IsNullOrEmpty(m_SpawnerType) ? null : Type.GetType(m_SpawnerType, Reflection.LoadAssemblyResolver, Reflection.DomainTypeResolver);
+    private Type SpawnerType => string.IsNullOrEmpty(m_SpawnerType) ? null : System.Type.GetType(m_SpawnerType, Reflection.LoadAssemblyResolver, Reflection.DomainTypeResolver);
 
     /// <summary>
     /// Gets the Type of the controller based on the stored controller type string. If the string is null or empty, it returns null. Otherwise, it attempts to resolve the type using reflection.
     /// </summary>
-    private Type ControllerType => string.IsNullOrEmpty(m_ControllerType) ? null : Type.GetType(m_ControllerType, Reflection.LoadAssemblyResolver, Reflection.DomainTypeResolver);
+    private Type ControllerType => string.IsNullOrEmpty(m_ControllerType) ? null : System.Type.GetType(m_ControllerType, Reflection.LoadAssemblyResolver, Reflection.DomainTypeResolver);
 
     /// <summary>
     /// Gets the Type of the main type based on the stored type string. If the string is null or empty, it returns null. Otherwise, it attempts to resolve the type using reflection.
     /// </summary>
-    public Type Type => string.IsNullOrEmpty(m_Type) ? null : Type.GetType(m_Type, Reflection.LoadAssemblyResolver, Reflection.DomainTypeResolver);
+    public Type Type => string.IsNullOrEmpty(m_Type) ? null : System.Type.GetType(m_Type, Reflection.LoadAssemblyResolver, Reflection.DomainTypeResolver);
 
     /// <summary>
     /// Gets the scope of the installation information. This indicates how instances of the type should be managed (e.g., singleton, multiton, Custom.).
@@ -65,7 +69,7 @@ public partial class SerializedInstallInfo : global::Godot.Resource
     /// <summary>
     /// Gets the set of types that the main type binds to. This is determined by resolving each type string in the binding array using reflection and filtering out any null results.
     /// </summary>
-    public HashSet<Type> Bindings => [..m_Binding.Select(static item => Type.GetType(item, Reflection.LoadAssemblyResolver, Reflection.DomainTypeResolver)).Where(static item => item != null)];
+    public HashSet<Type> Bindings => [..m_Binding.Select(static item => System.Type.GetType(item, Reflection.LoadAssemblyResolver, Reflection.DomainTypeResolver)).Where(static item => item != null)];
 
     /// <summary>
     /// Converts the <see cref="SerializedInstallInfo"/> to an <see cref="InstallInfo"/> instance.
@@ -496,3 +500,4 @@ public partial class SerializedInstallInfo : global::Godot.Resource
         });
     }
 }
+#endif

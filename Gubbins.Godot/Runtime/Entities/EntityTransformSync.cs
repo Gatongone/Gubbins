@@ -1,3 +1,4 @@
+#if GUBBINS_ENABLED
 using Godot;
 using Gubbins.Context;
 using Gubbins.Events;
@@ -133,3 +134,4 @@ public sealed partial class EntityTransformSync : IEventListener
     [Event(typeof(LoopEvents.Postprocess))]
     private void OnPostprocess(double delta) => EntityTransformSystem.SyncTransforms();
 }
+#endif

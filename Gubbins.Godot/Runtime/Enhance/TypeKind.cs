@@ -1,4 +1,8 @@
-﻿namespace Gubbins.Enhance;
+﻿using System;
+using Godot;
+
+#if GUBBINS_ENABLED
+namespace Gubbins.Enhance;
 
 [Flags]
 public enum TypeKind
@@ -51,3 +55,4 @@ public enum TypeKind
     /// <summary>All types.</summary>
     All = 999999
 }
+#endif

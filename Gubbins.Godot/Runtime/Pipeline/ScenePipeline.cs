@@ -1,4 +1,8 @@
-﻿using Godot;
+#if GUBBINS_ENABLED
+using System;
+using System.Collections.Generic;
+using System.Reflection;
+using Godot;
 using Godot.Collections;
 using Gubbins.Context;
 using Gubbins.Enhance;
@@ -117,7 +121,7 @@ public partial class ScenePipeline : Node, IPipeline
         {
             var targetType = listener.ExpectedType;
             // Try inject by ctor first.
-            if (targetType != null && InjectCache.GetInjectConstructor(targetType) != null)
+            if (targetType != null && ContainsInjectCtor(targetType))
             {
                 var item = context.InjectByCtor(targetType) as IEventListener;
                 listener.Value = item;
@@ -175,4 +179,23 @@ public partial class ScenePipeline : Node, IPipeline
         Stop();
         base.Dispose(disposing);
     }
+
+    /// <summary>
+    /// Checks if the specified type contains a constructor marked with the [Inject] attribute.
+    /// </summary>
+    /// <param name="type">The type to check for an [Inject] constructor.</param>
+    /// <returns>True if the type contains an [Inject] constructor; otherwise, false.</returns>
+    private static bool ContainsInjectCtor(Type type)
+    {
+        foreach (var constructor in type.GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
+        {
+            if (constructor.GetCustomAttribute<InjectAttribute>() is null)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }
+#endif

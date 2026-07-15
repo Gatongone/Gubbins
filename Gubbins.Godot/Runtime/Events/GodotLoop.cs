@@ -1,4 +1,6 @@
-﻿using Godot;
+﻿#if GUBBINS_ENABLED
+using System;
+using Godot;
 
 namespace Gubbins.Events;
 
@@ -155,3 +157,4 @@ internal static class GodotLoop
         Postprocess
     }
 }
+#endif

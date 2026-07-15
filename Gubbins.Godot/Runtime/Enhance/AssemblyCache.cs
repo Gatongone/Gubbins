@@ -1,4 +1,8 @@
-﻿namespace Gubbins.Enhance;
+﻿using System;
+using System.Linq;
+
+#if GUBBINS_ENABLED
+namespace Gubbins.Enhance;
 
 /// <summary>
 /// A static class that caches all public, non-abstract types from the current AppDomain's assemblies.
@@ -14,3 +18,4 @@ internal static class AssemblyCache
                                                       .Where(static t => t.IsPublic && !(t.IsSealed && t.IsAbstract))
                                                       .ToArray();
 }
+#endif

@@ -1,3 +1,4 @@
+#if GUBBINS_ENABLED
 namespace Gubbins.Entities;
 
 /// <summary>
@@ -15,3 +16,4 @@ internal interface ITransformComponent
     /// <summary>Merges this component's value(s) and axis flags into <paramref name="snapshot"/>.</summary>
     void Write(ref TransformSnapshot snapshot);
 }
+#endif

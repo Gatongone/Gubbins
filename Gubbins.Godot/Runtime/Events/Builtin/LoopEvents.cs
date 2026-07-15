@@ -1,4 +1,8 @@
-﻿namespace Gubbins.Events;
+﻿using System;
+using System.Collections.Generic;
+
+#if GUBBINS_ENABLED
+namespace Gubbins.Events;
 
 /// <summary>
 /// Provides strongly-typed wrappers for Godot window loop phase events.
@@ -87,3 +91,4 @@ public class LoopEvent : IEventSubscriable<double>
         m_HandlerMap.Clear();
     }
 }
+#endif

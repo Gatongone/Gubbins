@@ -1,4 +1,5 @@
-﻿using Godot;
+#if GUBBINS_ENABLED
+using Godot;
 using Gubbins.Enhance;
 
 namespace Gubbins.Context;
@@ -8,3 +9,4 @@ namespace Gubbins.Context;
 /// </summary>
 [GlobalClass, Tool]
 public partial class SerializedContext : SerializedReference<IContext>;
+#endif

@@ -1,4 +1,7 @@
-﻿using Godot;
+﻿#if GUBBINS_ENABLED
+using System;
+using System.Linq;
+using Godot;
 using Godot.Collections;
 
 namespace Gubbins.Context;
@@ -21,8 +24,13 @@ public partial class NodeContext : Node, IContext
 
     private IContext m_Context;
 
+    private IReadOnlyContext m_Parent;
+
     /// <inheritdoc/>
-    IReadOnlyContext IReadOnlyContext.Parent => field ??= Parent?.Value;
+    IReadOnlyContext IReadOnlyContext.Parent
+    {
+        get { return m_Parent ??= Parent?.Value; }
+    }
 
     /// <summary>
     /// Initializes the context when the node is ready.
@@ -55,3 +63,4 @@ public partial class NodeContext : Node, IContext
     /// <inheritdoc/>
     IMultitonBindingDecorator IDependenciesRegistry.Register(object[] instances) => m_Context.Register(instances);
 }
+#endif

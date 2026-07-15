@@ -1,4 +1,6 @@
-﻿using Godot;
+﻿#if GUBBINS_ENABLED
+using System;
+using Godot;
 
 namespace Gubbins.Events;
 
@@ -84,3 +86,4 @@ internal static class GodotScene
     /// </summary>
     private static void OnSceneChanged() => s_OnSceneLoaded?.Invoke(s_Scene.CurrentScene);
 }
+#endif

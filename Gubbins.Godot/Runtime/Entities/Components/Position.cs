@@ -1,3 +1,4 @@
+#if GUBBINS_ENABLED
 using System;
 using Godot;
 
@@ -115,3 +116,4 @@ public struct Position : IComponent, ITransformComponent
         snapshot.Flags    |= TransformSnapshot.HAS_POSITION;
     }
 }
+#endif

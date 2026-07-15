@@ -1,4 +1,5 @@
-﻿namespace Gubbins.Entities
+#if GUBBINS_ENABLED
+namespace Gubbins.Entities
 {
     /// <summary>
     /// Marker interface for components in the entities architecture.
@@ -8,3 +9,4 @@
     /// </summary>
     public interface IComponent { }
 }
+#endif

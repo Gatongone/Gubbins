@@ -1,3 +1,4 @@
+#if GUBBINS_ENABLED
 using Godot;
 
 namespace Gubbins.Entities;
@@ -127,3 +128,4 @@ public struct Orientation : IComponent, ITransformComponent
         snapshot.Flags       |= TransformSnapshot.HAS_ORIENTATION;
     }
 }
+#endif

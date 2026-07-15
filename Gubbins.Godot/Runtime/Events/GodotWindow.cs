@@ -1,4 +1,6 @@
-﻿using Godot;
+﻿#if GUBBINS_ENABLED
+using System;
+using Godot;
 
 namespace Gubbins.Events;
 
@@ -213,3 +215,4 @@ internal static class GodotWindow
     /// </summary>
     private static void OnCloseRequested() => s_OnCloseRequested?.Invoke();
 }
+#endif

@@ -1,4 +1,6 @@
-﻿using Godot;
+﻿#if GUBBINS_ENABLED
+using System.Linq;
+using Godot;
 using Godot.Collections;
 
 namespace Gubbins.Context;
@@ -8,7 +10,7 @@ namespace Gubbins.Context;
 /// list of <see cref="SerializedInstallInfo"/> entries.
 /// </summary>
 [GlobalClass]
-public partial class ResourceInstaller : Godot.Resource, IDependenciesInstaller
+public partial class ResourceInstaller : global::Godot.Resource, IDependenciesInstaller
 {
     /// <summary>
     /// Serialized install info array.
@@ -18,3 +20,4 @@ public partial class ResourceInstaller : Godot.Resource, IDependenciesInstaller
     /// <inheritdoc/>
     public void Install(IDependenciesRegistry registry) => registry.RegisterAll(InstallInfos.Select(static item => item.ToInstallInfo()));
 }
+#endif

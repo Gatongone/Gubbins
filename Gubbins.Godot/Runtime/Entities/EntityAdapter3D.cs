@@ -1,3 +1,5 @@
+#if GUBBINS_ENABLED
+using System;
 using System.Buffers;
 using Godot;
 using Gubbins.Context;
@@ -129,3 +131,4 @@ public partial class EntityAdapter3D : Node3D, ITransformBinding
         EntityTransformSystem.Unregister(this);
     }
 }
+#endif

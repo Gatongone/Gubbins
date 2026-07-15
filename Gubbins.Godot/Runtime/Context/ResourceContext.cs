@@ -1,4 +1,7 @@
-﻿using Godot;
+﻿#if GUBBINS_ENABLED
+using System;
+using System.Linq;
+using Godot;
 using Godot.Collections;
 
 namespace Gubbins.Context;
@@ -7,7 +10,7 @@ namespace Gubbins.Context;
 /// A resource that represents a context in the application.
 /// </summary>
 [GlobalClass, Tool]
-public partial class ResourceContext : Godot.Resource, IContext
+public partial class ResourceContext : global::Godot.Resource, IContext
 {
     /// <summary>
     /// The parent context to inherit from. If null, the context will be a root context.
@@ -21,8 +24,13 @@ public partial class ResourceContext : Godot.Resource, IContext
 
     private IContext m_Context;
 
+    private IReadOnlyContext m_Parent;
+
     /// <inheritdoc/>
-    IReadOnlyContext IReadOnlyContext.Parent => field ??= Parent?.Value;
+    IReadOnlyContext IReadOnlyContext.Parent
+    {
+        get { return m_Parent ??= Parent?.Value; }
+    }
 
     /// <summary>
     /// Initializes the context when the node is ready.
@@ -62,3 +70,4 @@ public partial class ResourceContext : Godot.Resource, IContext
     /// <inheritdoc/>
     IMultitonBindingDecorator IDependenciesRegistry.Register(object[] instances) => m_Context.Register(instances);
 }
+#endif

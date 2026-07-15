@@ -1,4 +1,6 @@
-﻿using Godot;
+﻿#if GUBBINS_ENABLED
+using System.Linq;
+using Godot;
 using Godot.Collections;
 
 namespace Gubbins.Context;
@@ -19,3 +21,4 @@ public partial class NodeInstaller  : Node, IDependenciesInstaller
     /// <inheritdoc/>
     public void Install(IDependenciesRegistry registry) => registry.RegisterAll(InstallInfos.Select(static item => item.ToInstallInfo()));
 }
+#endif

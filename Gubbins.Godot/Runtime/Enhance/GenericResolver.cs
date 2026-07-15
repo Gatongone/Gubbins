@@ -1,4 +1,7 @@
-﻿using Godot;
+﻿#if GUBBINS_ENABLED
+using System;
+using System.Collections.Generic;
+using Godot;
 
 namespace Gubbins.Enhance;
 
@@ -46,7 +49,7 @@ internal static class GenericTypeResolver
 
     /// <summary>
     /// Extract the expected type T from <see cref="SerializedReference{T}"/> using reflection.
-    /// </summary> 
+    /// </summary>
     private static Type TryMakeGeneric(Type openGeneric, Type argument)
     {
         if (openGeneric == null || argument == null || !openGeneric.IsGenericTypeDefinition)
@@ -78,3 +81,4 @@ internal static class GenericTypeResolver
     /// <returns></returns>
     private static bool ContainsDefaultConstructor(Type type) => type.GetConstructor(Type.EmptyTypes) != null;
 }
+#endif

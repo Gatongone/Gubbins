@@ -1,4 +1,6 @@
+#if GUBBINS_ENABLED
 using System;
+using System.Linq;
 using Godot;
 using Gubbins.Enhance;
 using Gubbins.Unsafe;
@@ -19,14 +21,14 @@ namespace Gubbins.Entities;
 /// keeps the boxed instances so their values survive into <see cref="BuildPayload"/>.
 /// </remarks>
 [GlobalClass, Tool]
-public partial class ComponentSet : Godot.Resource
+public partial class ComponentSet : global::Godot.Resource
 {
     /// <summary>
     /// The component type names selected in the inspector, stored as <see cref="Type.ToString"/> values
     /// and resolved back through <see cref="Reflection"/>. Ignored once <see cref="SetComponents"/> has
     /// supplied concrete instances.
     /// </summary>
-    private Godot.Collections.Array<string> m_ComponentTypeNames = [];
+    private global::Godot.Collections.Array<string> m_ComponentTypeNames = [];
 
     /// <summary>
     /// Concrete component instances set from code (tests/runtime spawning). When present they take
@@ -115,7 +117,7 @@ public partial class ComponentSet : Godot.Resource
     }
 
     /// <inheritdoc/>
-    public override Godot.Collections.Array<Godot.Collections.Dictionary> _GetPropertyList()
+    public override global::Godot.Collections.Array<global::Godot.Collections.Dictionary> _GetPropertyList()
     {
         // Every unmanaged struct component type in the loaded assemblies is offered per array element as
         // an enum dropdown, mirroring the type-picker style of SerializedType._GetPropertyList.
@@ -132,7 +134,7 @@ public partial class ComponentSet : Godot.Resource
 
         return
         [
-            new Godot.Collections.Dictionary
+            new global::Godot.Collections.Dictionary
             {
                 {"name", "ComponentTypes"},
                 {"type", (int) Variant.Type.Array},
@@ -159,10 +161,11 @@ public partial class ComponentSet : Godot.Resource
     {
         if (property == "ComponentTypes")
         {
-            m_ComponentTypeNames = value.As<Godot.Collections.Array<string>>() ?? [];
+            m_ComponentTypeNames = value.As<global::Godot.Collections.Array<string>>() ?? [];
             return true;
         }
 
         return base._Set(property, value);
     }
 }
+#endif

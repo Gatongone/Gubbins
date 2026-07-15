@@ -1,3 +1,6 @@
+#if GUBBINS_ENABLED
+using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Godot;
@@ -527,3 +530,4 @@ internal enum TransformVariants : uint
     AnyRotation = Rotation | RotationX | RotationY | RotationZ | RotationXY | RotationXZ | RotationYZ,
     AnyScale    = Scale | ScaleX | ScaleY | ScaleZ | ScaleXY | ScaleXZ | ScaleYZ
 }
+#endif

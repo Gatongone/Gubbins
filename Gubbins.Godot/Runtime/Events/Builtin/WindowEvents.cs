@@ -1,4 +1,7 @@
-﻿using Godot;
+﻿#if GUBBINS_ENABLED
+using System;
+using System.Collections.Generic;
+using Godot;
 using Gubbins.Enhance;
 
 namespace Gubbins.Events;
@@ -417,3 +420,4 @@ public static class WindowEvents
         }
     }
 }
+#endif
