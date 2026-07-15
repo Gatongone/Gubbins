@@ -13,7 +13,7 @@ namespace Gubbins.Context;
 /// <summary>
 /// SerializedInstallInfo is a Godot Resource that encapsulates the installation information for a specific type within a given scope.
 /// </summary>
-[GlobalClass, Tool]
+[Tool]
 public partial class SerializedInstallInfo : global::Godot.Resource
 {
     private Scope         m_Scope;
