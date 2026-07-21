@@ -1,5 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+    <PropertyGroup>
+        <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    </PropertyGroup>
+
     <ItemGroup>
       <ProjectReference Include="..\Gubbins.Enhance\Gubbins.Enhance.csproj" />
       <ProjectReference Include="..\Gubbins.Spawner\Gubbins.Spawner.csproj" />

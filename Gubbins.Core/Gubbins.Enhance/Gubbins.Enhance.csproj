@@ -1,5 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+    <PropertyGroup>
+        <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    </PropertyGroup>
+
     <ItemGroup>
         <ProjectReference Include="..\Gubbins.Unsafe\Gubbins.Unsafe.csproj"/>
     </ItemGroup>

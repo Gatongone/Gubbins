@@ -1,5 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+    <PropertyGroup>
+        <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    </PropertyGroup>
+
     <ItemGroup>
       <None Update="Extensions\EventSubscribeWeaklyExtensions.tt">
         <Generator>TextTemplatingFileGenerator</Generator>

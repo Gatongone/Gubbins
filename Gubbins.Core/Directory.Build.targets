@@ -1,4 +1,12 @@
 <Project>
+    <PropertyGroup Condition="'$(UnsafeAdapter)' == 'true'">
+        <DefineConstants>$(DefineConstants);CUSTOM_UNSAFE;</DefineConstants>
+    </PropertyGroup>
+    
+    <PropertyGroup Condition="'$(NativeAOT)' == 'true'">
+        <DefineConstants>$(DefineConstants);NATIVEAOT;</DefineConstants>
+    </PropertyGroup>
+
     <Target Name="PostBuild" BeforeTargets="PostBuildEvent" Condition="'$(IsTestProject)' != 'true' And '$(SkipDefaultPostBuild)' != 'true'">
         <PropertyGroup>
             <DotNetVer>$(TargetFramework)</DotNetVer>
