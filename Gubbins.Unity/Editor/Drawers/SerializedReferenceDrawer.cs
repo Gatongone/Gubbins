@@ -285,7 +285,7 @@ namespace Gubbins.Editor
         public override VisualElement CreatePropertyGUI(SerializedProperty property)
         {
             var root = new VisualElement();
-            var pureProp = property.FindPropertyRelative("pureReference");
+            var pureDataProp = property.FindPropertyRelative("pureReferenceData");
             var unityProp = property.FindPropertyRelative("unityReference");
             var typeNameProp = property.FindPropertyRelative("expectedTypeName");
             var expectedType = GetExpectedType(property);
@@ -327,7 +327,7 @@ namespace Gubbins.Editor
 
                 if (newIndex == 0)
                 {
-                    ClearReference(pureProp, unityProp, typeNameProp);
+                    ClearReference(pureDataProp, unityProp, typeNameProp);
                 }
                 else
                 {
@@ -339,9 +339,9 @@ namespace Gubbins.Editor
                         GenericTypeBuilderWindow.Show(newType, closedType =>
                         {
                             if (closedType == null)
-                                ClearReference(pureProp, unityProp, typeNameProp);
+                                ClearReference(pureDataProp, unityProp, typeNameProp);
                             else
-                                ApplyConcreteType(closedType, pureProp, unityProp, typeNameProp);
+                                ApplyConcreteType(closedType, pureDataProp, unityProp, typeNameProp);
                             property.serializedObject.ApplyModifiedProperties();
                             typeDropdown.SetValueWithoutNotify(GetCurrentDisplayName());
                             RefreshContent();
@@ -351,7 +351,7 @@ namespace Gubbins.Editor
                         return;
                     }
 
-                    ApplyConcreteType(newType, pureProp, unityProp, typeNameProp);
+                    ApplyConcreteType(newType, pureDataProp, unityProp, typeNameProp);
                 }
 
                 property.serializedObject.ApplyModifiedProperties();
@@ -379,7 +379,7 @@ namespace Gubbins.Editor
 
             Type GetCurrentType()
             {
-                var currentValue = GetCurrentValue(pureProp, unityProp);
+                var currentValue = GetCurrentValue(unityProp);
                 return currentValue != null ? currentValue.GetType() : GetTypeFromName(typeNameProp.stringValue);
             }
 
@@ -414,94 +414,221 @@ namespace Gubbins.Editor
             {
                 contentContainer.Clear();
 
-                var effectiveType = GetCurrentOrExpectedType(pureProp, unityProp, typeNameProp);
+                var effectiveType = GetCurrentOrExpectedType(unityProp, typeNameProp);
                 if (effectiveType == null) return;
 
-                // If it's not a Unity Object, draw the managed reference property field.
-                if (!typeof(UnityEngine.Object).IsAssignableFrom(effectiveType))
+                // Unity Object – show object field.
+                if (typeof(UnityEngine.Object).IsAssignableFrom(effectiveType))
                 {
-                    // If the type is serializable, show the properties of the pure C# object.
-                    if (IsTypeSerializable(GetCurrentType()) && pureProp.GetValue() != null && GetCurrentType()?.GetConstructor(Type.EmptyTypes) != null)
+                    var objectType = typeof(ScriptableObject).IsAssignableFrom(effectiveType) ? effectiveType : typeof(GameObject);
+                    var objectField = new ObjectField("Asset")
                     {
-                        var propertyField = new PropertyField(pureProp, "Properties");
-                        propertyField.SetEnabled(pureProp.managedReferenceValue != null);
-                        propertyField.RegisterValueChangeCallback(_ => { property.serializedObject.ApplyModifiedProperties(); });
-                        contentContainer.Add(propertyField);
-                    }
-
-                    return;
-                }
-
-                // Unity Object.
-                var objectType = typeof(ScriptableObject).IsAssignableFrom(effectiveType) ? effectiveType : typeof(GameObject);
-                var objectField = new ObjectField("Asset")
-                {
-                    objectType        = objectType,
-                    value             = unityProp.objectReferenceValue,
-                    allowSceneObjects = true
-                };
-                objectField.AddToClassList(ObjectField.alignedFieldUssClassName);
-                objectField.RegisterValueChangedCallback(evt =>
-                {
-                    var newObj = evt.newValue;
-                    if (newObj == null)
+                        objectType        = objectType,
+                        value             = unityProp.objectReferenceValue,
+                        allowSceneObjects = true
+                    };
+                    objectField.AddToClassList(ObjectField.alignedFieldUssClassName);
+                    objectField.RegisterValueChangedCallback(evt =>
                     {
-                        unityProp.objectReferenceValue = null;
-                        typeNameProp.stringValue       = null;
-                    }
-                    else
-                    {
-                        UnityEngine.Object finalObj = null;
-                        var isScriptableObject = typeof(ScriptableObject).IsAssignableFrom(effectiveType);
-                        if (isScriptableObject)
+                        var newObj = evt.newValue;
+                        if (newObj == null)
                         {
-                            if (effectiveType.IsAssignableFrom(newObj.GetType()))
-                                finalObj = newObj;
-                            else
-                                Debug.LogWarning($"Object type {newObj.GetType().Name} is not assignable to {effectiveType.Name}");
+                            unityProp.objectReferenceValue = null;
+                            typeNameProp.stringValue       = null;
                         }
                         else
                         {
-                            if (newObj is GameObject go)
+                            UnityEngine.Object finalObj = null;
+                            var isScriptableObject = typeof(ScriptableObject).IsAssignableFrom(effectiveType);
+                            if (isScriptableObject)
                             {
-                                var component = go.GetComponent(effectiveType);
-                                if (component != null)
-                                    finalObj = component;
+                                if (effectiveType.IsAssignableFrom(newObj.GetType()))
+                                    finalObj = newObj;
                                 else
-                                    Debug.LogWarning($"GameObject '{go.name}' does not have component of type {effectiveType.Name}");
-                            }
-                            else if (effectiveType.IsAssignableFrom(newObj.GetType()))
-                            {
-                                finalObj = newObj;
+                                    Debug.LogWarning($"Object type {newObj.GetType().Name} is not assignable to {effectiveType.Name}");
                             }
                             else
                             {
-                                Debug.LogWarning($"Invalid object: Expected {effectiveType.Name} component or GameObject with that component.");
+                                if (newObj is GameObject go)
+                                {
+                                    var component = go.GetComponent(effectiveType);
+                                    if (component != null)
+                                        finalObj = component;
+                                    else
+                                        Debug.LogWarning($"GameObject '{go.name}' does not have component of type {effectiveType.Name}");
+                                }
+                                else if (effectiveType.IsAssignableFrom(newObj.GetType()))
+                                {
+                                    finalObj = newObj;
+                                }
+                                else
+                                {
+                                    Debug.LogWarning($"Invalid object: Expected {effectiveType.Name} component or GameObject with that component.");
+                                }
+                            }
+
+                            if (finalObj != null)
+                            {
+                                unityProp.objectReferenceValue = finalObj;
+                                typeNameProp.stringValue       = finalObj.GetType().AssemblyQualifiedName;
                             }
                         }
 
-                        if (finalObj != null)
-                        {
-                            unityProp.objectReferenceValue = finalObj;
-                            typeNameProp.stringValue       = finalObj.GetType().AssemblyQualifiedName;
-                        }
-                    }
+                        unityProp.serializedObject.ApplyModifiedProperties();
+                        typeDropdown.SetValueWithoutNotify(GetCurrentDisplayName());
+                        RefreshContent();
+                    });
+                    contentContainer.Add(objectField);
+                    return;
+                }
 
-                    unityProp.serializedObject.ApplyModifiedProperties();
-                    typeDropdown.SetValueWithoutNotify(GetCurrentDisplayName());
-                    RefreshContent();
-                });
-                contentContainer.Add(objectField);
+                // Pure C# object – reconstruct from JSON data.
+                var typeName = typeNameProp.stringValue;
+                var json = pureDataProp.stringValue;
+                // Migrate legacy "{}" (empty JSON from fieldless types) to null so Unity
+                // doesn't show it as the compact-value label in array element headers.
+                if (json == "{}")
+                {
+                    pureDataProp.stringValue = null;
+                    pureDataProp.serializedObject.ApplyModifiedProperties();
+                    json = null;
+                }
+                if (string.IsNullOrEmpty(typeName) || string.IsNullOrEmpty(json))
+                    return;
+
+                var pureType = GetTypeFromName(typeName);
+                if (pureType == null || pureType.GetConstructor(Type.EmptyTypes) == null)
+                    return;
+
+                object pureObj;
+                try
+                {
+                    pureObj = JsonUtility.FromJson(json, pureType);
+                }
+                catch
+                {
+                    return;
+                }
+
+                if (pureObj == null) return;
+
+                var publicFields = pureType.GetFields(BindingFlags.Public | BindingFlags.Instance);
+                if (publicFields.Length == 0)
+                {
+                    return;
+                }
+
+                foreach (var field in publicFields)
+                {
+                    if (field.IsInitOnly) continue;
+
+                    var control = CreateFieldControl(field, pureObj, () =>
+                    {
+                        pureDataProp.stringValue = JsonUtility.ToJson(pureObj);
+                        pureDataProp.serializedObject.ApplyModifiedProperties();
+                    });
+                    if (control != null)
+                        contentContainer.Add(control);
+                }
             }
         }
 
         /// <summary>
-        /// Get the current value of the reference, prioritizing the pure C# reference if it exists, otherwise falling back to the UnityEngine.Object reference.
+        /// Create a UI control bound to a public field of <paramref name="obj"/>, calling
+        /// <paramref name="onChanged"/> when the value is modified.
         /// </summary>
-        private object GetCurrentValue(SerializedProperty pureProp, SerializedProperty unityProp)
+        private static VisualElement CreateFieldControl(FieldInfo field, object obj, Action onChanged)
         {
-            if (pureProp.managedReferenceValue != null)
-                return pureProp.managedReferenceValue;
+            var fieldType = field.FieldType;
+            var label = ObjectNames.NicifyVariableName(field.Name);
+
+            if (fieldType == typeof(bool))
+            {
+                var control = new Toggle(label) {value = (bool) field.GetValue(obj)};
+                control.RegisterValueChangedCallback(evt =>
+                {
+                    field.SetValue(obj, evt.newValue);
+                    onChanged();
+                });
+                return control;
+            }
+
+            if (fieldType == typeof(int))
+            {
+                var control = new IntegerField(label) {value = (int) field.GetValue(obj)};
+                control.RegisterValueChangedCallback(evt =>
+                {
+                    field.SetValue(obj, evt.newValue);
+                    onChanged();
+                });
+                return control;
+            }
+
+            if (fieldType == typeof(float))
+            {
+                var control = new FloatField(label) {value = (float) field.GetValue(obj)};
+                control.RegisterValueChangedCallback(evt =>
+                {
+                    field.SetValue(obj, evt.newValue);
+                    onChanged();
+                });
+                return control;
+            }
+
+            if (fieldType == typeof(double))
+            {
+                var control = new DoubleField(label) {value = (double) field.GetValue(obj)};
+                control.RegisterValueChangedCallback(evt =>
+                {
+                    field.SetValue(obj, evt.newValue);
+                    onChanged();
+                });
+                return control;
+            }
+
+            if (fieldType == typeof(string))
+            {
+                var control = new TextField(label) {value = (string) field.GetValue(obj) ?? string.Empty};
+                control.RegisterValueChangedCallback(evt =>
+                {
+                    field.SetValue(obj, evt.newValue);
+                    onChanged();
+                });
+                return control;
+            }
+
+            if (typeof(UnityEngine.Object).IsAssignableFrom(fieldType))
+            {
+                var control = new ObjectField(label) {objectType = fieldType, value = (UnityEngine.Object) field.GetValue(obj)};
+                control.RegisterValueChangedCallback(evt =>
+                {
+                    field.SetValue(obj, evt.newValue);
+                    onChanged();
+                });
+                return control;
+            }
+
+            if (fieldType.IsEnum)
+            {
+                var control = new EnumField(label, (Enum) field.GetValue(obj));
+                control.RegisterValueChangedCallback(evt =>
+                {
+                    field.SetValue(obj, evt.newValue);
+                    onChanged();
+                });
+                return control;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Get the current value of the reference from the Unity Object field.
+        /// Pure C# references are stored as JSON and reconstructed on demand via
+        /// <see cref="GetTypeFromName"/> + <see cref="UnityEngine.JsonUtility"/>.
+        /// </summary>
+        private static object GetCurrentValue(SerializedProperty unityProp)
+        {
             return unityProp.objectReferenceValue;
         }
 
@@ -516,37 +643,35 @@ namespace Gubbins.Editor
 
         /// <summary>
         /// Determine the effective type to use for drawing the property, prioritizing the actual type of the current
-        /// reference value (either pure or Unity) and falling back to the expected type name if no reference is currently set.
+        /// reference value (Unity Object) and falling back to the expected type name if no reference is currently set.
         /// </summary>
-        private Type GetCurrentOrExpectedType(SerializedProperty pureProp, SerializedProperty unityProp, SerializedProperty typeNameProp)
+        private Type GetCurrentOrExpectedType(SerializedProperty unityProp, SerializedProperty typeNameProp)
         {
-            if (pureProp.managedReferenceValue != null)
-                return pureProp.managedReferenceValue.GetType();
             if (unityProp.objectReferenceValue != null)
                 return unityProp.objectReferenceValue.GetType();
             return GetTypeFromName(typeNameProp.stringValue);
         }
 
         /// <summary>
-        /// Clear both the pure C# reference and the UnityEngine.Object reference, as well as the expected type name,
+        /// Clear both the pure C# JSON data and the UnityEngine.Object reference, as well as the expected type name,
         /// effectively resetting the property to a null state.
         /// </summary>
-        private void ClearReference(SerializedProperty pureProp, SerializedProperty unityProp, SerializedProperty typeNameProp)
+        private static void ClearReference(SerializedProperty pureDataProp, SerializedProperty unityProp, SerializedProperty typeNameProp)
         {
-            pureProp.managedReferenceValue = null;
+            pureDataProp.stringValue       = null;
             unityProp.objectReferenceValue = null;
             typeNameProp.stringValue       = null;
         }
 
         /// <summary>
         /// Assign a concrete (fully closed) type to the property: store the assembly qualified name and, for pure C#
-        /// types, instantiate a managed reference. UnityEngine.Object types only record the type name.
+        /// types, instantiate and serialize the default instance as JSON. UnityEngine.Object types only record the type name.
         /// </summary>
-        private void ApplyConcreteType(Type type, SerializedProperty pureProp, SerializedProperty unityProp, SerializedProperty typeNameProp)
+        private static void ApplyConcreteType(Type type, SerializedProperty pureDataProp, SerializedProperty unityProp, SerializedProperty typeNameProp)
         {
             if (typeof(UnityEngine.Object).IsAssignableFrom(type))
             {
-                pureProp.managedReferenceValue = null;
+                pureDataProp.stringValue       = null;
                 unityProp.objectReferenceValue = null;
                 typeNameProp.stringValue       = type.AssemblyQualifiedName;
                 return;
@@ -554,15 +679,11 @@ namespace Gubbins.Editor
 
             try
             {
-                if (IsTypeSerializable(type) && type.GetConstructor(Type.EmptyTypes) != null)
-                {
-                    pureProp.managedReferenceValue = Activator.CreateInstance(type);
-                }
-                else
-                {
-                    pureProp.managedReferenceValue = null;
-                }
-
+                object instance = null;
+                if (type.GetConstructor(Type.EmptyTypes) != null)
+                    instance = Activator.CreateInstance(type);
+                var json = instance != null ? JsonUtility.ToJson(instance) : null;
+                pureDataProp.stringValue       = json == "{}" ? null : json;
                 unityProp.objectReferenceValue = null;
                 typeNameProp.stringValue       = type.AssemblyQualifiedName;
             }
@@ -578,14 +699,7 @@ namespace Gubbins.Editor
         private bool IsTypeSerializable(Type type)
         {
             var allowEmptyCtorMissing = fieldInfo?.GetCustomAttribute<AllowDefaultConstructorMissingAttribute>() != null;
-#if UNITY_2023_2_OR_NEWER
             return allowEmptyCtorMissing || type.GetConstructor(Type.EmptyTypes) != null;
-#else
-            // Only *open* generics (with unbound type parameters) can't be instantiated. Closed generics
-            // such as ComponentSpawner<Sample> are concrete and, on Unity 2023.2+/Unity 6, serialize fine
-            // as managed references — instantiate them so their fields are editable in the inspector.
-            return (allowEmptyCtorMissing || type.GetConstructor(Type.EmptyTypes) != null) && !type.ContainsGenericParameters;
-#endif
         }
     }
 }

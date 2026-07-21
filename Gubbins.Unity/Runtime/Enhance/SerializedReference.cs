@@ -15,11 +15,19 @@ namespace Gubbins.Enhance
     [Serializable]
     public class SerializedReference<T> where T : class
     {
-        [SerializeReference] internal T pureReference;
+        /// <summary>
+        /// Runtime-only reference. For generic types Unity cannot serialize via SerializeReference,
+        /// this is reconstructed from <see cref="pureReferenceData"/> on load. For non-generic types
+        /// with zero fields it is likewise reconstructed; the inspector draws fields manually from
+        /// the reconstructed object rather than through a SerializedProperty.
+        /// </summary>
+        [NonSerialized] internal T pureReference;
 
-        [SerializeField] internal Object unityReference;
+        [SerializeField, HideInInspector] internal string pureReferenceData;
 
-        [SerializeField] internal string expectedTypeName;
+        [SerializeField, HideInInspector] internal Object unityReference;
+
+        [SerializeField, HideInInspector] internal string expectedTypeName;
 
         public Type ExpectedType => Type.GetType(expectedTypeName);
 
@@ -27,28 +35,37 @@ namespace Gubbins.Enhance
         {
             get
             {
+                // Migrate legacy "{}" data (empty JSON for fieldless types) to null.
+                if (pureReferenceData == "{}")
+                    pureReferenceData = null;
+
                 if (pureReference != null)
-                {
                     return pureReference;
-                }
 
                 if (unityReference != null)
                 {
                     if (unityReference is T unityObj)
-                    {
                         return unityObj;
-                    }
 
                     if (unityReference is GameObject go)
-                    {
                         return go.GetComponent<T>();
-                    }
                 }
 
                 if (!string.IsNullOrEmpty(expectedTypeName))
                 {
+                    if (!string.IsNullOrEmpty(pureReferenceData))
+                    {
+                        var type = Type.GetType(expectedTypeName);
+                        if (type != null)
+                            pureReference = JsonUtility.FromJson(pureReferenceData, type) as T;
+                        if (pureReference != null)
+                            return pureReference;
+                    }
+
                     var expectedType = Type.GetType(expectedTypeName);
-                    return pureReference = expectedType != null && typeof(T).IsAssignableFrom(expectedType) ? (T) Activator.CreateInstance(expectedType)! : null;
+                    return pureReference = expectedType != null && typeof(T).IsAssignableFrom(expectedType)
+                        ? (T) Activator.CreateInstance(expectedType)!
+                        : null;
                 }
 
                 return null;
@@ -57,21 +74,25 @@ namespace Gubbins.Enhance
             {
                 if (value == null)
                 {
-                    pureReference    = null;
-                    unityReference   = null;
-                    expectedTypeName = null;
+                    pureReference     = null;
+                    pureReferenceData = null;
+                    unityReference    = null;
+                    expectedTypeName  = null;
                 }
                 else if (value is Object uObj)
                 {
-                    pureReference    = null;
-                    unityReference   = uObj;
-                    expectedTypeName = uObj.GetType().AssemblyQualifiedName;
+                    pureReference     = null;
+                    pureReferenceData = null;
+                    unityReference    = uObj;
+                    expectedTypeName  = uObj.GetType().AssemblyQualifiedName;
                 }
                 else
                 {
-                    pureReference    = value;
-                    unityReference   = null;
-                    expectedTypeName = value.GetType().AssemblyQualifiedName;
+                    pureReference     = value;
+                    unityReference    = null;
+                    expectedTypeName  = value.GetType().AssemblyQualifiedName;
+                    var json = JsonUtility.ToJson(value);
+                    pureReferenceData = json == "{}" ? null : json;
                 }
             }
         }

@@ -27,7 +27,7 @@ namespace Gubbins.Editor
             }
 
             var iterator = property.Copy();
-            var end      = iterator.GetEndProperty();
+            var end = iterator.GetEndProperty();
             if (iterator.Next(true))
             {
                 while (!SerializedProperty.EqualContents(iterator, end))
@@ -67,7 +67,7 @@ namespace Gubbins.Editor
                     // boxedValue cannot handle types that contain [SerializeReference] fields
                     // (e.g. SerializedReference<T>), so recurse into children instead.
                     var iter = property.Copy();
-                    var end  = iter.GetEndProperty();
+                    var end = iter.GetEndProperty();
                     if (iter.Next(true))
                     {
                         while (!SerializedProperty.EqualContents(iter, end))
@@ -76,6 +76,7 @@ namespace Gubbins.Editor
                             if (!iter.Next(false)) break;
                         }
                     }
+
                     return;
                 }
             }
@@ -92,7 +93,28 @@ namespace Gubbins.Editor
         /// </summary>
         internal static object GetValue(this SerializedProperty property)
         {
-            return property.boxedValue;
+            if (property.isArray)
+            {
+                var list = new List<object>();
+                for (var i = 0; i < property.arraySize; i++)
+                {
+                    var element = property.GetArrayElementAtIndex(i);
+                    list.Add(element.GetValue());
+                }
+
+                return list.ToArray();
+            }
+
+            try
+            {
+                return property.boxedValue;
+            }
+            catch (InvalidOperationException)
+            {
+                // boxedValue cannot handle types that contain [SerializeReference] fields (e.g. SerializedReference<T>).
+                // Fall back to reflection.
+                return GetValueViaReflection(property);
+            }
         }
 
         /// <summary>
@@ -100,13 +122,37 @@ namespace Gubbins.Editor
         /// </summary>
         internal static void SetValue(this SerializedProperty property, object value)
         {
-            property.boxedValue = value;
+            if (property.isArray)
+            {
+                if (value is System.Collections.IEnumerable enumerable)
+                {
+                    property.ClearArray();
+                    foreach (var item in enumerable)
+                    {
+                        property.InsertArrayElementAtIndex(property.arraySize);
+                        var element = property.GetArrayElementAtIndex(property.arraySize - 1);
+                        element.SetValue(item);
+                    }
+                }
+                else
+                {
+                    throw new ArgumentException("Value must be an IEnumerable for array properties.");
+                }
+
+                return;
+            }
+
+            try
+            {
+                property.boxedValue = value;
+            }
+            catch (InvalidOperationException)
+            {
+                SetValueViaReflection(property, value);
+            }
         }
-#else
-        /// <summary>
-        /// Get the value of <paramref name="property"/> as an object.
-        /// </summary>
-        internal static object GetValue(this SerializedProperty property)
+
+        private static object GetValueViaReflection(SerializedProperty property)
         {
             var path = property.propertyPath.Replace(".Array.data[", "[");
             object obj = property.serializedObject.targetObject;
@@ -115,8 +161,8 @@ namespace Gubbins.Editor
             {
                 if (element.Contains("["))
                 {
-                    var elementName = element.Substring(0, element.IndexOf("[", StringComparison.Ordinal));
-                    var index = Convert.ToInt32(element.Substring(element.IndexOf("[", StringComparison.Ordinal)).Replace("[", "").Replace("]", ""));
+                    var elementName = element[..element.IndexOf("[", StringComparison.Ordinal)];
+                    var index = Convert.ToInt32(element[element.IndexOf("[", StringComparison.Ordinal)..].Replace("[", "").Replace("]", ""));
                     obj = GetFieldOrPropertyValue(obj, elementName, index);
                 }
                 else
@@ -128,10 +174,7 @@ namespace Gubbins.Editor
             return obj;
         }
 
-        /// <summary>
-        /// Set the value of <paramref name="property"/> to <paramref name="value"/>.
-        /// </summary>
-        internal static void SetValue(this SerializedProperty property, object value)
+        private static void SetValueViaReflection(SerializedProperty property, object value)
         {
             var path = property.propertyPath.Replace(".Array.data[", "[");
             object obj = property.serializedObject.targetObject;
@@ -140,8 +183,8 @@ namespace Gubbins.Editor
             {
                 if (element.Contains("["))
                 {
-                    var elementName = element.Substring(0, element.IndexOf("["));
-                    var index = Convert.ToInt32(element.Substring(element.IndexOf("[")).Replace("[", "").Replace("]", ""));
+                    var elementName = element[..element.IndexOf("[")];
+                    var index = Convert.ToInt32(element[element.IndexOf("[")..].Replace("[", "").Replace("]", ""));
                     obj = GetFieldOrPropertyValue(obj, elementName, index);
                 }
                 else
@@ -157,8 +200,8 @@ namespace Gubbins.Editor
             if (lastElement.Contains("["))
             {
                 var tp = obj.GetType();
-                var elementName = lastElement.Substring(0, lastElement.IndexOf("["));
-                var index = Convert.ToInt32(lastElement.Substring(lastElement.IndexOf("[")).Replace("[", "").Replace("]", ""));
+                var elementName = lastElement[..lastElement.IndexOf("[")];
+                var index = Convert.ToInt32(lastElement[lastElement.IndexOf("[")..].Replace("[", "").Replace("]", ""));
                 var field = tp.GetField(elementName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
                 var arr = field.GetValue(obj) as System.Collections.IList;
                 arr[index] = value;
@@ -173,6 +216,17 @@ namespace Gubbins.Editor
                 }
             }
         }
+#else
+        internal static object GetValue(this SerializedProperty property)
+        {
+            return GetValueViaReflection(property);
+        }
+
+        internal static void SetValue(this SerializedProperty property, object value)
+        {
+            SetValueViaReflection(property, value);
+        }
+#endif
 
         private static object GetFieldOrPropertyValue(object source, string name, int index)
         {
@@ -202,6 +256,5 @@ namespace Gubbins.Editor
 
             return null;
         }
-#endif
     }
 }

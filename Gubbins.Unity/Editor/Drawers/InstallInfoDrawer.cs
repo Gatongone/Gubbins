@@ -208,17 +208,14 @@ namespace Gubbins.Editor
                 TryRemove(elements.Bindings);
                 TryRemove(elements.Controller);
 
-#if UNITY_2023_2_OR_NEWER // Only Unity 2023.2+ supports generic SerializedReference fields.
-                // If the product type has an [Inject] constructor, we don't want to override the spawner type with a default one.
+// If the product type has an [Inject] constructor, we don't want to override the spawner type with a default one.
                 if (hasInjectConstructor)
                 {
                     spawnerType = SelectSpawnerType(changedType.Type);
                 }
 
                 AssignSpawner(properties.Spawner, spawnerType);
-#else
-                AssignSpawner(properties.Spawner, null);
-#endif
+
                 if (!hasType)
                 {
                     // Clearing the Type tears down everything that depends on it.
@@ -395,29 +392,24 @@ namespace Gubbins.Editor
         /// </summary>
         private static void AssignSpawner(SerializedProperty spawnerProperty, Type spawnerType)
         {
-            var pureRef = spawnerProperty.FindPropertyRelative("pureReference");
+            var pureData = spawnerProperty.FindPropertyRelative("pureReferenceData");
             var unityRef = spawnerProperty.FindPropertyRelative("unityReference");
             var typeName = spawnerProperty.FindPropertyRelative("expectedTypeName");
 
             if (spawnerType == null)
             {
-                if (pureRef != null) pureRef.managedReferenceValue  = null;
+                if (pureData != null) pureData.stringValue          = null;
                 if (unityRef != null) unityRef.objectReferenceValue = null;
                 if (typeName != null) typeName.stringValue          = string.Empty;
                 return;
             }
 
             object instance = null;
-            try
-            {
-                instance = Activator.CreateInstance(spawnerType);
-            }
-            catch (Exception e)
-            {
-                Debug.LogError($"[InstallInfo] Failed to create spawner {spawnerType}: {e.Message}");
-            }
+            try { instance = Activator.CreateInstance(spawnerType); }
+            catch (Exception e) { Debug.LogError($"[InstallInfo] Failed to create spawner {spawnerType}: {e.Message}"); }
 
-            if (pureRef != null) pureRef.managedReferenceValue  = instance;
+            var json = instance != null ? JsonUtility.ToJson(instance) : null;
+            if (pureData != null) pureData.stringValue          = json == "{}" ? null : json;
             if (unityRef != null) unityRef.objectReferenceValue = null;
             if (typeName != null) typeName.stringValue          = spawnerType.AssemblyQualifiedName;
         }
@@ -454,26 +446,15 @@ namespace Gubbins.Editor
         /// </summary>
         private VisualElement CreateSpawnerProperty(SerializedProperty property, Action<SerializedPropertyChangeEvent> onSpawnerChanged = null)
         {
-            const string pureProperty = nameof(SerializedReference<object>.pureReference);
-            const string unityProperty = nameof(SerializedReference<object>.unityReference);
-            const string typeName = nameof(SerializedReference<object>.expectedTypeName);
-            var pureProp = property.FindPropertyRelative(pureProperty);
-            var unityProp = property.FindPropertyRelative(unityProperty);
             var foldout = CreateFoldout(property);
             var propField = CreatePropertyField(property, "Type");
-            propField.AddToClassList("no-expand-children");
             // SerializedReferencePropertyDrawer labels its type DropdownField with the field's displayName
             // ("Spawner") and ignores the PropertyField label, so override it to "Type" once that dropdown exists.
             propField.RegisterCallback<GeometryChangedEvent>(RelabelTypeDropdown);
             foldout.Add(propField);
-            var childContainer = new VisualElement();
-            foldout.Add(childContainer);
 
-            string lastBuiltType = null;
-            RebuildChildren();
             propField.RegisterValueChangeCallback(evt =>
             {
-                RebuildChildren();
                 onSpawnerChanged?.Invoke(evt);
             });
 
@@ -484,35 +465,6 @@ namespace Gubbins.Editor
                 if (propField.Q<DropdownField>() is not { } dropdown) return;
                 dropdown.label = "Type";
                 propField.UnregisterCallback<GeometryChangedEvent>(RelabelTypeDropdown);
-            }
-
-            void RebuildChildren()
-            {
-                property.serializedObject.Update();
-                var newType = property.FindPropertyRelative(typeName).stringValue;
-                if (newType == lastBuiltType) return;
-                childContainer.Clear();
-                lastBuiltType = newType;
-
-                // Cleared to "Null": nothing left to draw, keep the emptied container.
-                if (string.IsNullOrEmpty(newType)) return;
-
-                var spawnerType = Type.GetType(newType, Reflection.LoadAssemblyResolver, Reflection.DomainTypeResolver);
-                var spawnerProperty = typeof(Object).IsAssignableFrom(spawnerType) ? unityProp : pureProp;
-
-                if (typeof(Object).IsAssignableFrom(spawnerType))
-                {
-                    var f = CreatePropertyField(unityProp, "Object");
-                    childContainer.Add(f);
-                    f.Bind(property.serializedObject);
-                }
-
-                foreach (var child in spawnerProperty.GetChildren())
-                {
-                    var f = CreatePropertyField(child);
-                    childContainer.Add(f);
-                    f.Bind(property.serializedObject);
-                }
             }
         }
 
