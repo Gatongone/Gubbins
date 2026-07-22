@@ -87,72 +87,12 @@ namespace Gubbins.Editor
             }
         }
 
-#if UNITY_2022_2_OR_NEWER
         /// <summary>
-        /// Get the value of <paramref name="property"/> as an object.
+        /// Get the value of <paramref name="property"/> as an object, using reflection to traverse the serialized data.
         /// </summary>
-        internal static object GetValue(this SerializedProperty property)
-        {
-            if (property.isArray)
-            {
-                var list = new List<object>();
-                for (var i = 0; i < property.arraySize; i++)
-                {
-                    var element = property.GetArrayElementAtIndex(i);
-                    list.Add(element.GetValue());
-                }
-
-                return list.ToArray();
-            }
-
-            try
-            {
-                return property.boxedValue;
-            }
-            catch (InvalidOperationException)
-            {
-                // boxedValue cannot handle types that contain [SerializeReference] fields (e.g. SerializedReference<T>).
-                // Fall back to reflection.
-                return GetValueViaReflection(property);
-            }
-        }
-
-        /// <summary>
-        /// Set the value of <paramref name="property"/> to <paramref name="value"/>.
-        /// </summary>
-        internal static void SetValue(this SerializedProperty property, object value)
-        {
-            if (property.isArray)
-            {
-                if (value is System.Collections.IEnumerable enumerable)
-                {
-                    property.ClearArray();
-                    foreach (var item in enumerable)
-                    {
-                        property.InsertArrayElementAtIndex(property.arraySize);
-                        var element = property.GetArrayElementAtIndex(property.arraySize - 1);
-                        element.SetValue(item);
-                    }
-                }
-                else
-                {
-                    throw new ArgumentException("Value must be an IEnumerable for array properties.");
-                }
-
-                return;
-            }
-
-            try
-            {
-                property.boxedValue = value;
-            }
-            catch (InvalidOperationException)
-            {
-                SetValueViaReflection(property, value);
-            }
-        }
-
-        private static object GetValueViaReflection(SerializedProperty property)
+        /// <param name="property">The <see cref="SerializedProperty"/> to get the value of.</param>
+        /// <returns>The value of the property as an object, or null if the property is not valid.</returns>
+        private static object GetValue(this SerializedProperty property)
         {
             var path = property.propertyPath.Replace(".Array.data[", "[");
             object obj = property.serializedObject.targetObject;
@@ -174,7 +114,12 @@ namespace Gubbins.Editor
             return obj;
         }
 
-        private static void SetValueViaReflection(SerializedProperty property, object value)
+        /// <summary>
+        /// Set the value of <paramref name="property"/> to <paramref name="value"/>, using reflection to traverse the serialized data.
+        /// </summary>
+        /// <param name="property">The <see cref="SerializedProperty"/> to set the value of.</param>
+        /// <param name="value">The value to set the property to.</param>
+        private static void SetValue(this SerializedProperty property, object value)
         {
             var path = property.propertyPath.Replace(".Array.data[", "[");
             object obj = property.serializedObject.targetObject;
@@ -183,8 +128,8 @@ namespace Gubbins.Editor
             {
                 if (element.Contains("["))
                 {
-                    var elementName = element[..element.IndexOf("[")];
-                    var index = Convert.ToInt32(element[element.IndexOf("[")..].Replace("[", "").Replace("]", ""));
+                    var elementName = element[..element.IndexOf("[", StringComparison.Ordinal)];
+                    var index = Convert.ToInt32(element[element.IndexOf("[", StringComparison.Ordinal)..].Replace("[", "").Replace("]", ""));
                     obj = GetFieldOrPropertyValue(obj, elementName, index);
                 }
                 else
@@ -200,8 +145,8 @@ namespace Gubbins.Editor
             if (lastElement.Contains("["))
             {
                 var tp = obj.GetType();
-                var elementName = lastElement[..lastElement.IndexOf("[")];
-                var index = Convert.ToInt32(lastElement[lastElement.IndexOf("[")..].Replace("[", "").Replace("]", ""));
+                var elementName = lastElement[..lastElement.IndexOf("[", StringComparison.Ordinal)];
+                var index = Convert.ToInt32(lastElement[lastElement.IndexOf("[", StringComparison.Ordinal)..].Replace("[", "").Replace("]", ""));
                 var field = tp.GetField(elementName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
                 var arr = field.GetValue(obj) as System.Collections.IList;
                 arr[index] = value;
@@ -216,18 +161,14 @@ namespace Gubbins.Editor
                 }
             }
         }
-#else
-        internal static object GetValue(this SerializedProperty property)
-        {
-            return GetValueViaReflection(property);
-        }
 
-        internal static void SetValue(this SerializedProperty property, object value)
-        {
-            SetValueViaReflection(property, value);
-        }
-#endif
-
+        /// <summary>
+        /// Get the value of a field or property from an object, where the field or property is an enumerable and we want the value at a specific index.
+        /// </summary>
+        /// <param name="source">The object to get the field or property value from.</param>
+        /// <param name="name">The name of the field or property to get the value of.</param>
+        /// <param name="index">The index of the value to get from the enumerable field or property.</param>
+        /// <returns>The value of the field or property at the specified index, or null if the field or property is not found or is not an enumerable.</returns>
         private static object GetFieldOrPropertyValue(object source, string name, int index)
         {
             if (GetFieldOrPropertyValue(source, name) is not System.Collections.IEnumerable enumerable) return null;
@@ -242,9 +183,16 @@ namespace Gubbins.Editor
             {
                 disposable.Dispose();
             }
+
             return result;
         }
 
+        /// <summary>
+        /// Get the value of a field or property from an object, using reflection to find the field or property by name.
+        /// </summary>
+        /// <param name="obj">The object to get the field or property value from.</param>
+        /// <param name="name">The name of the field or property to get the value of.</param>
+        /// <returns>The value of the field or property, or null if the field or property is not found.</returns>
         private static object GetFieldOrPropertyValue(object obj, string name)
         {
             if (obj == null) return null;
