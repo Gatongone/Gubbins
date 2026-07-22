@@ -7,6 +7,9 @@ using UnityEngine;
 
 namespace Gubbins.Unsafe
 {
+    /// <summary>
+    /// Unity memory operations.
+    /// </summary>
     internal unsafe class UnityMemory : Memory
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -25,7 +28,13 @@ namespace Gubbins.Unsafe
         public override void Free(IntPtr ptr) => UnsafeUtility.Free(ptr.ToPointer(), Allocator.Persistent);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public override IntPtr Allocate(int size, int align = 8) => (IntPtr) UnsafeUtility.Malloc(size, align, Allocator.Persistent);
+        public override void AlignedFree(IntPtr ptr) => UnsafeUtility.Free(ptr.ToPointer(), Allocator.Persistent);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public override IntPtr Alloc(int size) => (IntPtr) UnsafeUtility.Malloc(size, 8, Allocator.Persistent);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public override IntPtr AlignedAlloc(int size, int align) => (IntPtr) UnsafeUtility.Malloc(size, align, Allocator.Persistent);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override T ConvertToStructure<T>(void* ptr) => UnsafeUtility.ReadArrayElement<T>(ptr, 0);

@@ -30,11 +30,61 @@ public unsafe class Memory
     }
 #endif
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public virtual IntPtr Allocate(int size, int align = 8) => Marshal.AllocHGlobal(size);
+    public virtual IntPtr Alloc(int size)
+    {
+#if NET6_0_OR_GREATER
+        return (IntPtr) NativeMemory.Alloc((uint) size);
+#else
+        return Marshal.AllocHGlobal(size);
+#endif
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public virtual void  Free(IntPtr ptr) => Marshal.FreeHGlobal(ptr);
+    public virtual IntPtr AlignedAlloc(int size, int align)
+    {
+#if NET6_0_OR_GREATER
+        var ptr = NativeMemory.AlignedAlloc((nuint) size, (nuint) align);
+        return (IntPtr) ptr;
+#else
+        // The alignment value must be 2 to the power of 2.
+        if ((align & (align - 1)) != 0)
+            throw new ArgumentException("Alignment must be a power of 2.", nameof(align));
+
+        // AlignedAlloc extra space for alignment offset storage
+        // An additional align-1 byte is needed to align + 1 byte of storage offset
+        var totalSize = size + align - 1 + sizeof(nint);
+
+        var rawPtr = Marshal.AllocHGlobal(totalSize);
+
+        nint raw = rawPtr;
+        var aligned = (raw + sizeof(nint) + align - 1) & ~(nint) (align - 1);
+
+        // Offsets are stored before aligned addresses for future freeing.
+        *(nint*) (aligned - sizeof(nint)) = aligned - raw;
+
+        return aligned;
+#endif
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public virtual void AlignedFree(IntPtr ptr)
+    {
+#if NET6_0_OR_GREATER
+        NativeMemory.AlignedFree((void*) ptr);
+#else
+        Marshal.FreeHGlobal(ptr);
+#endif
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public virtual void Free(IntPtr ptr)
+    {
+#if NET6_0_OR_GREATER
+        NativeMemory.Free((void*) ptr);
+#else
+        Marshal.FreeHGlobal(ptr);
+#endif
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public virtual uint GetFieldOffset(FieldInfo fieldInfo)
@@ -106,6 +156,8 @@ public unsafe class Memory
 #endif
     }
 
+#if !NET5_0_OR_GREATER
     [DllImport("msvcrt.dll", EntryPoint = "memcpy", CallingConvention = CallingConvention.Cdecl, SetLastError = false)]
     private static extern IntPtr Memcpy(IntPtr dest, IntPtr src, UIntPtr count);
+#endif
 }

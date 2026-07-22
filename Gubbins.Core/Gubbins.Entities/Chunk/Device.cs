@@ -102,7 +102,7 @@ internal class Device
         GetLogicalProcessorInformation(IntPtr.Zero, ref returnLength);
         if (Marshal.GetLastWin32Error() != ERROR_INSUFFICIENT_BUFFER)
             return null;
-        var ptr = Native.Allocate((int) returnLength);
+        var ptr = Native.Alloc((int) returnLength);
         try
         {
             if (GetLogicalProcessorInformation(ptr, ref returnLength))

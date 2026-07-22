@@ -1,8 +1,4 @@
 <Project>
-    <PropertyGroup Condition="'$(UnsafeAdapter)' == 'true'">
-        <DefineConstants>$(DefineConstants);CUSTOM_UNSAFE;</DefineConstants>
-    </PropertyGroup>
-    
     <PropertyGroup Condition="'$(NativeAOT)' == 'true'">
         <DefineConstants>$(DefineConstants);NATIVEAOT;</DefineConstants>
     </PropertyGroup>

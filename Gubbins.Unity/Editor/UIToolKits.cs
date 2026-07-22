@@ -92,7 +92,7 @@ namespace Gubbins.Editor
         /// </summary>
         /// <param name="property">The <see cref="SerializedProperty"/> to get the value of.</param>
         /// <returns>The value of the property as an object, or null if the property is not valid.</returns>
-        private static object GetValue(this SerializedProperty property)
+        public static object GetValue(this SerializedProperty property)
         {
             var path = property.propertyPath.Replace(".Array.data[", "[");
             object obj = property.serializedObject.targetObject;
@@ -119,7 +119,7 @@ namespace Gubbins.Editor
         /// </summary>
         /// <param name="property">The <see cref="SerializedProperty"/> to set the value of.</param>
         /// <param name="value">The value to set the property to.</param>
-        private static void SetValue(this SerializedProperty property, object value)
+        public static void SetValue(this SerializedProperty property, object value)
         {
             var path = property.propertyPath.Replace(".Array.data[", "[");
             object obj = property.serializedObject.targetObject;

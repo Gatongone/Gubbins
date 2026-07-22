@@ -121,7 +121,7 @@ public unsafe struct Uarray<T> : IDisposable, IReadOnlyCollection<T>, IList, ISt
     /// </exception>
     public Uarray(int length)
     {
-        m_Address = Native.Allocate(length * sizeof(T), Native.GetAlignment<T>());
+        m_Address = Native.AlignedAlloc(length * sizeof(T), Native.GetAlignment<T>());
         m_Length  = length;
     }
 
@@ -135,7 +135,7 @@ public unsafe struct Uarray<T> : IDisposable, IReadOnlyCollection<T>, IList, ISt
     {
         EnsureNotDisposed();
         m_Length  = items.Length;
-        m_Address = Native.Allocate(m_Length * sizeof(T), Native.GetAlignment<T>());
+        m_Address = Native.AlignedAlloc(m_Length * sizeof(T), Native.GetAlignment<T>());
         items.CopyTo(m_Items);
     }
 
@@ -759,7 +759,7 @@ public unsafe struct Uarray<T> : IDisposable, IReadOnlyCollection<T>, IList, ISt
         if (m_IsDisposed) return;
 
         m_IsDisposed = true;
-        Native.Free(m_Address);
+        Native.AlignedFree(m_Address);
         m_Address = 0;
         m_Length  = 0;
     }

@@ -20,18 +20,34 @@ public sealed unsafe class Native
     internal static Memory Operation = new();
 
     /// <summary>
-    /// Allocates an unmanaged memory block.
+    /// Allocates an unmanaged aligned memory block.
     /// </summary>
     /// <param name="size">The number of bytes to allocate.</param>
     /// <param name="align">The requested byte alignment.</param>
     /// <returns>A pointer to the allocated memory block.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static IntPtr Allocate(int size, int align = 8) => Operation.Allocate(size, align);
+    public static IntPtr Alloc(int size) => Operation.Alloc(size);
+
+    /// <summary>
+    /// Allocates an unmanaged aligned memory block.
+    /// </summary>
+    /// <param name="size">The number of bytes to allocate.</param>
+    /// <param name="align">The requested byte alignment.</param>
+    /// <returns>A pointer to the allocated memory block.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static IntPtr AlignedAlloc(int size, int align) => Operation.AlignedAlloc(size, align);
+
+    /// <summary>
+    /// Frees a previously allocated unmanaged aligned memory block.
+    /// </summary>
+    /// <param name="ptr">The pointer returned by <see cref="AlignedAlloc"/>.</param>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void AlignedFree(IntPtr ptr) => Operation.AlignedFree(ptr);
 
     /// <summary>
     /// Frees a previously allocated unmanaged memory block.
     /// </summary>
-    /// <param name="ptr">The pointer returned by <see cref="Allocate"/>.</param>
+    /// <param name="ptr">The pointer returned by <see cref="AlignedAlloc"/>.</param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void Free(IntPtr ptr) => Operation.Free(ptr);
 
@@ -55,10 +71,12 @@ public sealed unsafe class Native
         {
             return 8;
         }
+
         if ((size & 3) == 0)
         {
             return 4;
         }
+
         return (size & 1) == 0 ? 2 : 1;
     }
 
@@ -265,11 +283,11 @@ public sealed unsafe class Native
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static object Box(void* address, Type sourceType, uint offset)
     {
-        #if NET5_0_OR_GREATER
+#if NET5_0_OR_GREATER
         var valueObj = RuntimeHelpers.GetUninitializedObject(sourceType);
-        #else
+#else
         var valueObj = FormatterServices.GetUninitializedObject(sourceType);
-        #endif
+#endif
         CopyMemory(address, Unbox(valueObj), offset);
         return valueObj;
     }
@@ -357,7 +375,7 @@ public sealed unsafe class Native
         TypeCode.UInt16   => *(ushort*) source,
         TypeCode.UInt32   => *(uint*) source,
         TypeCode.UInt64   => *(ulong*) source,
-        _              => isValueType ? Box(source, type, size) : *(object*) source
+        _                 => isValueType ? Box(source, type, size) : *(object*) source
     };
 
     /// <summary>
