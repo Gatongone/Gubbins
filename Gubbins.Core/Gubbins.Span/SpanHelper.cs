@@ -324,7 +324,7 @@ internal static class VectorMath
             + (new Vector<double>(c19) * r + new Vector<double>(c18))
             * r02
             + (new Vector<double>(c17) * r + new Vector<double>(c16));
-        var poly2 = new Vector<double>(c08)
+        var poly2 = r08
             * (r04
                 * ((new Vector<double>(c15) * r + new Vector<double>(c14))
                     * r02
@@ -586,11 +586,11 @@ internal static class VectorMath
         static Vector<float> CopySign(Vector<float> x, Vector<float> y)
         {
             const uint signMask = 0x8000_0000;
-            var xbits = Vector.ConvertToUInt32(x);
-            var ybits = Vector.ConvertToUInt32(y);
+            var xbits = Native.BitCast<Vector<float>, Vector<uint>>(x);
+            var ybits = Native.BitCast<Vector<float>, Vector<uint>>(y);
             var xmask = new Vector<uint>(~signMask);
             var ymask = new Vector<uint>(signMask);
-            return Vector.ConvertToSingle(Vector.BitwiseAnd(xbits, xmask) | Vector.BitwiseAnd(ybits, ymask));
+            return Native.BitCast<Vector<uint>, Vector<float>>(Vector.BitwiseAnd(xbits, xmask) | Vector.BitwiseAnd(ybits, ymask));
         }
 #endif
     }
@@ -611,11 +611,11 @@ internal static class VectorMath
         static Vector<double> CopySign(Vector<double> x, Vector<double> y)
         {
             const ulong signMask = 0x8000_0000_0000_0000;
-            var xbits = Vector.ConvertToUInt64(x);
-            var ybits = Vector.ConvertToUInt64(y);
+            var xbits = Native.BitCast<Vector<double>, Vector<ulong>>(x);
+            var ybits = Native.BitCast<Vector<double>, Vector<ulong>>(y);
             var xmask = new Vector<ulong>(~signMask);
             var ymask = new Vector<ulong>(signMask);
-            return Vector.ConvertToDouble(Vector.BitwiseAnd(xbits, xmask) | Vector.BitwiseAnd(ybits, ymask));
+            return Native.BitCast<Vector<ulong>, Vector<double>>(Vector.BitwiseAnd(xbits, xmask) | Vector.BitwiseAnd(ybits, ymask));
         }
 #endif
     }
