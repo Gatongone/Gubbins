@@ -1,6 +1,6 @@
 #if GUBBINS_ENABLED
 using Godot;
-using Gubbins.Events;
+using Gubbins.Game;
 using Gubbins.Pipeline;
 
 namespace Gubbins.Entities;
@@ -130,10 +130,7 @@ internal static class TransformWriteback
 /// </remarks>
 public sealed partial class EntityTransformSync : IEventListener
 {
-    [Event(typeof(LoopEvents.Postprocess))]
-    private void OnPostprocess(float delta)
-    {
-        EntityTransformSystem.SyncTransforms();
-    }
+    [Event(typeof(LoopEvents.Lately))]
+    private void OnPostprocess(float delta) => EntityTransformSystem.SyncTransforms();
 }
 #endif

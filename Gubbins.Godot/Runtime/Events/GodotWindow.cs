@@ -68,15 +68,24 @@ internal static class GodotWindow
             return;
         }
 
-        s_Window.SizeChanged     += OnSizeChanged;
-        s_Window.DpiChanged      += OnDpiChanged;
-        s_Window.MouseEntered    += OnMouseEntered;
-        s_Window.MouseExited     += OnMouseExited;
-        s_Window.FocusEntered    += OnFocusEntered;
-        s_Window.FocusExited     += OnFocusExited;
-        s_Window.Ready           += OnWindowReady;
-        s_Window.GoBackRequested += OnGobackRequested;
-        s_Window.CloseRequested  += OnCloseRequested;
+        if (!s_Window.IsConnected(Window.SignalName.SizeChanged, Callable.From(OnSizeChanged)))
+            s_Window.SizeChanged     += OnSizeChanged;
+        if (!s_Window.IsConnected(Window.SignalName.DpiChanged, Callable.From(OnDpiChanged)))
+            s_Window.DpiChanged      += OnDpiChanged;
+        if (!s_Window.IsConnected(Window.SignalName.MouseEntered, Callable.From(OnMouseEntered)))
+            s_Window.MouseEntered    += OnMouseEntered;
+        if (!s_Window.IsConnected(Window.SignalName.MouseExited, Callable.From(OnMouseExited)))
+            s_Window.MouseExited     += OnMouseExited;
+        if (!s_Window.IsConnected(Window.SignalName.FocusEntered, Callable.From(OnFocusEntered)))
+            s_Window.FocusEntered    += OnFocusEntered;
+        if (!s_Window.IsConnected(Window.SignalName.FocusExited, Callable.From(OnFocusExited)))
+            s_Window.FocusExited     += OnFocusExited;
+        if (!s_Window.IsConnected(Window.SignalName.Ready, Callable.From(OnWindowReady)))
+            s_Window.Ready           += OnWindowReady;
+        if (!s_Window.IsConnected(Window.SignalName.GoBackRequested, Callable.From(OnGobackRequested)))
+            s_Window.GoBackRequested += OnGobackRequested;
+        if (!s_Window.IsConnected(Window.SignalName.CloseRequested, Callable.From(OnCloseRequested)))
+            s_Window.CloseRequested  += OnCloseRequested;
     }
 
     /// <summary>

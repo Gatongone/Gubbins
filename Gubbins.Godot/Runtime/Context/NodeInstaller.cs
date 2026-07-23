@@ -19,6 +19,7 @@ public partial class NodeInstaller  : Node, IDependenciesInstaller
     [Export] public Array<SerializedInstallInfo> InstallInfos;
 
     /// <inheritdoc/>
-    public void Install(IDependenciesRegistry registry) => registry.RegisterAll(InstallInfos.Select(static item => item.ToInstallInfo()));
+    public void Install(IDependenciesRegistry registry) => registry.RegisterAll(InstallInfos.Select(static item => item.ToInstallInfo())
+                                                                                            .Where(static item => item.Type != null));
 }
 #endif

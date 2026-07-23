@@ -18,7 +18,8 @@
         "Gubbins.Entities.dll",
         "Gubbins.Events.dll",
         "Gubbins.Unsafe.dll",
-        "Gubbins.Pipeline.dll"
+        "Gubbins.Pipeline.dll",
+        "Gubbins.Game.dll"
     ],
     "autoReferenced": true,
     "defineConstraints": [],

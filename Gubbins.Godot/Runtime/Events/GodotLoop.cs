@@ -1,6 +1,7 @@
 ﻿#if GUBBINS_ENABLED
 using System;
 using Godot;
+using Gubbins.Game;
 
 namespace Gubbins.Events;
 
@@ -10,14 +11,19 @@ namespace Gubbins.Events;
 internal static class GodotLoop
 {
     /// <summary>
+    /// Indicates whether the GodotLoop has been initialized. This flag is used to ensure that the loop is only initialized once.
+    /// </summary>
+    private static bool s_Initialized;
+
+    /// <summary>
     /// The main loop of the Godot engine, cast to a SceneTree for access to its events.
     /// </summary>
-    private static readonly SceneTree s_Looper;
+    private static SceneTree s_Looper;
 
     /// <summary>
     /// The main window of the Godot engine, used to retrieve delta time for frame updates.
     /// </summary>
-    private static readonly Window s_Window;
+    private static Window s_Window;
 
     /// <summary>
     /// Event that is invoked during the ProcessFrame phase of the Godot main loop, passing the delta time since the last frame as a parameter.
@@ -39,8 +45,16 @@ internal static class GodotLoop
     /// </summary>
     private static event Action<float> s_PostFrame;
 
-    static GodotLoop()
+    static GodotLoop() => Init();
+
+    internal static void Init()
     {
+        if (s_Initialized)
+        {
+            return;
+        }
+
+        LoopEvent.Registrar = new GodotLoopPhaseRegistrar();
         s_Looper = Engine.GetMainLoop() as SceneTree;
         s_Window = s_Looper.Root;
         if (s_Looper == null || s_Window == null)
@@ -48,8 +62,12 @@ internal static class GodotLoop
             return;
         }
 
-        s_Looper.ProcessFrame += OnProcessFrame;
-        s_Looper.PhysicsFrame += OnPhysicsFrame;
+        if (!s_Looper.IsConnected(SceneTree.SignalName.ProcessFrame, Callable.From(OnProcessFrame)))
+            s_Looper.ProcessFrame += OnProcessFrame;
+        if (!s_Looper.IsConnected(SceneTree.SignalName.PhysicsFrame, Callable.From(OnPhysicsFrame)))
+            s_Looper.PhysicsFrame += OnPhysicsFrame;
+
+        s_Initialized = true;
     }
 
     /// <summary>

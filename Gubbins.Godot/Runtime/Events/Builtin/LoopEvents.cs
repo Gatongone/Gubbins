@@ -1,94 +1,33 @@
-﻿using System;
-using System.Collections.Generic;
-
 #if GUBBINS_ENABLED
-namespace Gubbins.Events;
+using System;
+using Gubbins.Game;
 
-/// <summary>
-/// Provides strongly-typed wrappers for Godot window loop phase events.
-/// </summary>
-public static class LoopEvents
+namespace Gubbins.Events
 {
-    /// <summary>
-    /// Emitted during the Preprocess phase of the Godot window loop.
-    /// </summary>
-    public sealed class Preprocess : LoopEvent
+    public sealed class GodotLoopPhaseRegistrar : ILoopPhaseRegistrar
     {
-        public Preprocess() : base(GodotLoop.Kind.Preprocess) { }
-    }
-
-    /// <summary>
-    /// Emitted during the Process phase of the Godot window loop.
-    /// </summary>
-    public sealed class Process : LoopEvent
-    {
-        public Process() : base(GodotLoop.Kind.Process) { }
-    }
-
-    /// <summary>
-    /// Emitted during the Postprocess phase of the Godot window loop.
-    /// </summary>
-    public sealed class Postprocess : LoopEvent
-    {
-        public Postprocess() : base(GodotLoop.Kind.Postprocess) { }
-    }
-
-    /// <summary>
-    /// Emitted during the Physics phase of the Godot window loop.
-    /// </summary>
-    public sealed class Physics : LoopEvent
-    {
-        public Physics() : base(GodotLoop.Kind.Physics) { }
-    }
-}
-
-/// <summary>
-/// Base class for WindowLoop event wrappers.
-/// </summary>
-public class LoopEvent : IEventSubscriable<float>
-{
-    private readonly GodotLoop.Kind                                    m_Kind;
-    private readonly Dictionary<IEventHandler<float>, Action<float>> m_HandlerMap = new();
-
-    internal LoopEvent(GodotLoop.Kind kind)
-    {
-        m_Kind = kind;
-    }
-
-    /// <inheritdoc/>
-    public void Subscribe(IEventHandler<float> handler)
-    {
-        Action<float> action;
-        if (handler is ActionEventHandler<float> actionHandler)
+        public void Register(LoopPhase phase, Action<float> handler)
         {
-            action = actionHandler.Invocation;
-        }
-        else
-        {
-            action = handler.Handle;
+            var kind = Map(phase);
+            if (kind.HasValue)
+                GodotLoop.RegisterUpdate(kind.Value, handler);
         }
 
-        m_HandlerMap.Add(handler, action);
-        GodotLoop.RegisterUpdate(m_Kind, action);
-    }
-
-    /// <inheritdoc/>
-    public bool Unsubscribe(IEventHandler<float> handler)
-    {
-        if (!m_HandlerMap.Remove(handler, out var action)) return false;
-        GodotLoop.UnregisterUpdate(m_Kind, action);
-        return true;
-    }
-
-    /// <inheritdoc/>
-    public void Clear()
-    {
-        foreach (var wrap in m_HandlerMap.Values)
+        public void Unregister(LoopPhase phase, Action<float> handler)
         {
-            GodotLoop.UnregisterUpdate(m_Kind, wrap);
+            var kind = Map(phase);
+            if (kind.HasValue)
+                GodotLoop.UnregisterUpdate(kind.Value, handler);
         }
 
-        m_HandlerMap.Clear();
+        private static GodotLoop.Kind? Map(LoopPhase phase) => phase switch
+        {
+            LoopPhase.Early   => GodotLoop.Kind.Preprocess,
+            LoopPhase.Frame   => GodotLoop.Kind.Process,
+            LoopPhase.Lately  => GodotLoop.Kind.Postprocess,
+            LoopPhase.Physics => GodotLoop.Kind.Physics,
+            _                 => null
+        };
     }
 }
 #endif

@@ -67,9 +67,9 @@ namespace Gubbins.Context
             }
 
             // Prevent this scriptable object was built in preload phase, which will cause the context to be messed up.
-            if (!Preload.HasInitialized)
+            if (!Preload.Startup.HasInitialized)
             {
-                Preload.Init();
+                Preload.Startup.Init();
             }
 
             var installers = m_Installers.Where(static installer => installer.Value != null)

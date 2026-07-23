@@ -82,17 +82,16 @@ public partial class GamePipeline : global::Godot.Resource, IPipeline
         {
             if (State == PipeLineState.NotStarted)
             {
-                State = PipeLineState.Running;
                 RegisterListeners(context);
             }
             else
             {
-                State = PipeLineState.Running;
                 foreach (var listener in m_ListenerInstances)
                 {
                     listener.Listen(context, context);
                 }
             }
+            State = PipeLineState.Running;
         }
         catch
         {

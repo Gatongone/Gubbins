@@ -1,0 +1,17 @@
+{
+    "name": "Gubbins.Unity.Preload",
+    "rootNamespace": "",
+    "references": [
+        "GUID:b7466a10e85b4f14884217f39dc29a66",
+        "GUID:05bb661b1e8a3c64ca7826c86481f58c"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

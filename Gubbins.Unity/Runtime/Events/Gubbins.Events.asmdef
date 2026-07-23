@@ -9,6 +9,7 @@
     "allowUnsafeCode": false,
     "overrideReferences": true,
     "precompiledReferences": [
+        "Gubbins.Game.dll",
         "Gubbins.Events.dll",
         "Gubbins.Unsafe.dll",
         "Gubbins.Enhance.dll",

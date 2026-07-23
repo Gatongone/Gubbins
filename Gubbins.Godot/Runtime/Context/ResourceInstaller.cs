@@ -1,5 +1,4 @@
 ﻿#if GUBBINS_ENABLED
-using System.Diagnostics;
 using System.Linq;
 using Godot;
 using Godot.Collections;
@@ -19,6 +18,7 @@ public partial class ResourceInstaller : global::Godot.Resource, IDependenciesIn
     [Export] public Array<SerializedInstallInfo> InstallInfos;
 
     /// <inheritdoc/>
-    public void Install(IDependenciesRegistry registry) => registry.RegisterAll(InstallInfos.Select(static item => item.ToInstallInfo()));
+    public void Install(IDependenciesRegistry registry) => registry.RegisterAll(InstallInfos.Select(static item => item.ToInstallInfo())
+                                                                                            .Where(static item => item.Type != null));
 }
 #endif

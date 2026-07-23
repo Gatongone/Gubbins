@@ -29,13 +29,23 @@ public partial class NodeContext : Node, IContext
     /// <inheritdoc/>
     IReadOnlyContext IReadOnlyContext.Parent
     {
-        get { return m_Parent ??= Parent?.Value; }
+        get
+        {
+            return m_Parent ??= Parent?.Value;
+        }
     }
 
     /// <summary>
     /// Initializes the context when the node is ready.
     /// </summary>
-    public override void _Ready() => m_Context = new ApplicationContext(Installers.Select(static item => item.Value), ((IReadOnlyContext) this).Parent);
+    public override void _Ready()
+    {
+        if (!Preload.Startup.HasInitialized)
+        {
+            Preload.Startup.Init();
+        }
+        m_Context = new ApplicationContext(Installers.Select(static item => item.Value), ((IReadOnlyContext) this).Parent);
+    }
 
     /// <summary>
     /// Releases any resources held by the context.

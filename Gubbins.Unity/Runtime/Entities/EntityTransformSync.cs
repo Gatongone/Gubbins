@@ -1,5 +1,6 @@
 using System;
 using Gubbins.Events;
+using Gubbins.Game;
 using Gubbins.Pipeline;
 using Unity.Burst;
 using Unity.Collections;
@@ -100,7 +101,7 @@ namespace Gubbins.Entities
     [Serializable]
     internal sealed partial class EntityTransformSyncRunner : IEventListener
     {
-        [Event(typeof(LoopEvents.PostLateUpdate))]
+        [Event(typeof(LoopEvents.Lately))]
         private void LateUpdate(float _) => EntityAdapter.SyncTransforms();
     }
 }

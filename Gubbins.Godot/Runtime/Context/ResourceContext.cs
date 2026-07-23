@@ -29,7 +29,17 @@ public partial class ResourceContext : global::Godot.Resource, IContext
     /// <inheritdoc/>
     IReadOnlyContext IReadOnlyContext.Parent => m_Parent ??= Parent?.Value;
 
-    private IContext Context => m_Context ??= new ApplicationContext(Installers.Select(static item => item.Value), ((IReadOnlyContext) this).Parent);
+    private IContext Context
+    {
+        get
+        {
+            if (!Preload.Startup.HasInitialized)
+            {
+                Preload.Startup.Init();
+            }
+            return m_Context ??= new ApplicationContext(Installers.Select(static item => item.Value), ((IReadOnlyContext) this).Parent);
+        }
+    }
 
     /// <summary>
     /// Releases any resources held by the context.

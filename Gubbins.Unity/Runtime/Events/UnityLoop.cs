@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using Gubbins.Game;
 using Unity.Jobs;
 using UnityEngine;
-using UnityEngine.Assertions;
 using UnityEngine.LowLevel;
 
 namespace Gubbins.Events
@@ -63,10 +63,12 @@ namespace Gubbins.Events
         private static PlayerLoopSystemWrapper s_PostLateUpdateSys;
 
         /// <summary>Root PlayerLoop system (current custom loop).</summary>
-        private static readonly PlayerLoopSystem s_RootLooper;
+        private static PlayerLoopSystem s_RootLooper;
 
         /// <summary>Default PlayerLoop system (Unity's default loop).</summary>
-        private static readonly PlayerLoopSystem s_DefaultLooper;
+        private static PlayerLoopSystem s_DefaultLooper;
+
+        private static bool s_Initialized;
 
         /// <summary>
         /// Static constructor. Initializes PlayerLoopSystemWrappers for each phase and injects custom update slots.
@@ -74,7 +76,17 @@ namespace Gubbins.Events
         /// </summary>
         static UnityLoop()
         {
+            if (!s_Initialized)
+            {
+                Init();
+            }
+        }
+
+        internal static void Init()
+        {
+            LoopEvent.Registrar = new UnityLoopPhaseRegistrar();
             var loop = PlayerLoop.GetDefaultPlayerLoop();
+            s_DefaultLooper = loop;
             for (var index = 0; index < loop.subSystemList.Length; index++)
             {
                 ref var system = ref loop.subSystemList[index];
@@ -91,7 +103,8 @@ namespace Gubbins.Events
             }
 
             PlayerLoop.SetPlayerLoop(loop);
-            s_RootLooper = loop;
+            s_RootLooper  = loop;
+            s_Initialized = true;
 #if UNITY_EDITOR
             UnityEditor.EditorApplication.playModeStateChanged += OnStateChanged;
 #endif
@@ -106,6 +119,7 @@ namespace Gubbins.Events
             if (!UnityEditor.EditorApplication.isPlayingOrWillChangePlaymode && UnityEditor.EditorApplication.isPlaying)
             {
                 PlayerLoop.SetPlayerLoop(s_DefaultLooper);
+                s_Initialized = false;
             }
         }
 #endif

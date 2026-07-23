@@ -1,6 +1,8 @@
 ﻿#if GUBBINS_ENABLED
 using System;
+using System.Collections.Generic;
 using Godot;
+using Gubbins.Game;
 
 namespace Gubbins.Events;
 
@@ -38,8 +40,52 @@ internal static class GodotScene
             return;
         }
 
-        s_Scene.SceneChanged     += OnSceneChanged;
-        s_Scene.NodeRemoved      += OnNodeRemoved;
+        if (!s_Scene.IsConnected(SceneTree.SignalName.SceneChanged, Callable.From(OnSceneChanged)))
+            s_Scene.SceneChanged += OnSceneChanged;
+        if (!s_Scene.IsConnected(SceneTree.SignalName.NodeRemoved, Callable.From<Node>(OnNodeRemoved)))
+            s_Scene.NodeRemoved  += OnNodeRemoved;
+    }
+
+    internal static void Init() => SceneEvent.Registrar = new GodotSceneEventRegistrar();
+
+    private sealed class GodotSceneEventRegistrar : ISceneEventRegistrar
+    {
+        private static readonly List<Action<Scene>> m_LoadedActions   = [];
+        private static readonly List<Action<Scene>> m_UnloadedActions = [];
+
+        public GodotSceneEventRegistrar()
+        {
+            RegisterSceneLoaded(scene =>
+            {
+                foreach (var callback in m_LoadedActions)
+                {
+                    callback.Invoke(new Scene(scene.Name.ToString()));
+                }
+            });
+            Register(SceneEventKind.Unload, scene =>
+            {
+                foreach (var callback in m_UnloadedActions)
+                {
+                    callback.Invoke(new Scene(scene.Name.ToString()));
+                }
+            });
+        }
+
+        public void Register(SceneEventKind kind, Action<Scene> handler)
+        {
+            if (kind == SceneEventKind.Load)
+                m_LoadedActions.Add(handler);
+            else
+                m_UnloadedActions.Add(handler);
+        }
+
+        public void Unregister(SceneEventKind kind, Action<Scene> handler)
+        {
+            if (kind == SceneEventKind.Load)
+                m_LoadedActions.Remove(handler);
+            else
+                m_UnloadedActions.Remove(handler);
+        }
     }
 
     /// <summary>
