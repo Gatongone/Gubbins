@@ -12,6 +12,14 @@ namespace Gubbins.Events
         /// <summary>
         /// Event for the Initialization phase of the PlayerLoop.
         /// </summary>
+        public class TimeUpdate : JobLoopEvent
+        {
+            public TimeUpdate() : base(UnityLoop.Kind.TimeUpdate) { }
+        }
+
+        /// <summary>
+        /// Event for the Initialization phase of the PlayerLoop.
+        /// </summary>
         public class Initialization : JobLoopEvent
         {
             public Initialization() : base(UnityLoop.Kind.Initialization) { }

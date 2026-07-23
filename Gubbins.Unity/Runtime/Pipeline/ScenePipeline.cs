@@ -87,7 +87,6 @@ namespace Gubbins.Pipeline
             {
                 if (State == PipeLineState.NotStarted)
                 {
-                    State = PipeLineState.Running;
                     RegisterListeners(context);
                 }
                 else
@@ -97,6 +96,7 @@ namespace Gubbins.Pipeline
                         listener.Listen(context, context);
                     }
                 }
+                State = PipeLineState.Running;
             }
             catch
             {

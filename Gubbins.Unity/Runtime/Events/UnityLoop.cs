@@ -14,6 +14,9 @@ namespace Gubbins.Events
     /// </summary>
     internal static class UnityLoop
     {
+        /// <summary>PlayerLoop phase name for TimeUpdate.</summary>
+        private const string SYS_NAME_TIME_UPDATE = "TimeUpdate";
+
         /// <summary>PlayerLoop phase name for Initialization.</summary>
         private const string SYS_NAME_INITIALIZATION = "Initialization";
 
@@ -34,6 +37,9 @@ namespace Gubbins.Events
 
         /// <summary>PlayerLoop phase name for PostLateUpdate.</summary>
         private const string SYS_NAME_POST_LATE_UPDATE = "PostLateUpdate";
+
+        /// <summary>Wrapper for Initialization phase.</summary>
+        private static PlayerLoopSystemWrapper s_TimeUpdate;
 
         /// <summary>Wrapper for Initialization phase.</summary>
         private static PlayerLoopSystemWrapper s_InitializationSys;
@@ -152,6 +158,7 @@ namespace Gubbins.Events
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static PlayerLoopSystemWrapper GetLoopSystem(Kind kind) => kind switch
         {
+            Kind.TimeUpdate     => s_TimeUpdate,
             Kind.Initialization => s_InitializationSys,
             Kind.EarlyUpdate    => s_EarlyUpdateSys,
             Kind.FixedUpdate    => s_FixedUpdateSys,
@@ -172,6 +179,9 @@ namespace Gubbins.Events
         {
             switch (kind)
             {
+                case Kind.TimeUpdate:
+                    s_TimeUpdate = playerLoopSystemWrapper;
+                    break;
                 case Kind.Initialization:
                     s_InitializationSys = playerLoopSystemWrapper;
                     break;
@@ -204,6 +214,7 @@ namespace Gubbins.Events
         /// <returns>The corresponding Kind value, or Kind.None if not matched.</returns>
         private static Kind GetUpdateKind(PlayerLoopSystem system) => system.type.Name switch
         {
+            SYS_NAME_TIME_UPDATE      => Kind.TimeUpdate,
             SYS_NAME_INITIALIZATION   => Kind.Initialization,
             SYS_NAME_EARLY_UPDATE     => Kind.EarlyUpdate,
             SYS_NAME_FIXED_UPDATE     => Kind.FixedUpdate,
@@ -211,7 +222,7 @@ namespace Gubbins.Events
             SYS_NAME_UPDATE           => Kind.Update,
             SYS_NAME_PRE_LATE_UPDATE  => Kind.PreLateUpdate,
             SYS_NAME_POST_LATE_UPDATE => Kind.PostLateUpdate,
-            _                         => throw new ArgumentOutOfRangeException()
+            _                         => Kind.Unknown
         };
 
         /// <summary>
@@ -219,6 +230,12 @@ namespace Gubbins.Events
         /// </summary>
         public enum Kind
         {
+            /// <summary>Unknown phase.</summary>
+            Unknown = 0,
+
+            /// <summary>TimeUpdate phase</summary>
+            TimeUpdate,
+
             /// <summary>Initialization phase.</summary>
             Initialization,
 

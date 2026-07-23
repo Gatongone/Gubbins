@@ -33,10 +33,30 @@ namespace Gubbins.Context
         /// <summary>
         /// Initializes the ScriptableContext instance and sets up the application context with the specified installers.
         /// </summary>
-        private void OnEnable()
+        private void OnEnable() => EnsureInitialized();
+
+#if UNITY_EDITOR
+        private void OnDisable() => UnityEditor.EditorApplication.playModeStateChanged -= OnPlayModeChanged;
+
+        private void OnPlayModeChanged(UnityEditor.PlayModeStateChange state)
         {
+            if (state != UnityEditor.PlayModeStateChange.ExitingPlayMode) return;
+            UnityEditor.EditorApplication.playModeStateChanged -= OnPlayModeChanged;
+            m_Context?.Dispose();
+            m_Context = null;
+        }
+#endif
+
+        private void EnsureInitialized()
+        {
+            if (m_Context != null)
+            {
+                return;
+            }
+
 #if UNITY_EDITOR
             var isPlaying = Application.isPlaying || UnityEditor.EditorApplication.isPlayingOrWillChangePlaymode;
+            UnityEditor.EditorApplication.playModeStateChanged += OnPlayModeChanged;
 #else
             var isPlaying = Application.isPlaying;
 #endif
@@ -60,21 +80,45 @@ namespace Gubbins.Context
         /// <summary>
         /// Releases any resources held by the context.
         /// </summary>
-        public void Dispose() => m_Context.Dispose();
+        public void Dispose()
+        {
+            EnsureInitialized();
+            m_Context.Dispose();
+        }
 
         /// <inheritdoc/>
-        object IDependenciesResolver.Resolve(Type type, string key) => m_Context.Resolve(type, key);
+        object IDependenciesResolver.Resolve(Type type, string key)
+        {
+            EnsureInitialized();
+            return m_Context.Resolve(type, key);
+        }
 
         /// <inheritdoc/>
-        object[] IDependenciesResolver.ResolveAll(Type type) => m_Context.ResolveAll(type);
+        object[] IDependenciesResolver.ResolveAll(Type type)
+        {
+            EnsureInitialized();
+            return m_Context.ResolveAll(type);
+        }
 
         /// <inheritdoc/>
-        public IBindingDecorator Register(Type type) => m_Context.Register(type);
+        public IBindingDecorator Register(Type type)
+        {
+            EnsureInitialized();
+            return m_Context.Register(type);
+        }
 
         /// <inheritdoc/>
-        INotMultitonBindingDecorator IDependenciesRegistry.Register(object instance) => m_Context.Register(instance);
+        INotMultitonBindingDecorator IDependenciesRegistry.Register(object instance)
+        {
+            EnsureInitialized();
+            return m_Context.Register(instance);
+        }
 
         /// <inheritdoc/>
-        IMultitonBindingDecorator IDependenciesRegistry.Register(object[] instances) => m_Context.Register(instances);
+        IMultitonBindingDecorator IDependenciesRegistry.Register(object[] instances)
+        {
+            EnsureInitialized();
+            return m_Context.Register(instances);
+        }
     }
 }

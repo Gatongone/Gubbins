@@ -40,7 +40,7 @@ namespace Gubbins.Pipeline
         private SerializedReference<IEventListener>[] m_Listeners;
 
         /// <inheritdoc/>
-        public PipeLineState State { get; private set; }
+        public PipeLineState State { get; private set; } = PipeLineState.NotStarted;
 
         /// <summary>
         /// A list of instantiated event listeners that have been registered with the context.
@@ -54,6 +54,7 @@ namespace Gubbins.Pipeline
         {
 #if UNITY_EDITOR
             var isPlaying = Application.isPlaying || UnityEditor.EditorApplication.isPlayingOrWillChangePlaymode;
+            UnityEditor.EditorApplication.playModeStateChanged += OnPlayModeChanged;
 #else
             var isPlaying = Application.isPlaying;
 #endif
@@ -68,6 +69,21 @@ namespace Gubbins.Pipeline
                 Start();
             }
         }
+
+#if UNITY_EDITOR
+        private void OnPlayModeChanged(UnityEditor.PlayModeStateChange state)
+        {
+            if (state != UnityEditor.PlayModeStateChange.ExitingPlayMode) return;
+            Stop();
+            m_ListenerInstances.Clear();
+            State = PipeLineState.NotStarted;
+        }
+
+        private void OnDisable()
+        {
+            UnityEditor.EditorApplication.playModeStateChanged -= OnPlayModeChanged;
+        }
+#endif
 
         /// <summary>
         /// Starts the GamePipeline by registering the event listeners with the context and transitioning the pipeline state to Running.
@@ -95,13 +111,10 @@ namespace Gubbins.Pipeline
                 Debug.LogWarning("The context reference for the GamePipeline is not set. Defaulting to the global application context. Please assign a valid context reference to ensure proper functionality.");
             }
 
-            State = PipeLineState.Running;
-
             try
             {
                 if (State == PipeLineState.NotStarted)
                 {
-                    State = PipeLineState.Running;
                     RegisterListeners(context);
                 }
                 else
@@ -111,6 +124,7 @@ namespace Gubbins.Pipeline
                         listener.Listen(context, context);
                     }
                 }
+                State = PipeLineState.Running;
             }
             catch
             {
@@ -127,6 +141,7 @@ namespace Gubbins.Pipeline
             foreach (var listener in m_Listeners)
             {
                 var targetType = listener.ExpectedType;
+
                 // Try inject by ctor first.
                 if (targetType != null && InjectCache.GetInjectConstructor(targetType) != null)
                 {
