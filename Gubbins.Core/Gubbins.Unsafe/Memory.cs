@@ -1,11 +1,9 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using System.Reflection;
+﻿using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace Gubbins.Unsafe;
 
-[SuppressMessage("ReSharper", "ClassWithVirtualMembersNeverInherited.Global")]
 public unsafe class Memory
 {
 #if !NATIVEAOT
@@ -119,6 +117,15 @@ public unsafe class Memory
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public virtual void SetObjectAddress(object source, void* destination) => *(IntPtr*) destination = (IntPtr) Native.GetAddress(source);
+
+    public virtual uint GetStackSize<T>()
+    {
+#if NET5_0_OR_GREATER
+        return (uint) System.Runtime.CompilerServices.Unsafe.SizeOf<T>();
+#else
+        return GetStackSize(typeof(T));
+#endif
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public virtual uint GetStackSize(Type type)

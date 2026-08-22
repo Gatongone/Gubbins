@@ -1,6 +1,4 @@
 ﻿using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using Gubbins.Unsafe;
 
 namespace Gubbins.Collections;
 
@@ -175,7 +173,7 @@ internal static class ArraySort<T>
                 break;
 
             keys[i - 1] = keys[child - 1];
-            i           = child;
+            i = child;
         }
 
         keys[i - 1] = d;
@@ -247,8 +245,38 @@ internal static class ArraySort<T>
     /// <param name="value">The unsigned integer value for which to calculate the logarithm. A value of 0 returns 0 by convention.</param>
     /// <returns>The integer floor of the base-2 logarithm of the input value. Returns 0 for input value 0.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int Log2(nuint value)
+    {
+#if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
+        return System.Numerics.BitOperations.Log2(value);
+#else
+        return Environment.Is64BitProcess ? Log2((ulong) value) : Log2((uint) value);
+#endif
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int Log2(ulong value)
+    {
+#if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
+        return System.Numerics.BitOperations.Log2(value);
+#else
+        var hi = (uint) (value >> 32);
+
+        if (hi == 0)
+        {
+            return Log2((uint) value);
+        }
+
+        return 32 + Log2(hi);
+#endif
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int Log2(uint value)
     {
+#if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
+        return System.Numerics.BitOperations.Log2(value);
+#else
         // The 0->0 contract is fulfilled by setting the LSB to 1.
         // Log(1) is 0, and setting the LSB for values > 1 does not change the log2 result.
         value |= 1;
@@ -262,11 +290,8 @@ internal static class ArraySort<T>
         value |= value >> 08;
         value |= value >> 16;
 
-        // uint.MaxValue >> 27 is always in range [0 - 31] so we use Unsafe.AddByteOffset to avoid bounds check
-        return Native.AddByteOffset(
-            // Using deBruijn sequence, k=2, n=5 (2^5=32) : 0b_0000_0111_1100_0100_1010_1100_1101_1101u
-            ref MemoryMarshal.GetReference(Log2DeBruijn),
-            // uint|long -> IntPtr cast on 32-bit platforms does expensive overflow checks not needed here
-            (int) ((value * 0x07C4ACDDu) >> 27));
+        // Using deBruijn sequence, k=2, n=5 (2^5=32) : 0b_0000_0111_1100_0100_1010_1100_1101_1101u
+        return Log2DeBruijn[(int) ((value * 0x07C4ACDDu) >> 27)];
+#endif
     }
 }

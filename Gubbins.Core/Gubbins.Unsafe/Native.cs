@@ -1,7 +1,7 @@
 ﻿using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Diagnostics.CodeAnalysis;
-using System.Runtime.Serialization;
+using System.Runtime.InteropServices;
 
 #pragma warning disable CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
 
@@ -81,6 +81,33 @@ public sealed unsafe class Native
     }
 
     /// <summary>
+    /// Checks whether a pointer is aligned to a specified byte boundary.
+    /// </summary>
+    /// <param name="ptr">The pointer to check.</param>
+    /// <param name="alignment">The alignment in bytes (must be a power of 2).</param>
+    /// <returns>True if the pointer is aligned; otherwise, false.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool IsAligned(void* ptr, uint alignment)
+    {
+        return ((nuint) ptr & alignment - 1) == 0;
+    }
+
+    /// <summary>
+    /// Checks whether a reference to a byte is aligned to a specified byte boundary.
+    /// </summary>
+    /// <param name="src">The reference to the byte to check.</param>
+    /// <param name="alignment">The alignment in bytes (must be a power of 2).</param>
+    /// <returns>True if the reference is aligned; otherwise, false.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool IsAligned(ref byte src, uint alignment)
+    {
+        fixed (byte* ptr = &src)
+        {
+            return IsAligned(ptr, alignment);
+        }
+    }
+
+    /// <summary>
     /// Reinterprets a struct reference as a reference to another struct type.
     /// </summary>
     /// <typeparam name="TFrom">The source struct type.</typeparam>
@@ -90,10 +117,14 @@ public sealed unsafe class Native
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static ref TTo Cast<TFrom, TTo>(ref TFrom src) where TFrom : struct where TTo : struct
     {
+#if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
+        return ref System.Runtime.CompilerServices.Unsafe.As<TFrom, TTo>(ref src);
+#else
         fixed (TFrom* pSource = &src)
         {
             return ref *(TTo*) pSource;
         }
+#endif
     }
 
     /// <summary>
@@ -132,6 +163,9 @@ public sealed unsafe class Native
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static void* AsReference<T>(ref T value)
     {
+#if NET5_0_OR_GREATER
+        return System.Runtime.CompilerServices.Unsafe.AsPointer(ref value);
+#else
         if (typeof(T).CheckType().IsValueType)
         {
             fixed (void* ptr = &value)
@@ -144,6 +178,7 @@ public sealed unsafe class Native
         {
             return (void**) ptr;
         }
+#endif
     }
 
     /// <summary>
@@ -155,10 +190,14 @@ public sealed unsafe class Native
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void* GetFirstElementAddress<T>(T[] value)
     {
+#if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
+        return System.Runtime.CompilerServices.Unsafe.AsPointer(ref value[0]);
+#else
         fixed (void* ptr = value)
         {
             return ptr;
         }
+#endif
     }
 
     /// <summary>
@@ -170,10 +209,14 @@ public sealed unsafe class Native
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void* GetFirstElementAddress<T>(Span<T> value)
     {
+#if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
+        return System.Runtime.CompilerServices.Unsafe.AsPointer(ref value[0]);
+#else
         fixed (void* ptr = value)
         {
             return ptr;
         }
+#endif
     }
 
     /// <summary>
@@ -200,10 +243,14 @@ public sealed unsafe class Native
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void* GetAddress<T>(ref T structure) where T : struct
     {
+#if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
+        return System.Runtime.CompilerServices.Unsafe.AsPointer(ref structure);
+#else
         fixed (void* ptr = &structure)
         {
             return ptr;
         }
+#endif
     }
 
     /// <summary>
@@ -212,7 +259,114 @@ public sealed unsafe class Native
     /// <param name="instance">The source object instance.</param>
     /// <returns>A pointer to the object header.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void* GetAddress(object instance) => *(void**) &instance;
+    public static void* GetAddress(object instance)
+    {
+#if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
+        return *(void**) System.Runtime.CompilerServices.Unsafe.AsPointer(ref instance);
+#else
+        return *(void**) &instance;
+#endif
+    }
+
+    /// <summary>
+    /// Checks whether the memory address of the first reference is less than the second reference.
+    /// </summary>
+    /// <param name="left">The first reference to compare.</param>
+    /// <param name="right">The second reference to compare.</param>
+    /// <typeparam name="T">The type of the references.</typeparam>
+    /// <returns>True if the first reference's address is less than the second reference's address; otherwise, false.</returns>
+    public static bool IsAddressLessThan<T>(ref readonly T left, ref readonly T right)
+    {
+#if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
+        return System.Runtime.CompilerServices.Unsafe.IsAddressLessThan(ref System.Runtime.CompilerServices.Unsafe.AsRef(in left), ref System.Runtime.CompilerServices.Unsafe.AsRef(in right));
+#else
+        fixed (void* leftPtr = &left)
+        fixed (void* rightPtr = &right)
+        {
+            return leftPtr < rightPtr;
+        }
+#endif
+    }
+
+    /// <summary>
+    /// Checks whether the memory address of the first reference is greater than the second reference.
+    /// </summary>
+    /// <param name="left">The first reference to compare.</param>
+    /// <param name="right">The second reference to compare.</param>
+    /// <typeparam name="T">The type of the references.</typeparam>
+    /// <returns>True if the first reference's address is greater than the second reference's address; otherwise, false.</returns>
+    public static bool IsAddressGreaterThan<T>(ref readonly T left, ref readonly T right)
+    {
+#if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
+        return System.Runtime.CompilerServices.Unsafe.IsAddressGreaterThan(ref System.Runtime.CompilerServices.Unsafe.AsRef(in left), ref System.Runtime.CompilerServices.Unsafe.AsRef(in right));
+#else
+        fixed (void* leftPtr = &left)
+        fixed (void* rightPtr = &right)
+        {
+            return leftPtr > rightPtr;
+        }
+#endif
+    }
+
+    /// <summary>
+    /// Checks whether the memory address of the first reference is less than or equal to the second reference.
+    /// </summary>
+    /// <param name="left">The first reference to compare.</param>
+    /// <param name="right">The second reference to compare.</param>
+    /// <typeparam name="T">The type of the references.</typeparam>
+    /// <returns>True if the first reference's address is less than or equal to the second reference's address; otherwise, false.</returns>
+    public static bool IsAddressLessThanOrEqual<T>(ref readonly T left, ref readonly T right)
+    {
+#if NET10_0_OR_GREATER
+        return System.Runtime.CompilerServices.Unsafe.IsAddressLessThanOrEqualTo(ref System.Runtime.CompilerServices.Unsafe.AsRef(in left), ref System.Runtime.CompilerServices.Unsafe.AsRef(in right));
+#else
+        fixed (void* leftPtr = &left)
+        fixed (void* rightPtr = &right)
+        {
+            return leftPtr <= rightPtr;
+        }
+#endif
+    }
+
+    /// <summary>
+    /// Checks whether the memory address of the first reference is greater than or equal to the second reference.
+    /// </summary>
+    /// <param name="left">The first reference to compare.</param>
+    /// <param name="right">The second reference to compare.</param>
+    /// <typeparam name="T">The type of the references.</typeparam>
+    /// <returns>True if the first reference's address is greater than or equal to the second reference's address; otherwise, false.</returns>
+    public static bool IsAddressGreaterThanOrEqual<T>(ref readonly T left, ref readonly T right)
+    {
+#if NET10_0_OR_GREATER
+        return System.Runtime.CompilerServices.Unsafe.IsAddressGreaterThanOrEqualTo(ref System.Runtime.CompilerServices.Unsafe.AsRef(in left), ref System.Runtime.CompilerServices.Unsafe.AsRef(in right));
+#else
+        fixed (void* leftPtr = &left)
+        fixed (void* rightPtr = &right)
+        {
+            return leftPtr >= rightPtr;
+        }
+#endif
+    }
+
+    /// <summary>
+    /// Checks whether two references point to the same memory address.
+    /// </summary>
+    /// <param name="left">The first reference to compare.</param>
+    /// <param name="right">The second reference to compare.</param>
+    /// <typeparam name="T">The type of the references.</typeparam>
+    /// <returns>True if the references point to the same memory address; otherwise, false.</returns>
+    public static bool IsAddressEqual<T>(ref readonly T left, ref readonly T right)
+    {
+#if NET6_0_OR_GREATER
+        return System.Runtime.CompilerServices.Unsafe.AreSame(ref System.Runtime.CompilerServices.Unsafe.AsRef(in left), ref System.Runtime.CompilerServices.Unsafe.AsRef(in right));
+#else
+        fixed (void* leftPtr = &left)
+        fixed (void* rightPtr = &right)
+        {
+            return leftPtr == rightPtr;
+        }
+#endif
+    }
 
     /// <summary>
     /// Adds a byte offset to a reference and reinterprets the result as the same type.
@@ -222,14 +376,58 @@ public sealed unsafe class Native
     /// <param name="byteOffset">The offset in bytes.</param>
     /// <returns>A reference at the shifted address.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static ref T AddByteOffset<T>(ref T source, int byteOffset) where T : struct
+    public static ref T AddByteOffset<T>(ref T source, nint byteOffset) where T : struct
     {
+#if NET6_0_OR_GREATER
+        return ref System.Runtime.CompilerServices.Unsafe.AddByteOffset(ref source, byteOffset);
+#else
         fixed (void* ptr = &source)
         {
             var bytePtr = (byte*) ptr;
             var a = bytePtr + byteOffset;
             return ref AsRef<T>(a);
         }
+#endif
+    }
+
+    /// <summary>
+    /// Adds an element offset to a reference and reinterprets the result as the same type.
+    /// </summary>
+    /// <param name="source">The source reference.</param>
+    /// <param name="elementOffset">The element offset to add.</param>
+    /// <typeparam name="T">The type of the elements.</typeparam>
+    /// <returns>The resulting reference.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static ref T Add<T>(ref T source, nint elementOffset) where T : struct
+    {
+#if NET6_0_OR_GREATER
+        return ref System.Runtime.CompilerServices.Unsafe.Add(ref source, elementOffset);
+#else
+        fixed (void* ptr = &source)
+        {
+            var bytePtr = (byte*) ptr;
+            var a = bytePtr + (int) elementOffset * sizeof(T);
+            return ref *(T*) a;
+        }
+#endif
+    }
+
+    /// <summary>
+    /// Adds an element offset to a pointer and returns the resulting pointer.
+    /// </summary>
+    /// <param name="source">The source pointer.</param>
+    /// <param name="elementOffset">The element offset to add.</param>
+    /// <typeparam name="T">The type of the elements.</typeparam>
+    /// <returns>The resulting pointer.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void* Add<T>(void* source, nint elementOffset) where T : struct
+    {
+#if NET6_0_OR_GREATER
+        return System.Runtime.CompilerServices.Unsafe.Add<T>(source, (int) elementOffset);
+#else
+        var bytePtr = (byte*) source;
+        return bytePtr + (uint) elementOffset * sizeof(T);
+#endif
     }
 
     /// <summary>
@@ -286,7 +484,7 @@ public sealed unsafe class Native
 #if NET5_0_OR_GREATER
         var valueObj = RuntimeHelpers.GetUninitializedObject(sourceType);
 #else
-        var valueObj = FormatterServices.GetUninitializedObject(sourceType);
+        var valueObj = System.Runtime.Serialization.FormatterServices.GetUninitializedObject(sourceType);
 #endif
         CopyMemory(address, Unbox(valueObj), offset);
         return valueObj;
@@ -301,22 +499,21 @@ public sealed unsafe class Native
     public static void* Unbox(object source) => (byte*) GetAddress(source) + IntPtr.Size;
 
     /// <summary>
-    /// Reads a struct value from an unmanaged pointer.
-    /// </summary>
-    /// <typeparam name="T">The struct type to read.</typeparam>
-    /// <param name="ptr">The source pointer.</param>
-    /// <returns>The read value.</returns>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static T GetValue<T>(void* ptr) where T : struct => *(T*) ptr;
-
-    /// <summary>
     /// Reinterprets an unmanaged pointer as a managed reference.
     /// </summary>
     /// <typeparam name="TResult">The destination reference type.</typeparam>
     /// <param name="ptr">The source pointer.</param>
     /// <returns>A managed reference bound to <paramref name="ptr"/>.</returns>
+    /// <returns>A mutable reference to a value of type TResult.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static ref TResult AsRef<TResult>(void* ptr) => ref *(TResult*) ptr;
+    public static ref TResult AsRef<TResult>(void* ptr)
+    {
+#if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
+        return ref System.Runtime.CompilerServices.Unsafe.AsRef<TResult>(ptr);
+#else
+        return ref *(TResult*) ptr;
+#endif
+    }
 
     /// <summary>
     /// Reinterprets the first element of a span as a different reference type.
@@ -324,14 +521,85 @@ public sealed unsafe class Native
     /// <typeparam name="TFrom">The source element type.</typeparam>
     /// <typeparam name="TResult">The destination reference type.</typeparam>
     /// <param name="span">The source span.</param>
-    /// <returns>A managed reference bound to the span data.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static ref TResult AsRef<TFrom, TResult>(Span<TFrom> span)
     {
+#if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
+        return ref System.Runtime.CompilerServices.Unsafe.As<TFrom, TResult>(ref MemoryMarshal.GetReference(span));
+#else
         fixed (void* p = span)
         {
             return ref AsRef<TResult>(p);
         }
+#endif
+    }
+
+    /// <summary>
+    /// Reads a struct value from an unaligned byte reference.
+    /// </summary>
+    /// <param name="source">The source byte reference.</param>
+    /// <typeparam name="T">The struct type to read.</typeparam>
+    /// <returns>The read value.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static T GetValueUnaligned<T>(scoped ref byte source) where T : struct
+    {
+#if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
+        return System.Runtime.CompilerServices.Unsafe.ReadUnaligned<T>(in source);
+#else
+        var size = (int) GetStackSize<T>();
+        var span = MemoryMarshal.CreateReadOnlySpan(ref source, size);
+
+        if (!IsAligned(ref source, (uint) size))
+        {
+            Span<byte> alignedBuffer = stackalloc byte[size];
+            span.CopyTo(alignedBuffer);
+            return MemoryMarshal.Cast<byte, T>(alignedBuffer)[0];
+        }
+
+        return MemoryMarshal.Cast<byte, T>(span)[0];
+#endif
+    }
+
+    /// <summary>
+    /// Reads a struct value from an unaligned unmanaged pointer.
+    /// </summary>
+    /// <param name="source">The source pointer.</param>
+    /// <typeparam name="T">The struct type to read.</typeparam>
+    /// <returns>The read value.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static T GetValueUnaligned<T>(void* source) where T : struct
+    {
+#if NET5_0_OR_GREATER
+        return System.Runtime.CompilerServices.Unsafe.ReadUnaligned<T>(source);
+#else
+        var size = (int) GetStackSize<T>();
+        var span = new Span<byte>(source, size);
+
+        if (!IsAligned(source, (uint) size))
+        {
+            Span<byte> alignedBuffer = stackalloc byte[size];
+            span.CopyTo(alignedBuffer);
+            return MemoryMarshal.Cast<byte, T>(alignedBuffer)[0];
+        }
+
+        return MemoryMarshal.Cast<byte, T>(span)[0];
+#endif
+    }
+
+    /// <summary>
+    /// Reads a struct value from an unmanaged pointer.
+    /// </summary>
+    /// <typeparam name="T">The struct type to read.</typeparam>
+    /// <param name="ptr">The source pointer.</param>
+    /// <returns>The read value.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static T GetValue<T>(void* ptr) where T : struct
+    {
+#if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
+        return System.Runtime.CompilerServices.Unsafe.Read<T>(ptr);
+#else
+        return *(T*) ptr;
+#endif
     }
 
     /// <summary>
@@ -385,7 +653,40 @@ public sealed unsafe class Native
     /// <param name="source">The destination pointer.</param>
     /// <param name="value">The value to write.</param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void SetValue<TValue>(void* source, ref TValue value) where TValue : struct => *(TValue*) source = value;
+    public static void SetValue<TValue>(void* source, ref TValue value) where TValue : struct
+    {
+#if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
+        System.Runtime.CompilerServices.Unsafe.Write(source, value);
+#else
+        *(TValue*) source = value;
+#endif
+    }
+
+    /// <summary>
+    /// Writes a struct value to unmanaged memory without requiring alignment.
+    /// </summary>
+    /// <param name="source">The destination pointer.</param>
+    /// <param name="value">The value to write.</param>
+    /// <typeparam name="TValue">The struct type to write.</typeparam>
+    public static void SetValueUnaligned<TValue>(void* source, ref TValue value) where TValue : struct
+    {
+#if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
+        System.Runtime.CompilerServices.Unsafe.WriteUnaligned(source, value);
+#else
+        var size = (int) GetStackSize<TValue>();
+        var span = new Span<byte>(source, size);
+        if (!IsAligned(source, (uint) size))
+        {
+            Span<byte> alignedBuffer = stackalloc byte[size];
+            MemoryMarshal.Cast<TValue, byte>(MemoryMarshal.CreateSpan(ref value, 1)).CopyTo(alignedBuffer);
+            alignedBuffer.CopyTo(span);
+        }
+        else
+        {
+            MemoryMarshal.Cast<TValue, byte>(MemoryMarshal.CreateSpan(ref value, 1)).CopyTo(span);
+        }
+#endif
+    }
 
     /// <summary>
     /// Writes an object value to unmanaged memory using runtime type metadata.
