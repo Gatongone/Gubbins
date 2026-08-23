@@ -1,6 +1,8 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Serialization;
+using Gubbins.Unsafe;
 
 namespace Gubbins.Enhance;
 
@@ -186,6 +188,63 @@ public static partial class Hash
                 Interlocked.CompareExchange(ref field, new ConditionalWeakTable<object, SerializationInfo>(), null);
             return field;
         }
+    }
+
+    /// <summary>
+    /// Hashes <paramref name="bytes" /> into a MurmurHash3 value as a <see cref="uint" />.
+    /// </summary>
+    /// <param name="bytes">The span.</param>
+    /// <param name="seed">The seed for this algorithm.</param>
+    /// <returns>The MurmurHash3 as a <see cref="uint" /></returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static uint Murmur(ref ReadOnlySpan<byte> bytes, uint seed)
+    {
+        ref var bp = ref MemoryMarshal.GetReference(bytes);
+
+        ref var endPoint = ref Native.Add(ref Native.Cast<byte, uint>(ref bp), bytes.Length >> 2);
+        if (bytes.Length >= 4)
+        {
+            do
+            {
+                seed = RotateLeft(seed ^ (RotateLeft(Native.GetValueUnaligned<uint>(ref bp) * 3432918353U, 15) * 461845907U), 13) * 5 - 430675100;
+                bp   = ref Native.Add(ref bp, 4);
+            } while (Native.IsAddressLessThan(ref Native.Cast<byte, uint>(ref bp), ref endPoint));
+        }
+
+        var remainder = bytes.Length & 3;
+        if (remainder > 0)
+        {
+            // Read the 1-3 remaining BYTES. endPoint is a uint* at the tail's first
+            // byte, so reinterpret it as byte* before indexing (a uint* would step
+            // by 4 bytes and read out of bounds for non-multiple-of-4 inputs).
+            ref var tail = ref Native.Cast<uint, byte>(ref endPoint);
+            uint num = 0;
+            if (remainder > 2) num ^= (uint) Native.Add(ref tail, 2) << 16;
+            if (remainder > 1) num ^= (uint) Native.Add(ref tail, 1) << 8;
+            num  ^= tail;
+            seed ^= RotateLeft(num * 3432918353U, 15) * 461845907U;
+        }
+
+        seed ^= (uint) bytes.Length;
+        seed =  (uint) ((seed ^ (seed >> 16)) * -2048144789);
+        seed =  (uint) ((seed ^ (seed >> 13)) * -1028477387);
+        return seed ^ (seed >> 16);
+    }
+
+    /// <summary>
+    /// Rotates the bits of the specified unsigned integer to the left by the given offset.
+    /// </summary>
+    /// <param name="value">The value to rotate.</param>
+    /// <param name="offset">The number of bits to rotate to the left.</param>
+    /// <returns>The rotated value.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static uint RotateLeft(uint value, int offset)
+    {
+#if NET7_0_OR_GREATER
+        return BitOperations.RotateLeft(value, offset);
+#else
+        return (value << offset) | (value >> (32 - offset));
+#endif
     }
 }
 
