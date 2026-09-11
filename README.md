@@ -60,7 +60,7 @@ Adapts Gubbins for Godot, integrating the Core modules with the engine's C# runt
 
 ### Install
 
-Clone `Gubbins.Context` into the addons directory of your Godot project, then enable Gubbins in ProjectSettings/Plugins and trigger a rebuild. This will automatically add a references to Gubbins in the project's root `.csproj` file.
+Clone `Gubbins.Godot` into the addons directory of your Godot project, then enable Gubbins in ProjectSettings/Plugins and trigger a rebuild. This will automatically add a references to Gubbins in the project's root `.csproj` file.
 
 ## License
 
