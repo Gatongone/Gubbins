@@ -2,7 +2,7 @@
 
     <PropertyGroup>
         <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
-        <RootNamespace>Gubbins.Native</RootNamespace>
+        <RootNamespace>Gubbins.Unsafe</RootNamespace>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     </PropertyGroup>
 

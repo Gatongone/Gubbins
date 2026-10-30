@@ -9,10 +9,10 @@ namespace Gubbins.Unsafe;
 [SuppressMessage("ReSharper", "UnusedType.Local")]
 public partial class ValuableMember
 {
-    private const string STRUCT_SOURCE_SET_WRAPPER_NAME = $"{nameof(Gubbins)}.{nameof(Gubbins.Unsafe)}.{nameof(ValuableMember)}+StructSourceSetWrapper";
-    private const string CLASS_SOURCE_SET_WRAPPER_NAME  = $"{nameof(Gubbins)}.{nameof(Gubbins.Unsafe)}.{nameof(ValuableMember)}+ClassSourceSetWrapper";
-    private const string STRUCT_SOURCE_GET_WRAPPER_NAME = $"{nameof(Gubbins)}.{nameof(Gubbins.Unsafe)}.{nameof(ValuableMember)}+StructSourceGetWrapper";
-    private const string CLASS_SOURCE_GET_WRAPPER_NAME  = $"{nameof(Gubbins)}.{nameof(Gubbins.Unsafe)}.{nameof(ValuableMember)}+ClassSourceGetWrapper";
+    private const string STRUCT_SOURCE_SET_WRAPPER_NAME = $"{nameof(Gubbins)}.{nameof(Unsafe)}.{nameof(ValuableMember)}+StructSourceSetWrapper";
+    private const string CLASS_SOURCE_SET_WRAPPER_NAME  = $"{nameof(Gubbins)}.{nameof(Unsafe)}.{nameof(ValuableMember)}+ClassSourceSetWrapper";
+    private const string STRUCT_SOURCE_GET_WRAPPER_NAME = $"{nameof(Gubbins)}.{nameof(Unsafe)}.{nameof(ValuableMember)}+StructSourceGetWrapper";
+    private const string CLASS_SOURCE_GET_WRAPPER_NAME  = $"{nameof(Gubbins)}.{nameof(Unsafe)}.{nameof(ValuableMember)}+ClassSourceGetWrapper";
 
     /// <summary>
     /// A wrapper for the get method of a property when the source type is a class.

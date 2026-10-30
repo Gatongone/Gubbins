@@ -10,6 +10,11 @@ namespace Gubbins.Unsafe;
 /// </summary>
 public static class Reflection
 {
+    internal static class Type<T>
+    {
+        public static readonly TypeChecker Info = typeof(T).CheckType();
+    }
+    
     /// <summary>
     /// Loads an assembly by its name. This method is used as the assembly resolver callback for type resolution,
     /// allowing the system to load assemblies on demand when resolving types that may not be currently loaded in the AppDomain.

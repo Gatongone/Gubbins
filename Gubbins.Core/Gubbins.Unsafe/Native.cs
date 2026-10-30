@@ -4,6 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 
 #pragma warning disable CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
+#pragma warning disable CS9091 // This returns local by reference but it is not a ref local
 
 namespace Gubbins.Unsafe;
 
@@ -23,7 +24,6 @@ public sealed unsafe class Native
     /// Allocates an unmanaged aligned memory block.
     /// </summary>
     /// <param name="size">The number of bytes to allocate.</param>
-    /// <param name="align">The requested byte alignment.</param>
     /// <returns>A pointer to the allocated memory block.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static IntPtr Alloc(int size) => Operation.Alloc(size);
@@ -57,7 +57,7 @@ public sealed unsafe class Native
     /// <typeparam name="T">The value type to inspect.</typeparam>
     /// <returns>The alignment in bytes (1, 2, 4, or 8).</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static int GetAlignment<T>() => GetAlignment((int) GetStackSize<T>());
+    public static byte GetAlignment<T>() => GetAlignment((int)GetStackSize<T>());
 
     /// <summary>
     /// Gets an alignment value based on a byte size.
@@ -65,7 +65,7 @@ public sealed unsafe class Native
     /// <param name="size">The byte size to evaluate.</param>
     /// <returns>The alignment in bytes (1, 2, 4, or 8).</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static int GetAlignment(int size)
+    public static byte GetAlignment(int size)
     {
         if ((size & 7) == 0)
         {
@@ -77,7 +77,7 @@ public sealed unsafe class Native
             return 4;
         }
 
-        return (size & 1) == 0 ? 2 : 1;
+        return (byte)((size & 1) == 0 ? 2 : 1);
     }
 
     /// <summary>
@@ -87,9 +87,9 @@ public sealed unsafe class Native
     /// <param name="alignment">The alignment in bytes (must be a power of 2).</param>
     /// <returns>True if the pointer is aligned; otherwise, false.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool IsAligned(void* ptr, uint alignment)
+    public static bool IsAligned(void* ptr, byte alignment)
     {
-        return ((nuint) ptr & alignment - 1) == 0;
+        return ((nuint)ptr & (uint)(alignment - 1)) == 0;
     }
 
     /// <summary>
@@ -99,7 +99,7 @@ public sealed unsafe class Native
     /// <param name="alignment">The alignment in bytes (must be a power of 2).</param>
     /// <returns>True if the reference is aligned; otherwise, false.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool IsAligned(ref byte src, uint alignment)
+    public static bool IsAligned(ref byte src, byte alignment)
     {
         fixed (byte* ptr = &src)
         {
@@ -115,14 +115,50 @@ public sealed unsafe class Native
     /// <param name="src">The source value reference.</param>
     /// <returns>A reference to the same memory interpreted as <typeparamref name="TTo"/>.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static ref TTo Cast<TFrom, TTo>(ref TFrom src) where TFrom : struct where TTo : struct
+    public static ref TTo Cast<TFrom, TTo>(ref TFrom src)
+#if NET9_0_OR_GREATER
+        where TFrom : allows ref struct
+        where TTo : allows ref struct
+#endif
     {
 #if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
         return ref System.Runtime.CompilerServices.Unsafe.As<TFrom, TTo>(ref src);
 #else
         fixed (TFrom* pSource = &src)
         {
-            return ref *(TTo*) pSource;
+            return ref *(TTo*)pSource;
+        }
+#endif
+    }
+
+    public static ref TTo Cast<TTo>(void* src)
+    {
+#if NET5_0_OR_GREATER
+        return ref System.Runtime.CompilerServices.Unsafe.AsRef<TTo>(src);
+#else
+        return ref *(TTo*)src;
+#endif
+    }
+
+    /// <summary>
+    /// Reinterprets a span of one struct type as a span of another struct type.
+    /// </summary>
+    /// <param name="src">The source span.</param>
+    /// <typeparam name="TFrom">The source struct type.</typeparam>
+    /// <typeparam name="TTo">The destination struct type.</typeparam>
+    /// <returns></returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static unsafe ref Span<TTo> Cast<TFrom, TTo>(ref Span<TFrom> src)
+    {
+#if NET9_0_OR_GREATER
+        return ref System.Runtime.CompilerServices.Unsafe.As<Span<TFrom>, Span<TTo>>(ref src);
+#else
+        fixed (TFrom* ptr = src)
+        {
+            ref var to = ref *(TTo*)ptr;
+            var result = MemoryMarshal.CreateSpan(ref to, (int)(src.Length * GetStackSize<TFrom>() / GetStackSize<TTo>()));
+
+            return ref result;
         }
 #endif
     }
@@ -134,7 +170,7 @@ public sealed unsafe class Native
     /// <param name="src">The source object reference.</param>
     /// <returns>A reference to memory interpreted as <typeparamref name="TTo"/>.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static ref TTo Cast<TTo>(object src) => ref *(TTo*) &src;
+    public static ref TTo Cast<TTo>(object src) => ref *(TTo*)&src;
 
     /// <summary>
     /// Reinterprets the bits of one struct as another struct type.
@@ -161,12 +197,15 @@ public sealed unsafe class Native
     /// <param name="value">The value to pin for the duration of the call.</param>
     /// <returns>A pointer to the value data or object reference slot.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static void* AsReference<T>(ref T value)
+    internal static void* AsPointer<T>(ref T value)
+#if NET9_0_OR_GREATER
+        where T : allows ref struct
+#endif
     {
 #if NET5_0_OR_GREATER
         return System.Runtime.CompilerServices.Unsafe.AsPointer(ref value);
 #else
-        if (typeof(T).CheckType().IsValueType)
+        if (Reflection.Type<T>.Info.IsValueType)
         {
             fixed (void* ptr = &value)
             {
@@ -176,7 +215,26 @@ public sealed unsafe class Native
 
         fixed (void* ptr = &value)
         {
-            return (void**) ptr;
+            return (void**)ptr;
+        }
+#endif
+    }
+
+    /// <summary>
+    /// Returns a pointer to the first element of a span.
+    /// </summary>
+    /// <param name="span">The span to get the pointer from.</param>
+    /// <typeparam name="T">The element type of the span.</typeparam>
+    /// <returns>A pointer to the first element of the span.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static void* AsPointer<T>(Span<T> span)
+    {
+#if NET5_0_OR_GREATER
+        return System.Runtime.CompilerServices.Unsafe.AsPointer(ref MemoryMarshal.GetReference(span));
+#else
+        fixed (void* ptr = &MemoryMarshal.GetReference(span))
+        {
+            return ptr;
         }
 #endif
     }
@@ -193,7 +251,9 @@ public sealed unsafe class Native
 #if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
         return System.Runtime.CompilerServices.Unsafe.AsPointer(ref value[0]);
 #else
+
         fixed (void* ptr = value)
+
         {
             return ptr;
         }
@@ -212,7 +272,9 @@ public sealed unsafe class Native
 #if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
         return System.Runtime.CompilerServices.Unsafe.AsPointer(ref value[0]);
 #else
+
         fixed (void* ptr = value)
+
         {
             return ptr;
         }
@@ -229,6 +291,7 @@ public sealed unsafe class Native
     public static void* GetFirstElementAddress<T>(ReadOnlySpan<T> value)
     {
         fixed (void* ptr = value)
+
         {
             return ptr;
         }
@@ -246,7 +309,9 @@ public sealed unsafe class Native
 #if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
         return System.Runtime.CompilerServices.Unsafe.AsPointer(ref structure);
 #else
+
         fixed (void* ptr = &structure)
+
         {
             return ptr;
         }
@@ -262,9 +327,11 @@ public sealed unsafe class Native
     public static void* GetAddress(object instance)
     {
 #if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
-        return *(void**) System.Runtime.CompilerServices.Unsafe.AsPointer(ref instance);
+        return *(void**)System.Runtime.CompilerServices.Unsafe.AsPointer(ref instance);
 #else
-        return *(void**) &instance;
+
+        return *(void**)&instance;
+
 #endif
     }
 
@@ -280,8 +347,10 @@ public sealed unsafe class Native
 #if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
         return System.Runtime.CompilerServices.Unsafe.IsAddressLessThan(ref System.Runtime.CompilerServices.Unsafe.AsRef(in left), ref System.Runtime.CompilerServices.Unsafe.AsRef(in right));
 #else
+
         fixed (void* leftPtr = &left)
         fixed (void* rightPtr = &right)
+
         {
             return leftPtr < rightPtr;
         }
@@ -300,8 +369,10 @@ public sealed unsafe class Native
 #if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
         return System.Runtime.CompilerServices.Unsafe.IsAddressGreaterThan(ref System.Runtime.CompilerServices.Unsafe.AsRef(in left), ref System.Runtime.CompilerServices.Unsafe.AsRef(in right));
 #else
+
         fixed (void* leftPtr = &left)
         fixed (void* rightPtr = &right)
+
         {
             return leftPtr > rightPtr;
         }
@@ -320,8 +391,10 @@ public sealed unsafe class Native
 #if NET10_0_OR_GREATER
         return System.Runtime.CompilerServices.Unsafe.IsAddressLessThanOrEqualTo(ref System.Runtime.CompilerServices.Unsafe.AsRef(in left), ref System.Runtime.CompilerServices.Unsafe.AsRef(in right));
 #else
+
         fixed (void* leftPtr = &left)
         fixed (void* rightPtr = &right)
+
         {
             return leftPtr <= rightPtr;
         }
@@ -360,8 +433,10 @@ public sealed unsafe class Native
 #if NET6_0_OR_GREATER
         return System.Runtime.CompilerServices.Unsafe.AreSame(ref System.Runtime.CompilerServices.Unsafe.AsRef(in left), ref System.Runtime.CompilerServices.Unsafe.AsRef(in right));
 #else
+
         fixed (void* leftPtr = &left)
         fixed (void* rightPtr = &right)
+
         {
             return leftPtr == rightPtr;
         }
@@ -381,9 +456,11 @@ public sealed unsafe class Native
 #if NET6_0_OR_GREATER
         return ref System.Runtime.CompilerServices.Unsafe.AddByteOffset(ref source, byteOffset);
 #else
+
         fixed (void* ptr = &source)
+
         {
-            var bytePtr = (byte*) ptr;
+            var bytePtr = (byte*)ptr;
             var a = bytePtr + byteOffset;
             return ref AsRef<T>(a);
         }
@@ -403,12 +480,14 @@ public sealed unsafe class Native
 #if NET6_0_OR_GREATER
         return ref System.Runtime.CompilerServices.Unsafe.Add(ref source, elementOffset);
 #else
+
         fixed (void* ptr = &source)
         {
-            var bytePtr = (byte*) ptr;
-            var a = bytePtr + (int) elementOffset * sizeof(T);
-            return ref *(T*) a;
+            var bytePtr = (byte*)ptr;
+            var a = bytePtr + (int)elementOffset * sizeof(T);
+            return ref *(T*)a;
         }
+
 #endif
     }
 
@@ -423,10 +502,12 @@ public sealed unsafe class Native
     public static void* Add<T>(void* source, nint elementOffset) where T : struct
     {
 #if NET6_0_OR_GREATER
-        return System.Runtime.CompilerServices.Unsafe.Add<T>(source, (int) elementOffset);
+        return System.Runtime.CompilerServices.Unsafe.Add<T>(source, (int)elementOffset);
 #else
-        var bytePtr = (byte*) source;
-        return bytePtr + (uint) elementOffset * sizeof(T);
+        var bytePtr = (byte*)source;
+
+        return bytePtr + (uint)elementOffset * sizeof(T);
+
 #endif
     }
 
@@ -496,7 +577,7 @@ public sealed unsafe class Native
     /// <param name="source">The boxed object.</param>
     /// <returns>A pointer to the object data payload.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void* Unbox(object source) => (byte*) GetAddress(source) + IntPtr.Size;
+    public static void* Unbox(object source) => (byte*)GetAddress(source) + IntPtr.Size;
 
     /// <summary>
     /// Reinterprets an unmanaged pointer as a managed reference.
@@ -511,7 +592,9 @@ public sealed unsafe class Native
 #if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
         return ref System.Runtime.CompilerServices.Unsafe.AsRef<TResult>(ptr);
 #else
-        return ref *(TResult*) ptr;
+
+        return ref *(TResult*)ptr;
+
 #endif
     }
 
@@ -527,7 +610,9 @@ public sealed unsafe class Native
 #if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
         return ref System.Runtime.CompilerServices.Unsafe.As<TFrom, TResult>(ref MemoryMarshal.GetReference(span));
 #else
+
         fixed (void* p = span)
+
         {
             return ref AsRef<TResult>(p);
         }
@@ -546,10 +631,10 @@ public sealed unsafe class Native
 #if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
         return System.Runtime.CompilerServices.Unsafe.ReadUnaligned<T>(in source);
 #else
-        var size = (int) GetStackSize<T>();
+        var size = (int)GetStackSize<T>();
         var span = MemoryMarshal.CreateReadOnlySpan(ref source, size);
 
-        if (!IsAligned(ref source, (uint) size))
+        if (!IsAligned(ref source, (byte)(size > 128 ? 128 : size)))
         {
             Span<byte> alignedBuffer = stackalloc byte[size];
             span.CopyTo(alignedBuffer);
@@ -572,10 +657,10 @@ public sealed unsafe class Native
 #if NET5_0_OR_GREATER
         return System.Runtime.CompilerServices.Unsafe.ReadUnaligned<T>(source);
 #else
-        var size = (int) GetStackSize<T>();
+        var size = (int)GetStackSize<T>();
         var span = new Span<byte>(source, size);
 
-        if (!IsAligned(source, (uint) size))
+        if (!IsAligned(source, GetAlignment<T>()))
         {
             Span<byte> alignedBuffer = stackalloc byte[size];
             span.CopyTo(alignedBuffer);
@@ -598,7 +683,9 @@ public sealed unsafe class Native
 #if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
         return System.Runtime.CompilerServices.Unsafe.Read<T>(ptr);
 #else
-        return *(T*) ptr;
+
+        return *(T*)ptr;
+
 #endif
     }
 
@@ -629,21 +716,22 @@ public sealed unsafe class Native
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static object GetValueInternal(void* source, TypeCode typeCode, bool isValueType, uint size, Type type) => typeCode switch
     {
-        TypeCode.Boolean  => *(bool*) source,
-        TypeCode.Byte     => *(byte*) source,
-        TypeCode.Char     => *(char*) source,
-        TypeCode.DateTime => *(DateTime*) source,
-        TypeCode.Decimal  => *(decimal*) source,
-        TypeCode.Double   => *(double*) source,
-        TypeCode.Int16    => *(short*) source,
-        TypeCode.Int32    => *(int*) source,
-        TypeCode.Int64    => *(long*) source,
-        TypeCode.SByte    => *(sbyte*) source,
-        TypeCode.Single   => *(float*) source,
-        TypeCode.UInt16   => *(ushort*) source,
-        TypeCode.UInt32   => *(uint*) source,
-        TypeCode.UInt64   => *(ulong*) source,
-        _                 => isValueType ? Box(source, type, size) : *(object*) source
+        TypeCode.Boolean => *(bool*)source,
+        TypeCode.Byte => *(byte*)source,
+        TypeCode.Char => *(char*)source,
+        TypeCode.DateTime => *(DateTime*)source,
+        TypeCode.Decimal => *(decimal*)source,
+        TypeCode.Double => *(double*)source,
+        TypeCode.Int16 => *(short*)source,
+        TypeCode.Int32 => *(int*)source,
+        TypeCode.Int64 => *(long*)source,
+        TypeCode.SByte => *(sbyte*)source,
+        TypeCode.Single => *(float*)source,
+        TypeCode.UInt16 => *(ushort*)source,
+        TypeCode.UInt32 => *(uint*)source,
+        TypeCode.UInt64 => *(ulong*)source,
+
+        _ => isValueType ? Box(source, type, size) : *(object*)source
     };
 
     /// <summary>
@@ -658,7 +746,7 @@ public sealed unsafe class Native
 #if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
         System.Runtime.CompilerServices.Unsafe.Write(source, value);
 #else
-        *(TValue*) source = value;
+        *(TValue*)source = value;
 #endif
     }
 
@@ -673,9 +761,9 @@ public sealed unsafe class Native
 #if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
         System.Runtime.CompilerServices.Unsafe.WriteUnaligned(source, value);
 #else
-        var size = (int) GetStackSize<TValue>();
+        var size = (int)GetStackSize<TValue>();
         var span = new Span<byte>(source, size);
-        if (!IsAligned(source, (uint) size))
+        if (!IsAligned(source, GetAlignment<TValue>()))
         {
             Span<byte> alignedBuffer = stackalloc byte[size];
             MemoryMarshal.Cast<TValue, byte>(MemoryMarshal.CreateSpan(ref value, 1)).CopyTo(alignedBuffer);
@@ -709,7 +797,7 @@ public sealed unsafe class Native
     /// <typeparam name="TValue">The value type to write.</typeparam>
     /// <param name="source">The destination pointer.</param>
     /// <param name="value">The value to write.</param>
-    internal static void SetValueInternal<TValue>(void* source, TValue value) => *(TValue*) source = value;
+    internal static void SetValueInternal<TValue>(void* source, TValue value) => *(TValue*)source = value;
 
     /// <summary>
     /// Internal typed write dispatch for unmanaged memory.
@@ -725,46 +813,46 @@ public sealed unsafe class Native
         switch (typeCode)
         {
             case TypeCode.Boolean:
-                *(bool*) source = (bool) value;
+                *(bool*)source = (bool)value;
                 break;
             case TypeCode.Byte:
-                *(byte*) source = (byte) value;
+                *(byte*)source = (byte)value;
                 break;
             case TypeCode.Char:
-                *(char*) source = (char) value;
+                *(char*)source = (char)value;
                 break;
             case TypeCode.DateTime:
-                *(DateTime*) source = (DateTime) value;
+                *(DateTime*)source = (DateTime)value;
                 break;
             case TypeCode.Decimal:
-                *(decimal*) source = (decimal) value;
+                *(decimal*)source = (decimal)value;
                 break;
             case TypeCode.Double:
-                *(double*) source = (double) value;
+                *(double*)source = (double)value;
                 break;
             case TypeCode.Int16:
-                *(short*) source = (short) value;
+                *(short*)source = (short)value;
                 break;
             case TypeCode.Int32:
-                *(int*) source = (int) value;
+                *(int*)source = (int)value;
                 break;
             case TypeCode.Int64:
-                *(long*) source = (long) value;
+                *(long*)source = (long)value;
                 break;
             case TypeCode.SByte:
-                *(sbyte*) source = (sbyte) value;
+                *(sbyte*)source = (sbyte)value;
                 break;
             case TypeCode.Single:
-                *(float*) source = (float) value;
+                *(float*)source = (float)value;
                 break;
             case TypeCode.UInt16:
-                *(ushort*) source = (ushort) value;
+                *(ushort*)source = (ushort)value;
                 break;
             case TypeCode.UInt32:
-                *(uint*) source = (uint) value;
+                *(uint*)source = (uint)value;
                 break;
             case TypeCode.UInt64:
-                *(ulong*) source = (ulong) value;
+                *(ulong*)source = (ulong)value;
                 break;
             default:
                 if (isValueType)

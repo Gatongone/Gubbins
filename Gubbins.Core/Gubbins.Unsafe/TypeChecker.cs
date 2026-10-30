@@ -19,64 +19,79 @@ public struct TypeChecker
     private const TypeAttributes ATTRIB_FOR_STATIC_CLASS = TypeAttributes.Abstract | TypeAttributes.Sealed | TypeAttributes.BeforeFieldInit;
 
     /// <summary>
-    /// A static HashSet that caches types that have been determined to be unmanaged.
+    /// Caches types that have been determined to be unmanaged.
     /// </summary>
     private static readonly HashSet<Type?> s_UnmanagedTypeCache = [];
+    
+    /// <summary>
+    /// The alignment of the type in bytes, which is determined by the type's size and the platform's alignment requirements.
+    /// </summary>
+    public readonly byte Alignment;
 
     /// <summary>
-    /// A readonly boolean that indicates whether the type is a class.
+    /// The fixed size of the type in bytes, which is determined by whether the type is a class or a value type.
+    /// </summary>
+    public readonly nuint FixedSize;
+
+    /// <summary>
+    /// The size of the type in bytes.
+    /// </summary>
+    public readonly nuint Size;
+
+    /// <summary>
+    /// Indicates whether the type is a class.
     /// </summary>
     public readonly bool IsClass;
 
     /// <summary>
-    /// A readonly boolean that indicates whether the type is a value type.
+    /// Indicates whether the type is a value type.
     /// </summary>
     public readonly bool IsValueType;
 
     /// <summary>
-    /// A readonly boolean that indicates whether the type is a managed type, which is determined by checking if it is not a primitive, enum, or pointer, and is a value type that is not unmanaged.
+    /// Indicates whether the type is a managed type, which is determined by checking if it is not a primitive, enum, or pointer, and is a value type that is not unmanaged.
     /// </summary>
     public readonly bool IsManagedType;
 
     /// <summary>
-    /// A readonly boolean that indicates whether the type is a primitive type, such as int, float, etc.
+    /// Indicates whether the type is a primitive type, such as int, float, etc.
     /// </summary>
     public readonly bool IsPrimitive;
 
     /// <summary>
-    /// A readonly boolean that indicates whether the type is a pointer type.
+    /// Indicates whether the type is a pointer type.
     /// </summary>
     public readonly bool IsPointer;
 
     /// <summary>
-    /// A readonly boolean that indicates whether the type is an enum type.
+    /// Indicates whether the type is an enum type.
     /// </summary>
     public readonly bool IsEnum;
 
     /// <summary>
-    /// A readonly boolean that indicates whether the type is an abstract class.
+    /// Indicates whether the type is an abstract class.
     /// </summary>
     public readonly bool IsAbstract;
 
     /// <summary>
-    /// A readonly boolean that indicates whether the type is an interface.
+    /// Indicates whether the type is an interface.
     /// </summary>
     public readonly bool IsInterface;
 
     /// <summary>
-    /// A readonly boolean that indicates whether the type is a static class, which is determined by checking
+    /// Indicates whether the type is a static class, which is determined by checking
     /// if the type's attributes match the combination of TypeAttributes for a static class.
     /// </summary>
     public readonly bool IsStatic;
 
     /// <summary>
-    /// A readonly boolean that indicates whether the type is a number type, which is determined by checking
+    /// Indicates whether the type is a number type, which is determined by checking
     /// if it is a primitive type and matches one of the common numeric types (byte, sbyte, int, uint, long, ulong, double, float, decimal).
     /// </summary>
     public readonly bool IsNumberType;
 
     /// <summary>
-    /// A readonly boolean that indicates whether the type is a generic type.
+    /// Indicates whether the type is a generic type.
     /// </summary>
     public readonly bool IsGeneric;
 
@@ -87,7 +102,10 @@ public struct TypeChecker
     /// <param name="type"></param>
     public TypeChecker(Type type)
     {
+        Size          = Native.GetStackSize(type);
+        Alignment     = Native.GetAlignment((int)Size);
         IsClass       = type.IsClass;
+        FixedSize     = type.IsClass ? (nuint)IntPtr.Size * 2 + Size : Size;
         IsValueType   = type.IsValueType;
         IsPrimitive   = type.IsPrimitive;
         IsPointer     = type.IsPointer;
@@ -97,7 +115,7 @@ public struct TypeChecker
         IsManagedType = !IsPrimitive && !IsEnum && !IsPointer && IsValueType && !CheckIsTypeUnmanaged(type);
         IsStatic      = (ATTRIB_FOR_STATIC_CLASS & type.Attributes) == type.Attributes || (ATTRIB_FOR_STATIC_CLASS & type.Attributes) == ATTRIB_FOR_STATIC_CLASS;
         IsGeneric     = type.IsGenericType;
-        IsNumberType = IsPrimitive && (
+        IsNumberType  = IsPrimitive && (
             type == typeof(byte) ||
             type == typeof(sbyte) ||
             type == typeof(int) ||
