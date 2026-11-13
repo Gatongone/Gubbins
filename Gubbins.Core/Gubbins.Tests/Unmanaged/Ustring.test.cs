@@ -23,7 +23,7 @@ public class UstringTests
         var input = "Hello";
 
         // Act
-        using var ustr = new Ustring(input);
+        using var ustr = new Ustring(input, TestAllocator.Shared);
 
         // Assert
         Assert.Multiple(() =>
@@ -41,7 +41,7 @@ public class UstringTests
     public void Constructor_FromNullString_UsesEmptyString()
     {
         // Act
-        using var ustr = new Ustring((string) null!);
+        using var ustr = new Ustring((string) null!, TestAllocator.Shared);
 
         // Assert
         Assert.That(ustr.Length, Is.EqualTo(0));
@@ -55,7 +55,7 @@ public class UstringTests
         var input = "World".ToArray().AsSpan();
 
         // Act
-        using var ustr = new Ustring(input);
+        using var ustr = new Ustring(input, TestAllocator.Shared);
 
         // Assert
         Assert.That(ustr.Length, Is.EqualTo(input.Length));
@@ -73,7 +73,7 @@ public class UstringTests
         var input = "Test";
 
         // Act
-        Ustring ustr = input;
+        var ustr = new Ustring(input, TestAllocator.Shared);
 
         // Assert
         Assert.That(ustr.ToString(), Is.EqualTo(input));
@@ -83,7 +83,7 @@ public class UstringTests
     public void ImplicitOperator_ToString_Works()
     {
         // Arrange
-        using var ustr = new Ustring("Implicit");
+        using var ustr = new Ustring("Implicit", TestAllocator.Shared);
 
         // Act
         string result = ustr;
@@ -96,7 +96,7 @@ public class UstringTests
     public void ImplicitOperator_ToReadOnlySpan_Works()
     {
         // Arrange
-        using var ustr = new Ustring("SpanTest");
+        using var ustr = new Ustring("SpanTest", TestAllocator.Shared);
 
         // Act
         ReadOnlySpan<char> span = ustr;
@@ -109,7 +109,7 @@ public class UstringTests
     public void ImplicitOperator_ToSpan_Works()
     {
         // Arrange
-        using var ustr = new Ustring("MutableSpan");
+        using var ustr = new Ustring("MutableSpan", TestAllocator.Shared);
 
         // Act
         Span<char> span = ustr;
@@ -122,7 +122,7 @@ public class UstringTests
     public void Indexer_AccessesCharacters()
     {
         // Arrange
-        using var ustr = new Ustring("Index");
+        using var ustr = new Ustring("Index", TestAllocator.Shared);
         Assert.Multiple(() =>
         {
             // Act & Assert
@@ -136,7 +136,7 @@ public class UstringTests
     public void Dispose_MarksAsDisposedAndReturnsToPool()
     {
         // Arrange
-        using var ustr = new Ustring("Disposable");
+        using var ustr = new Ustring("Disposable", TestAllocator.Shared);
 
         // Act
         ustr.Dispose();
@@ -152,7 +152,7 @@ public class UstringTests
     public void Clone_CreatesIndependentCopy()
     {
         // Arrange
-        var original = new Ustring("CloneMe");
+        var original = new Ustring("CloneMe", TestAllocator.Shared);
 
         // Act
         var clone = original.Clone();
@@ -177,7 +177,7 @@ public class UstringTests
     public void AsSpan_ReturnsCorrectSpan()
     {
         // Arrange
-        using var ustr = new Ustring("SpanMethods");
+        using var ustr = new Ustring("SpanMethods", TestAllocator.Shared);
 
         // Act
         var span = ustr.AsSpan();
@@ -191,7 +191,7 @@ public class UstringTests
     public void AsSpan_WithStart_ReturnsSlicedSpan()
     {
         // Arrange
-        using var ustr = new Ustring("Sliced");
+        using var ustr = new Ustring("Sliced", TestAllocator.Shared);
 
         // Act
         var span = ustr.AsSpan(2);
@@ -205,7 +205,7 @@ public class UstringTests
     public void AsSpan_WithStartAndLength_ReturnsSlicedSpan()
     {
         // Arrange
-        using var ustr = new Ustring("Substring");
+        using var ustr = new Ustring("Substring", TestAllocator.Shared);
 
         // Act
         var span = ustr.AsSpan(3, 5);
@@ -218,7 +218,7 @@ public class UstringTests
     public void AsSpan_WithRange_ReturnsSlicedSpan()
     {
         // Arrange
-        using var ustr = new Ustring("RangeTest");
+        using var ustr = new Ustring("RangeTest", TestAllocator.Shared);
 
         // Act
         var span = ustr.AsSpan(0..5);
@@ -231,7 +231,7 @@ public class UstringTests
     public void AsReadOnlySpan_BehavesLikeAsSpan()
     {
         // Arrange
-        using var ustr = new Ustring("ReadOnly");
+        using var ustr = new Ustring("ReadOnly", TestAllocator.Shared);
 
         // Act
         var roSpan = ustr.AsReadOnlySpan();
@@ -244,7 +244,7 @@ public class UstringTests
     public void GetPinnableReference_ReturnsFirstCharRef()
     {
         // Arrange
-        using var ustr = new Ustring("Pinned");
+        using var ustr = new Ustring("Pinned", TestAllocator.Shared);
 
         // Act
         ref var first = ref ustr.GetPinnableReference();
@@ -257,7 +257,7 @@ public class UstringTests
     public void Equals_WithString_Matches()
     {
         // Arrange
-        using var ustr = new Ustring("Equal");
+        using var ustr = new Ustring("Equal", TestAllocator.Shared);
         var other = "Equal";
         Assert.Multiple(() =>
         {
@@ -271,13 +271,13 @@ public class UstringTests
     public void Equals_WithUstring_Matches()
     {
         // Arrange
-        using var ustr1 = new Ustring("Match");
-        using var ustr2 = new Ustring("Match");
+        using var ustr1 = new Ustring("Match", TestAllocator.Shared);
+        using var ustr2 = new Ustring("Match", TestAllocator.Shared);
         Assert.Multiple(() =>
         {
             // Act & Assert
             Assert.That(ustr1.Equals(ustr2), Is.True);
-            Assert.That(ustr1.Equals(new Ustring("NoMatch")), Is.False);
+            Assert.That(ustr1.Equals(new Ustring("NoMatch", TestAllocator.Shared)), Is.False);
         });
     }
 
@@ -285,7 +285,7 @@ public class UstringTests
     public void Equals_WithReadOnlySpan_Matches()
     {
         // Arrange
-        using var ustr = new Ustring("SpanEqual");
+        using var ustr = new Ustring("SpanEqual", TestAllocator.Shared);
         var span = "SpanEqual".AsSpan();
         // Act & Assert
         Assert.That(ustr.Equals(span), Is.True);
@@ -296,7 +296,7 @@ public class UstringTests
     public void Operator_Equality_WithString_Works()
     {
         // Arrange
-        using var ustr = new Ustring("OpEqual");
+        using var ustr = new Ustring("OpEqual", TestAllocator.Shared);
         Assert.Multiple(() =>
         {
             // Act & Assert
@@ -309,13 +309,13 @@ public class UstringTests
     public void Operator_Equality_WithUstring_Works()
     {
         // Arrange
-        using var ustr1 = new Ustring("UOp");
-        using var ustr2 = new Ustring("UOp");
+        using var ustr1 = new Ustring("UOp", TestAllocator.Shared);
+        using var ustr2 = new Ustring("UOp", TestAllocator.Shared);
         Assert.Multiple(() =>
         {
             // Act & Assert
             Assert.That(ustr1 == ustr2, Is.True);
-            Assert.That(ustr1 != new Ustring("No"), Is.True);
+            Assert.That(ustr1 != new Ustring("No", TestAllocator.Shared), Is.True);
         });
     }
 
@@ -323,7 +323,7 @@ public class UstringTests
     public void Operator_Equality_WithSpan_Works()
     {
         // Arrange
-        using var ustr = new Ustring("SpanOp");
+        using var ustr = new Ustring("SpanOp", TestAllocator.Shared);
         var span = "SpanOp".AsSpan();
         // Act & Assert
         Assert.That(ustr == span, Is.True);
@@ -335,8 +335,8 @@ public class UstringTests
     public void Operator_Addition_UstringUstring_Works()
     {
         // Arrange
-        var left = new Ustring("Hello");
-        var right = new Ustring("World");
+        var left = new Ustring("Hello", TestAllocator.Shared);
+        var right = new Ustring("World", TestAllocator.Shared);
 
         // Act
         var result = left + right;
@@ -352,7 +352,7 @@ public class UstringTests
     public void Operator_Addition_UstringSpan_Works()
     {
         // Arrange
-        var left = new Ustring("Prefix");
+        var left = new Ustring("Prefix", TestAllocator.Shared);
         var right = "Suffix".AsSpan();
 
         // Act
@@ -367,7 +367,7 @@ public class UstringTests
     {
         // Arrange
         var left = "Pre";
-        var right = new Ustring("Suf");
+        var right = new Ustring("Suf", TestAllocator.Shared);
 
         // Act
         var result = left + right;
@@ -380,10 +380,10 @@ public class UstringTests
     public void Join_WithCharSeparator_Works()
     {
         // Arrange
-        var values = new[] {new Ustring("A"), new Ustring("B"), new Ustring("C")};
+        var values = new[] {new Ustring("A", TestAllocator.Shared), new Ustring("B", TestAllocator.Shared), new Ustring("C", TestAllocator.Shared)};
 
         // Act
-        var result = Ustring.Join(',', values);
+        var result = Ustring.Join(TestAllocator.Shared, ',', values);
 
         // Assert
         Assert.That(result.ToString(), Is.EqualTo("A,B,C"));
@@ -396,7 +396,7 @@ public class UstringTests
         var values = new[] {"X", "Y", "Z"};
 
         // Act
-        var result = Ustring.Join(" - ".AsSpan(), values);
+        var result = Ustring.Join(TestAllocator.Shared, " - ".AsSpan(), values);
 
         // Assert
         Assert.That(result.ToString(), Is.EqualTo("X - Y - Z"));
@@ -406,10 +406,10 @@ public class UstringTests
     public void Join_WithDisposeAll_DisposesInputs()
     {
         // Arrange
-        var values = new[] {new Ustring("DisposeTest1"), new Ustring("DisposeTest2")};
+        var values = new[] {new Ustring("DisposeTest1", TestAllocator.Shared), new Ustring("DisposeTest2", TestAllocator.Shared)};
 
         // Act
-        var result = Ustring.Join('-', true, values);
+        var result = Ustring.Join(TestAllocator.Shared, '-', true, values);
 
         // Assert
         Assert.That(result.ToString(), Is.EqualTo("DisposeTest1-DisposeTest2"));
@@ -420,10 +420,10 @@ public class UstringTests
     public void Concat_WithUstrings_Works()
     {
         // Arrange
-        var strings = new[] {new Ustring("Cat"), new Ustring("One"), new Ustring("Two")};
+        var strings = new[] {new Ustring("Cat", TestAllocator.Shared), new Ustring("One", TestAllocator.Shared), new Ustring("Two", TestAllocator.Shared)};
 
         // Act
-        var result = Ustring.Concat(strings);
+        var result = Ustring.Concat(TestAllocator.Shared, strings);
 
         // Assert
         Assert.That(result.ToString(), Is.EqualTo("CatOneTwo"));
@@ -433,10 +433,10 @@ public class UstringTests
     public void Concat_WithDisposeOrigin_DisposesInputs()
     {
         // Arrange
-        var strings = new[] {new Ustring("Disp"), new Ustring("Cat")};
+        var strings = new[] {new Ustring("Disp", TestAllocator.Shared), new Ustring("Cat", TestAllocator.Shared)};
 
         // Act
-        var result = Ustring.Concat(true, strings);
+        var result = Ustring.Concat(TestAllocator.Shared, true, strings);
 
         // Assert
         Assert.That(result.ToString(), Is.EqualTo("DispCat"));
@@ -446,7 +446,7 @@ public class UstringTests
     public void Concat_WithSpans_Works()
     {
         // Act
-        var result = Ustring.Concat(true, "Span".ToUstring(), "Cut".ToUstring());
+        var result = Ustring.Concat(TestAllocator.Shared, true, "Span".ToUstring(TestAllocator.Shared), "Cut".ToUstring(TestAllocator.Shared));
 
         // Assert
         Assert.That(result.ToString(), Is.EqualTo("SpanCut"));
@@ -456,7 +456,7 @@ public class UstringTests
     public void Format_WithSingleArg_Works()
     {
         // Act
-        using var result = Ustring.Format("Value: {0}", 42);
+        using var result = Ustring.Format(TestAllocator.Shared, "Value: {0}", 42);
 
         // Assert
         Assert.That(result.ToString(), Is.EqualTo("Value: 42"));
@@ -466,7 +466,7 @@ public class UstringTests
     public void Format_WithMultipleArgs_Works()
     {
         // Act
-        using var result = Ustring.Format("A: {0}, B: {1}, C: {2}", "first", 2.05, true);
+        using var result = Ustring.Format(TestAllocator.Shared, "A: {0}, B: {1}, C: {2}", "first", 2.05, true);
 
         // Assert
         Assert.That(result.ToString(), Is.EqualTo("A: first, B: 2.05, C: true"));
@@ -476,7 +476,7 @@ public class UstringTests
     public void Extension_Trim_RemovesWhitespace()
     {
         // Arrange
-        var ustr = new Ustring("  TrimMe  ");
+        var ustr = new Ustring("  TrimMe  ", TestAllocator.Shared);
 
         // Act
         var result = ustr.Trim();
@@ -493,7 +493,7 @@ public class UstringTests
     public void Extension_TrimStart_RemovesLeadingWhitespace()
     {
         // Arrange
-        var ustr = new Ustring("   Start");
+        var ustr = new Ustring("   Start", TestAllocator.Shared);
 
         // Act
         var result = ustr.TrimStart();
@@ -507,7 +507,7 @@ public class UstringTests
     public void Extension_TrimEnd_RemovesTrailingWhitespace()
     {
         // Arrange
-        var ustr = new Ustring("End   ");
+        var ustr = new Ustring("End   ", TestAllocator.Shared);
 
         // Act
         var result = ustr.TrimEnd();
@@ -521,7 +521,7 @@ public class UstringTests
     public void Extension_ToUpper_ConvertsCase()
     {
         // Arrange
-        var ustr = new Ustring("lowercase");
+        var ustr = new Ustring("lowercase", TestAllocator.Shared);
 
         // Act
         var result = ustr.ToUpper();
@@ -535,7 +535,7 @@ public class UstringTests
     public void Extension_ToLower_ConvertsCase()
     {
         // Arrange
-        var ustr = new Ustring("UPPERCASE");
+        var ustr = new Ustring("UPPERCASE", TestAllocator.Shared);
 
         // Act
         var result = ustr.ToLower();
@@ -549,7 +549,7 @@ public class UstringTests
     public void Extension_Replace_CharToChar_Works()
     {
         // Arrange
-        var ustr = new Ustring("Replace Me");
+        var ustr = new Ustring("Replace Me", TestAllocator.Shared);
 
         // Act
         var result = ustr.Replace('e', 'E');
@@ -564,7 +564,7 @@ public class UstringTests
     public void Extension_Replace_SpanToSpan_Works()
     {
         // Arrange
-        var ustr = new Ustring("Hello World, Hello!");
+        var ustr = new Ustring("Hello World, Hello!", TestAllocator.Shared);
 
         // Act
         var result = ustr.Replace("Hello", "Hi");
@@ -578,7 +578,7 @@ public class UstringTests
     public void Extension_Contains_Char_Found()
     {
         // Arrange
-        var ustr = new Ustring("MayContains a");
+        var ustr = new Ustring("MayContains a", TestAllocator.Shared);
         Assert.Multiple(() =>
         {
             // Act & Assert
@@ -592,7 +592,7 @@ public class UstringTests
     public void Extension_Contains_Span_Found()
     {
         // Arrange
-        var ustr = new Ustring("MayContains this");
+        var ustr = new Ustring("MayContains this", TestAllocator.Shared);
         Assert.Multiple(() =>
         {
             // Act & Assert
@@ -606,7 +606,7 @@ public class UstringTests
     public void Extension_IndexOf_Char_Found()
     {
         // Arrange
-        var ustr = new Ustring("IndexOf");
+        var ustr = new Ustring("IndexOf", TestAllocator.Shared);
         Assert.Multiple(() =>
         {
             // Act & Assert
@@ -620,7 +620,7 @@ public class UstringTests
     public void Extension_IndexOf_Span_Found()
     {
         // Arrange
-        var ustr = new Ustring("Find Index");
+        var ustr = new Ustring("Find Index", TestAllocator.Shared);
         Assert.Multiple(() =>
         {
             // Act & Assert
@@ -634,7 +634,7 @@ public class UstringTests
     public void Extension_LastIndexOf_Char_Found()
     {
         // Arrange
-        var ustr = new Ustring("LastIndexOf f");
+        var ustr = new Ustring("LastIndexOf f", TestAllocator.Shared);
 
         // Act & Assert
         Assert.That(ustr.LastIndexOf('f'), Is.EqualTo(12));
@@ -645,7 +645,7 @@ public class UstringTests
     public void Extension_Split_CharSeparator_Works()
     {
         // Arrange
-        var ustr = new Ustring("Split,Me,Now");
+        var ustr = new Ustring("Split,Me,Now", TestAllocator.Shared);
 
         // Act
         var parts = ustr.Split(',');
@@ -665,7 +665,7 @@ public class UstringTests
     public void Extension_Split_WithOptions_RemoveEmpty()
     {
         // Arrange
-        var ustr = new Ustring(",,Hello,,World,");
+        var ustr = new Ustring(",,Hello,,World,", TestAllocator.Shared);
 
         // Act
         var parts = ustr.Split(',', StringSplitOptions.RemoveEmptyEntries);
@@ -684,7 +684,7 @@ public class UstringTests
     public void Extension_Split_WithCount_LimitsResults()
     {
         // Arrange
-        var ustr = new Ustring("One,Two,Three,Four");
+        var ustr = new Ustring("One,Two,Three,Four", TestAllocator.Shared);
 
         // Act
         var parts = ustr.Split(',', 2);
@@ -703,7 +703,7 @@ public class UstringTests
     public void Extension_Split_WithMultipleSeparators_Works()
     {
         // Arrange
-        var ustr = new Ustring("Split on chars: a b c");
+        var ustr = new Ustring("Split on chars: a b c", TestAllocator.Shared);
 
         // Act
         var parts = ustr.Split(new[] {' ', ':'});
@@ -717,7 +717,7 @@ public class UstringTests
     public void Append_Char_Works()
     {
         // Arrange
-        using var builder = new UstringBuilder();
+        using var builder = new UstringBuilder(TestAllocator.Shared);
 
         // Act
         builder.Append('A');
@@ -731,7 +731,7 @@ public class UstringTests
     public void Append_Span_Works()
     {
         // Arrange
-        using var builder = new UstringBuilder();
+        using var builder = new UstringBuilder(TestAllocator.Shared);
 
         // Act
         builder.Append("Hello".AsSpan());
@@ -745,7 +745,7 @@ public class UstringTests
     public void Append_Generic_Works()
     {
         // Arrange
-        using var builder = new UstringBuilder();
+        using var builder = new UstringBuilder(TestAllocator.Shared);
 
         // Act
         builder.Append(42);
@@ -759,7 +759,7 @@ public class UstringTests
     public void AppendFormat_SingleArg_Works()
     {
         // Arrange
-        using var builder = new UstringBuilder();
+        using var builder = new UstringBuilder(TestAllocator.Shared);
 
         // Act
         builder.AppendFormat("Value: {0}", 123);
@@ -772,7 +772,7 @@ public class UstringTests
     public void AppendFormat_MultipleArgs_Works()
     {
         // Arrange
-        using var builder = new UstringBuilder();
+        using var builder = new UstringBuilder(TestAllocator.Shared);
 
         // Act
         builder.AppendFormat("A{0}B{1}C", "X", "Y");
@@ -785,7 +785,7 @@ public class UstringTests
     public void ToChars_ReturnsUstring()
     {
         // Arrange
-        using var builder = new UstringBuilder();
+        using var builder = new UstringBuilder(TestAllocator.Shared);
         builder.Append("BuilderTest");
 
         // Act
@@ -799,7 +799,7 @@ public class UstringTests
     public void ToString_CallsToChars()
     {
         // Arrange
-        using var builder = new UstringBuilder();
+        using var builder = new UstringBuilder(TestAllocator.Shared);
         builder.Append("ToStringTest");
 
         // Act

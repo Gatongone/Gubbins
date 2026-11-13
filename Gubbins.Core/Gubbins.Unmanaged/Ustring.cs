@@ -1,19 +1,19 @@
-using Gubbins.Unsafe;
+﻿using Gubbins.Unsafe;
 using System.Buffers;
-using System.Collections.Concurrent;
 using System.Globalization;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using Gubbins.Span;
-using Gubbins.Enhance;
-using Gubbins.Spawner;
 
 namespace Gubbins.Unmanaged;
 
 /// <summary>
-/// Unmanaged string.
+/// Unmanaged string backed by memory obtained from an <see cref="Allocator"/>.
 /// </summary>
-public struct Ustring : IDisposable, IEquatable<string>, IEquatable<Ustring>
+/// <remarks>
+/// The allocator is supplied by the caller so that allocation policy is decided by the business layer.
+/// Copies of a <see cref="Ustring"/> share the same buffer; only one of them should be disposed.
+/// </remarks>
+public unsafe struct Ustring : IDisposable, IEquatable<string>, IEquatable<Ustring>
 {
     /// <summary>
     /// Represents an empty <see cref="Ustring"/> instance with no allocated memory and zero length.
@@ -22,9 +22,19 @@ public struct Ustring : IDisposable, IEquatable<string>, IEquatable<Ustring>
     public static readonly Ustring Empty = new(IntPtr.Zero, 0);
 
     /// <summary>
-    /// Unmanaged string address.
+    /// The unmanaged character buffer, or <see langword="null"/> for an empty/non-owning string.
     /// </summary>
-    internal readonly nint Address;
+    private char* m_Buffer;
+
+    /// <summary>
+    /// The allocator that owns <see cref="m_Buffer"/>.
+    /// </summary>
+    private Allocator m_Allocator;
+
+    /// <summary>
+    /// Whether <see cref="m_Buffer"/> was allocated by this instance and must be freed on dispose.
+    /// </summary>
+    private bool m_OwnsMemory;
 
     /// <summary>
     /// Whether the current String is disposed.
@@ -32,19 +42,34 @@ public struct Ustring : IDisposable, IEquatable<string>, IEquatable<Ustring>
     private bool m_IsDisposed;
 
     /// <summary>
+    /// Unmanaged string address.
+    /// </summary>
+    internal readonly nint Address
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => (nint)m_Buffer;
+    }
+
+    /// <summary>
+    /// The allocator associated with this string, used by operations that produce new strings.
+    /// </summary>
+    internal readonly Allocator MemoryAllocator
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => m_Allocator;
+    }
+
+    /// <summary>
     /// Gets the <see cref="char"/> object at a specified position in the current String.
     /// </summary>
     /// <param name="index"></param>
-    public unsafe char this[int index]
+    public char this[int index]
     {
         get
         {
-            var handle = GCHandle.FromIntPtr(Address);
-            if (handle.Target is not char[] str) throw new ObjectDisposedException(nameof(Ustring));
-            fixed (char* ptr = str)
-            {
-                return Native.AsRef<char>(ptr + index);
-            }
+            if (m_Buffer == null) throw new ObjectDisposedException(nameof(Ustring));
+            if ((uint)index >= (uint)Length) throw new IndexOutOfRangeException($"Index '{index}' out of range.");
+            return m_Buffer[index];
         }
     }
 
@@ -68,7 +93,7 @@ public struct Ustring : IDisposable, IEquatable<string>, IEquatable<Ustring>
     public bool IsValid
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => !m_IsDisposed && GCHandle.FromIntPtr(Address) is {IsAllocated: true, Target: not null};
+        get => !m_IsDisposed && m_Buffer != null;
     }
 
     /// <summary>
@@ -82,53 +107,105 @@ public struct Ustring : IDisposable, IEquatable<string>, IEquatable<Ustring>
 
     /// <summary>
     /// Initializes a new instance of the <see cref="Ustring"/> struct with the specified address and length.
+    /// The instance is a non-owning view; the caller remains responsible for the memory.
     /// </summary>
     /// <param name="address">The unmanaged memory address pointing to the character data.</param>
     /// <param name="length">The number of characters in the string.</param>
     public Ustring(nint address, int length)
     {
-        Address = address;
-        Length  = length;
+        m_Buffer     = (char*)address;
+        Length       = length;
+        m_Allocator  = default;
+        m_OwnsMemory = false;
+        m_IsDisposed = false;
     }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="Ustring"/> struct from a managed string.
-    /// Creates an unmanaged copy of the string data using the shared string pool.
+    /// Initializes a new instance of the <see cref="Ustring"/> struct from a managed string,
+    /// allocating the unmanaged copy from <paramref name="allocator"/>.
     /// </summary>
     /// <param name="value">The managed string to copy into unmanaged memory.</param>
-    public Ustring(string value)
-    {
-        if (value == null!)
-        {
-            value = "";
-        }
-
-        var str = UstringPool.Shared.Rent(value.Length, out var handle).AsSpan();
-        value.AsSpan().CopyTo(str);
-        Address = GCHandle.ToIntPtr(handle);
-        Length  = value.Length;
-    }
+    /// <param name="allocator">The allocator used to obtain the character buffer.</param>
+    public Ustring(string value, Allocator allocator) : this((value ?? string.Empty).AsSpan(), allocator) { }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="Ustring"/> struct from a span of characters.
-    /// Creates an unmanaged copy of the character data using the shared string pool.
+    /// Initializes a new instance of the <see cref="Ustring"/> struct from a span of characters,
+    /// allocating the unmanaged copy from <paramref name="allocator"/>.
     /// </summary>
     /// <param name="value">The span of characters to copy into unmanaged memory.</param>
-    public Ustring(Span<char> value)
+    /// <param name="allocator">The allocator used to obtain the character buffer.</param>
+    public Ustring(Span<char> value, Allocator allocator) : this((ReadOnlySpan<char>)value, allocator) { }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="Ustring"/> struct from a read-only span of characters,
+    /// allocating the unmanaged copy from <paramref name="allocator"/>.
+    /// </summary>
+    /// <param name="value">The span of characters to copy into unmanaged memory.</param>
+    /// <param name="allocator">The allocator used to obtain the character buffer.</param>
+    public Ustring(ReadOnlySpan<char> value, Allocator allocator)
     {
-        var str = UstringPool.Shared.Rent(value.Length, out var handle).AsSpan();
-        value.CopyTo(str);
-        Address = GCHandle.ToIntPtr(handle);
-        Length  = value.Length;
+        if (!allocator.IsValid)
+        {
+            throw new ArgumentException("A valid allocator is required to create a Ustring.", nameof(allocator));
+        }
+
+        var charCount = value.Length + 1; // Include the null terminator for interop.
+        m_Buffer = (char*)allocator.Alloc((nuint)charCount * sizeof(char), sizeof(char));
+        if (m_Buffer == null)
+        {
+            throw new OutOfMemoryException($"Unable to allocate {charCount} characters for a Ustring.");
+        }
+
+        value.CopyTo(new Span<char>(m_Buffer, value.Length));
+        m_Buffer[value.Length] = '\0';
+
+        Length       = value.Length;
+        m_Allocator  = allocator;
+        m_OwnsMemory = true;
+        m_IsDisposed = false;
     }
 
     /// <summary>
-    /// Casts a managed string to an unmanaged string.
+    /// Allocates a string buffer of the specified length from <paramref name="allocator"/> without initializing it.
     /// </summary>
-    /// <param name="str">Managed string.</param>
-    /// <returns>Unmanaged string.</returns>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static implicit operator Ustring(string str) => new(str);
+    /// <param name="length">The number of characters (excluding the null terminator).</param>
+    /// <param name="allocator">The allocator used to obtain the character buffer.</param>
+    /// <returns>A string whose characters can be written through <see cref="AsSpan()"/>.</returns>
+    internal static Ustring CreateUninitialized(int length, Allocator allocator)
+    {
+        if (!allocator.IsValid)
+        {
+            throw new ArgumentException("A valid allocator is required to create a Ustring.", nameof(allocator));
+        }
+
+        if (length < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(length));
+        }
+
+        var charCount = length + 1;
+        var buffer = (char*)allocator.Alloc((nuint)charCount * sizeof(char), sizeof(char));
+        if (buffer == null)
+        {
+            throw new OutOfMemoryException($"Unable to allocate {charCount} characters for a Ustring.");
+        }
+
+        buffer[length] = '\0';
+
+        return new Ustring(buffer, length, allocator);
+    }
+
+    /// <summary>
+    /// Initializes an owning string over an already-allocated buffer.
+    /// </summary>
+    private Ustring(char* buffer, int length, Allocator allocator)
+    {
+        m_Buffer     = buffer;
+        Length       = length;
+        m_Allocator  = allocator;
+        m_OwnsMemory = true;
+        m_IsDisposed = false;
+    }
 
     /// <summary>
     /// Casts an unmanaged string to a managed string.
@@ -158,13 +235,19 @@ public struct Ustring : IDisposable, IEquatable<string>, IEquatable<Ustring>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Dispose()
     {
-        if (m_IsDisposed || GCHandle.FromIntPtr(Address).Target is not char[] str)
+        if (m_IsDisposed)
         {
             return;
         }
 
+        if (m_OwnsMemory && m_Buffer != null && m_Allocator.IsValid)
+        {
+            m_Allocator.Free(m_Buffer, (nuint)(Length + 1) * sizeof(char), sizeof(char));
+        }
+
+        m_Buffer     = null;
+        m_OwnsMemory = false;
         m_IsDisposed = true;
-        UstringPool.Shared.Return(str);
     }
 
     /// <summary>
@@ -172,19 +255,14 @@ public struct Ustring : IDisposable, IEquatable<string>, IEquatable<Ustring>
     /// </summary>
     /// <returns>New <see cref="Ustring"/>.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Ustring Clone()
-    {
-        var str = UstringPool.Shared.Rent(Length, out var handle).AsSpan();
-        AsSpan().CopyTo(str);
-        return new Ustring(GCHandle.ToIntPtr(handle), Length);
-    }
+    public Ustring Clone() => new(AsSpan(), MemoryAllocator);
 
     /// <summary>
     /// Creates a new span over a portion of the target string from a specified position for a specified number of characters.
     /// </summary>
     /// <returns>The span representation of the string.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Span<char> AsSpan() => GCHandle.FromIntPtr(Address).Target is not char[] str ? Span<char>.Empty : str.AsSpan(0, Length);
+    public Span<char> AsSpan() => m_Buffer == null || Length == 0 ? Span<char>.Empty : new Span<char>(m_Buffer, Length);
 
     /// <summary>
     /// Creates a new span over a portion of the target string from a specified position to the end of the string.
@@ -198,7 +276,7 @@ public struct Ustring : IDisposable, IEquatable<string>, IEquatable<Ustring>
     public Span<char> AsSpan(int start)
     {
         if (start < 0 || start >= Length) throw new ArgumentOutOfRangeException(nameof(start));
-        return GCHandle.FromIntPtr(Address).Target is not char[] str ? Span<char>.Empty : str.AsSpan(start, Length - start);
+        return m_Buffer == null ? Span<char>.Empty : new Span<char>(m_Buffer + start, Length - start);
     }
 
     /// <summary>
@@ -214,8 +292,8 @@ public struct Ustring : IDisposable, IEquatable<string>, IEquatable<Ustring>
     public Span<char> AsSpan(int start, int length)
     {
         if (start < 0 || start >= Length) throw new ArgumentOutOfRangeException(nameof(start));
-        if (length < 0 || length > Length) throw new ArgumentOutOfRangeException(nameof(length));
-        return GCHandle.FromIntPtr(Address).Target is not char[] str ? Span<char>.Empty : str.AsSpan(start, length);
+        if (length < 0 || length > Length - start) throw new ArgumentOutOfRangeException(nameof(length));
+        return m_Buffer == null ? Span<char>.Empty : new Span<char>(m_Buffer + start, length);
     }
 
     /// <summary>
@@ -249,14 +327,10 @@ public struct Ustring : IDisposable, IEquatable<string>, IEquatable<Ustring>
     /// Returns a reference to the first character in the unmanaged string.
     /// </summary>
     /// <returns>First character reference.</returns>
-    public unsafe ref char GetPinnableReference()
+    public ref char GetPinnableReference()
     {
-        var handle = GCHandle.FromIntPtr(Address);
-        if (handle.Target is not char[] str) throw new ObjectDisposedException(nameof(Ustring));
-        fixed (char* ptr = str)
-        {
-            return ref Native.AsRef<char>(ptr);
-        }
+        if (m_Buffer == null) throw new ObjectDisposedException(nameof(Ustring));
+        return ref *m_Buffer;
     }
 
     /// <summary>
@@ -271,7 +345,7 @@ public struct Ustring : IDisposable, IEquatable<string>, IEquatable<Ustring>
         if (other.Length != Length) return false;
         var left = AsSpan();
         var right = other;
-        var operation = SpanOperations.GetOperation<char, ISpanEquals<char>>(SpanOperationMask.Simd);
+        var operation = SpanOperations.GetOperation<char, ISpanEquals<char>>(IterationMode.Simd);
         return operation?.EqualsAll(left, right) ?? left.SequenceEqual(right);
     }
 
@@ -288,7 +362,7 @@ public struct Ustring : IDisposable, IEquatable<string>, IEquatable<Ustring>
         var left = AsSpan();
         var right = other.AsSpan();
 
-        var operation = SpanOperations.GetOperation<char, ISpanEquals<char>>(SpanOperationMask.Simd);
+        var operation = SpanOperations.GetOperation<char, ISpanEquals<char>>(IterationMode.Simd);
         return operation?.EqualsAll(left, right) ?? left.SequenceEqual(right);
     }
 
@@ -305,7 +379,7 @@ public struct Ustring : IDisposable, IEquatable<string>, IEquatable<Ustring>
         var left = AsSpan();
         var right = other.AsSpan();
 
-        var operation = SpanOperations.GetOperation<char, ISpanEquals<char>>(SpanOperationMask.Simd);
+        var operation = SpanOperations.GetOperation<char, ISpanEquals<char>>(IterationMode.Simd);
         return operation?.EqualsAll(left, right) ?? left.SequenceEqual(right);
     }
 
@@ -408,7 +482,7 @@ public struct Ustring : IDisposable, IEquatable<string>, IEquatable<Ustring>
 
     /// <inheritdoc />
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public override string ToString() => GCHandle.FromIntPtr(Address).Target is not char[] str ? string.Empty : new string(str, 0, Length);
+    public override string ToString() => m_Buffer == null ? string.Empty : new string(m_Buffer, 0, Length);
 
     /// <summary>Concatenates an array of strings, using the specified separator between each member.</summary>
     /// <param name="separator">The character to use as a separator. <paramref name="separator" /> is included in the returned string only if <paramref name="value" /> has more than one element.</param>
@@ -421,9 +495,9 @@ public struct Ustring : IDisposable, IEquatable<string>, IEquatable<Ustring>
     /// -or-
     /// <see cref="F:System.String.Empty" /> if <paramref name="values" /> has zero elements.
     /// </returns>
-    public static Ustring Join(ReadOnlySpan<char> separator, params object[] values)
+    public static Ustring Join(Allocator allocator, ReadOnlySpan<char> separator, params object[] values)
     {
-        var builder = new UstringBuilder();
+        var builder = new UstringBuilder(allocator);
         for (var i = 0; i < values.Length; i++)
         {
             if (i > 0)
@@ -439,7 +513,7 @@ public struct Ustring : IDisposable, IEquatable<string>, IEquatable<Ustring>
 
     /// <inheritdoc cref="Join(ReadOnlySpan{char}, object[])" />
     /// <remarks>Dispose all  after joining.</remarks>
-    public static Ustring Join(ReadOnlySpan<char> separator, params Ustring[] values) => Join(separator, true, values);
+    public static Ustring Join(Allocator allocator, ReadOnlySpan<char> separator, params Ustring[] values) => Join(allocator, separator, true, values);
 
     /// <summary>Concatenates an array of strings, using the specified separator between each member.</summary>
     /// <param name="separator">The character to use as a separator. <paramref name="separator" /> is included in the returned string only if <paramref name="value" /> has more than one element.</param>
@@ -453,9 +527,9 @@ public struct Ustring : IDisposable, IEquatable<string>, IEquatable<Ustring>
     /// -or-
     /// <see cref="F:System.String.Empty" /> if <paramref name="values" /> has zero elements.
     /// </returns>
-    public static Ustring Join(ReadOnlySpan<char> separator, bool disposeAll, params Ustring[] values)
+    public static Ustring Join(Allocator allocator, ReadOnlySpan<char> separator, bool disposeAll, params Ustring[] values)
     {
-        var builder = new UstringBuilder();
+        var builder = new UstringBuilder(allocator);
         for (var i = 0; i < values.Length; i++)
         {
             var value = values[i];
@@ -475,9 +549,9 @@ public struct Ustring : IDisposable, IEquatable<string>, IEquatable<Ustring>
     }
 
     /// <inheritdoc cref="Join(ReadOnlySpan{char}, object[])" />
-    public static Ustring Join<T>(ReadOnlySpan<char> separator, params T[] values)
+    public static Ustring Join<T>(Allocator allocator, ReadOnlySpan<char> separator, params T[] values)
     {
-        var builder = new UstringBuilder();
+        var builder = new UstringBuilder(allocator);
         for (var i = 0; i < values.Length; i++)
         {
             if (i > 0)
@@ -492,9 +566,9 @@ public struct Ustring : IDisposable, IEquatable<string>, IEquatable<Ustring>
     }
 
     /// <inheritdoc cref="Join(ReadOnlySpan{char}, object[])" />
-    public static Ustring Join(ReadOnlySpan<char> separator, params string[] values)
+    public static Ustring Join(Allocator allocator, ReadOnlySpan<char> separator, params string[] values)
     {
-        var builder = new UstringBuilder();
+        var builder = new UstringBuilder(allocator);
         for (var i = 0; i < values.Length; i++)
         {
             if (i > 0)
@@ -509,9 +583,9 @@ public struct Ustring : IDisposable, IEquatable<string>, IEquatable<Ustring>
     }
 
     /// <inheritdoc cref="Join(ReadOnlySpan{char}, object[])" />
-    public static Ustring Join(char separator, params object[] values)
+    public static Ustring Join(Allocator allocator, char separator, params object[] values)
     {
-        var builder = new UstringBuilder();
+        var builder = new UstringBuilder(allocator);
         for (var i = 0; i < values.Length; i++)
         {
             if (i > 0)
@@ -526,9 +600,9 @@ public struct Ustring : IDisposable, IEquatable<string>, IEquatable<Ustring>
     }
 
     /// <inheritdoc cref="Join(ReadOnlySpan{char}, object[])" />
-    public static Ustring Join(char separator, params string[] values)
+    public static Ustring Join(Allocator allocator, char separator, params string[] values)
     {
-        var builder = new UstringBuilder();
+        var builder = new UstringBuilder(allocator);
         for (var i = 0; i < values.Length; i++)
         {
             if (i > 0)
@@ -543,12 +617,12 @@ public struct Ustring : IDisposable, IEquatable<string>, IEquatable<Ustring>
     }
 
     /// <inheritdoc cref="Join(ReadOnlySpan{char}, ReadOnlySpan{Ustring})" />
-    public static Ustring Join(char separator, params Ustring[] values) => Join(separator, true, values);
+    public static Ustring Join(Allocator allocator, char separator, params Ustring[] values) => Join(allocator, separator, true, values);
 
     /// <inheritdoc cref="Join(ReadOnlySpan{char}, bool, Ustring[])" />
-    public static Ustring Join(char separator, bool disposeAll, params Ustring[] values)
+    public static Ustring Join(Allocator allocator, char separator, bool disposeAll, params Ustring[] values)
     {
-        var builder = new UstringBuilder();
+        var builder = new UstringBuilder(allocator);
         for (var i = 0; i < values.Length; i++)
         {
             var value = values[i];
@@ -573,7 +647,7 @@ public struct Ustring : IDisposable, IEquatable<string>, IEquatable<Ustring>
     /// <param name="strings">Concat targets.</param>
     /// <returns>Conceited string.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Ustring Concat(params ReadOnlySpan<Ustring> strings) => Concat(true, strings);
+    public static Ustring Concat(Allocator allocator, params ReadOnlySpan<Ustring> strings) => Concat(allocator, true, strings);
 
     /// <summary>
     /// Concat strings.
@@ -582,9 +656,9 @@ public struct Ustring : IDisposable, IEquatable<string>, IEquatable<Ustring>
     /// <param name="strings">Concat targets.</param>
     /// <returns>Conceited string.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Ustring Concat(bool disposeOrigin, params ReadOnlySpan<Ustring> strings)
+    public static Ustring Concat(Allocator allocator, bool disposeOrigin, params ReadOnlySpan<Ustring> strings)
     {
-        using var builder = new UstringBuilder();
+        using var builder = new UstringBuilder(allocator);
         if (!disposeOrigin)
         {
             for (var index = 0; index < strings.Length; index++)
@@ -611,9 +685,9 @@ public struct Ustring : IDisposable, IEquatable<string>, IEquatable<Ustring>
     /// <param name="strings">Concat targets.</param>
     /// <returns>Conceited string.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Ustring Concat(params ReadOnlySpan<char> strings)
+    public static Ustring Concat(Allocator allocator, params ReadOnlySpan<char> strings)
     {
-        using var builder = new UstringBuilder();
+        using var builder = new UstringBuilder(allocator);
 
         for (var index = 0; index < strings.Length; index++)
         {
@@ -626,153 +700,154 @@ public struct Ustring : IDisposable, IEquatable<string>, IEquatable<Ustring>
 
     /// <inheritdoc cref="string.Format(string, object[])"/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Ustring Format<T>(string format, T arg)
+    public static Ustring Format<T>(Allocator allocator, string format, T arg)
     {
-        var builder = new UstringBuilder();
+        var builder = new UstringBuilder(allocator);
         builder.AppendFormat(format, arg);
         return builder.ToChars();
     }
 
     /// <inheritdoc cref="string.Format(string, object[])"/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Ustring Format<T1, T2>(string format, T1 arg1, T2 arg2)
+    public static Ustring Format<T1, T2>(Allocator allocator, string format, T1 arg1, T2 arg2)
     {
-        var builder = new UstringBuilder();
+        var builder = new UstringBuilder(allocator);
         builder.AppendFormat(format, arg1, arg2);
         return builder.ToChars();
     }
 
     /// <inheritdoc cref="string.Format(string, object[])"/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Ustring Format<T1, T2, T3>(string format, T1 arg1, T2 arg2, T3 arg3)
+    public static Ustring Format<T1, T2, T3>(Allocator allocator, string format, T1 arg1, T2 arg2, T3 arg3)
     {
-        var builder = new UstringBuilder();
+        var builder = new UstringBuilder(allocator);
         builder.AppendFormat(format, arg1, arg2, arg3);
         return builder.ToChars();
     }
 
     /// <inheritdoc cref="string.Format(string, object[])"/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Ustring Format<T1, T2, T3, T4>(string format, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
+    public static Ustring Format<T1, T2, T3, T4>(Allocator allocator, string format, T1 arg1, T2 arg2, T3 arg3, T4 arg4)
     {
-        var builder = new UstringBuilder();
+        var builder = new UstringBuilder(allocator);
         builder.AppendFormat(format, arg1, arg2, arg3, arg4);
         return builder.ToChars();
     }
 
     /// <inheritdoc cref="string.Format(string, object[])"/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Ustring Format<T1, T2, T3, T4, T5>(string format, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
+    public static Ustring Format<T1, T2, T3, T4, T5>(Allocator allocator, string format, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5)
     {
-        var builder = new UstringBuilder();
+        var builder = new UstringBuilder(allocator);
         builder.AppendFormat(format, arg1, arg2, arg3, arg4, arg5);
         return builder.ToChars();
     }
 
     /// <inheritdoc cref="string.Format(string, object[])"/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Ustring Format<T1, T2, T3, T4, T5, T6>(string format, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
+    public static Ustring Format<T1, T2, T3, T4, T5, T6>(Allocator allocator, string format, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6)
     {
-        var builder = new UstringBuilder();
+        var builder = new UstringBuilder(allocator);
         builder.AppendFormat(format, arg1, arg2, arg3, arg4, arg5, arg6);
         return builder.ToChars();
     }
 
     /// <inheritdoc cref="string.Format(string, object[])"/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Ustring Format<T1, T2, T3, T4, T5, T6, T7>(string format, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7)
+    public static Ustring Format<T1, T2, T3, T4, T5, T6, T7>(Allocator allocator, string format, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7)
     {
-        var builder = new UstringBuilder();
+        var builder = new UstringBuilder(allocator);
         builder.AppendFormat(format, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
         return builder.ToChars();
     }
 
     /// <inheritdoc cref="string.Format(string, object[])"/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Ustring Format<T1, T2, T3, T4, T5, T6, T7, T8>(string format, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8)
+    public static Ustring Format<T1, T2, T3, T4, T5, T6, T7, T8>(Allocator allocator, string format, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8)
     {
-        var builder = new UstringBuilder();
+        var builder = new UstringBuilder(allocator);
         builder.AppendFormat(format, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
         return builder.ToChars();
     }
 
     /// <inheritdoc cref="string.Format(string, object[])"/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Ustring Format<T1, T2, T3, T4, T5, T6, T7, T8, T9>(string format, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9)
+    public static Ustring Format<T1, T2, T3, T4, T5, T6, T7, T8, T9>(Allocator allocator, string format, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9)
     {
-        var builder = new UstringBuilder();
+        var builder = new UstringBuilder(allocator);
         builder.AppendFormat(format, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
         return builder.ToChars();
     }
 
     /// <inheritdoc cref="string.Format(string, object[])"/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Ustring Format<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(string format, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10)
+    public static Ustring Format<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(Allocator allocator, string format, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10)
     {
-        var builder = new UstringBuilder();
+        var builder = new UstringBuilder(allocator);
         builder.AppendFormat(format, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
         return builder.ToChars();
     }
 
     /// <inheritdoc cref="string.Format(string, object[])"/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Ustring Format<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11>(string format, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10, T11 arg11)
+    public static Ustring Format<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11>(Allocator allocator, string format, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10, T11 arg11)
     {
-        var builder = new UstringBuilder();
+        var builder = new UstringBuilder(allocator);
         builder.AppendFormat(format, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11);
         return builder.ToChars();
     }
 
     /// <inheritdoc cref="string.Format(string, object[])"/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Ustring Format<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12>(string format, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10, T11 arg11, T12 arg12)
+    public static Ustring Format<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12>(Allocator allocator, string format, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10, T11 arg11, T12 arg12)
     {
-        var builder = new UstringBuilder();
+        var builder = new UstringBuilder(allocator);
         builder.AppendFormat(format, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12);
         return builder.ToChars();
     }
 
     /// <inheritdoc cref="string.Format(string, object[])"/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Ustring Format<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13>(string format, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10, T11 arg11, T12 arg12, T13 arg13)
+    public static Ustring Format<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13>(Allocator allocator, string format, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10, T11 arg11, T12 arg12, T13 arg13)
     {
-        var builder = new UstringBuilder();
+        var builder = new UstringBuilder(allocator);
         builder.AppendFormat(format, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13);
         return builder.ToChars();
     }
 
     /// <inheritdoc cref="string.Format(string, object[])"/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Ustring Format<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14>(string format, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10, T11 arg11, T12 arg12, T13 arg13, T14 arg14)
+    public static Ustring Format<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14>(Allocator allocator, string format, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10, T11 arg11, T12 arg12, T13 arg13, T14 arg14)
     {
-        var builder = new UstringBuilder();
+        var builder = new UstringBuilder(allocator);
         builder.AppendFormat(format, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14);
         return builder.ToChars();
     }
 
     /// <inheritdoc cref="string.Format(string, object[])"/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Ustring Format<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15>(string format, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10, T11 arg11, T12 arg12, T13 arg13, T14 arg14, T15 arg15)
+    public static Ustring Format<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15>(Allocator allocator, string format, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10, T11 arg11, T12 arg12, T13 arg13, T14 arg14, T15 arg15)
     {
-        var builder = new UstringBuilder();
+        var builder = new UstringBuilder(allocator);
         builder.AppendFormat(format, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15);
         return builder.ToChars();
     }
 
     /// <inheritdoc cref="string.Format(string, object[])"/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Ustring Format<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16>(string format, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10, T11 arg11, T12 arg12, T13 arg13, T14 arg14, T15 arg15, T16 arg16)
+    public static Ustring Format<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16>(Allocator allocator, string format, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5, T6 arg6, T7 arg7, T8 arg8, T9 arg9, T10 arg10, T11 arg11, T12 arg12, T13 arg13, T14 arg14, T15 arg15, T16 arg16)
     {
-        var builder = new UstringBuilder();
+        var builder = new UstringBuilder(allocator);
         builder.AppendFormat(format, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12, arg13, arg14, arg15, arg16);
         return builder.ToChars();
     }
 }
 
 /// <inheritdoc cref="System.Text.StringBuilder"/>
-public ref struct UstringBuilder() : IDisposable
+/// <param name="allocator">The allocator used for the temporary and result character buffers.</param>
+public ref struct UstringBuilder(Allocator allocator) : IDisposable
 {
-    private UstringWriter m_Writer = new();
+    private UstringWriter m_Writer = new(allocator);
 
     /// <summary>
     /// Converts the value of this instance to a <see cref="Ustring"/>.
@@ -2280,28 +2355,30 @@ public ref struct UstringBuilder() : IDisposable
 public static unsafe class UstringExtensions
 {
     /// <summary>
-    /// Converts a managed string to an unmanaged string.
+    /// Converts a managed string to an unmanaged string using the specified allocator.
     /// </summary>
     /// <param name="str">Managed string.</param>
+    /// <param name="allocator">The allocator used to obtain the character buffer.</param>
     /// <returns>Unmanaged string.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Ustring ToUstring(this string str) => new(str);
+    public static Ustring ToUstring(this string str, Allocator allocator) => new(str, allocator);
 
     /// <summary>
     /// Converts a <see cref="Ustring"/> to a <see cref="Uarray{T}"/> of characters.
     /// </summary>
     /// <param name="str">The <see cref="Ustring"/> to convert.</param>
+    /// <param name="allocator">The allocator used for the new array.</param>
     /// <param name="disposeOrigin">
-    /// <see langword="true"/> to dispose the original <see cref="Ustring"/> after conversion; 
+    /// <see langword="true"/> to dispose the original <see cref="Ustring"/> after conversion;
     /// otherwise, <see langword="false"/>. Default is <see langword="true"/>.
     /// </param>
     /// <returns>
     /// A new <see cref="Uarray{T}"/> of characters containing the same character data as the input <see cref="Ustring"/>.
     /// </returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static Uarray<char> ToUarray(this ref Ustring str, bool disposeOrigin = true)
+    public static Uarray<char> ToUarray(this ref Ustring str, Allocator allocator, bool disposeOrigin = true)
     {
-        var result = new Uarray<char>(str);
+        var result = new Uarray<char>((ReadOnlySpan<char>)str, allocator);
         if (disposeOrigin)
         {
             str.Dispose();
@@ -2324,7 +2401,7 @@ public static unsafe class UstringExtensions
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Ustring ToUstring(this Uarray<char> array, bool disposeOrigin = true)
     {
-        var result = new Ustring(array);
+        var result = new Ustring(array.AsSpan(), array.MemoryAllocator);
         if (disposeOrigin)
         {
             array.Dispose();
@@ -2345,7 +2422,6 @@ public static unsafe class UstringExtensions
     /// <param name="disposeOrigin">True then dispose origin <see cref="Ustring"/>.</param>
     /// <returns>
     /// A new string that is equivalent to this instance, but right-aligned and padded on the left with
-    /// as many <paramref name="paddingChar" /> characters as needed to create a length of <paramref name="totalWidth" />.
     /// However, if <paramref name="totalWidth" /> is less than the length of this instance, the method returns a reference
     /// to the existing instance. If <paramref name="totalWidth" /> is equal to the length of this instance,
     /// the method returns a new string that is identical to this instance.
@@ -2375,15 +2451,16 @@ public static unsafe class UstringExtensions
     public static Ustring PadLeft(this ref Ustring str, int totalWidth, char paddingChar, bool disposeOrigin = true)
     {
         var length = str.Length + totalWidth;
-        var result = UstringPool.Shared.Rent(length, out var handle).AsSpan();
-        Native.CopyMemory((void*) str.Address, (char*) Native.GetFirstElementAddress(result) + totalWidth, (uint) str.Length * sizeof(char));
-        fixed (char* ptr = str)
+        var result = Ustring.CreateUninitialized(length, str.MemoryAllocator);
+        var span = result.AsSpan();
+        str.AsSpan().CopyTo(span.Slice(totalWidth));
+        fixed (char* ptr = span)
         {
             SetChars(ptr, totalWidth, paddingChar);
         }
 
         if (disposeOrigin) str.Dispose();
-        return new Ustring(GCHandle.ToIntPtr(handle), length);
+        return result;
     }
 
     /// <summary>
@@ -2427,15 +2504,16 @@ public static unsafe class UstringExtensions
     public static Ustring PadRight(this ref Ustring str, int totalWidth, char paddingChar, bool disposeOrigin = true)
     {
         var length = str.Length + totalWidth;
-        var result = UstringPool.Shared.Rent(length, out var handle).AsSpan();
-        Native.CopyMemory((void*) str.Address, (char*) Native.GetFirstElementAddress(result), (uint) str.Length * sizeof(char));
-        fixed (char* ptr = str)
+        var result = Ustring.CreateUninitialized(length, str.MemoryAllocator);
+        var span = result.AsSpan();
+        str.AsSpan().CopyTo(span);
+        fixed (char* ptr = span)
         {
             SetChars(ptr + str.Length, totalWidth, paddingChar);
         }
 
         if (disposeOrigin) str.Dispose();
-        return new Ustring(GCHandle.ToIntPtr(handle), length);
+        return result;
     }
 
     /// <summary>
@@ -2475,10 +2553,10 @@ public static unsafe class UstringExtensions
             throw new ArgumentOutOfRangeException(nameof(length), "Length is out of range.");
         }
 
-        var result = UstringPool.Shared.Rent(length, out var handle).AsSpan();
-        str.AsSpan(startIndex, length).CopyTo(result);
+        var result = Ustring.CreateUninitialized(length, str.MemoryAllocator);
+        str.AsSpan(startIndex, length).CopyTo(result.AsSpan());
         if (disposeOrigin) str.Dispose();
-        return new Ustring(GCHandle.ToIntPtr(handle), length);
+        return result;
     }
 
     /// <summary>Removes all leading and trailing white-space characters from the current string.</summary>
@@ -2508,7 +2586,8 @@ public static unsafe class UstringExtensions
                 --length;
             }
 
-            var result = new Ustring(new Span<char>(ptr, length));
+            var result = Ustring.CreateUninitialized(length, str.MemoryAllocator);
+            new ReadOnlySpan<char>(ptr, length).CopyTo(result.AsSpan());
             if (disposeOrigin) str.Dispose();
             return result;
         }
@@ -2542,7 +2621,8 @@ public static unsafe class UstringExtensions
                 --length;
             }
 
-            var result = new Ustring(new Span<char>(ptr, length));
+            var result = Ustring.CreateUninitialized(length, str.MemoryAllocator);
+            new ReadOnlySpan<char>(ptr, length).CopyTo(result.AsSpan());
             if (disposeOrigin) str.Dispose();
             return result;
         }
@@ -2569,7 +2649,8 @@ public static unsafe class UstringExtensions
                 --length;
             }
 
-            var result = new Ustring(new Span<char>(ptr, length));
+            var result = Ustring.CreateUninitialized(length, str.MemoryAllocator);
+            new ReadOnlySpan<char>(ptr, length).CopyTo(result.AsSpan());
             if (disposeOrigin) str.Dispose();
             return result;
         }
@@ -2597,7 +2678,8 @@ public static unsafe class UstringExtensions
                 --length;
             }
 
-            var result = new Ustring(new Span<char>(ptr, length));
+            var result = Ustring.CreateUninitialized(length, str.MemoryAllocator);
+            new ReadOnlySpan<char>(ptr, length).CopyTo(result.AsSpan());
             if (disposeOrigin) str.Dispose();
             return result;
         }
@@ -2624,7 +2706,8 @@ public static unsafe class UstringExtensions
                 --length;
             }
 
-            var result = new Ustring(new Span<char>(ptr, length));
+            var result = Ustring.CreateUninitialized(length, str.MemoryAllocator);
+            new ReadOnlySpan<char>(ptr, length).CopyTo(result.AsSpan());
             if (disposeOrigin) str.Dispose();
             return result;
         }
@@ -2652,7 +2735,8 @@ public static unsafe class UstringExtensions
                 --length;
             }
 
-            var result = new Ustring(new Span<char>(ptr, length));
+            var result = Ustring.CreateUninitialized(length, str.MemoryAllocator);
+            new ReadOnlySpan<char>(ptr, length).CopyTo(result.AsSpan());
             if (disposeOrigin) str.Dispose();
             return result;
         }
@@ -2676,7 +2760,7 @@ public static unsafe class UstringExtensions
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Ustring Concat(this ref Ustring str, bool disposeOrigin, params ReadOnlySpan<string> others)
     {
-        using var builder = new UstringBuilder();
+        using var builder = new UstringBuilder(str.MemoryAllocator);
         builder.Append(str);
         for (var index = 0; index < others.Length; index++)
         {
@@ -2701,7 +2785,7 @@ public static unsafe class UstringExtensions
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Ustring Concat(this ref Ustring str, ReadOnlySpan<char> other, bool disposeOrigin = true)
     {
-        using var builder = new UstringBuilder();
+        using var builder = new UstringBuilder(str.MemoryAllocator);
         builder.Append(str);
         builder.Append(other);
         if (disposeOrigin) str.Dispose();
@@ -2717,17 +2801,16 @@ public static unsafe class UstringExtensions
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Ustring ToUpper(this ref Ustring str, bool disposeOrigin = true)
     {
-        var result = UstringPool.Shared.Rent(str.Length, out var handle).AsSpan();
-        fixed (char* ptr = str)
+        var result = Ustring.CreateUninitialized(str.Length, str.MemoryAllocator);
+        var source = str.AsSpan();
+        var target = result.AsSpan();
+        for (var i = 0; i < str.Length; i++)
         {
-            for (var i = 0; i < str.Length; i++)
-            {
-                result[i] = ToUpper(ptr[i]);
-            }
+            target[i] = ToUpper(source[i]);
         }
 
         if (disposeOrigin) str.Dispose();
-        return new Ustring(GCHandle.ToIntPtr(handle), str.Length);
+        return result;
     }
 
     /// <summary>
@@ -2739,17 +2822,16 @@ public static unsafe class UstringExtensions
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Ustring ToLower(this ref Ustring str, bool disposeOrigin = true)
     {
-        var result = UstringPool.Shared.Rent(str.Length, out var handle).AsSpan();
-        fixed (char* ptr = str)
+        var result = Ustring.CreateUninitialized(str.Length, str.MemoryAllocator);
+        var source = str.AsSpan();
+        var target = result.AsSpan();
+        for (var i = 0; i < str.Length; i++)
         {
-            for (var i = 0; i < str.Length; i++)
-            {
-                result[i] = ToLower(ptr[i]);
-            }
+            target[i] = ToLower(source[i]);
         }
 
         if (disposeOrigin) str.Dispose();
-        return new Ustring(GCHandle.ToIntPtr(handle), str.Length);
+        return result;
     }
 
     /// <summary>
@@ -2765,18 +2847,17 @@ public static unsafe class UstringExtensions
     /// </returns>
     public static Ustring Replace(this ref Ustring str, char oldChar, char newChar, bool disposeOrigin = true)
     {
-        var result = UstringPool.Shared.Rent(str.Length, out var handle).AsSpan();
-        fixed (char* ptr = str)
+        var result = Ustring.CreateUninitialized(str.Length, str.MemoryAllocator);
+        var source = str.AsSpan();
+        var target = result.AsSpan();
+        for (var i = 0; i < str.Length; i++)
         {
-            for (var i = 0; i < str.Length; i++)
-            {
-                var cur = ptr[i];
-                result[i] = cur == oldChar ? newChar : cur;
-            }
+            var cur = source[i];
+            target[i] = cur == oldChar ? newChar : cur;
         }
 
         if (disposeOrigin) str.Dispose();
-        return new Ustring(GCHandle.ToIntPtr(handle), str.Length);
+        return result;
     }
 
     /// <summary>
@@ -2792,8 +2873,8 @@ public static unsafe class UstringExtensions
     /// </returns>
     public static Ustring Replace(this ref Ustring str, ReadOnlySpan<char> oldChar, ReadOnlySpan<char> newChar, bool disposeOrigin = true)
     {
-        var operation = SpanOperations.GetOperation<char, ISpanEquals<char>>(SpanOperationMask.Simd);
-        using var builder = new UstringBuilder();
+        var operation = SpanOperations.GetOperation<char, ISpanEquals<char>>(IterationMode.Simd);
+        using var builder = new UstringBuilder(str.MemoryAllocator);
         var text = str.AsSpan();
         var start = oldChar[0];
 
@@ -2949,10 +3030,10 @@ public static unsafe class UstringExtensions
             case 0:
                 return [];
             case 1:
-                return [new Ustring(str.ToString())];
+                return [str.Clone()];
         }
 
-        var results = Pool<List<Ustring>>.Default.Spawn();
+        var results = new List<Ustring>();
         var start = 0;
         var removeEmpty = (options & StringSplitOptions.RemoveEmptyEntries) != 0;
 
@@ -2979,11 +3060,10 @@ public static unsafe class UstringExtensions
         }
         else if (!removeEmpty && start == str.Length)
         {
-            results.Add(new Ustring(""));
+            results.Add(new Ustring(string.Empty, str.MemoryAllocator));
         }
 
         var result = results.ToArray();
-        Pool<List<Ustring>>.Default.Recycle(results);
         return result;
     }
 
@@ -3031,10 +3111,10 @@ public static unsafe class UstringExtensions
             case 0:
                 return [];
             case 1:
-                return [new Ustring(str.ToString())];
+                return [str.Clone()];
         }
 
-        var results = Pool<List<Ustring>>.Default.Spawn();
+        var results = new List<Ustring>();
         var start = 0;
         var removeEmpty = (options & StringSplitOptions.RemoveEmptyEntries) != 0;
 
@@ -3095,11 +3175,10 @@ public static unsafe class UstringExtensions
         }
         else if (!removeEmpty && start == str.Length)
         {
-            results.Add(new Ustring(""));
+            results.Add(new Ustring(string.Empty, str.MemoryAllocator));
         }
 
         var result = results.ToArray();
-        Pool<List<Ustring>>.Default.Recycle(results);
         return result;
     }
 
@@ -3132,10 +3211,10 @@ public static unsafe class UstringExtensions
             case 0:
                 return [];
             case 1:
-                return [new Ustring(str.ToString())];
+                return [str.Clone()];
         }
 
-        var results = Pool<List<Ustring>>.Default.Spawn();
+        var results = new List<Ustring>();
         var start = 0;
         var removeEmpty = (options & StringSplitOptions.RemoveEmptyEntries) != 0;
 
@@ -3215,11 +3294,10 @@ public static unsafe class UstringExtensions
         }
         else if (!removeEmpty && start == str.Length)
         {
-            results.Add(new Ustring(""));
+            results.Add(new Ustring(string.Empty, str.MemoryAllocator));
         }
 
         var result = results.ToArray();
-        Pool<List<Ustring>>.Default.Recycle(results);
         return result;
     }
 
@@ -3314,89 +3392,28 @@ public static unsafe class UstringExtensions
     private static bool IsWhiteSpace(char c) => c == 0x20 || (c >= 0x9 && c <= 0xd) || c == 0x85 || c == 0xa0;
 }
 
-/// <summary>
-/// Provides a specialized array pool for character arrays that maintains pinned GC handles for unmanaged string operations.
-/// This pool extends the standard ArrayPool functionality by automatically creating and caching GC handles for rented arrays,
-/// enabling safe interop with unmanaged code that requires pinned memory addresses.
-/// </summary>
-internal class UstringPool : ArrayPool<char>
-{
-    /// <summary>
-    /// Gets a shared instance of the UnmanageStringPool for application-wide use.
-    /// </summary>
-    /// <value>A singleton instance of UnmanageStringPool.</value>
-    public new static UstringPool Shared => new UstringPool();
-
-    /// <summary>
-    /// The underlying character array pool used for renting and returning character arrays.
-    /// This pool is created as a new instance of the same type as the shared ArrayPool to ensure
-    /// proper isolation while maintaining the same pooling behavior and performance characteristics.
-    /// </summary>
-    private readonly ArrayPool<char> m_Pool = (ArrayPool<char>) Activator.CreateInstance(ArrayPool<char>.Shared.GetType());
-
-    /// <summary>
-    /// A thread-safe cache that maintains the association between rented character arrays and their corresponding
-    /// pinned GC handles. This cache ensures that each array has a persistent pinned handle for unmanaged interop
-    /// operations, preventing the garbage collector from moving the array in memory while it's being used by
-    /// unmanaged code. The cache persists handles across multiple rent/return cycles to avoid the overhead
-    /// of repeatedly creating and destroying GC handles for the same arrays.
-    /// </summary>
-    private readonly ConcurrentDictionary<char[], GCHandle> m_HandleCache = new();
-
-    /// <inheritdoc />
-    public override char[] Rent(int minimumLength) => Rent(minimumLength, out _);
-
-    /// <summary>
-    /// Rents a character array from the pool with at least the specified minimum length and provides a pinned GC handle for the array.
-    /// If the array is not already cached, a new pinned GC handle is created and stored for future use.
-    /// </summary>
-    /// <param name="minimumLength">The minimum length of the character array to rent.</param>
-    /// <param name="handle">When this method returns, contains the pinned GC handle for the rented array, allowing safe access to its memory address from unmanaged code.</param>
-    /// <returns>A character array with at least the specified minimum length, backed by a pinned GC handle.</returns>
-    public char[] Rent(int minimumLength, out GCHandle handle)
-    {
-        var result = m_Pool.Rent(minimumLength);
-        if (!m_HandleCache.TryGetValue(result, out handle))
-        {
-            handle                = GCHandle.Alloc(result, GCHandleType.Pinned);
-            m_HandleCache[result] = handle;
-        }
-
-        return result;
-    }
-
-    /// <summary>
-    /// Returns a character array to the pool and ensures it has a cached pinned GC handle for future use.
-    /// If the array doesn't have a cached handle, a new pinned GC handle is created and stored.
-    /// </summary>
-    /// <param name="array">The character array to return to the pool.</param>
-    /// <param name="clearArray">True to clear the contents of the array before returning it to the pool; otherwise, false.</param>
-    public override void Return(char[] array, bool clearArray = false)
-    {
-        if (!m_HandleCache.TryGetValue(array, out var handle))
-        {
-            handle               = GCHandle.Alloc(array, GCHandleType.Pinned);
-            m_HandleCache[array] = handle;
-        }
-
-        m_Pool.Return(array, clearArray);
-    }
-}
 
 /// <summary>
 /// Represents a buffer segment for character data with tracking of written content and automatic memory management.
 /// </summary>
+/// <param name="allocator">The allocator used for the character buffer.</param>
 /// <param name="count">The initial capacity of the buffer segment in characters.</param>
-internal struct UstringBufferSegment(int count)
+internal unsafe struct UstringBufferSegment(Allocator allocator, int count)
 {
     /// <summary>
-    /// Gets or sets the character array buffer used to store character data.
-    /// This buffer is rented from the UnmanageStringPool and should be returned when no longer needed.
+    /// The unmanaged character buffer.
     /// </summary>
-    /// <value>
-    /// A character array that serves as the underlying storage for the buffer segment.
-    /// </value>
-    internal char[] Buffer = UstringPool.Shared.Rent(count);
+    private char* m_Buffer = AllocateBuffer(allocator, count);
+
+    /// <summary>
+    /// The capacity of the buffer in characters.
+    /// </summary>
+    private readonly int m_Capacity = count;
+
+    /// <summary>
+    /// The allocator that owns <see cref="m_Buffer"/>.
+    /// </summary>
+    private readonly Allocator m_Allocator = allocator;
 
     /// <summary>
     /// Tracks the number of characters that have been written to the buffer.
@@ -3410,10 +3427,10 @@ internal struct UstringBufferSegment(int count)
     /// <value>
     /// <c>true</c> if the buffer is null; otherwise, <c>false</c>.
     /// </value>
-    public bool IsNull
+    public readonly bool IsNull
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => Buffer == null;
+        get => m_Buffer == null;
     }
 
     /// <summary>
@@ -3422,7 +3439,7 @@ internal struct UstringBufferSegment(int count)
     /// <value>
     /// The count of characters written to the buffer.
     /// </value>
-    public int WrittenCount
+    public readonly int WrittenCount
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => m_Written;
@@ -3434,22 +3451,10 @@ internal struct UstringBufferSegment(int count)
     /// <value>
     /// A <see cref="Span{T}"/> of characters containing the written data.
     /// </value>
-    public Span<char> WrittenBuffer
+    public readonly Span<char> WrittenBuffer
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => Buffer.AsSpan(0, m_Written);
-    }
-
-    /// <summary>
-    /// Gets a memory region representing the portion of the buffer that contains written data.
-    /// </summary>
-    /// <value>
-    /// A <see cref="Memory{T}"/> of characters containing the written data.
-    /// </value>
-    public Memory<char> WrittenMemory
-    {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => Buffer.AsMemory(0, m_Written);
+        get => m_Buffer == null ? Span<char>.Empty : new Span<char>(m_Buffer, m_Written);
     }
 
     /// <summary>
@@ -3458,10 +3463,10 @@ internal struct UstringBufferSegment(int count)
     /// <value>
     /// A <see cref="Span{T}"/> of characters representing the available space for writing.
     /// </value>
-    public Span<char> FreeBuffer
+    public readonly Span<char> FreeBuffer
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => Buffer.AsSpan(m_Written);
+        get => m_Buffer == null ? Span<char>.Empty : new Span<char>(m_Buffer + m_Written, m_Capacity - m_Written);
     }
 
     /// <summary>
@@ -3472,13 +3477,29 @@ internal struct UstringBufferSegment(int count)
     public void Advance(int count) => m_Written += count;
 
     /// <summary>
-    /// Frees the buffer by returning it to the pool and resetting the segment state.
+    /// Allocates the segment buffer and validates the result.
+    /// </summary>
+    /// <param name="allocator">The allocator to use.</param>
+    /// <param name="count">The capacity in characters.</param>
+    /// <returns>The allocated buffer.</returns>
+    private static char* AllocateBuffer(Allocator allocator, int count)
+    {
+        var buffer = (char*)allocator.Alloc((nuint)count * sizeof(char), sizeof(char));
+        return buffer != null ? buffer : throw new OutOfMemoryException($"Unable to allocate {count} characters for a string buffer.");
+    }
+
+    /// <summary>
+    /// Frees the buffer and resets the segment state.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Free()
     {
-        UstringPool.Shared.Return(Buffer);
-        Buffer    = null!;
+        if (m_Buffer != null)
+        {
+            m_Allocator.Free(m_Buffer, (nuint)m_Capacity * sizeof(char), sizeof(char));
+            m_Buffer = null;
+        }
+
         m_Written = 0;
     }
 }
@@ -3493,9 +3514,9 @@ public sealed class AdvanceException(int count, int bufferLength) : Exception($"
 /// <summary>
 /// A high-performance character writer that provides efficient buffered writing operations for character data.
 /// </summary>
-internal ref struct UstringWriter() : IDisposable
+internal ref struct UstringWriter(Allocator allocator) : IDisposable
 {
-    private readonly ReusableBufferWriter m_BufferWriter = Pool<ReusableBufferWriter>.Default.Spawn();
+    private readonly ReusableBufferWriter m_BufferWriter = new(allocator);
 
     private Span<char> m_BufferRef     = default;
     private int        m_AdvancedCount = 0;
@@ -3597,7 +3618,7 @@ internal ref struct UstringWriter() : IDisposable
         }
 
         m_BufferRef = default;
-        var result = new Ustring(new string(m_BufferWriter.GetWrittenBuffer()));
+        var result = new Ustring(m_BufferWriter.GetWrittenBuffer(), m_BufferWriter.MemoryAllocator);
         if (dispose)
         {
             Dispose();
@@ -3608,14 +3629,20 @@ internal ref struct UstringWriter() : IDisposable
 
     /// <inheritdoc />
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void Dispose() => Pool<ReusableBufferWriter>.Default.Recycle(m_BufferWriter);
+    public void Dispose() => m_BufferWriter.Reset();
 }
 
 /// <summary>
 /// Resizable  Cache Writer.
 /// </summary>
-internal sealed class ReusableBufferWriter : IResetable, IBufferWriter<char>
+/// <param name="allocator">The allocator used for the character buffers.</param>
+internal sealed class ReusableBufferWriter(Allocator allocator) : IBufferWriter<char>
 {
+    /// <summary>
+    /// The allocator used for the character buffers.
+    /// </summary>
+    internal Allocator MemoryAllocator => allocator;
+
     /// <summary>
     /// The maximum length of an int[] array is just a tad smaller than int.MaxValue.
     /// </summary>
@@ -3668,13 +3695,13 @@ internal sealed class ReusableBufferWriter : IResetable, IBufferWriter<char>
         m_NextBufferSize ??= INITIAL_BUFFER_SIZE;
         if (sizeHint <= m_NextBufferSize)
         {
-            next = new UstringBufferSegment(m_NextBufferSize.Value);
+            next = new UstringBufferSegment(allocator, m_NextBufferSize.Value);
 
             m_NextBufferSize = GetNewArrayCapacity(m_NextBufferSize.Value);
         }
         else
         {
-            next = new UstringBufferSegment(sizeHint);
+            next = new UstringBufferSegment(allocator, sizeHint);
         }
 
         // Replace CurrentBuffer with NextBuffer.

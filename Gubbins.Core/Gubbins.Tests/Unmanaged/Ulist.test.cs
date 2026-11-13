@@ -1,4 +1,4 @@
-namespace Gubbins.Unmanaged.Tests;
+﻿namespace Gubbins.Unmanaged.Tests;
 
 [TestFixture]
 public sealed class UlistTests
@@ -7,7 +7,7 @@ public sealed class UlistTests
     public void Insert_IndexGreaterThanCount_ThrowsArgumentOutOfRangeException()
     {
         // Arrange
-        var list = new Ulist<int>(5);
+        var list = new Ulist<int>(5, TestAllocator.Shared);
         list.Add(1);
         list.Add(2);
         // Count is now 2
@@ -20,7 +20,7 @@ public sealed class UlistTests
     public void Insert_ShouldSuccessfullyInsertElementAtValidIndexAndShiftExistingElements()
     {
         // Arrange
-        var list = new Ulist<int>(5);
+        var list = new Ulist<int>(5, TestAllocator.Shared);
         list.Add(1);
         list.Add(2);
         list.Add(4);
@@ -46,7 +46,7 @@ public sealed class UlistTests
     public void IndexOf_NonExistingElement_ReturnsMinusOne()
     {
         // Arrange
-        var list = new Ulist<int>(5);
+        var list = new Ulist<int>(5, TestAllocator.Shared);
         list.Add(1);
         list.Add(2);
         list.Add(3);
@@ -65,7 +65,7 @@ public sealed class UlistTests
     public void IndexerGet_IndexGreGaterThanOrEqualToCount_ThrowsArgumentOutOfRangeException()
     {
         // Arrange
-        var list = new Ulist<int>(5);
+        var list = new Ulist<int>(5, TestAllocator.Shared);
         list.Add(1);
         list.Add(2);
         list.Add(3);
@@ -83,7 +83,7 @@ public sealed class UlistTests
     public void Indexer_ShouldThrowArgumentOutOfRangeException_WhenAccessingNegativeIndex()
     {
         // Arrange
-        var list = new Ulist<int>(5);
+        var list = new Ulist<int>(5, TestAllocator.Shared);
         list.Add(1);
         list.Add(2);
         list.Add(3);
@@ -100,7 +100,7 @@ public sealed class UlistTests
         var span = new ReadOnlySpan<int>(sourceArray);
 
         // Act
-        var list = new Ulist<int>(span);
+        var list = new Ulist<int>(span, TestAllocator.Shared);
 
         // Assert
         Assert.That(list, Has.Count.EqualTo(5));
@@ -121,7 +121,7 @@ public sealed class UlistTests
         const int expectedCapacity = 10;
 
         // Act
-        var list = new Ulist<int>(expectedCapacity);
+        var list = new Ulist<int>(expectedCapacity, TestAllocator.Shared);
 
         // Assert
         Assert.That(list.Count, Is.EqualTo(0));
@@ -142,7 +142,7 @@ public sealed class UlistTests
     public void Ulist_DefaultConstructor_ShouldInitializeEmptyListWithZeroCountAndCapacity()
     {
         // Arrange & Act
-        var list = new Ulist<int>();
+        var list = new Ulist<int>(TestAllocator.Shared);
 
         // Assert
         Assert.That(list.Count, Is.EqualTo(0));
@@ -153,7 +153,7 @@ public sealed class UlistTests
     {
         // Arrange
         const int capacity = 5;
-        var list = new Ulist<int>(capacity);
+        var list = new Ulist<int>(capacity, TestAllocator.Shared);
 
         // Fill list to maximum capacity
         for (int i = 0; i < capacity; i++)
@@ -182,7 +182,7 @@ public sealed class UlistTests
     public void RemoveAt_ShouldThrowIndexOutOfRangeException()
     {
         // Arrange
-        var list = new Ulist<int>(5);
+        var list = new Ulist<int>(5, TestAllocator.Shared);
         list.Add(10);
         list.Add(20);
         list.Add(30);
@@ -207,7 +207,7 @@ public sealed class UlistTests
     public void RemoveAt_ShouldDecreaseCountByOne_AfterSuccessfulRemoval()
     {
         // Arrange
-        var list = new Ulist<int>(5);
+        var list = new Ulist<int>(5, TestAllocator.Shared);
         list.Add(1);
         list.Add(2);
         list.Add(3);
@@ -227,7 +227,7 @@ public sealed class UlistTests
     public void RemoveAt_ShouldSuccessfullyRemoveMiddleElementAndShiftRemainingElementsLeft()
     {
         // Arrange
-        var list = new Ulist<int>(5);
+        var list = new Ulist<int>(5, TestAllocator.Shared);
         list.Add(1);
         list.Add(2);
         list.Add(3);
@@ -255,7 +255,7 @@ public sealed class UlistTests
     public void RemoveAt_ShouldSuccessfullyRemoveElementAtIndexZeroFromSingleElementList()
     {
         // Arrange
-        var list = new Ulist<int>(5);
+        var list = new Ulist<int>(5, TestAllocator.Shared);
         list.Add(42);
 
         // Act
@@ -273,7 +273,7 @@ public sealed class UlistTests
     public void RemoveAt_IndexEqualsCount_ThrowsArgumentOutOfRangeException()
     {
         // Arrange
-        var list = new Ulist<int>(5);
+        var list = new Ulist<int>(5, TestAllocator.Shared);
         list.Add(1);
         list.Add(2);
         list.Add(3);
@@ -289,7 +289,7 @@ public sealed class UlistTests
     public void RemoveAt_NegativeIndex_ThrowsArgumentOutOfRangeException()
     {
         // Arrange
-        var list = new Ulist<int>(5);
+        var list = new Ulist<int>(5, TestAllocator.Shared);
         list.Add(1);
         list.Add(2);
         list.Add(3);
@@ -305,7 +305,7 @@ public sealed class UlistTests
     public void RemoveAt_IndexGreaterThanCount_ThrowsArgumentOutOfRangeException()
     {
         // Arrange
-        var list = new Ulist<int>(5);
+        var list = new Ulist<int>(5, TestAllocator.Shared);
         list.Add(1);
         list.Add(2);
         // Count is now 2
@@ -320,7 +320,7 @@ public sealed class UlistTests
     public void RemoveAt_ShouldSuccessfullyRemoveLastElementWithoutShiftingOtherElements()
     {
         // Arrange
-        var list = new Ulist<int>(5);
+        var list = new Ulist<int>(5, TestAllocator.Shared);
         list.Add(1);
         list.Add(2);
         list.Add(3);
@@ -346,7 +346,7 @@ public sealed class UlistTests
     public void AsUarray_ShouldReturnViewWithCorrectCountWhenListHasElements()
     {
         // Arrange
-        var list = new Ulist<int>(5);
+        var list = new Ulist<int>(5, TestAllocator.Shared);
         list.Add(10);
         list.Add(20);
         list.Add(30);
@@ -372,7 +372,7 @@ public sealed class UlistTests
     public void AsUarray_ShouldReturnEmptyViewWhenListIsEmpty()
     {
         // Arrange
-        var list = new Ulist<int>(5);
+        var list = new Ulist<int>(5, TestAllocator.Shared);
 
         // Act
         var result = list.AsUarray();
@@ -389,7 +389,7 @@ public sealed class UlistTests
     public void ToArray_WithDisposeOriginFalse_ShouldCreateManagedArrayAndPreserveOriginalList()
     {
         // Arrange
-        var list = new Ulist<int>(5);
+        var list = new Ulist<int>(5, TestAllocator.Shared);
         list.Add(1);
         list.Add(2);
         list.Add(3);
@@ -422,7 +422,7 @@ public sealed class UlistTests
     public void ToUarray_WithStartAndLength_ShouldCreateCorrectSubsetAndDisposeOriginWhenDisposeOriginIsTrue()
     {
         // Arrange
-        var list = new Ulist<int>(10);
+        var list = new Ulist<int>(10, TestAllocator.Shared);
         list.Add(1);
         list.Add(2);
         list.Add(3);
@@ -451,7 +451,7 @@ public sealed class UlistTests
     public void ToArray_WithDisposeOriginTrue_ShouldCreateManagedArrayAndDisposeOriginalList()
     {
         // Arrange
-        var list = new Ulist<int>(5);
+        var list = new Ulist<int>(5, TestAllocator.Shared);
         list.Add(10);
         list.Add(20);
         list.Add(30);
@@ -475,7 +475,7 @@ public sealed class UlistTests
     public void ToUarray_WithStartOnly_ShouldCreateSubsetFromStartToEndAndDisposeOriginWhenDisposeOriginIsTrue()
     {
         // Arrange
-        var list = new Ulist<int>(10);
+        var list = new Ulist<int>(10, TestAllocator.Shared);
         list.Add(1);
         list.Add(2);
         list.Add(3);

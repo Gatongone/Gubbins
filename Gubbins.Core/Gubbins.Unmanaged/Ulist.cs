@@ -1,5 +1,7 @@
 using System.Collections;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
+using Gubbins.Unsafe;
 
 namespace Gubbins.Unmanaged;
 
@@ -9,7 +11,7 @@ namespace Gubbins.Unmanaged;
 /// The list automatically expands its capacity when needed and provides both fast ref-based access and standard collection operations.
 /// </summary>
 /// <typeparam name="T">The type of elements stored in the unmanaged list. This type should be unmanaged or blittable for optimal performance.</typeparam>
-public struct Ulist<T> : IList, IList<T>, IReadOnlyList<T>, IDisposable where T : unmanaged
+public struct Ulist<T> : IList, IList<T>, IReadOnlyList<T>, IDisposable
 {
     /// <summary>
     /// The current capacity of the underlying array, representing the maximum number of elements that can be stored without expansion.
@@ -45,7 +47,13 @@ public struct Ulist<T> : IList, IList<T>, IReadOnlyList<T>, IDisposable where T 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get
         {
-            if (index < 0 || index >= m_Count) throw new IndexOutOfRangeException($"Index '{index}' out of range.");
+            // Keep the hot path small: the formatting throw lives in a non-inlined helper so this getter is
+            // still a candidate for inlining (see Uarray<T>'s indexer).
+            if ((uint)index >= (uint)m_Count)
+            {
+                ThrowIndexOutOfRange(index);
+            }
+
             return ref m_Array[index];
         }
     }
@@ -126,11 +134,18 @@ public struct Ulist<T> : IList, IList<T>, IReadOnlyList<T>, IDisposable where T 
     /// <exception cref="ObjectDisposedException">Thrown when the underlying array has been disposed or the address is invalid.</exception>
     private Uarray<T> m_Array;
 
+    private readonly Allocator m_Allocator;
+    private readonly byte m_Alignment;
+
+    public Ulist(Allocator allocator) : this(Native.GetAlignment<T>(), allocator) { }
+
     /// <summary>
     /// Initializes a new instance of the UnmanagedList struct by spawning an ExpandArray from the unmanaged pool.
     /// </summary>
-    public Ulist()
+    public Ulist(byte alignment, Allocator allocator)
     {
+        m_Allocator = allocator;
+        m_Alignment = alignment;
         m_Array    = Uarray<T>.Empty;
         m_Capacity = 0;
         m_Count    = 0;
@@ -140,9 +155,11 @@ public struct Ulist<T> : IList, IList<T>, IReadOnlyList<T>, IDisposable where T 
     /// Initializes a new instance of the Ulist struct with the specified initial capacity.
     /// </summary>
     /// <param name="capacity">The initial capacity of the list, representing the number of elements that can be stored without expansion.</param>
-    public Ulist(int capacity)
+    public Ulist(int capacity, byte alignment, Allocator allocator)
     {
-        m_Array    = new Uarray<T>(capacity);
+        m_Array    = new Uarray<T>(capacity, alignment, allocator);
+        m_Allocator = allocator;
+        m_Alignment = alignment;
         m_Capacity = capacity;
         m_Count    = 0;
     }
@@ -151,12 +168,25 @@ public struct Ulist<T> : IList, IList<T>, IReadOnlyList<T>, IDisposable where T 
     /// Initializes a new instance of the Ulist struct with elements copied from the specified span.
     /// </summary>
     /// <param name="items">A read-only span containing the elements to copy into the new list.</param>
-    public Ulist(ReadOnlySpan<T> items)
+    public Ulist(ReadOnlySpan<T> items, byte alignment, Allocator allocator)
     {
+        m_Allocator = allocator;
+        m_Alignment = alignment;
         m_Capacity = items.Length;
-        m_Array    = new Uarray<T>(items);
+        m_Array    = new Uarray<T>(items, alignment, allocator);
         m_Count    = items.Length;
     }
+    
+    public Ulist(ReadOnlySpan<T> array, Allocator allocator) : this(array, Native.GetAlignment<T>(), allocator) { }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="Ulist{T}"/> struct with the specified initial capacity,
+    /// using the default alignment for <typeparamref name="T"/>.
+    /// </summary>
+    /// <param name="capacity">The initial capacity of the list.</param>
+    /// <param name="allocator">The allocator used for the underlying storage.</param>
+    public Ulist(int capacity, Allocator allocator) : this(capacity, Native.GetAlignment<T>(), allocator) { }
+
 
     /// <summary>
     /// Returns a fast enumerator that provides direct access to the list elements without boxing.
@@ -195,11 +225,52 @@ public struct Ulist<T> : IList, IList<T>, IReadOnlyList<T>, IDisposable where T 
     {
         if (m_Count >= m_Capacity)
         {
-            AutoExpand();
+            AutoExpand(GetNewCapacity());
         }
 
         m_Array[m_Count] = item;
         m_Count++;
+    }
+
+    public void AddRange(IEnumerable<T> target)
+    {
+        if (target is IList<T> list)
+        {
+            AddRange(list);
+        }
+        else
+        {
+            foreach (var item in target)
+            {
+                Add(item);
+            }
+        }
+    }
+
+    public void AddRange(IReadOnlyList<T> target)
+    {
+        if (m_Count + target.Count > m_Capacity)
+        {
+            AutoExpand(GetNewCapacity());
+        }
+
+        for (var i = 0; i < target.Count; i++)
+        {
+            m_Array[m_Count + i] = target[i];
+        }
+
+        m_Count += target.Count;
+    }
+
+    public void AddRange(ReadOnlySpan<T> target)
+    {
+        if (m_Count + target.Length > m_Capacity)
+        {
+            AutoExpand(GetNewCapacity());
+        }
+
+        target.CopyTo(m_Array.AsSpan().Slice(m_Count, target.Length));
+        m_Count += target.Length;
     }
 
     /// <inheritdoc />
@@ -227,7 +298,6 @@ public struct Ulist<T> : IList, IList<T>, IReadOnlyList<T>, IDisposable where T 
         EnsureNotDisposed();
         if (reset)
         {
-            DisposeElements();
             m_Array.AsSpan().Clear();
         }
         m_Count = 0;
@@ -326,7 +396,7 @@ public struct Ulist<T> : IList, IList<T>, IReadOnlyList<T>, IDisposable where T 
     /// Thrown when the hash map has been disposed and is no longer valid for use.
     /// </exception>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Span<T> AsSpan()
+    public readonly Span<T> AsSpan()
     {
         EnsureNotDisposed();
         return m_Array.AsSpan()[..m_Count];
@@ -342,7 +412,7 @@ public struct Ulist<T> : IList, IList<T>, IReadOnlyList<T>, IDisposable where T 
     /// Thrown when the hash map has been disposed and is no longer valid for use.
     /// </exception>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Span<T> AsSpan(int start, int length)
+    public readonly Span<T> AsSpan(int start, int length)
     {
         EnsureNotDisposed();
         return m_Array.AsSpan()[start..(start + length)];
@@ -357,7 +427,7 @@ public struct Ulist<T> : IList, IList<T>, IReadOnlyList<T>, IDisposable where T 
     /// Thrown when the hash map has been disposed and is no longer valid for use.
     /// </exception>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Span<T> AsSpan(int start)
+    public readonly Span<T> AsSpan(int start)
     {
         EnsureNotDisposed();
         return m_Array.AsSpan()[start..(m_Count - start)];
@@ -371,7 +441,7 @@ public struct Ulist<T> : IList, IList<T>, IReadOnlyList<T>, IDisposable where T 
     /// Thrown when the hash map has been disposed and is no longer valid for use.
     /// </exception>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Uarray<T> AsUarray()
+    public readonly Uarray<T> AsUarray()
     {
         EnsureNotDisposed();
         return m_Array.Slice(0, m_Count);
@@ -392,7 +462,7 @@ public struct Ulist<T> : IList, IList<T>, IReadOnlyList<T>, IDisposable where T 
     {
         EnsureNotDisposed();
         var span = m_Array.AsSpan(start, length);
-        var result = new Uarray<T>(span);
+        var result = new Uarray<T>(span, m_Alignment, m_Allocator);
         if (disposeOrigin)
         {
             Dispose();
@@ -414,7 +484,7 @@ public struct Ulist<T> : IList, IList<T>, IReadOnlyList<T>, IDisposable where T 
     public Uarray<T> ToUarray(int start, bool disposeOrigin = true)
     {
         EnsureNotDisposed();
-        var result = new Uarray<T>(m_Array.AsSpan(start, m_Count - start));
+        var result = new Uarray<T>(m_Array.AsSpan(start, m_Count - start), m_Alignment, m_Allocator);
         if (disposeOrigin)
         {
             Dispose();
@@ -435,7 +505,7 @@ public struct Ulist<T> : IList, IList<T>, IReadOnlyList<T>, IDisposable where T 
     public Uarray<T> ToUarray(bool disposeOrigin = true)
     {
         EnsureNotDisposed();
-        var result = new Uarray<T>(m_Array.AsSpan());
+        var result = new Uarray<T>(m_Array.AsSpan(), m_Alignment, m_Allocator);
         if (disposeOrigin)
         {
             Dispose();
@@ -683,7 +753,7 @@ public struct Ulist<T> : IList, IList<T>, IReadOnlyList<T>, IDisposable where T 
 
         if (m_Count >= m_Capacity)
         {
-            AutoExpand();
+            AutoExpand(GetNewCapacity());
         }
 
         if (index < m_Count)
@@ -695,6 +765,9 @@ public struct Ulist<T> : IList, IList<T>, IReadOnlyList<T>, IDisposable where T 
         m_Array[index] = item;
         m_Count++;
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private int GetNewCapacity() => m_Capacity == 0 ? 4 : m_Capacity * 2;
 
     /// <summary>
     /// Removes the last element from the list.
@@ -744,12 +817,6 @@ public struct Ulist<T> : IList, IList<T>, IReadOnlyList<T>, IDisposable where T 
 
         return ref m_Array[--m_Count];
     }
-    /// <summary>
-    /// Disposes all elements currently stored in the list by calling their dispose methods if they implement IDisposable.
-    /// This method is used internally to clean up resources held by individual elements before the list itself is disposed.
-    /// </summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal void DisposeElements() => m_Array.DisposeElements(0, m_Count);
 
     /// <summary>
     /// Releases all resources used by the Ulist instance, including disposing all contained elements and returning the underlying unmanaged memory to the pool.
@@ -763,15 +830,12 @@ public struct Ulist<T> : IList, IList<T>, IReadOnlyList<T>, IDisposable where T 
             return;
         }
 
-        if (!m_Array.IsValid)
-        {
-            DisposeElements();
-            m_Array.DisposeOnlySelf();
-        }
-
         m_IsDisposed = true;
         m_Count      = 0;
         m_Capacity   = 0;
+
+        // Release the backing allocation; Uarray.Dispose is a no-op for a default (unallocated) array.
+        m_Array.Dispose();
     }
 
     /// <summary>
@@ -780,10 +844,18 @@ public struct Ulist<T> : IList, IList<T>, IReadOnlyList<T>, IDisposable where T 
     /// </summary>
     /// <exception cref="ObjectDisposedException">Thrown when the Ulist instance has been disposed and is no longer valid for use.</exception>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void EnsureNotDisposed()
+    private readonly void EnsureNotDisposed()
     {
         if (m_IsDisposed) throw new ObjectDisposedException(nameof(Ulist<T>));
     }
+
+    /// <summary>
+    /// Throws the exception reported when an element is accessed outside the list bounds.
+    /// </summary>
+    /// <param name="index">The invalid index.</param>
+    [DoesNotReturn]
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void ThrowIndexOutOfRange(int index) => throw new IndexOutOfRangeException($"Index '{index}' out of range.");
 
     /// <summary>
     /// Automatically expands the capacity of the underlying array when more space is needed, doubling the current capacity or setting it to 4 if currently empty.
@@ -791,11 +863,16 @@ public struct Ulist<T> : IList, IList<T>, IReadOnlyList<T>, IDisposable where T 
     /// <exception cref="ObjectDisposedException">
     /// Thrown when the hash map has been disposed and is no longer valid for use.
     /// </exception>
-    private void AutoExpand()
+    private void AutoExpand(int newCapacity)
     {
         EnsureNotDisposed();
-        var newCapacity = m_Capacity == 0 ? 4 : m_Capacity * 2;
-        var newArray = new Uarray<T>(newCapacity);
+        if(m_Array.Resize(newCapacity))
+        {
+            m_Capacity = newCapacity;
+            return;
+        }
+        
+        var newArray = new Uarray<T>(newCapacity, m_Alignment, m_Allocator);
 
         if (m_Count > 0)
         {

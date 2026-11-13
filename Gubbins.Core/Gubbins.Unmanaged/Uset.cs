@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using Gubbins.Enhance;
+using Gubbins.Unsafe;
 
 namespace Gubbins.Unmanaged;
 
@@ -16,7 +17,7 @@ namespace Gubbins.Unmanaged;
 /// with modifications to use unmanaged memory and support value types without boxing.
 /// Licensed to the .NET Foundation under one or more agreements.
 /// </remarks>
-public struct Uset<T> : ICollection<T>, IDisposable where T : unmanaged
+public struct Uset<T> : ICollection<T>, IDisposable
 {
     /// <summary>
     /// Total number of slots that have been used, including removed entries.
@@ -53,6 +54,65 @@ public struct Uset<T> : ICollection<T>, IDisposable where T : unmanaged
     /// Bucket heads using 1-based indexing into <see cref="m_Entries"/>.
     /// </summary>
     private Uarray<int>? m_Buckets;
+
+    /// <summary>
+    /// The allocator used for the underlying entry and bucket storage.
+    /// </summary>
+    private Allocator m_Allocator;
+
+    /// <summary>
+    /// Initializes a new, empty <see cref="Uset{T}"/> backed by the specified allocator.
+    /// </summary>
+    /// <param name="allocator">The allocator used for the underlying storage.</param>
+    public Uset(Allocator allocator)
+    {
+        m_Count      = 0;
+        m_FreeCount  = 0;
+        m_FreeList   = 0;
+        m_Version    = 0;
+#if TARGET_64BIT
+        m_FastModMultiplier = 0;
+#endif
+        m_Entries   = null;
+        m_Buckets   = null;
+        m_Allocator = allocator;
+
+        // Allocate the initial (empty) storage so that the first Add can index into the buckets.
+        Resize();
+    }
+
+    /// <summary>
+    /// Initializes a new, empty <see cref="Uset{T}"/> with the specified initial capacity,
+    /// backed by the specified allocator.
+    /// </summary>
+    /// <param name="capacity">The initial capacity of the set.</param>
+    /// <param name="allocator">The allocator used for the underlying storage.</param>
+    public Uset(int capacity, Allocator allocator) : this(allocator)
+    {
+        if (capacity > 0)
+        {
+            Resize(Math.Max(Hash.GetPrime(capacity), 3));
+        }
+    }
+
+    /// <summary>
+    /// Initializes a new <see cref="Uset{T}"/> that contains the elements of the specified collection,
+    /// backed by the specified allocator. Duplicates are ignored.
+    /// </summary>
+    /// <param name="collection">The collection whose elements are copied into the new set.</param>
+    /// <param name="allocator">The allocator used for the underlying storage.</param>
+    public Uset(IEnumerable<T> collection, Allocator allocator) : this(allocator)
+    {
+        if (collection == null)
+        {
+            throw new ArgumentNullException(nameof(collection));
+        }
+
+        foreach (var item in collection)
+        {
+            Add(item);
+        }
+    }
 
     /// <summary>
     /// When constructing a hashset from an existing collection, it may contain duplicates,
@@ -98,15 +158,18 @@ public struct Uset<T> : ICollection<T>, IDisposable where T : unmanaged
     /// </exception>
     private bool AddIfNotPresent(T value, out int location)
     {
+        // A default-initialized set has no storage yet; allocate the initial arrays on first use.
+        if (m_Buckets == null)
+        {
+            Resize();
+        }
+
         ref var entries = ref m_Entries;
-        var hashCode = 0;
 
         uint collisionCount = 0;
-        ref var bucket = ref hashCode;
 
-
-        hashCode = value.GetHashCode();
-        bucket   = ref GetBucketRef(hashCode);
+        var hashCode = value.GetHashCode();
+        ref var bucket = ref GetBucketRef(hashCode);
         var i = bucket - 1; // Value in m_Buckets is 1-based
 
         // Devirtualize with EqualityComparer<TValue>.Default intrinsic
@@ -164,14 +227,77 @@ public struct Uset<T> : ICollection<T>, IDisposable where T : unmanaged
         return true;
     }
 
-    /// <inheritdoc />
-    public void Clear() { }
+    /// <summary>
+    /// Removes all elements from the set while keeping the allocated storage for reuse.
+    /// </summary>
+    public void Clear()
+    {
+        if (m_Count != 0)
+        {
+            if (m_Entries.HasValue)
+            {
+                m_Entries.Value.AsSpan(0, m_Count).Clear();
+            }
+
+            if (m_Buckets.HasValue)
+            {
+                m_Buckets.Value.AsSpan().Clear();
+            }
+
+            m_Count     = 0;
+            m_FreeCount = 0;
+            m_FreeList  = 0;
+        }
+
+        m_Version++;
+    }
 
     /// <inheritdoc />
     public bool Contains(T item) => FindItemIndex(item) >= 0;
 
     /// <inheritdoc />
-    public void CopyTo(T[] array, int arrayIndex) { }
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="array"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="arrayIndex"/> is negative or greater than the array length.</exception>
+    /// <exception cref="ArgumentException">Thrown when the destination does not have enough space for all elements.</exception>
+    public void CopyTo(T[] array, int arrayIndex)
+    {
+        if (array == null)
+        {
+            throw new ArgumentNullException(nameof(array));
+        }
+
+        CopyTo(array.AsSpan(arrayIndex));
+    }
+
+    /// <summary>
+    /// Copies the elements of the set into a span, starting at the beginning of the span.
+    /// </summary>
+    /// <param name="destination">The destination span.</param>
+    /// <exception cref="ArgumentException">Thrown when the destination does not have enough space for all elements.</exception>
+    public void CopyTo(Span<T> destination)
+    {
+        if (destination.Length < Count)
+        {
+            throw new ArgumentException("Destination is not long enough.", nameof(destination));
+        }
+
+        var written = 0;
+        foreach (var item in this)
+        {
+            destination[written++] = item;
+        }
+    }
+
+    /// <summary>
+    /// Copies the elements of the set into a new managed array.
+    /// </summary>
+    /// <returns>A new array containing all elements of the set.</returns>
+    public T[] ToArray()
+    {
+        var result = new T[Count];
+        CopyTo(result);
+        return result;
+    }
 
     /// <inheritdoc />
     public bool Remove(T item)
@@ -213,6 +339,7 @@ public struct Uset<T> : ICollection<T>, IDisposable where T : unmanaged
 
                 m_FreeList = i;
                 m_FreeCount++;
+                m_Version++;
                 return true;
             }
 
@@ -245,6 +372,11 @@ public struct Uset<T> : ICollection<T>, IDisposable where T : unmanaged
             m_Buckets.Value.Dispose();
             m_Buckets = null;
         }
+
+        m_Count     = 0;
+        m_FreeCount = 0;
+        m_FreeList  = 0;
+        m_Version++;
     }
 
     /// <summary>
@@ -317,36 +449,63 @@ public struct Uset<T> : ICollection<T>, IDisposable where T : unmanaged
     /// <param name="newSize">The new size for the internal data structures. Must be greater than or equal to the current number of entries.</param>
     private void Resize(int newSize)
     {
-        // Value types never rehash
-        Debug.Assert(newSize >= m_Entries!.Value.Count);
+        var activeCount = Count;
 
-        var entries = new Uarray<Entry>(newSize);
-
-        var count = Count;
-
-        m_Entries.Value.CopyTo(entries);
-
-        // Assign member variables after both arrays allocated to guard against corruption from OOM if second fails
-        if (m_Buckets != null)
+        if (newSize < activeCount)
         {
-            m_Buckets.Value.Dispose();
+            newSize = activeCount;
         }
 
-        m_Buckets = new Uarray<int>(newSize);
+        if (newSize < 3)
+        {
+            newSize = 3;
+        }
+
+        var oldEntries = m_Entries;
+        var usedCount  = m_Count;
+
+        var entries = new Uarray<Entry>(newSize, m_Allocator);
+
+        // Replace the buckets before rebuilding the chains so GetBucketRef targets the new array.
+        m_Buckets?.Dispose();
+        m_Buckets = new Uarray<int>(newSize, m_Allocator);
+
+        // The unmanaged allocator does not zero memory; buckets must start at 0 (1-based chain heads).
+        m_Buckets.Value.AsSpan().Clear();
 #if TARGET_64BIT
         m_FastModMultiplier = Hash.GetFastModMultiplier((uint)newSize);
 #endif
-        for (var i = 0; i < count; i++)
+
+        // Compact the live entries to the front of the new array and rebuild the bucket chains.
+        var index = 0;
+        if (oldEntries != null)
         {
-            ref var entry = ref entries[i];
-            if (entry.Next < -1) continue;
-            ref var bucket = ref GetBucketRef(entry.HashCode);
-            entry.Next = bucket - 1; // Value in m_Buckets is 1-based
-            bucket     = i + 1;
+            var oldSpan = oldEntries.Value.AsSpan();
+            for (var i = 0; i < usedCount; i++)
+            {
+                ref var oldEntry = ref oldSpan[i];
+                if (oldEntry.Next < -1)
+                {
+                    continue; // Slot is on the free list.
+                }
+
+                ref var newEntry = ref entries[index];
+                newEntry.HashCode = oldEntry.HashCode;
+                newEntry.Value    = oldEntry.Value;
+
+                ref var bucket = ref GetBucketRef(newEntry.HashCode);
+                newEntry.Next = bucket - 1; // Value in buckets is 1-based
+                bucket        = index + 1;
+                index++;
+            }
         }
 
-        m_Entries.Value.Dispose();
-        m_Entries = entries;
+        oldEntries?.Dispose();
+
+        m_Entries   = entries;
+        m_Count     = index;
+        m_FreeCount = 0;
+        m_FreeList  = 0;
     }
 
     /// <summary>
@@ -409,6 +568,11 @@ public struct Uset<T> : ICollection<T>, IDisposable where T : unmanaged
         private int m_Index;
 
         /// <summary>
+        /// Index of the entry exposed by <see cref="Current"/>, or -1 before enumeration starts.
+        /// </summary>
+        private int m_CurrentIndex;
+
+        /// <summary>
         /// Cached current value for interface-based enumeration.
         /// </summary>
         private T m_Current;
@@ -419,9 +583,11 @@ public struct Uset<T> : ICollection<T>, IDisposable where T : unmanaged
         /// <param name="hashSet">Set instance to enumerate.</param>
         internal Enumerator(Uset<T> hashSet)
         {
-            m_HashSet = hashSet;
-            m_Version = hashSet.m_Version;
-            m_Index   = 0;
+            m_HashSet      = hashSet;
+            m_Version      = hashSet.m_Version;
+            m_Index        = 0;
+            m_CurrentIndex = -1;
+            m_Current      = default!;
         }
 
         /// <summary>
@@ -436,18 +602,24 @@ public struct Uset<T> : ICollection<T>, IDisposable where T : unmanaged
                 throw new InvalidOperationException("Collection was modified; enumeration operation may not execute.");
             }
 
-            // Use unsigned comparison since we set index to dictionary.count+1 when the enumeration ends.
-            // dictionary.count+1 could be negative if dictionary.count is int.MaxValue
-            while ((uint) m_Index < (uint) m_HashSet.Count)
+            // Use unsigned comparison since we set index to usedSlots+1 when the enumeration ends.
+            // usedSlots+1 could be negative if usedSlots is int.MaxValue.
+            // Iterate over used slots (including free-list slots), not the active element count.
+            while ((uint)m_Index < (uint)m_HashSet.m_Count)
             {
-                ref var entry = ref m_HashSet.m_Entries!.Value[m_Index++];
+                var index = m_Index++;
+                ref var entry = ref m_HashSet.m_Entries!.Value[index];
                 if (entry.Next >= -1)
                 {
+                    m_CurrentIndex = index;
+                    m_Current      = entry.Value;
                     return true;
                 }
             }
 
-            m_Index = m_HashSet.m_Count + 1;
+            m_Index        = m_HashSet.m_Count + 1;
+            m_CurrentIndex = -1;
+            m_Current      = default!;
             return false;
         }
 
@@ -462,7 +634,7 @@ public struct Uset<T> : ICollection<T>, IDisposable where T : unmanaged
         public ref T Current
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => ref m_HashSet.m_Entries!.Value[m_Index].Value;
+            get => ref m_HashSet.m_Entries!.Value[m_CurrentIndex].Value;
         }
 
         /// <inheritdoc />
@@ -490,8 +662,9 @@ public struct Uset<T> : ICollection<T>, IDisposable where T : unmanaged
                 throw new InvalidOperationException("Collection was modified; enumeration operation may not execute.");
             }
 
-            m_Index   = 0;
-            m_Current = default!;
+            m_Index        = 0;
+            m_CurrentIndex = -1;
+            m_Current      = default!;
         }
     }
 
@@ -544,9 +717,10 @@ public struct Uset<T> : ICollection<T>, IDisposable where T : unmanaged
                 throw new InvalidOperationException("Collection was modified; enumeration operation may not execute.");
             }
 
-            // Use unsigned comparison since we set index to dictionary.count+1 when the enumeration ends.
-            // dictionary.count+1 could be negative if dictionary.count is int.MaxValue
-            while ((uint) m_Index < (uint) m_HashSet.Count)
+            // Use unsigned comparison since we set index to usedSlots+1 when the enumeration ends.
+            // usedSlots+1 could be negative if usedSlots is int.MaxValue.
+            // Iterate over used slots (including free-list slots), not the active element count.
+            while ((uint)m_Index < (uint)m_HashSet.m_Count)
             {
                 ref var entry = ref m_HashSet.m_Entries!.Value[m_Index++];
                 if (entry.Next >= -1)
@@ -696,7 +870,7 @@ file class NonRandomizedStringEqualityComparer : IEqualityComparer<string?>
                 hash2 = (RotateLeft(hash2, 5) + hash2) ^ ptr[0];
             }
 
-            return (int) (hash1 + (hash2 * 1566083941));
+            return (int) (hash1 + hash2 * 1566083941);
         }
 
         static uint RotateLeft(uint value, int offset)

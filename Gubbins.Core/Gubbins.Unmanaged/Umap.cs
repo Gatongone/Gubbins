@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Runtime.CompilerServices;
 using Gubbins.Enhance;
+using Gubbins.Unsafe;
 
 namespace Gubbins.Unmanaged;
 
@@ -11,7 +12,7 @@ namespace Gubbins.Unmanaged;
 /// <see cref="IReadOnlyDictionary{TKey, TValue}"/> interfaces.
 /// </summary>
 /// <typeparam name="TValue">The type of values in the dictionary.</typeparam>
-public struct Umap<TKey, TValue> : IDisposable, IDictionary<TKey, TValue>, IReadOnlyDictionary<TKey, TValue> where TKey : unmanaged where TValue : unmanaged
+public struct Umap<TKey, TValue> : IDisposable, IDictionary<TKey, TValue>, IReadOnlyDictionary<TKey, TValue>
 {
     /// <summary>
     /// The maximum load factor threshold before the hash map triggers a resize operation.
@@ -31,6 +32,11 @@ public struct Umap<TKey, TValue> : IDisposable, IDictionary<TKey, TValue>, IRead
     /// A value of -1 indicates an empty bucket with no entries.
     /// </summary>
     private Ulist<int> m_Buckets;
+
+    /// <summary>
+    /// The allocator used for the underlying <see cref="Ulist{T}"/> storage.
+    /// </summary>
+    private readonly Allocator m_Allocator;
 
     /// <summary>
     /// The current number of buckets in the hash map, used for hash code modulo operations
@@ -139,7 +145,7 @@ public struct Umap<TKey, TValue> : IDisposable, IDictionary<TKey, TValue>, IRead
         get
         {
             EnsureNotDisposed();
-            return new(m_Buckets.AsSpan(), m_Items.AsSpan(), Count);
+            return new(m_Buckets.AsSpan(), m_Items.AsSpan(), Count, m_Allocator);
         }
     }
 
@@ -156,7 +162,7 @@ public struct Umap<TKey, TValue> : IDisposable, IDictionary<TKey, TValue>, IRead
         get
         {
             EnsureNotDisposed();
-            return new(m_Buckets.AsSpan(), m_Items.AsSpan(), Count);
+            return new(m_Buckets.AsSpan(), m_Items.AsSpan(), Count, m_Allocator);
         }
     }
 
@@ -180,47 +186,59 @@ public struct Umap<TKey, TValue> : IDisposable, IDictionary<TKey, TValue>, IRead
     }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="Umap{TKey, TValue}"/> struct with a default capacity of 4.
+    /// Initializes a new instance of the <see cref="Umap{TKey, TValue}"/> struct with a default capacity of 4,
+    /// using the specified allocator.
     /// </summary>
-    public Umap() : this(4) { }
+    /// <param name="allocator">The allocator used for the underlying storage.</param>
+    public Umap(Allocator allocator) : this(4, allocator) { }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="Umap{TKey, TValue}"/> struct with the specified initial capacity.
+    /// Initializes a new instance of the <see cref="Umap{TKey, TValue}"/> struct with the specified initial capacity,
+    /// using the specified allocator.
     /// </summary>
     /// <param name="capacity">The initial number of elements that the dictionary can contain.</param>
+    /// <param name="allocator">The allocator used for the underlying storage.</param>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="capacity"/> is less than 0.</exception>
-    public Umap(int capacity)
+    public Umap(int capacity, Allocator allocator)
     {
         if (capacity < 0)
             throw new ArgumentOutOfRangeException(nameof(capacity));
 
+        m_Allocator   = allocator;
         m_BucketCount = capacity == 0 ? 4 : Hash.GetPrime(capacity);
-        m_Buckets     = new Ulist<int>(m_BucketCount);
+        m_Buckets     = new Ulist<int>(m_BucketCount, allocator);
         for (var i = 0; i < m_BucketCount; i++)
         {
             m_Buckets.Add(-1);
         }
 
-        m_Items      = new Ulist<Entry>(capacity);
+        m_Items      = new Ulist<Entry>(capacity, allocator);
         m_Count      = 0;
         m_FreeList   = -1;
         m_FreeCount  = 0;
         m_IsDisposed = false;
     }
 
-    public Umap(ICollection<KeyValuePair<TKey, TValue>> collection)
+    /// <summary>
+    /// Initializes a new instance of the <see cref="Umap{TKey, TValue}"/> struct from an existing collection,
+    /// using the specified allocator.
+    /// </summary>
+    /// <param name="collection">The collection whose key-value pairs are copied into the new map.</param>
+    /// <param name="allocator">The allocator used for the underlying storage.</param>
+    public Umap(ICollection<KeyValuePair<TKey, TValue>> collection, Allocator allocator)
     {
         if (collection == null)
             throw new ArgumentNullException(nameof(collection));
 
+        m_Allocator   = allocator;
         m_BucketCount = collection.Count == 0 ? 4 : Hash.GetPrime(collection.Count);
-        m_Buckets     = new Ulist<int>(m_BucketCount);
+        m_Buckets     = new Ulist<int>(m_BucketCount, allocator);
         for (var i = 0; i < m_BucketCount; i++)
         {
             m_Buckets.Add(-1);
         }
 
-        m_Items      = new Ulist<Entry>(collection.Count);
+        m_Items      = new Ulist<Entry>(collection.Count, allocator);
         m_Count      = 0;
         m_FreeList   = -1;
         m_FreeCount  = 0;
@@ -664,9 +682,9 @@ public struct Umap<TKey, TValue> : IDisposable, IDictionary<TKey, TValue>, IRead
         var oldBucketCount = m_BucketCount;
 
         m_BucketCount = newBucketCount;
-        m_Buckets     = new Ulist<int>(m_BucketCount);
+        m_Buckets     = new Ulist<int>(m_BucketCount, m_Allocator);
         for (var i = 0; i < m_BucketCount; i++) m_Buckets.Add(-1);
-        m_Items = new Ulist<Entry>(newSize);
+        m_Items = new Ulist<Entry>(newSize, m_Allocator);
 
         for (var b = 0; b < oldBucketCount; b++)
         {
@@ -862,6 +880,7 @@ public struct Umap<TKey, TValue> : IDisposable, IDictionary<TKey, TValue>, IRead
         private readonly Span<int>   m_Buckets;
         private readonly Span<Entry> m_Items;
         private readonly int         m_Count;
+        private readonly Allocator   m_Allocator;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="KeyCollection"/> struct.
@@ -869,11 +888,13 @@ public struct Umap<TKey, TValue> : IDisposable, IDictionary<TKey, TValue>, IRead
         /// <param name="buckets">A span containing the bucket heads array where each element points to the first entry in that bucket's chain.</param>
         /// <param name="items">A span containing the entries storage with key-value pairs and chain links.</param>
         /// <param name="count">The actual number of keys (non-tombstones).</param>
-        internal KeyCollection(Span<int> buckets, Span<Entry> items, int count)
+        /// <param name="allocator">The allocator used when a temporary array is required.</param>
+        internal KeyCollection(Span<int> buckets, Span<Entry> items, int count, Allocator allocator)
         {
-            m_Buckets = buckets;
-            m_Items   = items;
-            m_Count   = count;
+            m_Buckets   = buckets;
+            m_Items     = items;
+            m_Count     = count;
+            m_Allocator = allocator;
         }
 
         /// <inheritdoc cref="ICollection{T}.Count"/>
@@ -921,9 +942,9 @@ public struct Umap<TKey, TValue> : IDisposable, IDictionary<TKey, TValue>, IRead
         /// </returns>
         public List<TKey> ToList()
         {
-            using var result = new Uarray<TKey>(m_Count);
+            using var result = new Uarray<TKey>(m_Count, m_Allocator);
             CopyTo(result);
-            return result.ToList();
+            return [.. result];
         }
 
         /// <summary>
@@ -1033,6 +1054,7 @@ public struct Umap<TKey, TValue> : IDisposable, IDictionary<TKey, TValue>, IRead
         private readonly Span<int>   m_Buckets;
         private readonly Span<Entry> m_Items;
         private readonly int         m_Count;
+        private readonly Allocator   m_Allocator;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ValueCollection"/> struct.
@@ -1040,11 +1062,13 @@ public struct Umap<TKey, TValue> : IDisposable, IDictionary<TKey, TValue>, IRead
         /// <param name="buckets">A span containing the bucket heads array where each element points to the first entry in that bucket's chain.</param>
         /// <param name="items">A span containing the entries storage with key-value pairs and chain links.</param>
         /// <param name="count">The actual number of values (non-tombstones).</param>
-        internal ValueCollection(Span<int> buckets, Span<Entry> items, int count)
+        /// <param name="allocator">The allocator used when a temporary array is required.</param>
+        internal ValueCollection(Span<int> buckets, Span<Entry> items, int count, Allocator allocator)
         {
-            m_Buckets = buckets;
-            m_Items   = items;
-            m_Count   = count;
+            m_Buckets   = buckets;
+            m_Items     = items;
+            m_Count     = count;
+            m_Allocator = allocator;
         }
 
         /// <inheritdoc cref="ICollection{T}.Count"/>
@@ -1093,9 +1117,9 @@ public struct Umap<TKey, TValue> : IDisposable, IDictionary<TKey, TValue>, IRead
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public List<TValue> ToList()
         {
-            using var result = new Uarray<TValue>(m_Count);
+            using var result = new Uarray<TValue>(m_Count, m_Allocator);
             CopyTo(result);
-            return result.ToList();
+            return [.. result];
         }
 
         /// <summary>

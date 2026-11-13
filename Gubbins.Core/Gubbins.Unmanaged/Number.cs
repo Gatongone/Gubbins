@@ -62,16 +62,16 @@ internal static class Number
     private const char EXPONENT_SIGN = 'E';
 
     /// <summary>Pre-computed array of positive powers of 10 (1, 10, 100, 1000, 1e4, 1e5, 1e6, ... 1e308)</summary>
-    private static readonly double[] s_PositiveExponents;
+    private static readonly double[] positiveExponents;
 
     /// <summary>Pre-computed array of negative powers of 10 (1, 0.1, 0.01, 0.001, 1e-4, 1e-5, 1e-6, ... 1e-324)</summary>
-    private static readonly double[] s_NegativeExponents;
+    private static readonly double[] negativeExponents;
 
     /// <summary>Maximum digital length for float formatting: 7 + 1 (decimal point)</summary>
-    private static readonly int s_MaxFloatDigitalLength = GetIntegerLength(0x7FFFFF) + 1;
+    private static readonly int maxFloatDigitalLength = GetIntegerLength(0x7FFFFF) + 1;
 
     /// <summary>Maximum digital length for double formatting: 15 + 1 (decimal point)</summary>
-    private static readonly int s_MaxDoubleDigitalLength = GetIntegerLength(0xFFFFFFFFFFFFF) + 1;
+    private static readonly int maxDoubleDigitalLength = GetIntegerLength(0xFFFFFFFFFFFFF) + 1;
 
     /// <summary>
     /// Initializes static members of the Number class.
@@ -80,17 +80,17 @@ internal static class Number
     static Number()
     {
         // Initialize positive exponents array
-        s_PositiveExponents = new double[SlowGetLength(MAX_POSITIVE_DOUBLE_VALUE)];
-        for (var i = 0; i < s_PositiveExponents.Length; i++)
+        positiveExponents = new double[SlowGetLength(MAX_POSITIVE_DOUBLE_VALUE)];
+        for (var i = 0; i < positiveExponents.Length; i++)
         {
-            s_PositiveExponents[i] = Math.Pow(10, i);
+            positiveExponents[i] = Math.Pow(10, i);
         }
 
         // Initialize negative exponents array
-        s_NegativeExponents = new double[SlowGetFractionalLength(MIN_POSITIVE_DOUBLE_VALUE)];
-        for (var i = 0; i < s_NegativeExponents.Length; i++)
+        negativeExponents = new double[SlowGetFractionalLength(MIN_POSITIVE_DOUBLE_VALUE)];
+        for (var i = 0; i < negativeExponents.Length; i++)
         {
-            s_NegativeExponents[i] = Math.Pow(10, -i);
+            negativeExponents[i] = Math.Pow(10, -i);
         }
     }
 
@@ -126,14 +126,14 @@ internal static class Number
     /// <returns>The result of x raised to the power of y.</returns>
     private static double Pow(double x, int y)
     {
-        if (y >= 0 && y < s_PositiveExponents.Length)
+        if (y >= 0 && y < positiveExponents.Length)
         {
-            return x * s_PositiveExponents[y];
+            return x * positiveExponents[y];
         }
 
-        if (y < 0 && -y < s_PositiveExponents.Length)
+        if (y < 0 && -y < positiveExponents.Length)
         {
-            return x / s_PositiveExponents[-y];
+            return x / positiveExponents[-y];
         }
 
         // For extremely large y values, divide by half and calculate twice
@@ -168,11 +168,11 @@ internal static class Number
         // Get the exponent part of the floating-point number
         var exponent = GetExponent(value);
         // Length of integer part. If digits exceed max or negative, use scientific notation with integer length of 1
-        var lengthOfInteger = exponent >= 0 && exponent < s_MaxDoubleDigitalLength ? exponent + 1 : 1;
+        var lengthOfInteger = exponent >= 0 && exponent < maxDoubleDigitalLength ? exponent + 1 : 1;
         // Length of fractional part + 1 (for rounding)
-        var lengthOfFractional = s_MaxDoubleDigitalLength - lengthOfInteger;
+        var lengthOfFractional = maxDoubleDigitalLength - lengthOfInteger;
         // exponent now represents the scientific notation exponent. If 0, no scientific notation needed
-        if (exponent < s_MaxDoubleDigitalLength && exponent > -MAX_FLOATING_ZERO_LENGTH)
+        if (exponent < maxDoubleDigitalLength && exponent > -MAX_FLOATING_ZERO_LENGTH)
         {
             exponent = 0;
         }
@@ -300,11 +300,11 @@ internal static class Number
         // Get the exponent part of the floating-point number
         var exponent = GetExponent(value);
         // Length of integer part. If digits exceed max or negative, use scientific notation with integer length of 1
-        var lengthOfInteger = exponent >= 0 && exponent < s_MaxFloatDigitalLength ? exponent + 1 : 1;
+        var lengthOfInteger = exponent >= 0 && exponent < maxFloatDigitalLength ? exponent + 1 : 1;
         // Length of fractional part + 1 (for rounding)
-        var lengthOfFractional = s_MaxFloatDigitalLength - lengthOfInteger;
+        var lengthOfFractional = maxFloatDigitalLength - lengthOfInteger;
         // exponent now represents the scientific notation exponent. If 0, no scientific notation needed
-        if (exponent < s_MaxFloatDigitalLength && exponent > -MAX_FLOATING_ZERO_LENGTH)
+        if (exponent < maxFloatDigitalLength && exponent > -MAX_FLOATING_ZERO_LENGTH)
         {
             exponent = 0;
         }
@@ -426,7 +426,7 @@ internal static class Number
         // Get the number of digits in the integer part of a number greater than 1, which is also the exponent in scientific notation
         static int GetPositiveExponent(double v)
         {
-            var exponents = s_PositiveExponents;
+            var exponents = positiveExponents;
             var i = 0;
             while (i + 128 < exponents.Length &&
                 v >= exponents[i + 128])
@@ -453,7 +453,7 @@ internal static class Number
         static int GetNegativeExponent(double v)
         {
             var i = 0;
-            var exponents = s_NegativeExponents;
+            var exponents = negativeExponents;
             while (i + 128 < exponents.Length &&
                 v < exponents[i + 128])
             {

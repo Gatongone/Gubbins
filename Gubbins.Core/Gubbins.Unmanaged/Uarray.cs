@@ -1,6 +1,6 @@
 using System.Collections;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using Gubbins.Unsafe;
 
 namespace Gubbins.Unmanaged;
@@ -9,7 +9,7 @@ namespace Gubbins.Unmanaged;
 /// Represents an unmanaged array that stores elements in unmanaged memory.
 /// </summary>
 /// <typeparam name="T">The type of elements in the array.</typeparam>
-public unsafe struct Uarray<T> : IDisposable, IReadOnlyCollection<T>, IList, IStructuralComparable, IStructuralEquatable, ICloneable where T : unmanaged
+public unsafe struct Uarray<T> : IDisposable, IReadOnlyCollection<T>, IList, IStructuralComparable, IStructuralEquatable, ICloneable
 {
     /// <summary>
     /// Gets an empty unmanaged array instance that contains no elements.
@@ -20,7 +20,12 @@ public unsafe struct Uarray<T> : IDisposable, IReadOnlyCollection<T>, IList, ISt
     /// <summary>
     /// The size of a single element in bytes.
     /// </summary>
-    public static readonly int ElementSize = (int) Native.GetStackSize<T>();
+    public static readonly int ElementSize = (int)Native.GetStackSize<T>();
+
+    /// <summary>
+    /// Gets the size of the unmanaged array in bytes.
+    /// </summary>
+    private Allocator m_Allocator;
 
     /// <summary>
     /// Indicates whether this UnmanagedList instance has been disposed and its resources returned to the pool.
@@ -28,9 +33,20 @@ public unsafe struct Uarray<T> : IDisposable, IReadOnlyCollection<T>, IList, ISt
     private bool m_IsDisposed;
 
     /// <summary>
+    /// Indicates whether this instance is a view over another array's memory. Views must never free the
+    /// underlying allocation, because they do not own it and their address may point into the middle of it.
+    /// </summary>
+    private bool m_IsSlice;
+
+    /// <summary>
     /// The number of elements in the unmanaged array.
     /// </summary>
     private int m_Length;
+
+    /// <summary>
+    /// The alignment of the unmanaged array in bytes, which is determined by the type <typeparamref name="T"/>.
+    /// </summary>
+    private byte m_Alignment;
 
     /// <summary>
     /// The memory address pointing to the unmanaged memory block containing the array elements.
@@ -43,10 +59,19 @@ public unsafe struct Uarray<T> : IDisposable, IReadOnlyCollection<T>, IList, ISt
     /// <value>
     /// <see langword="true"/> if the array has allocated memory and has not been disposed; otherwise, <see langword="false"/>.
     /// </value>
-    public bool IsValid
+    public readonly bool IsValid
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => m_Address != IntPtr.Zero && !m_IsDisposed;
+    }
+
+    /// <summary>
+    /// Gets the allocator that owns the array's memory, used by operations that produce new unmanaged values.
+    /// </summary>
+    internal readonly Allocator MemoryAllocator
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => m_Allocator;
     }
 
     /// <summary>
@@ -55,14 +80,14 @@ public unsafe struct Uarray<T> : IDisposable, IReadOnlyCollection<T>, IList, ISt
     /// <value>
     /// <see langword="true"/> if the array has zero length; otherwise, <see langword="false"/>.
     /// </value>
-    public bool IsEmpty
+    public readonly bool IsEmpty
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => m_Length == 0;
     }
 
     /// <inheritdoc cref="IReadOnlyList{T}.Count"/>
-    public int Count
+    public readonly int Count
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => m_Length;
@@ -81,9 +106,19 @@ public unsafe struct Uarray<T> : IDisposable, IReadOnlyCollection<T>, IList, ISt
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get
         {
-            EnsureNotDisposed();
-            if (index < 0 || index >= m_Length) throw new IndexOutOfRangeException($"Index '{index}' out of range.");
-            return ref m_Items[index];
+            // The exception paths live in non-inlined helpers so the hot path stays small enough for the JIT
+            // to inline this getter; otherwise every element access becomes an out-of-line call.
+            if (m_IsDisposed)
+            {
+                ThrowDisposed();
+            }
+
+            if ((uint)index >= (uint)m_Length)
+            {
+                ThrowIndexOutOfRange(index);
+            }
+
+            return ref Native.AsRef<T>((byte*)m_Address + (nint)index * ElementSize);
         }
     }
 
@@ -102,42 +137,66 @@ public unsafe struct Uarray<T> : IDisposable, IReadOnlyCollection<T>, IList, ISt
     /// <inheritdoc />
     object IList.this[int index]
     {
-        get => this[index];
-        set => this[index] = (T) value;
+        get => this[index]!;
+        set => this[index] = (T)value;
     }
 
-    private readonly Span<T> m_Items
+    private readonly Span<T> MItems
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => new((void*) m_Address, m_Length);
+        get => new((void*)m_Address, m_Length);
     }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="Uarray{T}"/> struct with the specified length.
     /// </summary>
     /// <param name="length">The number of elements in the array.</param>
+    /// <param name="alignment">The alignment of the array in bytes, which is determined by the type <typeparamref name="T"/>.</param>
+    /// <param name="allocator">The allocator to use for allocating unmanaged memory.</param>
     /// <exception cref="ObjectDisposedException">
     /// Thrown when the array has been disposed and is no longer valid for use.
     /// </exception>
-    public Uarray(int length)
+    public Uarray(int length, byte alignment, Allocator allocator)
     {
-        m_Address = Native.AlignedAlloc(length * sizeof(T), Native.GetAlignment<T>());
-        m_Length  = length;
+        m_Allocator = allocator;
+        m_Address = (nint)allocator.Alloc((nuint)(length * Native.GetStackSize<T>()), alignment);
+        m_Alignment = alignment;
+        m_Length = length;
     }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="Uarray{T}"/> struct with elements copied from the specified span.
     /// </summary>
-    /// <param name="items">The span of items to copy.</param>/// <exception cref="ObjectDisposedException">
+    /// <param name="items">The span of items to copy.</param>
+    /// <param name="alignment">The alignment of the array in bytes, which is determined by the type <typeparamref name="T"/>.</param>
+    /// <param name="allocator">The allocator to use for allocating unmanaged memory.</param>
+    /// /// <exception cref="ObjectDisposedException">
     /// Thrown when the array has been disposed and is no longer valid for use.
     /// </exception>
-    public Uarray(ReadOnlySpan<T> items)
+    public Uarray(ReadOnlySpan<T> items, byte alignment, Allocator allocator)
     {
         EnsureNotDisposed();
-        m_Length  = items.Length;
-        m_Address = Native.AlignedAlloc(m_Length * sizeof(T), Native.GetAlignment<T>());
-        items.CopyTo(m_Items);
+        m_Allocator = allocator;
+        m_Length = items.Length;
+        m_Alignment = alignment;
+        m_Address = (nint)allocator.Alloc((nuint)(m_Length * Native.GetStackSize<T>()), alignment);
+        items.CopyTo(MItems);
     }
+    
+    /// <summary>
+    /// Initializes a new instance of the <see cref="Uarray{T}"/> struct with the specified length and allocator, using the default alignment for type <typeparamref name="T"/>.
+    /// </summary>
+    /// <param name="length">The number of elements in the array.</param>
+    /// <param name="allocator">The allocator to use for allocating unmanaged memory.</param>
+    public Uarray(int length, Allocator allocator) : this(length, Native.GetAlignment<T>(), allocator){}
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="Uarray{T}"/> struct with elements copied from the specified span and allocator, using the default alignment for type <typeparamref name="T"/>.
+    /// </summary>
+    /// <param name="items">The span of items to copy.</param>
+    /// <param name="allocator">The allocator to use for allocating unmanaged memory.</param>
+    public Uarray(ReadOnlySpan<T> items, Allocator allocator) : this(items, Native.GetAlignment<T>(), allocator){}
+
 
     /// <summary>
     /// Creates a new unmanaged array that represents a slice of this array, sharing the same underlying memory.
@@ -147,10 +206,17 @@ public unsafe struct Uarray<T> : IDisposable, IReadOnlyCollection<T>, IList, ISt
     /// <returns>A new <see cref="Uarray{T}"/> instance that shares memory with this array, starting at the specified index and containing the specified number of elements.</returns>
     /// <exception cref="ObjectDisposedException">Thrown when this array instance has been disposed or is invalid.</exception>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal Uarray<T> Slice(int start, int length)
+    internal readonly Uarray<T> Slice(int start, int length)
     {
         if (!IsValid) throw new ObjectDisposedException(nameof(Uarray<T>));
-        return new Uarray<T> {m_Address = new IntPtr((byte*) m_Address + start * ElementSize), m_Length = length};
+        return new Uarray<T>
+        {
+            m_Address   = new IntPtr((byte*)m_Address + start * ElementSize),
+            m_Length    = length,
+            m_Allocator = m_Allocator,
+            m_Alignment = m_Alignment,
+            m_IsSlice   = true
+        };
     }
 
     /// <summary>
@@ -163,7 +229,7 @@ public unsafe struct Uarray<T> : IDisposable, IReadOnlyCollection<T>, IList, ISt
     public Span<T> AsSpan(int start, int length)
     {
         EnsureNotDisposed();
-        return m_Items[start..(start + length)];
+        return MItems[start..(start + length)];
     }
 
     /// <summary>
@@ -178,7 +244,7 @@ public unsafe struct Uarray<T> : IDisposable, IReadOnlyCollection<T>, IList, ISt
     public Span<T> AsSpan(int start)
     {
         EnsureNotDisposed();
-        return m_Items[start..];
+        return MItems[start..];
     }
 
     /// <summary>
@@ -189,10 +255,10 @@ public unsafe struct Uarray<T> : IDisposable, IReadOnlyCollection<T>, IList, ISt
     /// Thrown when the array has been disposed and is no longer valid for use.
     /// </exception>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Span<T> AsSpan()
+    public readonly Span<T> AsSpan()
     {
         EnsureNotDisposed();
-        return m_Items;
+        return MItems;
     }
 
     /// <summary>
@@ -236,7 +302,7 @@ public unsafe struct Uarray<T> : IDisposable, IReadOnlyCollection<T>, IList, ISt
     {
         EnsureNotDisposed();
         var result = new T[m_Length - start];
-        m_Items[start..].CopyTo(result);
+        MItems[start..].CopyTo(result);
         if (disposedOrigin) Dispose();
         return result;
     }
@@ -262,7 +328,7 @@ public unsafe struct Uarray<T> : IDisposable, IReadOnlyCollection<T>, IList, ISt
     {
         EnsureNotDisposed();
         var result = new T[length];
-        m_Items[start..(start + length)].CopyTo(result);
+        MItems[start..(start + length)].CopyTo(result);
         if (disposedOrigin) Dispose();
         return result;
     }
@@ -358,7 +424,7 @@ public unsafe struct Uarray<T> : IDisposable, IReadOnlyCollection<T>, IList, ISt
     public Ulist<T> ToUlist(bool disposedOrigin = true)
     {
         EnsureNotDisposed();
-        var result = new Ulist<T>(this);
+        var result = new Ulist<T>(this, m_Alignment, m_Allocator);
         if (disposedOrigin) Dispose();
         return result;
     }
@@ -382,7 +448,7 @@ public unsafe struct Uarray<T> : IDisposable, IReadOnlyCollection<T>, IList, ISt
     public Ulist<T> ToUlist(int start, bool disposedOrigin = true)
     {
         EnsureNotDisposed();
-        var result = new Ulist<T>(this[start..]);
+        var result = new Ulist<T>(this[start..], m_Alignment, m_Allocator);
         if (disposedOrigin) Dispose();
         return result;
     }
@@ -407,7 +473,7 @@ public unsafe struct Uarray<T> : IDisposable, IReadOnlyCollection<T>, IList, ISt
     public Ulist<T> ToUlist(int start, int length, bool disposedOrigin = true)
     {
         EnsureNotDisposed();
-        var result = new Ulist<T>(this[start..(start + length)]);
+        var result = new Ulist<T>(this[start..(start + length)], m_Alignment, m_Allocator);
         if (disposedOrigin) Dispose();
         return result;
     }
@@ -453,7 +519,7 @@ public unsafe struct Uarray<T> : IDisposable, IReadOnlyCollection<T>, IList, ISt
     public Enumerator GetEnumerator()
     {
         EnsureNotDisposed();
-        return new Enumerator(m_Items);
+        return new Enumerator(MItems);
     }
 
     /// <inheritdoc />
@@ -462,7 +528,7 @@ public unsafe struct Uarray<T> : IDisposable, IReadOnlyCollection<T>, IList, ISt
         EnsureNotDisposed();
         for (var i = 0; i < m_Length; i++)
         {
-            yield return m_Items[i];
+            yield return MItems[i];
         }
     }
 
@@ -472,7 +538,7 @@ public unsafe struct Uarray<T> : IDisposable, IReadOnlyCollection<T>, IList, ISt
         EnsureNotDisposed();
         for (var i = 0; i < m_Length; i++)
         {
-            yield return m_Items[i];
+            yield return MItems[i];
         }
     }
 
@@ -491,7 +557,7 @@ public unsafe struct Uarray<T> : IDisposable, IReadOnlyCollection<T>, IList, ISt
         var comparer = EqualityComparer<T>.Default;
         for (var i = 0; i < m_Length; i++)
         {
-            if (!comparer.Equals(m_Items[i], other[i]))
+            if (!comparer.Equals(MItems[i], other[i]))
             {
                 return false;
             }
@@ -574,7 +640,7 @@ public unsafe struct Uarray<T> : IDisposable, IReadOnlyCollection<T>, IList, ISt
 
         for (var i = 0; i < m_Length; i++)
         {
-            array.SetValue(m_Items[i], index + i);
+            array.SetValue(MItems[i], index + i);
         }
     }
 
@@ -589,7 +655,7 @@ public unsafe struct Uarray<T> : IDisposable, IReadOnlyCollection<T>, IList, ISt
     bool IList.Contains(object? value)
     {
         EnsureNotDisposed();
-        var array = m_Items;
+        var array = MItems;
         if (value is not T v) return false;
         var comparer = EqualityComparer<T>.Default;
         for (var i = 0; i < m_Length; i++)
@@ -628,7 +694,7 @@ public unsafe struct Uarray<T> : IDisposable, IReadOnlyCollection<T>, IList, ISt
     public int IndexOf(T item)
     {
         EnsureNotDisposed();
-        var array = m_Items;
+        var array = MItems;
         var comparer = EqualityComparer<T>.Default;
         for (var i = 0; i < m_Length; i++)
         {
@@ -644,7 +710,7 @@ public unsafe struct Uarray<T> : IDisposable, IReadOnlyCollection<T>, IList, ISt
     /// <inheritdoc />
     int IList.IndexOf(object? value)
     {
-        var array = m_Items;
+        var array = MItems;
         if (value is not T v) return -1;
         var comparer = EqualityComparer<T>.Default;
         for (var i = 0; i < m_Length; i++)
@@ -687,7 +753,7 @@ public unsafe struct Uarray<T> : IDisposable, IReadOnlyCollection<T>, IList, ISt
         var minLength = Math.Min(m_Length, otherArray.m_Length);
         for (var i = 0; i < minLength; i++)
         {
-            var comparison = comparer.Compare(m_Items[i], otherArray.m_Items[i]);
+            var comparison = comparer.Compare(MItems[i], otherArray.MItems[i]);
             if (comparison != 0) return comparison;
         }
 
@@ -703,7 +769,7 @@ public unsafe struct Uarray<T> : IDisposable, IReadOnlyCollection<T>, IList, ISt
 
         for (var i = 0; i < m_Length; i++)
         {
-            if (!comparer.Equals(m_Items[i], otherArray.m_Items[i]))
+            if (!comparer.Equals(MItems[i], otherArray.MItems[i]))
                 return false;
         }
 
@@ -712,7 +778,7 @@ public unsafe struct Uarray<T> : IDisposable, IReadOnlyCollection<T>, IList, ISt
 
     /// <inheritdoc />
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public override int GetHashCode() => (int) m_Address;
+    public override int GetHashCode() => (int)m_Address;
 
     /// <inheritdoc />
     public int GetHashCode(IEqualityComparer comparer)
@@ -720,7 +786,7 @@ public unsafe struct Uarray<T> : IDisposable, IReadOnlyCollection<T>, IList, ISt
         var hash = 17;
         for (var i = 0; i < m_Length; i++)
         {
-            hash = hash * 31 + comparer.GetHashCode(m_Items[i]);
+            hash = hash * 31 + comparer.GetHashCode(MItems[i]);
         }
 
         return hash;
@@ -730,7 +796,8 @@ public unsafe struct Uarray<T> : IDisposable, IReadOnlyCollection<T>, IList, ISt
     object ICloneable.Clone()
     {
         EnsureNotDisposed();
-        return new Uarray<T>(m_Items);
+
+        return new Uarray<T>(MItems, m_Alignment, m_Allocator);
     }
 
     /// <summary>
@@ -743,81 +810,57 @@ public unsafe struct Uarray<T> : IDisposable, IReadOnlyCollection<T>, IList, ISt
     public Uarray<T> Clone()
     {
         EnsureNotDisposed();
-        return new Uarray<T>(m_Items);
+
+        return new Uarray<T>(MItems, m_Alignment, m_Allocator);
     }
 
     /// <summary>
-    /// Disposes only the unmanaged memory allocated for this array instance without disposing individual elements.
+    /// Resizes the unmanaged array to the specified new length, preserving existing elements.
     /// </summary>
-    /// <remarks>
-    /// This method releases the unmanaged memory block and marks the array as disposed, but does not call dispose
-    /// on individual elements. Use this method when elements do not require disposal or when elements have already
-    /// been disposed separately.
-    /// </remarks>
-    public void DisposeOnlySelf()
+    /// <param name="newLength">The new length for the array. Must be greater than or equal to zero.</param>
+    /// <returns><see langword="true"/> if the resize operation was successful; otherwise, <see langword="false"/>.</returns>
+    public bool Resize(int newLength)
+    {
+        if (newLength < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(newLength));
+        }
+
+        // A default (or disposed) array owns no allocation and no allocator, so there is nothing to resize.
+        // Callers such as Ulist.AutoExpand fall back to allocating a fresh array when this returns false.
+        // Views must not be resized in place either; only the owning array can hand its allocation back.
+        if (m_Address == 0 || m_IsSlice)
+        {
+            return false;
+        }
+
+        if (!m_Allocator.Resize(MItems, newLength, m_Alignment, out _))
+        {
+            return false;
+        }
+
+        m_Length = newLength;
+        return true;
+    }
+
+    /// <summary>
+    /// Releases all resources used by the unmanaged array.
+    /// </summary>
+    public void Dispose()
     {
         if (m_IsDisposed) return;
 
         m_IsDisposed = true;
-        Native.AlignedFree(m_Address);
-        m_Address = 0;
-        m_Length  = 0;
-    }
 
-    /// <summary>
-    /// Disposes all elements in the array if they implement IDisposable.
-    /// </summary>
-    /// <remarks>
-    /// This method calls the dispose method on each element in the array if the element type implements IDisposable.
-    /// The unmanaged memory for the array itself is not released by this method.
-    /// </remarks>
-    public void DisposeElements() => DisposeElements(0, m_Length);
-
-    /// <summary>
-    /// Disposes elements in the array starting from the specified index to the end of the array if they implement IDisposable.
-    /// </summary>
-    /// <param name="startIndex">The zero-based starting index from which to begin disposing elements.</param>
-    /// <remarks>
-    /// This method calls the dispose method on each element from the specified starting index to the end of the array
-    /// if the element type implements IDisposable. The unmanaged memory for the array itself is not released by this method.
-    /// </remarks>
-    public void DisposeElements(int startIndex) => DisposeElements(startIndex, m_Length - startIndex);
-
-    /// <summary>
-    /// Disposes a specified range of elements in the array if they implement IDisposable.
-    /// </summary>
-    /// <param name="startIndex">The zero-based starting index from which to begin disposing elements.</param>
-    /// <param name="length">The number of elements to dispose starting from the specified index.</param>
-    /// <remarks>
-    /// This method calls the dispose method on each element within the specified range if the element type implements IDisposable.
-    /// The unmanaged memory for the array itself is not released by this method. If the array has already been disposed,
-    /// this method returns without performing any operations.
-    /// </remarks>
-    public void DisposeElements(int startIndex, int length)
-    {
-        if (m_IsDisposed) return;
-        if (Disposer<T>.IsDisposable)
+        // `new Uarray<T>()` / `default` leave the allocator uninitialized, so only free when there is an allocation.
+        // Slices share another array's memory and only own a view of it, so they must not free it.
+        if (m_Address != 0 && !m_IsSlice)
         {
-            var end = startIndex + length;
-            for (var i = startIndex; i < end; i++)
-            {
-                Disposer<T>.Dispose(ref m_Items[i]);
-            }
+            m_Allocator.Free((void*)m_Address, (nuint)m_Length * Native.GetStackSize<T>(), m_Alignment);
         }
-    }
 
-    /// <summary>
-    /// Releases all resources used by the unmanaged array, including disposing individual elements and freeing unmanaged memory.
-    /// </summary>
-    /// <remarks>
-    /// This method first disposes all elements in the array if they implement IDisposable, then releases the unmanaged memory
-    /// allocated for the array. After calling this method, the array instance becomes invalid and should not be used.
-    /// This method implements the IDisposable pattern.
-    /// </remarks>
-    public void Dispose()
-    {
-        DisposeElements(0, m_Length);
-        DisposeOnlySelf();
+        m_Address = 0;
+        m_Length = 0;
     }
 
     /// <summary>
@@ -829,10 +872,25 @@ public unsafe struct Uarray<T> : IDisposable, IReadOnlyCollection<T>, IList, ISt
     /// Thrown when the array has been disposed and is no longer valid for use.
     /// </exception>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void EnsureNotDisposed()
+    private readonly void EnsureNotDisposed()
     {
-        if (m_IsDisposed) throw new ObjectDisposedException(nameof(Ulist<T>));
+        if (m_IsDisposed) throw new ObjectDisposedException(nameof(Uarray<T>));
     }
+
+    /// <summary>
+    /// Throws the exception reported when an element is accessed outside the array bounds.
+    /// </summary>
+    /// <param name="index">The invalid index.</param>
+    [DoesNotReturn]
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void ThrowIndexOutOfRange(int index) => throw new IndexOutOfRangeException($"Index '{index}' out of range.");
+
+    /// <summary>
+    /// Throws the exception reported when a disposed array is accessed.
+    /// </summary>
+    [DoesNotReturn]
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void ThrowDisposed() => throw new ObjectDisposedException(nameof(Uarray<T>));
 
     /// <summary>
     /// Provides a fast enumerator for the unmanaged array using ref struct.
@@ -855,7 +913,7 @@ public unsafe struct Uarray<T> : IDisposable, IReadOnlyCollection<T>, IList, ISt
         /// <param name="span">The span to enumerate.</param>
         public Enumerator(Span<T> span)
         {
-            m_Span  = span;
+            m_Span = span;
             m_Index = -1;
         }
 

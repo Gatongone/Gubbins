@@ -4,7 +4,7 @@
 /// Provides a cached disposal delegate for unmanaged value types that also implement <see cref="IDisposable"/>.
 /// </summary>
 /// <typeparam name="T">The unmanaged target type.</typeparam>
-internal static class Disposer<T> where T : unmanaged
+internal static class Disposer<T>
 {
     /// <summary>
     /// Represents a disposal function for <typeparamref name="T"/>.

@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 
 namespace Gubbins.Unmanaged.Tests;
 
@@ -9,7 +9,7 @@ public sealed class UarrayTests
     public void ConstructorWithLengthTest()
     {
         const int length = 5;
-        var array = new Uarray<int>(length);
+        var array = new Uarray<int>(length, TestAllocator.Shared);
 
         Assert.Multiple(() =>
         {
@@ -38,7 +38,7 @@ public sealed class UarrayTests
     [Test]
     public void IndexerShouldThrowIndexOutOfRangeExceptionForNegativeIndex()
     {
-        var array = new Uarray<int>(5);
+        var array = new Uarray<int>(5, TestAllocator.Shared);
         Assert.Throws<IndexOutOfRangeException>(() => { _ = array[-1]; });
         array.Dispose();
     }
@@ -46,7 +46,7 @@ public sealed class UarrayTests
     [Test]
     public void IndexOutOfRangeExceptionTest()
     {
-        var array = new Uarray<int>(3);
+        var array = new Uarray<int>(3, TestAllocator.Shared);
         array[0] = 1;
         array[1] = 2;
         array[2] = 3;
@@ -68,7 +68,7 @@ public sealed class UarrayTests
         var sourceData = new[] {1, 2, 3, 4, 5};
         var span = new ReadOnlySpan<int>(sourceData);
 
-        var uarray = new Uarray<int>(span);
+        var uarray = new Uarray<int>(span, TestAllocator.Shared);
 
         Assert.Multiple(() =>
         {
@@ -88,7 +88,7 @@ public sealed class UarrayTests
     [Test]
     public void IsValidReturnsFalseWhenArrayIsDisposed()
     {
-        var array = new Uarray<int>(5);
+        var array = new Uarray<int>(5, TestAllocator.Shared);
         Assert.That(array.IsValid, Is.True);
 
         array.Dispose();
@@ -99,7 +99,7 @@ public sealed class UarrayTests
     [Test]
     public void SliceThrowsObjectDisposedExceptionWhenDisposed()
     {
-        var array = new Uarray<int>(5);
+        var array = new Uarray<int>(5, TestAllocator.Shared);
         array.Dispose();
         Assert.Throws<ObjectDisposedException>(() => array.Slice(0, 2));
     }
@@ -107,7 +107,7 @@ public sealed class UarrayTests
     [Test]
     public void DisposeTest()
     {
-        var array = new Uarray<int>(5);
+        var array = new Uarray<int>(5, TestAllocator.Shared);
 
         Assert.Multiple(() =>
         {
@@ -127,7 +127,7 @@ public sealed class UarrayTests
     [Test]
     public void GetHashCodeTest()
     {
-        var array = new Uarray<int>(5);
+        var array = new Uarray<int>(5, TestAllocator.Shared);
         var hashCode = array.GetHashCode();
 
         Assert.That(hashCode, Is.Not.EqualTo(0));
@@ -138,7 +138,7 @@ public sealed class UarrayTests
     [Test]
     public void AsSpanMethodsReturnCorrectSpanWithSpecifiedParameters()
     {
-        var array = new Uarray<int>(10);
+        var array = new Uarray<int>(10, TestAllocator.Shared);
         for (int i = 0; i < 10; i++)
         {
             array[i] = i + 1;
@@ -167,8 +167,8 @@ public sealed class UarrayTests
     [Test]
     public void SequenceEqualReturnsFalseWhenArraysHaveDifferentSequences()
     {
-        var array1 = new Uarray<int>(new ReadOnlySpan<int>(new[] {1, 2, 3, 4, 5}));
-        var array2 = new ReadOnlySpan<int>(new[] {1, 2, 3, 4, 6});
+        var array1 = new Uarray<int>(new ReadOnlySpan<int>([1, 2, 3, 4, 5]), TestAllocator.Shared);
+        var array2 = new ReadOnlySpan<int>([1, 2, 3, 4, 6]);
 
         var result = array1.SequenceEqual(array2);
 
@@ -178,9 +178,9 @@ public sealed class UarrayTests
     }
 
     [Test]
-    public void IListMethodsShouldThrowNotSupportedException()
+    public void ListMethodsShouldThrowNotSupportedException()
     {
-        var array = new Uarray<int>(3);
+        var array = new Uarray<int>(3, TestAllocator.Shared);
         IList ilist = array;
         Assert.That(() => ilist.Add(5), Throws.TypeOf<NotSupportedException>().With.Message.EqualTo("Array is fixed size."));
         Assert.That(() => ilist.Insert(0, 5), Throws.TypeOf<NotSupportedException>().With.Message.EqualTo("Array is fixed size."));
@@ -194,7 +194,7 @@ public sealed class UarrayTests
     public void ToArray_WithDisposedOriginFalse_PreservesOriginalArray()
     {
         var sourceData = new[] {1, 2, 3, 4, 5};
-        var uarray = new Uarray<int>(sourceData);
+        var uarray = new Uarray<int>(sourceData, TestAllocator.Shared);
 
         var managedArray = uarray.ToArray(disposedOrigin: false);
 
@@ -214,7 +214,7 @@ public sealed class UarrayTests
     public void ToArray_WithDefaultDisposedOriginParameterShouldDisposeOriginalArrayAndReturnCorrectManagedArray()
     {
         var sourceData = new[] {1, 2, 3, 4, 5};
-        var array = new Uarray<int>(sourceData);
+        var array = new Uarray<int>(sourceData, TestAllocator.Shared);
 
         var result = array.ToArray();
 
@@ -236,7 +236,7 @@ public sealed class UarrayTests
     public void ToArray_WithStartIndexAndDisposedOriginFalsePreservesOriginalArrayAndCopiesFromSpecifiedPosition()
     {
         var sourceData = new[] {1, 2, 3, 4, 5};
-        var uarray = new Uarray<int>(sourceData);
+        var uarray = new Uarray<int>(sourceData, TestAllocator.Shared);
 
         var managedArray = uarray.ToArray(2, disposedOrigin: false);
 
@@ -259,7 +259,7 @@ public sealed class UarrayTests
     public void ToArray_WithStartIndexShouldCopyElementsFromSpecifiedPositionAndDisposeOriginalWhenDisposedOriginIsTrue()
     {
         var sourceData = new[] {10, 20, 30, 40, 50};
-        var array = new Uarray<int>(sourceData);
+        var array = new Uarray<int>(sourceData, TestAllocator.Shared);
 
         var result = array.ToArray(2, disposedOrigin: true);
 
@@ -279,7 +279,7 @@ public sealed class UarrayTests
     public void ToArray_WithStartAndLengthParametersPreservesOriginalArrayWhenDisposedOriginIsFalse()
     {
         var sourceData = new[] {10, 20, 30, 40, 50, 60, 70};
-        var array = new Uarray<int>(sourceData);
+        var array = new Uarray<int>(sourceData, TestAllocator.Shared);
 
         var result = array.ToArray(2, 3, disposedOrigin: false);
 
@@ -303,7 +303,7 @@ public sealed class UarrayTests
     public void ToArray_WithStartAndLengthShouldCreateCorrectArrayAndDisposeOriginalWhenDisposedOriginIsTrue()
     {
         var sourceData = new[] {10, 20, 30, 40, 50, 60, 70};
-        var array = new Uarray<int>(sourceData);
+        var array = new Uarray<int>(sourceData, TestAllocator.Shared);
 
         var result = array.ToArray(2, 3, disposedOrigin: true);
 
@@ -323,7 +323,7 @@ public sealed class UarrayTests
     public void ToList_WithDisposedOriginFalse_PreservesOriginalArray()
     {
         var sourceData = new[] {1, 2, 3, 4, 5};
-        var uarray = new Uarray<int>(sourceData);
+        var uarray = new Uarray<int>(sourceData, TestAllocator.Shared);
 
         var managedList = uarray.ToList(disposedOrigin: false);
 
@@ -343,7 +343,7 @@ public sealed class UarrayTests
     public void ToList_WithDefaultDisposedOriginParameterShouldDisposeOriginalArrayAndReturnCorrectManagedArray()
     {
         var sourceData = new[] {1, 2, 3, 4, 5};
-        var array = new Uarray<int>(sourceData);
+        var array = new Uarray<int>(sourceData, TestAllocator.Shared);
 
         var managedList = array.ToList();
 
@@ -365,7 +365,7 @@ public sealed class UarrayTests
     public void ToList_WithStartIndexAndDisposedOriginFalsePreservesOriginalArrayAndCopiesFromSpecifiedPosition()
     {
         var sourceData = new[] {1, 2, 3, 4, 5};
-        var uarray = new Uarray<int>(sourceData);
+        var uarray = new Uarray<int>(sourceData, TestAllocator.Shared);
 
         var managedList = uarray.ToList(2, disposedOrigin: false);
 
@@ -388,7 +388,7 @@ public sealed class UarrayTests
     public void ToList_WithStartIndexShouldCopyElementsFromSpecifiedPositionAndDisposeOriginalWhenDisposedOriginIsTrue()
     {
         var sourceData = new[] {10, 20, 30, 40, 50};
-        var array = new Uarray<int>(sourceData);
+        var array = new Uarray<int>(sourceData, TestAllocator.Shared);
 
         var managedList = array.ToList(2, disposedOrigin: true);
 
@@ -408,7 +408,7 @@ public sealed class UarrayTests
     public void ToList_WithStartAndLengthParametersPreservesOriginalArrayWhenDisposedOriginIsFalse()
     {
         var sourceData = new[] {10, 20, 30, 40, 50, 60, 70};
-        var array = new Uarray<int>(sourceData);
+        var array = new Uarray<int>(sourceData, TestAllocator.Shared);
 
         var managedList = array.ToList(2, 3, disposedOrigin: false);
 
@@ -432,7 +432,7 @@ public sealed class UarrayTests
     public void ToList_WithStartAndLengthShouldCreateCorrectArrayAndDisposeOriginalWhenDisposedOriginIsTrue()
     {
         var sourceData = new[] {10, 20, 30, 40, 50, 60, 70};
-        var array = new Uarray<int>(sourceData);
+        var array = new Uarray<int>(sourceData, TestAllocator.Shared);
 
         var managedList = array.ToList(2, 3, disposedOrigin: true);
 
@@ -452,7 +452,7 @@ public sealed class UarrayTests
     public void ToUlist_WithDisposedOriginFalse_PreservesOriginalArray()
     {
         var sourceData = new[] {1, 2, 3, 4, 5};
-        var uarray = new Uarray<int>(sourceData);
+        var uarray = new Uarray<int>(sourceData, TestAllocator.Shared);
 
         var unmanagedList = uarray.ToUlist(disposedOrigin: false);
 
@@ -472,7 +472,7 @@ public sealed class UarrayTests
     public void ToUlist_WithDefaultDisposedOriginParameterShouldDisposeOriginalArrayAndReturnCorrectManagedArray()
     {
         var sourceData = new[] {1, 2, 3, 4, 5};
-        var array = new Uarray<int>(sourceData);
+        var array = new Uarray<int>(sourceData, TestAllocator.Shared);
 
         var unmanagedList = array.ToUlist();
 
@@ -494,7 +494,7 @@ public sealed class UarrayTests
     public void ToUlist_WithStartIndexAndDisposedOriginFalsePreservesOriginalArrayAndCopiesFromSpecifiedPosition()
     {
         var sourceData = new[] {1, 2, 3, 4, 5};
-        var uarray = new Uarray<int>(sourceData);
+        var uarray = new Uarray<int>(sourceData, TestAllocator.Shared);
 
         var unmanagedList = uarray.ToUlist(2, disposedOrigin: false);
 
@@ -517,7 +517,7 @@ public sealed class UarrayTests
     public void ToUlist_WithStartIndexShouldCopyElementsFromSpecifiedPositionAndDisposeOriginalWhenDisposedOriginIsTrue()
     {
         var sourceData = new[] {10, 20, 30, 40, 50};
-        var array = new Uarray<int>(sourceData);
+        var array = new Uarray<int>(sourceData, TestAllocator.Shared);
 
         var unmanagedList = array.ToUlist(2, disposedOrigin: true);
 
@@ -537,7 +537,7 @@ public sealed class UarrayTests
     public void ToUlist_WithStartAndLengthParametersPreservesOriginalArrayWhenDisposedOriginIsFalse()
     {
         var sourceData = new[] {10, 20, 30, 40, 50, 60, 70};
-        var array = new Uarray<int>(sourceData);
+        var array = new Uarray<int>(sourceData, TestAllocator.Shared);
 
         var unmanagedList = array.ToUlist(2, 3, disposedOrigin: false);
 
@@ -561,7 +561,7 @@ public sealed class UarrayTests
     public void ToUlist_WithStartAndLengthShouldCreateCorrectArrayAndDisposeOriginalWhenDisposedOriginIsTrue()
     {
         var sourceData = new[] {10, 20, 30, 40, 50, 60, 70};
-        var array = new Uarray<int>(sourceData);
+        var array = new Uarray<int>(sourceData, TestAllocator.Shared);
 
         var unmanagedList = array.ToUlist(2, 3, disposedOrigin: true);
 

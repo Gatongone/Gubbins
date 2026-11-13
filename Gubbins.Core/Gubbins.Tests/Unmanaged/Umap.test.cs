@@ -5,11 +5,13 @@ namespace Gubbins.Unmanaged.Tests;
 [TestFixture]
 public class UmapTests
 {
+    private static Ustring U(string value) => new(value, TestAllocator.Shared);
+
     [Test]
     public void DefaultConstructor_InitializesCorrectly()
     {
         // Arrange & Act
-        using var map = new Umap<int, Ustring>();
+        using var map = new Umap<int, Ustring>(TestAllocator.Shared);
 
         // Assert
         Assert.That(map, Is.Empty);
@@ -20,7 +22,7 @@ public class UmapTests
     public void ConstructorWithCapacity_InitializesCorrectly()
     {
         // Arrange & Act
-        using var map = new Umap<int, Ustring>(16);
+        using var map = new Umap<int, Ustring>(16, TestAllocator.Shared);
 
         // Assert
         Assert.That(map, Is.Empty);
@@ -31,87 +33,87 @@ public class UmapTests
     public void ConstructorWithNegativeCapacity_ThrowsArgumentOutOfRangeException()
     {
         // Arrange & Act & Assert
-        Assert.Throws<ArgumentOutOfRangeException>(() => new Umap<int, Ustring>(-1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new Umap<int, Ustring>(-1, TestAllocator.Shared));
     }
 
     [Test]
     public void Add_KeyValuePair_Succeeds()
     {
         // Arrange
-        using var map = new Umap<int, Ustring>();
+        using var map = new Umap<int, Ustring>(TestAllocator.Shared);
 
         // Act
-        map.Add(new KeyValuePair<int, Ustring>(1, "one"));
+        map.Add(new KeyValuePair<int, Ustring>(1, U("one")));
 
         // Assert
         Assert.That(map.Count, Is.EqualTo(1));
         Assert.IsTrue(map.ContainsKey(1));
-        Assert.That(map[1], Is.EqualTo("one"));
+        Assert.That(map[1], Is.EqualTo(U("one")));
     }
 
     [Test]
     public void Add_Tuple_KeyValue_Succeeds()
     {
         // Arrange
-        using var map = new Umap<int, Ustring>();
+        using var map = new Umap<int, Ustring>(TestAllocator.Shared);
 
         // Act
-        map.Add((1, "one"));
+        map.Add((1, U("one")));
 
         // Assert
         Assert.That(map.Count, Is.EqualTo(1));
         Assert.IsTrue(map.ContainsKey(1));
-        Assert.That(map[1], Is.EqualTo("one"));
+        Assert.That(map[1], Is.EqualTo(U("one")));
     }
 
     [Test]
     public void Add_DuplicateKey_ThrowsArgumentException()
     {
         // Arrange
-        using var map = new Umap<int, Ustring>();
-        map.Add(1, "one");
+        using var map = new Umap<int, Ustring>(TestAllocator.Shared);
+        map.Add(1, U("one"));
 
         // Act & Assert
-        Assert.Throws<ArgumentException>(() => map.Add(1, "two"));
+        Assert.Throws<ArgumentException>(() => map.Add(1, U("two")));
     }
 
     [Test]
     public void TryAdd_ExistingKey_ReturnsFalse()
     {
         // Arrange
-        using var map = new Umap<int, Ustring>();
-        map.Add(1, "one");
+        using var map = new Umap<int, Ustring>(TestAllocator.Shared);
+        map.Add(1, U("one"));
 
         // Act
-        var result = map.TryAdd(1, "two");
+        var result = map.TryAdd(1, U("two"));
 
         // Assert
         Assert.That(result, Is.False);
         Assert.That(map.Count, Is.EqualTo(1));
-        Assert.That(map[1], Is.EqualTo("one"));
+        Assert.That(map[1], Is.EqualTo(U("one")));
     }
 
     [Test]
     public void TryAdd_NewKey_ReturnsTrue()
     {
         // Arrange
-         using var map = new Umap<int, Ustring>();
+         using var map = new Umap<int, Ustring>(TestAllocator.Shared);
 
         // Act
-        var result = map.TryAdd(1, "one");
+        var result = map.TryAdd(1, U("one"));
 
         // Assert
         Assert.IsTrue(result);
         Assert.That(map.Count, Is.EqualTo(1));
-        Assert.That(map[1], Is.EqualTo("one"));
+        Assert.That(map[1], Is.EqualTo(U("one")));
     }
 
     [Test]
     public void Remove_ExistingKey_Succeeds()
     {
         // Arrange
-        using var map = new Umap<int, Ustring>();
-        map.Add(1, "one");
+        using var map = new Umap<int, Ustring>(TestAllocator.Shared);
+        map.Add(1, U("one"));
 
         // Act
         var result = map.Remove(1);
@@ -126,7 +128,7 @@ public class UmapTests
     public void Remove_NonExistingKey_ReturnsFalse()
     {
         // Arrange
-        using var map = new Umap<int, Ustring>();
+        using var map = new Umap<int, Ustring>(TestAllocator.Shared);
 
         // Act
         var result = map.Remove(1);
@@ -140,8 +142,8 @@ public class UmapTests
     public void ContainsKey_ExistingKey_ReturnsTrue()
     {
         // Arrange
-        using var map = new Umap<int, Ustring>();
-        map.Add(1, "one");
+        using var map = new Umap<int, Ustring>(TestAllocator.Shared);
+        map.Add(1, U("one"));
 
         // Act & Assert
         Assert.IsTrue(map.ContainsKey(1));
@@ -151,7 +153,7 @@ public class UmapTests
     public void ContainsKey_NonExistingKey_ReturnsFalse()
     {
         // Arrange
-        using var map = new Umap<int, Ustring>();
+        using var map = new Umap<int, Ustring>(TestAllocator.Shared);
 
         // Act & Assert
         Assert.That(map.ContainsKey(1), Is.False);
@@ -161,22 +163,22 @@ public class UmapTests
     public void TryGetValue_ExistingKey_ReturnsTrueAndValue()
     {
         // Arrange
-        using var map = new Umap<int, Ustring>();
-        map.Add(1, "one");
+        using var map = new Umap<int, Ustring>(TestAllocator.Shared);
+        map.Add(1, U("one"));
 
         // Act
         var result = map.TryGetValue(1, out var value);
 
         // Assert
         Assert.IsTrue(result);
-        Assert.That(value, Is.EqualTo("one"));
+        Assert.That(value, Is.EqualTo(U("one")));
     }
 
     [Test]
     public void TryGetValue_NonExistingKey_ReturnsFalseAndDefault()
     {
         // Arrange
-        using var map = new Umap<int, Ustring>();
+        using var map = new Umap<int, Ustring>(TestAllocator.Shared);
 
         // Act
         var result = map.TryGetValue(1, out var value);
@@ -190,78 +192,78 @@ public class UmapTests
     public void IndexerGet_ExistingKey_ReturnsValue()
     {
         // Arrange
-        using var map = new Umap<int, Ustring>();
-        map.Add(1, "one");
+        using var map = new Umap<int, Ustring>(TestAllocator.Shared);
+        map.Add(1, U("one"));
 
         // Act & Assert
-        Assert.That(map[1], Is.EqualTo("one"));
+        Assert.That(map[1], Is.EqualTo(U("one")));
     }
 
     [Test]
     public void IndexerSet_ExistingKey_UpdatesValue()
     {
         // Arrange
-        using var map = new Umap<int, Ustring>();
-        map.Add(1, "one");
+        using var map = new Umap<int, Ustring>(TestAllocator.Shared);
+        map.Add(1, U("one"));
 
         // Act
-        map[1] = "uno";
+        map[1] = U("uno");
 
         // Assert
-        Assert.That(map[1], Is.EqualTo("uno"));
+        Assert.That(map[1], Is.EqualTo(U("uno")));
     }
 
     [Test]
     public void IndexerSet_NonExistingKey_AddsNewEntry()
     {
         // Arrange
-        using var map = new Umap<int, Ustring>();
+        using var map = new Umap<int, Ustring>(TestAllocator.Shared);
 
         // Act
-        map[1] = "one";
+        map[1] = U("one");
 
         // Assert
         Assert.That(map.Count, Is.EqualTo(1));
-        Assert.That(map[1], Is.EqualTo("one"));
+        Assert.That(map[1], Is.EqualTo(U("one")));
     }
 
     [Test]
     public void RefIndexerGet_ExistingKey_ReturnsRefToValue()
     {
         // Arrange
-        using var map = new Umap<int, Ustring>();
-        map.Add(1, "one");
+        using var map = new Umap<int, Ustring>(TestAllocator.Shared);
+        map.Add(1, U("one"));
 
         // Act
         ref var valueRef = ref map[1];
-        valueRef = "uno";
+        valueRef = U("uno");
 
         // Assert
-        Assert.That(map[1], Is.EqualTo("uno"));
+        Assert.That(map[1], Is.EqualTo(U("uno")));
     }
 
     [Test]
     public void TryGetValueRefOrAddDefault_ExistingKey_ReturnsRefAndTrue()
     {
         // Arrange
-        using var map = new Umap<int, Ustring>();
-        map.Add(1, "one");
+        using var map = new Umap<int, Ustring>(TestAllocator.Shared);
+        map.Add(1, U("one"));
 
         // Act
         ref var valueRef = ref map.TryGetValueRefOrAddDefault(1, out var exists);
 
         // Assert
         Assert.IsTrue(exists);
-        Assert.That(valueRef, Is.EqualTo("one"));
-        valueRef = "uno";
-        Assert.That(map[1], Is.EqualTo("uno"));
+        Assert.That(valueRef, Is.EqualTo(U("one")));
+        valueRef = U("uno");
+        Assert.That(map[1], Is.EqualTo(U("uno")));
     }
 
     [Test]
     public void TryGetValueRefOrAddDefault_NonExistingKey_ReturnsRefToDefaultAndFalse()
     {
         // Arrange
-        using var map = new Umap<int, Ustring>();
+        using var map = new Umap<int, Ustring>(TestAllocator.Shared);
 
         // Act
         ref var valueRef = ref map.TryGetValueRefOrAddDefault(1, out var exists);
@@ -269,18 +271,18 @@ public class UmapTests
         // Assert
         Assert.That(exists, Is.False);
         Assert.That(valueRef.IsInvalidOrEmpty, Is.True);
-        valueRef = "one";
+        valueRef = U("one");
         Assert.That(map.Count, Is.EqualTo(1));
-        Assert.That(map[1], Is.EqualTo("one"));
+        Assert.That(map[1], Is.EqualTo(U("one")));
     }
 
     [Test]
     public void Clear_EmptiesMap()
     {
         // Arrange
-        using var map = new Umap<int, Ustring>();
-        map.Add(1, "one");
-        map.Add(2, "two");
+        using var map = new Umap<int, Ustring>(TestAllocator.Shared);
+        map.Add(1, U("one"));
+        map.Add(2, U("two"));
 
         // Act
         map.Clear();
@@ -295,9 +297,9 @@ public class UmapTests
     public void CopyTo_Array_Succeeds()
     {
         // Arrange
-        using var map = new Umap<int, Ustring>();
-        map.Add(1, "one");
-        map.Add(2, "two");
+        using var map = new Umap<int, Ustring>(TestAllocator.Shared);
+        map.Add(1, U("one"));
+        map.Add(2, U("two"));
         var array = new KeyValuePair<int, Ustring>[2];
 
         // Act
@@ -305,18 +307,18 @@ public class UmapTests
 
         // Assert
         Assert.That(array[0].Key, Is.EqualTo(1));
-        Assert.That(array[0].Value, Is.EqualTo("one"));
+        Assert.That(array[0].Value, Is.EqualTo(U("one")));
         Assert.That(array[1].Key, Is.EqualTo(2));
-        Assert.That(array[1].Value, Is.EqualTo("two"));
+        Assert.That(array[1].Value, Is.EqualTo(U("two")));
     }
 
     [Test]
     public void CopyTo_Span_Succeeds()
     {
         // Arrange
-        using var map = new Umap<int, Ustring>();
-        map.Add(1, "one");
-        map.Add(2, "two");
+        using var map = new Umap<int, Ustring>(TestAllocator.Shared);
+        map.Add(1, U("one"));
+        map.Add(2, U("two"));
         var array = new KeyValuePair<int, Ustring>[2];
         var span = array.AsSpan();
 
@@ -325,17 +327,17 @@ public class UmapTests
 
         // Assert
         Assert.That(array[0].Key, Is.EqualTo(1));
-        Assert.That(array[0].Value, Is.EqualTo("one"));
+        Assert.That(array[0].Value, Is.EqualTo(U("one")));
         Assert.That(array[1].Key, Is.EqualTo(2));
-        Assert.That(array[1].Value, Is.EqualTo("two"));
+        Assert.That(array[1].Value, Is.EqualTo(U("two")));
     }
 
     [Test]
     public void CopyTo_InvalidArray_Throws()
     {
         // Arrange
-        using var map = new Umap<int, Ustring>();
-        map.Add(1, "one");
+        using var map = new Umap<int, Ustring>(TestAllocator.Shared);
+        map.Add(1, U("one"));
 
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() => map.CopyTo((KeyValuePair<int, Ustring>[])null, 0));
@@ -347,9 +349,9 @@ public class UmapTests
     public void Enumerator_IteratesCorrectly()
     {
         // Arrange
-        using var map = new Umap<int, Ustring>();
-        map.Add(1, "one");
-        map.Add(2, "two");
+        using var map = new Umap<int, Ustring>(TestAllocator.Shared);
+        map.Add(1, U("one"));
+        map.Add(2, U("two"));
 
         // Act
         var keys = new List<int>();
@@ -365,17 +367,17 @@ public class UmapTests
         Assert.That(keys.Count, Is.EqualTo(2));
         CollectionAssert.Contains(keys, 1);
         CollectionAssert.Contains(keys, 2);
-        CollectionAssert.Contains(values, "one");
-        CollectionAssert.Contains(values, "two");
+        CollectionAssert.Contains(values, U("one"));
+        CollectionAssert.Contains(values, U("two"));
     }
 
     [Test]
     public void Keys_Collection_IteratesCorrectly()
     {
         // Arrange
-        using var map = new Umap<int, Ustring>();
-        map.Add(1, "one");
-        map.Add(2, "two");
+        using var map = new Umap<int, Ustring>(TestAllocator.Shared);
+        map.Add(1, U("one"));
+        map.Add(2, U("two"));
 
         // Act
         var keys = map.Keys.ToArray();
@@ -390,26 +392,26 @@ public class UmapTests
     public void Values_Collection_IteratesCorrectly()
     {
         // Arrange
-        using var map = new Umap<int, Ustring>();
-        map.Add(1, "one");
-        map.Add(2, "two");
+        using var map = new Umap<int, Ustring>(TestAllocator.Shared);
+        map.Add(1, U("one"));
+        map.Add(2, U("two"));
 
         // Act
         var values = map.Values.ToArray();
 
         // Assert
         Assert.That(values.Count, Is.EqualTo(2));
-        CollectionAssert.Contains(values, "one");
-        CollectionAssert.Contains(values, "two");
+        CollectionAssert.Contains(values, U("one"));
+        CollectionAssert.Contains(values, U("two"));
     }
 
     [Test]
     public void KeyCollection_CopyTo_Succeeds()
     {
         // Arrange
-        using var map = new Umap<int, Ustring>();
-        map.Add(1, "one");
-        map.Add(2, "two");
+        using var map = new Umap<int, Ustring>(TestAllocator.Shared);
+        map.Add(1, U("one"));
+        map.Add(2, U("two"));
         var array = new int[2];
 
         // Act
@@ -424,25 +426,25 @@ public class UmapTests
     public void ValueCollection_CopyTo_Succeeds()
     {
         // Arrange
-        using var map = new Umap<int, Ustring>();
-        map.Add(1, "one");
-        map.Add(2, "two");
+        using var map = new Umap<int, Ustring>(TestAllocator.Shared);
+        map.Add(1, U("one"));
+        map.Add(2, U("two"));
         var array = new Ustring[2];
 
         // Act
         map.Values.CopyTo(array, 0);
 
         // Assert
-        Assert.That(array[0], Is.EqualTo("one"));
-        Assert.That(array[1], Is.EqualTo("two"));
+        Assert.That(array[0], Is.EqualTo(U("one")));
+        Assert.That(array[1], Is.EqualTo(U("two")));
     }
 
     [Test]
     public void KeyCollection_Contains_Succeeds()
     {
         // Arrange
-        using var map = new Umap<int, Ustring>();
-        map.Add(1, "one");
+        using var map = new Umap<int, Ustring>(TestAllocator.Shared);
+        map.Add(1, U("one"));
 
         // Act & Assert
         Assert.IsTrue(map.Keys.Contains(1));
@@ -453,24 +455,24 @@ public class UmapTests
     public void ValueCollection_Contains_Succeeds()
     {
         // Arrange
-        using var map = new Umap<int, Ustring>();
-        map.Add(1, "one");
+        using var map = new Umap<int, Ustring>(TestAllocator.Shared);
+        map.Add(1, U("one"));
 
         // Act & Assert
-        Assert.IsTrue(map.Values.Contains("one"));
-        Assert.That(map.Values.Contains("two"), Is.False);
+        Assert.IsTrue(map.Values.Contains(U("one")));
+        Assert.That(map.Values.Contains(U("two")), Is.False);
     }
 
     [Test]
     public void Resize_GrowsBeyondLoadFactor()
     {
         // Arrange
-        using var map = new Umap<int, Ustring>(1); // Small capacity to force resize quickly
+        using var map = new Umap<int, Ustring>(1, TestAllocator.Shared); // Small capacity to force resize quickly
 
         // Act
         for (int i = 0; i < 10; i++)
         {
-            map.Add(i, i.ToString());
+            map.Add(i, U(i.ToString()));
         }
 
         // Assert
@@ -486,12 +488,12 @@ public class UmapTests
     public void Dispose_PreventsOperations()
     {
         // Arrange
-        using var map = new Umap<int, Ustring>();
-        map.Add(1, "one");
+        using var map = new Umap<int, Ustring>(TestAllocator.Shared);
+        map.Add(1, U("one"));
         map.Dispose();
 
         // Act & Assert
-        Assert.Throws<ObjectDisposedException>(() => map.Add(2, "two"));
+        Assert.Throws<ObjectDisposedException>(() => map.Add(2, U("two")));
         Assert.Throws<ObjectDisposedException>(() => _ = map[1]);
         Assert.Throws<ObjectDisposedException>(() => map.ContainsKey(1));
         Assert.Throws<ObjectDisposedException>(() => map.Remove(1));
@@ -506,7 +508,7 @@ public class UmapTests
     public void Dispose_MultipleCalls_DoesNotThrow()
     {
         // Arrange
-        using var map = new Umap<int, Ustring>();
+        using var map = new Umap<int, Ustring>(TestAllocator.Shared);
         map.Dispose();
 
         // Act & Assert
@@ -517,25 +519,25 @@ public class UmapTests
     public void ICollectionContains_KeyValuePair_Succeeds()
     {
         // Arrange
-        using var map = new Umap<int, Ustring>();
-        map.Add(1, "one");
+        using var map = new Umap<int, Ustring>(TestAllocator.Shared);
+        map.Add(1, U("one"));
 
         // Act & Assert
         var collection = (ICollection<KeyValuePair<int, Ustring>>)map;
-        Assert.IsTrue(collection.Contains(new KeyValuePair<int, Ustring>(1, "one")));
-        Assert.That(collection.Contains(new KeyValuePair<int, Ustring>(1, "two")), Is.False);
+        Assert.IsTrue(collection.Contains(new KeyValuePair<int, Ustring>(1, U("one"))));
+        Assert.That(collection.Contains(new KeyValuePair<int, Ustring>(1, U("two"))), Is.False);
     }
 
     [Test]
     public void ICollectionRemove_KeyValuePair_CallsKeyRemove()
     {
         // Arrange
-        using var map = new Umap<int, Ustring>();
-        map.Add(1, "one");
+        using var map = new Umap<int, Ustring>(TestAllocator.Shared);
+        map.Add(1, U("one"));
 
         // Act
         var collection = (ICollection<KeyValuePair<int, Ustring>>) map;
-        var result = collection.Remove(new KeyValuePair<int, Ustring>(1, "one"));
+        var result = collection.Remove(new KeyValuePair<int, Ustring>(1, U("one")));
 
         // Assert
         Assert.IsTrue(result);
@@ -547,9 +549,9 @@ public class UmapTests
     public void IEnumerableGetEnumerator_IteratesCorrectly()
     {
         // Arrange
-        using var map = new Umap<int, Ustring>();
-        map.Add(1, "one");
-        map.Add(2, "two");
+        using var map = new Umap<int, Ustring>(TestAllocator.Shared);
+        map.Add(1, U("one"));
+        map.Add(2, U("two"));
 
         // Act
         var enumerable = (IEnumerable)map;
@@ -562,28 +564,28 @@ public class UmapTests
 
         // Assert
         Assert.That(list.Count, Is.EqualTo(2));
-        CollectionAssert.Contains(list, new KeyValuePair<int, Ustring>(1, "one"));
-        CollectionAssert.Contains(list, new KeyValuePair<int, Ustring>(2, "two"));
+        CollectionAssert.Contains(list, new KeyValuePair<int, Ustring>(1, U("one")));
+        CollectionAssert.Contains(list, new KeyValuePair<int, Ustring>(2, U("two")));
     }
 
     [Test]
     public void ContainsKey_NullKey_DoesNotThrowButReturnsFalse()
     {
         // Arrange
-        using var map = new Umap<Ustring, int>();
+        using var map = new Umap<Ustring, int>(TestAllocator.Shared);
 
         // Act & Assert
-        Assert.That(map.ContainsKey(null!), Is.False); // Should not throw, as per implementation
+        Assert.That(map.ContainsKey(U(null!)), Is.False); // Should not throw, as per implementation
     }
 
     [Test]
     public void TryGetValue_NullKey_DoesNotThrowReturnsFalse()
     {
         // Arrange
-        using var map = new Umap<Ustring, int>();
+        using var map = new Umap<Ustring, int>(TestAllocator.Shared);
 
         // Act & Assert
-        Assert.That(map.TryGetValue(null!, out _), Is.False);
+        Assert.That(map.TryGetValue(U(null!), out _), Is.False);
     }
 
 }
