@@ -63,19 +63,19 @@ public class HttpRequest : IHttpRequest
     /// </summary>
     private static class HttpClientFactory
     {
-        private static readonly HttpClient                                                          s_SharedClient = new();
-        private static readonly System.Collections.Concurrent.ConcurrentDictionary<Uri, HttpClient> s_ClientMaps   = new();
+        private static readonly HttpClient                                                          sharedClient = new();
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<Uri, HttpClient> clientMaps   = new();
 
         public static HttpClient Spawn(Uri proxyHost = null)
         {
-            if (proxyHost == null) return s_SharedClient;
+            if (proxyHost == null) return sharedClient;
 
-            if (s_ClientMaps.TryGetValue(proxyHost, out var client))
+            if (clientMaps.TryGetValue(proxyHost, out var client))
                 return client;
             var proxy = new WebProxy(proxyHost);
             var handler = new HttpClientHandler {Proxy = proxy, UseProxy = true};
             client = new HttpClient(handler);
-            s_ClientMaps.TryAdd(proxyHost, client);
+            clientMaps.TryAdd(proxyHost, client);
             return client;
         }
     }

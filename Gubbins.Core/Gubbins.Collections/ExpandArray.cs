@@ -24,16 +24,16 @@ public class ExpandArray<T> : IList, IList<T>, IReadOnlyList<T>
     internal T[] Items;
     internal int Size;
     internal int Version;
-    private static readonly T[] s_EmptyArray = [];
+    private static readonly T[] emptyArray = [];
 
     /// <summary>Initializes a new instance of the <see cref="T:Gubbins.Collections.ExpandArray{T}" /> class that is empty and has the default initial capacity.</summary>
-    public ExpandArray() => Items = s_EmptyArray;
+    public ExpandArray() => Items = emptyArray;
 
     /// <summary>Initializes a new instance of the <see cref="T:Gubbins.Collections.ExpandArray{T}" /> class that is empty and has the specified initial capacity.</summary>
     /// <param name="capacity">The number of elements that the new expand array can initially store.</param>
     /// <exception cref="T:System.ArgumentOutOfRangeException">
     /// <paramref name="capacity" /> is less than 0.</exception>
-    public ExpandArray(int capacity) => Items = capacity == 0 ? s_EmptyArray : new T[capacity];
+    public ExpandArray(int capacity) => Items = capacity == 0 ? emptyArray : new T[capacity];
 
     /// <summary>Initializes a new instance of the <see cref="T:Gubbins.Collections.ExpandArray{T}" /> class that contains elements copied from the specified collection and has sufficient capacity to accommodate the number of elements copied.</summary>
     /// <param name="collection">The collection whose elements are copied to the new list.</param>
@@ -45,7 +45,7 @@ public class ExpandArray<T> : IList, IList<T>, IReadOnlyList<T>
         {
             case null:
             {
-                Items = s_EmptyArray;
+                Items = emptyArray;
                 break;
             }
             case ICollection<T> objs:
@@ -53,7 +53,7 @@ public class ExpandArray<T> : IList, IList<T>, IReadOnlyList<T>
                 var count = objs.Count;
                 if (count == 0)
                 {
-                    Items = s_EmptyArray;
+                    Items = emptyArray;
                 }
                 else
                 {
@@ -66,7 +66,7 @@ public class ExpandArray<T> : IList, IList<T>, IReadOnlyList<T>
             }
             default:
             {
-                Items = s_EmptyArray;
+                Items = emptyArray;
                 foreach (var obj in collection)
                 {
                     Add(obj);
@@ -102,7 +102,7 @@ public class ExpandArray<T> : IList, IList<T>, IReadOnlyList<T>
                 Items = destinationArray;
             }
             else
-                Items = s_EmptyArray;
+                Items = emptyArray;
         }
     }
 
@@ -1059,7 +1059,7 @@ public class ExpandArray<T> : IList, IList<T>, IReadOnlyList<T>
     public T[] ToArray()
     {
         if (Size == 0)
-            return s_EmptyArray;
+            return emptyArray;
         var destinationArray = new T[Size];
         Array.Copy(Items, destinationArray, Size);
         return destinationArray;

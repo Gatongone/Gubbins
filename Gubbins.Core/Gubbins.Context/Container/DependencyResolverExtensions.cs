@@ -16,7 +16,7 @@ public static class DependencyResolverExtensions
         /// </summary>
         /// <typeparam name="T">The type of the dependency.</typeparam>
         /// <returns>The dependence instances of target <c>type</c>.</returns>
-        public T[] ResolveAll<T>() => resolver.ResolveAll(typeof(T)).Cast<T>().ToArray();
+        public T[] ResolveAll<T>() => [.. resolver.ResolveAll(typeof(T)).Cast<T>()];
 
         /// <summary>
         /// Resolve the dependence key and get the dependency.

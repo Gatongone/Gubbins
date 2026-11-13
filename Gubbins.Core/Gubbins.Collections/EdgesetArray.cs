@@ -20,11 +20,11 @@ public class EdgesetArray<TVertex, TWeight> : IWeightedGraph<TVertex, TWeight>, 
     public int VertexCount => m_Vertexes.Count;
     public int EdgeCount => m_Edges.Count;
 
-    public EdgesetArray(IEnumerable<TVertex> vertexes, bool isDirected) => (m_Vertexes, m_Edges, IsDirected) = (vertexes.ToList(), new(), isDirected);
+    public EdgesetArray(IEnumerable<TVertex> vertexes, bool isDirected) => (m_Vertexes, m_Edges, IsDirected) = ([.. vertexes], [], isDirected);
 
-    public EdgesetArray(bool isDirected) => (m_Vertexes, m_Edges, IsDirected) = (new(), new(), isDirected);
+    public EdgesetArray(bool isDirected) => (m_Vertexes, m_Edges, IsDirected) = ([], [], isDirected);
 
-    internal EdgesetArray(IEnumerable<TVertex> vertexes, IEnumerable<Edge> edges, bool isDirected) => (m_Vertexes, m_Edges, IsDirected) = (vertexes.ToList(), edges.ToList(), isDirected);
+    internal EdgesetArray(IEnumerable<TVertex> vertexes, IEnumerable<Edge> edges, bool isDirected) => (m_Vertexes, m_Edges, IsDirected) = ([.. vertexes], [.. edges], isDirected);
 
     public void GetObjectData(SerializationInfo info, StreamingContext context)
     {
@@ -243,16 +243,16 @@ public class EdgesetArray<TVertex> : IGraph<TVertex>, ISerializable
     private readonly List<TVertex> m_Vertexes;
     private readonly List<Edge> m_Edges;
     public readonly bool IsDirected;
-    public IReadOnlyList<TVertex> Vertexes => m_Vertexes.ToArray();
-    public IReadOnlyList<Edge> Edges => m_Edges.ToArray();
+    public IReadOnlyList<TVertex> Vertexes => [.. m_Vertexes];
+    public IReadOnlyList<Edge> Edges => [.. m_Edges];
     public int VertexCount => m_Vertexes.Count;
     public int EdgeCount => m_Edges.Count;
 
-    public EdgesetArray(IEnumerable<TVertex> vertexes, bool isDirected) => (m_Vertexes, m_Edges, IsDirected) = (vertexes.ToList(), new(), isDirected);
+    public EdgesetArray(IEnumerable<TVertex> vertexes, bool isDirected) => (m_Vertexes, m_Edges, IsDirected) = ([.. vertexes], [], isDirected);
 
-    public EdgesetArray(bool isDirected) => (m_Vertexes, m_Edges, IsDirected) = (new(), new(), isDirected);
+    public EdgesetArray(bool isDirected) => (m_Vertexes, m_Edges, IsDirected) = ([], [], isDirected);
 
-    internal EdgesetArray(IEnumerable<TVertex> vertexes, IEnumerable<Edge> edges, bool isDirected) => (m_Vertexes, m_Edges, IsDirected) = (vertexes.ToList(), edges.ToList(), isDirected);
+    internal EdgesetArray(IEnumerable<TVertex> vertexes, IEnumerable<Edge> edges, bool isDirected) => (m_Vertexes, m_Edges, IsDirected) = ([.. vertexes], [.. edges], isDirected);
 
     public void GetObjectData(SerializationInfo info, StreamingContext context)
     {

@@ -155,7 +155,7 @@ public class EventGenerator : ISourceGenerator
             && eventInfo.ParameterTypes[0].Equals("Gubbins.Enhance.Unit")))
         {
             var returnType = string.IsNullOrEmpty(eventInfo.Result) ? "void" : eventInfo.Result;
-            var parameterType = returnType == "void" ? methodInfo.ParameterTypes : methodInfo.ParameterTypes.Take(methodInfo.ParameterTypes.Length - 1).ToArray();
+            var parameterType = returnType == "void" ? methodInfo.ParameterTypes : [.. methodInfo.ParameterTypes.Take(methodInfo.ParameterTypes.Length - 1)];
             if (!eventInfo.ParameterTypes.SequenceEqual(parameterType) || !returnType.Equals(methodInfo.ReturnType))
             {
                 context.ReportDiagnostic(ErrorDiagnostic.Descriptor.EventSignatureNotMatch,
@@ -293,7 +293,7 @@ public class EventGenerator : ISourceGenerator
                 NestedTypes = typeSymbol.GetNestedTypeName(),
                 Namespace   = typeSymbol.ContainingNamespace.ToDisplayString(),
                 FullName    = typeSymbol.ToDisplayString(),
-                Methods     = methods.ToArray()
+                Methods     = [.. methods]
             };
             Infos.Add(info);
         }
@@ -327,8 +327,8 @@ public class EventGenerator : ISourceGenerator
             return new MethodInfo
             {
                 ReturnType     = method.ReturnType.ToDisplayString(),
-                ParameterTypes = method.Parameters.Select(p => p.Type.ToDisplayString()).ToArray(),
-                Events         = events.ToArray(),
+                ParameterTypes = [.. method.Parameters.Select(p => p.Type.ToDisplayString())],
+                Events         = [.. events],
                 Name           = method.Name,
                 Location       = method.Locations.First()
             };
@@ -386,7 +386,7 @@ public class EventGenerator : ISourceGenerator
                 result = ((INamedTypeSymbol) interfaceSymbol.TypeArguments[1]).ToDisplayString();
                 if (interfaceSymbol.TypeArguments.Length == 1)
                 {
-                    parameterTypes = Array.Empty<string>();
+                    parameterTypes = [];
                 }
                 else
                 {
@@ -414,7 +414,7 @@ public class EventGenerator : ISourceGenerator
 
             if (genericArg.ContainingNamespace.ToDisplayString().Equals(nameof(System)) && genericArg.Name.Equals(nameof(ValueTuple)))
             {
-                return genericArg.TypeArguments.Select(t => t.ToDisplayString()).ToArray();
+                return [.. genericArg.TypeArguments.Select(t => t.ToDisplayString())];
             }
 
             return [genericArg.ToDisplayString()];

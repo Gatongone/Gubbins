@@ -617,13 +617,13 @@ public static class GraphExtensions
         /// </summary>
         private class Comparer : IComparer<DirectedEdge<TVertex, TWeight>>
         {
-            private static readonly Comparer<TWeight> s_DefaultComparer = Comparer<TWeight>.Default;
+            private static readonly Comparer<TWeight> defaultComparer = Comparer<TWeight>.Default;
 
             private readonly bool m_Reversed;
 
             public Comparer(bool reversed) => m_Reversed = reversed;
 
-            public int Compare(DirectedEdge<TVertex, TWeight> x, DirectedEdge<TVertex, TWeight> y) => m_Reversed ? s_DefaultComparer.Compare(y.Weight, x.Weight) : s_DefaultComparer.Compare(x.Weight, y.Weight);
+            public int Compare(DirectedEdge<TVertex, TWeight> x, DirectedEdge<TVertex, TWeight> y) => m_Reversed ? defaultComparer.Compare(y.Weight, x.Weight) : defaultComparer.Compare(x.Weight, y.Weight);
         }
     }
 
@@ -704,13 +704,13 @@ public static class GraphExtensions
         /// </summary>
         private class Comparer : IComparer<UndirectedEdge<TVertex, TWeight>>
         {
-            private static readonly Comparer<TWeight> s_DefaultComparer = Comparer<TWeight>.Default;
+            private static readonly Comparer<TWeight> defaultComparer = Comparer<TWeight>.Default;
 
             private readonly bool m_Reversed;
 
             public Comparer(bool reversed) => m_Reversed = reversed;
 
-            public int Compare(UndirectedEdge<TVertex, TWeight> x, UndirectedEdge<TVertex, TWeight> y) => m_Reversed ? s_DefaultComparer.Compare(y.Weight, x.Weight) : s_DefaultComparer.Compare(x.Weight, y.Weight);
+            public int Compare(UndirectedEdge<TVertex, TWeight> x, UndirectedEdge<TVertex, TWeight> y) => m_Reversed ? defaultComparer.Compare(y.Weight, x.Weight) : defaultComparer.Compare(x.Weight, y.Weight);
         }
     }
 }

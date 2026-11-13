@@ -49,7 +49,7 @@ public class AsyncAutoResetEvent
     /// </param>
     public AsyncAutoResetEvent(bool allowInliningAwaiters)
     {
-        m_AllowInliningAwaiters        = allowInliningAwaiters;
+        m_AllowInliningAwaiters = allowInliningAwaiters;
         m_OnCancellationRequestHandler = OnCancellationRequest;
     }
 
@@ -90,7 +90,7 @@ public class AsyncAutoResetEvent
     /// </summary>
     public void Set()
     {
-        var completionSource = (WaiterCompletionSource) null!;
+        var completionSource = (WaiterCompletionSource)null!;
         lock (m_SignalAwaiters)
         {
             if (m_SignalAwaiters.Count > 0)
@@ -101,7 +101,7 @@ public class AsyncAutoResetEvent
 
         if (completionSource == null)
             return;
-        completionSource.registration.Dispose();
+        completionSource.Registration.Dispose();
         completionSource.TrySetResult(Unit.Instance);
     }
 
@@ -111,13 +111,13 @@ public class AsyncAutoResetEvent
     /// <param name="state">The <see cref="T:AsyncAutoResetEvent.WaiterCompletionSource" /> passed in to the <see cref="M:System.Threading.CancellationToken.Register(System.Action{System.Object},System.Object)" /> method.</param>
     private void OnCancellationRequest(object state)
     {
-        var valueToRemove = (WaiterCompletionSource) state;
+        var valueToRemove = (WaiterCompletionSource)state;
         bool flag;
         lock (m_SignalAwaiters)
             flag = m_SignalAwaiters.RemoveMidQueue(valueToRemove);
         if (!flag)
             return;
-        valueToRemove.TrySetCanceled(valueToRemove.cancellationToken);
+        valueToRemove.TrySetCanceled(valueToRemove.CancellationToken);
     }
 
     /// <summary>Tracks someone waiting for a signal from the event.</summary>
@@ -131,19 +131,19 @@ public class AsyncAutoResetEvent
         /// <param name="cancellationToken">The cancellation token associated with the waiter.</param>
         internal WaiterCompletionSource(AsyncAutoResetEvent owner, bool allowInliningContinuations, CancellationToken cancellationToken) : base(allowInliningContinuations)
         {
-            this.cancellationToken = cancellationToken;
-            registration           = cancellationToken.Register(owner.m_OnCancellationRequestHandler, this);
+            this.CancellationToken = cancellationToken;
+            Registration = cancellationToken.Register(owner.m_OnCancellationRequestHandler, this);
         }
 
         /// <summary>
-        /// Gets the <see cref="P:cancellationToken" /> provided by the waiter.
+        /// Gets the <see cref="P:CancellationToken" /> provided by the waiter.
         /// </summary>
-        internal CancellationToken cancellationToken { get; }
+        internal CancellationToken CancellationToken { get; }
 
         /// <summary>
         /// Gets the registration to dispose of when the waiter receives their event.
         /// </summary>
-        internal CancellationTokenRegistration registration { get; }
+        internal CancellationTokenRegistration Registration { get; }
     }
 }
 
@@ -267,6 +267,7 @@ public static class Async
                             {
                                 break;
                             }
+
                             s.Callback(s.State, j, cancellationToken);
                         }
                     }
@@ -315,29 +316,29 @@ public static class Async
 
     private class CountdownState
     {
-        private static readonly ConcurrentQueue<CountdownState> s_Pool     = new();
-        public readonly         List<Exception>                 Exceptions = new();
-        public                  CountdownEvent                  Handle;
-        public                  CancellationToken               CancellationToken;
+        private static readonly ConcurrentQueue<CountdownState> pool = new();
+        public readonly List<Exception> Exceptions = [];
+        public CountdownEvent Handle;
+        public CancellationToken CancellationToken;
 
         internal static CountdownState Spawn(CountdownEvent countdownEvent, CancellationToken cancellationToken)
         {
-            if (!s_Pool.TryDequeue(out var state))
+            if (!pool.TryDequeue(out var state))
             {
                 state = new CountdownState();
             }
 
-            state.Handle         = countdownEvent;
+            state.Handle = countdownEvent;
             state.CancellationToken = cancellationToken;
             return state;
         }
 
         internal static void Recycle(CountdownState state)
         {
-            state.Handle         = null!;
+            state.Handle = null!;
             state.CancellationToken = default!;
             state.Exceptions.Clear();
-            s_Pool.Enqueue(state);
+            pool.Enqueue(state);
         }
     }
 
@@ -347,7 +348,7 @@ public static class Async
         {
             // Short tasks can use a busy-wait loop to avoid context switching overhead.
             while (!countdown.IsSet ||
-                !cancellationToken.IsCancellationRequested)
+                   !cancellationToken.IsCancellationRequested)
             {
                 await Task.Yield();
             }
@@ -357,7 +358,7 @@ public static class Async
             // Long tasks should use a cancellation token registration to avoid blocking the thread pool.
             await using var registration = cancellationToken.Register(static state =>
             {
-                var countdown = (CountdownEvent) state!;
+                var countdown = (CountdownEvent)state!;
                 while (!countdown.IsSet)
                 {
                     countdown.Signal();
@@ -366,7 +367,7 @@ public static class Async
             var state = CountdownState.Spawn(countdown, cancellationToken);
             await Task.Factory.StartNew(static arg =>
             {
-                var state = (CountdownState) arg!;
+                var state = (CountdownState)arg!;
                 state.Handle.Wait(state.CancellationToken);
             }, state, cancellationToken, TaskCreationOptions.LongRunning, TaskScheduler.Default);
         }

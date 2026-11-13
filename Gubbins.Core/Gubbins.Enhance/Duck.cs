@@ -66,7 +66,7 @@ public class DuckAttribute : Attribute;
 /// </remarks>
 public static class Duck
 {
-    private static readonly ConcurrentDictionary<Type, object> s_DuckCache = new();
+    private static readonly ConcurrentDictionary<Type, object> duckCache = new();
 
     /// <summary>
     /// Check whether <c>obj</c> can have a duck proxy for the given interface type that has <see cref="DuckAttribute"/>.
@@ -102,7 +102,7 @@ public static class Duck
             return true;
         }
 
-        if (!s_DuckCache.TryGetValue(typeof(T), out var duck))
+        if (!duckCache.TryGetValue(typeof(T), out var duck))
         {
             // Get type from generated code.
             var generatedDuckTypeName = $"Gubbins.Generated.Duck_{typeof(T).FullName!.Replace(".", "_").Replace(".", "_").Replace("+", "_").Replace("`", "_")}";
@@ -114,7 +114,7 @@ public static class Duck
             }
 
             duck = Activator.CreateInstance(duckType);
-            s_DuckCache[typeof(T)] = duck!;
+            duckCache[typeof(T)] = duck!;
         }
 
         if (duck == null)

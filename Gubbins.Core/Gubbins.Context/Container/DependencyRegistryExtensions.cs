@@ -79,7 +79,7 @@ public static class DependencyRegistryExtensions
 
             if (info.Bindings != null)
             {
-                decorator.BindTo(info.Bindings.ToArray());
+                decorator.BindTo([.. info.Bindings]);
             }
 
             if (!string.IsNullOrEmpty(info.Key))
@@ -121,7 +121,7 @@ public static class DependencyRegistryExtensions
 
             if (info.Bindings != null)
             {
-                decorator.BindTo(info.Bindings.ToArray());
+                decorator.BindTo([.. info.Bindings]);
             }
 
             if (info.Scope == Scope.Singleton)
@@ -153,7 +153,7 @@ public static class DependencyRegistryExtensions
 
             if (info.Bindings != null)
             {
-                decorator.BindTo(info.Bindings.ToArray());
+                decorator.BindTo([.. info.Bindings]);
             }
 
             if (!string.IsNullOrEmpty(info.Key))
@@ -184,7 +184,7 @@ public static class DependencyRegistryExtensions
 
             if (info.Bindings != null)
             {
-                decorator.BindTo(info.Bindings.ToArray());
+                decorator.BindTo([.. info.Bindings]);
             }
 
             if (!string.IsNullOrEmpty(info.Key))

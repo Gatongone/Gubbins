@@ -311,7 +311,7 @@ public class RedBlackTreeTests
             3
         };
 
-        int[] expected = {1, 2, 3};
+        int[] expected = [1, 2, 3];
         var i = 0;
 
         foreach (var item in tree)

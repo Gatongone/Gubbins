@@ -23,17 +23,17 @@ internal static class InjectCache
     /// <summary>
     /// InjectMember cache.
     /// </summary>
-    private static readonly Dictionary<Type?, InjectMember[]> s_Cache = new();
+    private static readonly Dictionary<Type?, InjectMember[]> cache = new();
 
     /// <summary>
     /// Inject method cache, keyed by declaring type.
     /// </summary>
-    private static readonly Dictionary<Type, InjectMethod[]> s_MethodCache = new();
+    private static readonly Dictionary<Type, InjectMethod[]> methodCache = new();
 
     /// <summary>
     /// Inject constructor cache. A null value means the type has no usable constructor.
     /// </summary>
-    private static readonly Dictionary<Type, InjectConstructor?> s_ConstructorCache = new();
+    private static readonly Dictionary<Type, InjectConstructor?> constructorCache = new();
 
     /// <summary>
     /// Get <see cref="InjectMember"/> with <inheritdoc cref="InjectAttribute"/>.
@@ -48,7 +48,7 @@ internal static class InjectCache
             throw new NullReferenceException("Got a null type.");
         }
         // Try get result from cache.
-        if (s_Cache.TryGetValue(type, out var results))
+        if (cache.TryGetValue(type, out var results))
         {
             return results;
         }
@@ -58,9 +58,9 @@ internal static class InjectCache
         // Append all properties and fields with InjectAttribute into cache.
         AppendFields(type, valuableMembers);
         AppendProperties(type, valuableMembers);
-        results = valuableMembers.ToArray();
+        results = [.. valuableMembers];
         pool.Recycle(valuableMembers);
-        s_Cache.Add(type, results);
+        cache.Add(type, results);
         return results;
     }
 
@@ -72,7 +72,7 @@ internal static class InjectCache
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static InjectMethod[] GetInjectMethods(Type type)
     {
-        if (s_MethodCache.TryGetValue(type, out var results))
+        if (methodCache.TryGetValue(type, out var results))
         {
             return results;
         }
@@ -88,8 +88,8 @@ internal static class InjectCache
             list.Add(new InjectMethod(method, BuildParameters(method.GetParameters())));
         }
 
-        results = list.ToArray();
-        s_MethodCache.Add(type, results);
+        results = [.. list];
+        methodCache.Add(type, results);
         return results;
     }
 
@@ -103,7 +103,7 @@ internal static class InjectCache
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static InjectConstructor? GetInjectConstructor(Type type)
     {
-        if (s_ConstructorCache.TryGetValue(type, out var cached))
+        if (constructorCache.TryGetValue(type, out var cached))
         {
             return cached;
         }
@@ -138,7 +138,7 @@ internal static class InjectCache
         }
 
         var result = chosen == null ? null : new InjectConstructor(chosen, BuildParameters(chosen.GetParameters()));
-        s_ConstructorCache.Add(type, result);
+        constructorCache.Add(type, result);
         return result;
     }
 

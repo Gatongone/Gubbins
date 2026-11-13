@@ -75,7 +75,7 @@ public sealed class XmlContext(XmlDocument doc) : IDependenciesInstaller
             result.Spawner    = spawner == null ? result.Type.IsNewable(out var newable) ? newable.ToSpawner() : throw new ArgumentException($"Non spawner for type: \"{result.Type}\"") : (ISpawner) Activator.CreateInstance(Type.GetType(spawner, Reflection.LoadAssemblyResolver, Reflection.DomainTypeResolver)!);
             result.Controller = controller == null ? null : Activator.CreateInstance(Type.GetType(controller, Reflection.LoadAssemblyResolver, Reflection.DomainTypeResolver)!) as IScopeController;
             result.BakeCount  = bake == null ? 0 : uint.Parse(bake);
-            result.Bindings   = bindings == null ? [] : bindings.Select(binding => Type.GetType(binding.Attributes["type"]!.Value, Reflection.LoadAssemblyResolver, Reflection.DomainTypeResolver)!).ToHashSet();
+            result.Bindings   = bindings == null ? [] : [.. bindings.Select(binding => Type.GetType(binding.Attributes["type"]!.Value, Reflection.LoadAssemblyResolver, Reflection.DomainTypeResolver)!)];
             return result;
         }
     }

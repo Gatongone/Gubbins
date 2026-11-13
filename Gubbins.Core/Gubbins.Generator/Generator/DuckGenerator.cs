@@ -383,9 +383,9 @@ public class DuckGenerator : ISourceGenerator
                                 }
                                 var _castedFunc = Native.Cast<Func{{index}}<object, {{string.Join(", ", method.GenericNames)}}>>(_func);
 
-                                {{(method.IsVoidReturn ? string.Empty : "return ")}}_castedFunc.Invoke(m_Proxy{{(method.Args.Length == 0 ? string.Empty : ", " + string.Join(",", method.Args.Select(static arg => arg.Name).ToArray()))}});
+                                {{(method.IsVoidReturn ? string.Empty : "return ")}}_castedFunc.Invoke(m_Proxy{{(method.Args.Length == 0 ? string.Empty : ", " + string.Join(",", [.. method.Args.Select(static arg => arg.Name)]))}});
                """
-            : $"                {(method.IsVoidReturn ? string.Empty : "return ")}m_Func{index}.Invoke(m_Proxy{(method.Args.Length == 0 ? string.Empty : ", " + string.Join(",", method.Args.Select(static arg => arg.Name).ToArray()))});";
+            : $"                {(method.IsVoidReturn ? string.Empty : "return ")}m_Func{index}.Invoke(m_Proxy{(method.Args.Length == 0 ? string.Empty : ", " + string.Join(",", [.. method.Args.Select(static arg => arg.Name)]))});";
         return $$"""
 
                              [global::System.Runtime.CompilerServices.CompilerGenerated]
@@ -422,9 +422,9 @@ public class DuckGenerator : ISourceGenerator
                         {
                             Name           = typeSymbol.Name,
                             ReturnType     = typeSymbol.DelegateInvokeMethod!.ReturnType,
-                            Args           = typeSymbol.DelegateInvokeMethod.Parameters.Select(static p => (p.Type, p.Name)).ToArray(),
+                            Args           = [.. typeSymbol.DelegateInvokeMethod.Parameters.Select(static p => (p.Type, p.Name))],
                             HasGenericType = typeSymbol.DelegateInvokeMethod.IsGenericMethod,
-                            GenericNames   = typeSymbol.DelegateInvokeMethod.TypeParameters.Select(static p => p.Name).ToArray(),
+                            GenericNames   = [.. typeSymbol.DelegateInvokeMethod.TypeParameters.Select(static p => p.Name)],
                             Constraints    = typeSymbol.DelegateInvokeMethod.GetConstraintsString()
                         }
                     ]
@@ -434,15 +434,18 @@ public class DuckGenerator : ISourceGenerator
                     IsInterface = true,
                     FullName    = typeSymbol.ToDisplayString(),
                     DisplayName = typeSymbol.ToDisplayString().Replace(".", "_").Replace("+", "_").Replace("`", "_"),
-                    Methods = typeSymbol.GetMethods().Select(m => new MethodInfo
-                    {
-                        Name           = m.Name,
-                        ReturnType     = m.ReturnType,
-                        Args           = m.Parameters.Select(static p => (p.Type, p.Name)).ToArray(),
-                        HasGenericType = m.IsGenericMethod,
-                        GenericNames   = m.TypeParameters.Select(static p => p.Name).ToArray(),
-                        Constraints    = m.GetConstraintsString()
-                    }).ToArray()
+                    Methods =
+                    [
+                        .. typeSymbol.GetMethods().Select(m => new MethodInfo
+                        {
+                            Name = m.Name,
+                            ReturnType = m.ReturnType,
+                            Args = [.. m.Parameters.Select(static p => (p.Type, p.Name))],
+                            HasGenericType = m.IsGenericMethod,
+                            GenericNames = [.. m.TypeParameters.Select(static p => p.Name)],
+                            Constraints = m.GetConstraintsString()
+                        })
+                    ]
                 };
             Infos.Add(info);
         }

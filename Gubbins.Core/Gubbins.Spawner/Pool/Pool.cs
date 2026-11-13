@@ -142,7 +142,7 @@ internal interface IClearable
 public class TraceablePool<T> : IPool<T>, ITraceablePool, IEnumerable<T>
 {
     private readonly Pool<T>    m_Pool    = new();
-    private readonly HashSet<T> m_Tracing = new();
+    private readonly HashSet<T> m_Tracing = [];
 
     /// <summary>
     /// Gets the shared default traceable pool instance.

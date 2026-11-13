@@ -138,7 +138,7 @@ public sealed class ApplicationContextTests
     {
         var first = new ServiceA();
         var second = new ServiceA();
-        var context = Build(r => r.Register(new object[] {first, second}).WithKey("multi"));
+        var context = Build(r => r.Register([first, second]).WithKey("multi"));
 
         var resolvedA = context.Resolve("multi");
         var resolvedB = context.Resolve("multi");

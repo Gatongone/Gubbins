@@ -14,7 +14,7 @@ namespace Gubbins.Collections;
 /// <c>byte[]</c> is ever allocated.
 /// </summary>
 /// <typeparam name="T">The type of the elements being hashed.</typeparam>
-internal sealed class MPHF<T>
+internal sealed class Mphf<T>
 {
     /// <summary>The seed used to hash elements into their initial buckets.</summary>
     private const uint INIT_SEED = 0;
@@ -54,7 +54,7 @@ internal sealed class MPHF<T>
     /// <param name="forwardsPerBucket">Number of elements grouped into each bucket during construction.</param>
     /// <param name="maxSeed">Upper bound (exclusive) on the displacement values tried per bucket.</param>
     /// <param name="loadFactor">Ratio of elements to bins; must be at most 1.0.</param>
-    public MPHF(Func<T, uint, uint> hash, int forwardsPerBucket = 4, int maxSeed = int.MaxValue, double loadFactor = 1.0)
+    public Mphf(Func<T, uint, uint> hash, int forwardsPerBucket = 4, int maxSeed = int.MaxValue, double loadFactor = 1.0)
     {
         if (loadFactor > 1.0)
             throw new ArgumentException("Load factor should be <= 1.0");
@@ -151,7 +151,7 @@ internal sealed class MPHF<T>
     {
         m_NumForwards       = forwardSize;
         m_NumBins           = (int) (m_NumForwards / loadFactor);
-        m_DisplacementArray = displacementArray.ToArray();
+        m_DisplacementArray = [.. displacementArray];
         m_NumBuckets        = m_DisplacementArray.Length;
     }
 
@@ -202,10 +202,10 @@ internal sealed class MPHF<T>
 public class ReadOnlyBimap<TForward, TReverse> : IReadOnlyBimap<TForward, TReverse> where TForward : notnull where TReverse : notnull
 {
     /// <summary>Maps each forward to a unique index in <c>[0, n)</c>.</summary>
-    private readonly MPHF<TForward> m_ForwardMph;
+    private readonly Mphf<TForward> m_ForwardMph;
 
     /// <summary>Maps each reverse to a unique index in <c>[0, n)</c>.</summary>
-    private readonly MPHF<TReverse> m_ReverseMph;
+    private readonly Mphf<TReverse> m_ReverseMph;
 
     /// <summary>The dense forward table, indexed by the reverse MPHF.</summary>
     private readonly TForward[] m_ForwardTable;
@@ -254,7 +254,7 @@ public class ReadOnlyBimap<TForward, TReverse> : IReadOnlyBimap<TForward, TRever
         IEqualityComparer<TForward>? forwardComparer = null,
         IEqualityComparer<TReverse>? reverseComparer = null)
     {
-        var items = pairs as IReadOnlyList<KeyValuePair<TForward, TReverse>> ?? pairs.ToList();
+        var items = pairs as IReadOnlyList<KeyValuePair<TForward, TReverse>> ?? [.. pairs];
         m_ForwardComparer = forwardComparer ?? EqualityComparer<TForward>.Default;
         m_ReverseComparer = reverseComparer ?? EqualityComparer<TReverse>.Default;
         Count             = items.Count;
@@ -272,9 +272,9 @@ public class ReadOnlyBimap<TForward, TReverse> : IReadOnlyBimap<TForward, TRever
             reverses[i] = items[i].Value;
         }
 
-        m_ForwardMph = new MPHF<TForward>(hashForward);
+        m_ForwardMph = new Mphf<TForward>(hashForward);
         m_ForwardMph.Construct(forwards);
-        m_ReverseMph = new MPHF<TReverse>(hashReverse);
+        m_ReverseMph = new Mphf<TReverse>(hashReverse);
         m_ReverseMph.Construct(reverses);
 
         m_ForwardTable = new TForward[Count];
@@ -315,9 +315,9 @@ public class ReadOnlyBimap<TForward, TReverse> : IReadOnlyBimap<TForward, TRever
             index++;
         }
 
-        m_ForwardMph = new MPHF<TForward>(hashForward);
+        m_ForwardMph = new Mphf<TForward>(hashForward);
         m_ForwardMph.Construct(forwards);
-        m_ReverseMph = new MPHF<TReverse>(hashReverse);
+        m_ReverseMph = new Mphf<TReverse>(hashReverse);
         m_ReverseMph.Construct(reverses);
 
         m_ForwardTable = new TForward[Count];
@@ -601,7 +601,7 @@ public class Bitmap<TForward, TReverse> : IBimap<TForward, TReverse> where TForw
     /// <param name="capacity">The initial capacity for the underlying dictionaries.</param>
     /// <param name="forwardComparer">Compares forwards for equality. Defaults to <see cref="EqualityComparer{T}.Default" />.</param>
     /// <param name="reverseComparer">Compares reverses for equality. Defaults to <see cref="EqualityComparer{T}.Default" />.</param>
-    public Bitmap(int capacity, IEqualityComparer<TForward>? forwardComparer = null, IEqualityComparer<TReverse>? reverseComparer = null) : this(Enumerable.Empty<KeyValuePair<TForward, TReverse>>(), capacity, forwardComparer, reverseComparer) { }
+    public Bitmap(int capacity, IEqualityComparer<TForward>? forwardComparer = null, IEqualityComparer<TReverse>? reverseComparer = null) : this([], capacity, forwardComparer, reverseComparer) { }
 
     /// <summary>Initializes a bimap by copying another, including its comparers.</summary>
     /// <param name="other">The bimap to copy.</param>

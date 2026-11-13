@@ -189,7 +189,7 @@ public class ResourceGraph : IEnumerable<IResourceKey>
             CollectEdgesForGroup(graph, rootLookup, vertexMap, edge => edges.Add(edge), root, info);
         });
 
-        return edges.ToList();
+        return [.. edges];
     }
 
     /// <summary>

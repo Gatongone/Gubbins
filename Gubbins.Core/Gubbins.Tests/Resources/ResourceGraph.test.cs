@@ -115,7 +115,7 @@ public class ResourceGraphTests
 
     private static IEnumerable<IResourceKey> GetGroupMembers(IResourceKey key)
     {
-        return key is ResourceGroupKey groupKey ? groupKey.Members : new[] {key};
+        return key is ResourceGroupKey groupKey ? groupKey.Members : [key];
     }
 
     private static ResourceGraph CreateLargeGraph()
@@ -136,34 +136,38 @@ public class ResourceGraphTests
 
     private static string[] SnapshotGroups(ResourceGraph graph)
     {
-        return graph.Graph
-            .Select(key =>
-            {
-                if (key is ResourceGroupKey groupKey)
+        return
+        [
+            .. graph.Graph
+                .Select(key =>
                 {
-                    return groupKey.Members;
-                }
+                    if (key is ResourceGroupKey groupKey)
+                    {
+                        return groupKey.Members;
+                    }
 
-                return new List<IResourceKey> {key};
-            })
-            .Select(group => string.Join("|", group.Select(member => member.ToString()).OrderBy(value => value)))
-            .OrderBy(value => value)
-            .ToArray();
+                    return new List<IResourceKey> { key };
+                })
+                .Select(group => string.Join("|", group.Select(member => member.ToString()).OrderBy(value => value)))
+                .OrderBy(value => value)
+        ];
     }
 
     private static string[] SnapshotEdges(ResourceGraph graph)
     {
-        return graph.Graph
-            .SelectMany(start => graph.Graph.GetAdjacencyOuterVertexesOf(start),
-                (start, end) =>
-                {
-                    var startGroup = start is ResourceGroupKey startKey ? startKey.Members : new List<IResourceKey> {start};
-                    var endGroup = end is ResourceGroupKey endKey ? endKey.Members : new List<IResourceKey> {end};
-                    return $"{string.Join("|", startGroup.Select(member => member.ToString()).OrderBy(value => value))}" +
-                           $"->{string.Join("|", endGroup.Select(member => member.ToString()).OrderBy(value => value))}";
-                })
-            .OrderBy(value => value)
-            .ToArray();
+        return
+        [
+            .. graph.Graph
+                .SelectMany(start => graph.Graph.GetAdjacencyOuterVertexesOf(start),
+                    (start, end) =>
+                    {
+                        var startGroup = start is ResourceGroupKey startKey ? startKey.Members : new List<IResourceKey> { start };
+                        var endGroup = end is ResourceGroupKey endKey ? endKey.Members : new List<IResourceKey> { end };
+                        return $"{string.Join("|", startGroup.Select(member => member.ToString()).OrderBy(value => value))}" +
+                               $"->{string.Join("|", endGroup.Select(member => member.ToString()).OrderBy(value => value))}";
+                    })
+                .OrderBy(value => value)
+        ];
     }
 
     private sealed class TestResourceKey(string id) : IResourceKey

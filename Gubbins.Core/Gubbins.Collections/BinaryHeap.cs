@@ -37,7 +37,7 @@ public class BinaryHeap<T> : IPriorityQueue<T>
     public BinaryHeap(IComparer<T> comparer)
     {
         m_Comparer = comparer;
-        m_List     = new List<T>();
+        m_List     = [];
     }
 
     /// <summary>
@@ -54,7 +54,7 @@ public class BinaryHeap<T> : IPriorityQueue<T>
     public BinaryHeap(IEnumerable<T> elements, IComparer<T> comparer)
     {
         m_Comparer = comparer;
-        m_List     = new List<T>(elements);
+        m_List     = [.. elements];
         Heapify();
     }
 

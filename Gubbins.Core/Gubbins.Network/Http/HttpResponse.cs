@@ -49,7 +49,7 @@ public readonly struct HttpResponse : IDisposable
     /// <param name="description">Http description with code.</param>
     public HttpResponse(Stream stream, long code, string? description)
     {
-        Data = Array.Empty<byte>();
+        Data = [];
         _ = stream.Read(Data);
         Stream = stream;
         Code = code;

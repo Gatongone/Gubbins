@@ -10,7 +10,7 @@ namespace Gubbins.Network;
 public struct HttpContext : IDisposable
 {
     private const string DEFAULT_HTTP_VERSION = "1.1";
-    private static readonly ConcurrentQueue<HttpMessageCache> s_CachePool = new();
+    private static readonly ConcurrentQueue<HttpMessageCache> cachePool = new();
 
     private string? m_Url;
     private volatile bool m_IsDisposed;
@@ -78,7 +78,7 @@ public struct HttpContext : IDisposable
 
     public HttpContext()
     {
-        if (!s_CachePool.TryDequeue(out m_MessageCache))
+        if (!cachePool.TryDequeue(out m_MessageCache))
         {
             m_MessageCache = new HttpMessageCache();
         }
@@ -88,7 +88,7 @@ public struct HttpContext : IDisposable
     {
         if (m_IsDisposed) return;
         m_MessageCache.Clear();
-        s_CachePool.Enqueue(m_MessageCache);
+        cachePool.Enqueue(m_MessageCache);
         m_IsDisposed = true;
     }
 

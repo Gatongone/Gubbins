@@ -68,7 +68,7 @@ public class RedBlackTree<TNode> : Tree<TNode>, ICollection<TNode>
         if (item == null) throw new ArgumentNullException(nameof(item));
         var newNode = new Node(item);
 
-        AddBSTNode(newNode);
+        AddBstNode(newNode);
         FixAddingViolations(newNode);
         UpdateVersion();
     }
@@ -107,12 +107,12 @@ public class RedBlackTree<TNode> : Tree<TNode>, ICollection<TNode>
     {
         if (!TryGetNode(item, out var node))
             return false;
-        RemoveBSTNode(node!);
+        RemoveBstNode(node!);
         UpdateVersion();
         return true;
     }
 
-    private void AddBSTNode(Node newNode)
+    private void AddBstNode(Node newNode)
     {
         // If is root.
         if (m_Root == null)
@@ -158,7 +158,7 @@ public class RedBlackTree<TNode> : Tree<TNode>, ICollection<TNode>
         m_Count++;
     }
 
-    private void RemoveBSTNode(Node node)
+    private void RemoveBstNode(Node node)
     {
         var parent = node.Parent;
         var left = node.Left;
@@ -168,7 +168,7 @@ public class RedBlackTree<TNode> : Tree<TNode>, ICollection<TNode>
         {
             var predecessor = GetPredecessor(node);
             node.Value = predecessor.Value;
-            RemoveBSTNode(predecessor);
+            RemoveBstNode(predecessor);
             return;
         }
 

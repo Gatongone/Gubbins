@@ -135,7 +135,7 @@ public sealed class JsonInstaller(string json) : IDependenciesInstaller
 
                     break;
                 case "bindings":
-                    config.Bindings = ParseStringArray(value).Select(binding => Type.GetType(binding.Trim('"'), Reflection.LoadAssemblyResolver, Reflection.DomainTypeResolver)).ToHashSet();
+                    config.Bindings = [.. ParseStringArray(value).Select(binding => Type.GetType(binding.Trim('"'), Reflection.LoadAssemblyResolver, Reflection.DomainTypeResolver))];
                     break;
             }
         }

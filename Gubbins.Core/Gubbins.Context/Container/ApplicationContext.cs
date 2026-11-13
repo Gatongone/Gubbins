@@ -52,7 +52,7 @@ public class ApplicationContext : IScopeController, IContext
     /// <summary>
     /// Keys currently being constructed via constructor injection, used to detect circular dependencies.
     /// </summary>
-    private readonly HashSet<string> m_Constructing = new();
+    private readonly HashSet<string> m_Constructing = [];
 
     /// <summary>
     /// Binding type to key mappings.
@@ -151,7 +151,7 @@ public class ApplicationContext : IScopeController, IContext
         {
 #pragma warning disable CS8619 // Nullability of reference types in value doesn't match target type.
             return m_ActualTypeMaps.TryGetValue(type, out keys)
-                ? keys.Select(ResolveKey).Where(instance => null != instance).ToArray()
+                ? [.. keys.Select(ResolveKey).Where(instance => null != instance)]
                 : [];
 #pragma warning restore CS8619 // Nullability of reference types in value doesn't match target type.
         }
@@ -169,7 +169,7 @@ public class ApplicationContext : IScopeController, IContext
 
         if (Parent != null)
             result.AddRange(Parent.ResolveAll(type)!);
-        return result.ToArray();
+        return [.. result];
     }
 
     /// <summary>
@@ -510,7 +510,7 @@ public class ApplicationContext : IScopeController, IContext
                 if (!m_BindingMaps.TryGetValue(bind, out keys))
                 {
                     // Create a new collection.
-                    keys = new List<string>();
+                    keys = [];
                     m_BindingMaps.Add(bind, keys);
                 }
 

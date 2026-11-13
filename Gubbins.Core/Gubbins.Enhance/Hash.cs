@@ -40,7 +40,7 @@ public static partial class Hash
     /// <value>
     /// A <see cref="ReadOnlySpan{T}"/> of integers containing prime numbers from 3 to 7199369.
     /// </value>
-    public static ReadOnlySpan<int> Primes => s_Primes.AsSpan();
+    public static ReadOnlySpan<int> Primes => primes.AsSpan();
 
     // Table of prime numbers to use as hash table sizes.
     // A typical resize algorithm would pick the smallest prime number in this array
@@ -55,7 +55,7 @@ public static partial class Hash
     // h1(key) + i*h2(key), 0 <= i < size.  h2 and the size must be relatively prime.
     // We prefer the low computation costs of higher prime numbers over the increased
     // memory allocation of a fixed prime number i.e. when right sizing a HashSet.
-    private static readonly int[] s_Primes =
+    private static readonly int[] primes =
     [
         3, 7, 11, 17, 23, 29, 37, 47, 59, 71, 89, 107, 131, 163, 197, 239, 293, 353, 431, 521, 631, 761, 919,
         1103, 1327, 1597, 1931, 2333, 2801, 3371, 4049, 4861, 5839, 7013, 8419, 10103, 12143, 14591,
@@ -255,7 +255,7 @@ static partial class Hash
     /// Contains 256 entries representing all possible CRC-8 values for single-byte inputs.
     /// This table enables fast CRC-8 computation using table lookup instead of polynomial division.
     /// </summary>
-    private static readonly byte[] s_Crc8Table =
+    private static readonly byte[] crc8Table =
     [
         0x00, 0x5E, 0xBC, 0xE2, 0x61, 0x3F, 0xDD, 0x83,
         0xC2, 0x9C, 0x7E, 0x20, 0xA3, 0xFD, 0x1F, 0x41,
@@ -296,7 +296,7 @@ static partial class Hash
     /// Contains 256 entries representing all possible CRC-16 values for single-byte inputs.
     /// This table enables fast CRC-16 computation using table lookup instead of polynomial division.
     /// </summary>
-    private static readonly ushort[] s_CRC16Table =
+    private static readonly ushort[] crc16Table =
     [
         0x0000, 0xC0C1, 0xC181, 0x0140, 0xC301, 0x03C0, 0x0280, 0xC241, 0xC601, 0x06C0, 0x0780,
         0xC741, 0x0500, 0xC5C1, 0xC481, 0x0440, 0xCC01, 0x0CC0, 0x0D80, 0xCD41, 0x0F00, 0xCFC1,
@@ -329,7 +329,7 @@ static partial class Hash
     /// Contains 256 entries representing all possible CRC-32 values for single-byte inputs.
     /// This table enables fast CRC-32 computation using table lookup instead of polynomial division.
     /// </summary>
-    private static readonly uint[] s_CRC32Table =
+    private static readonly uint[] crc32Table =
     [
         0x00000000, 0x04c11db7, 0x09823b6e, 0x0d4326d9, 0x130476dc, 0x17c56b6b, 0x1a864db2, 0x1e475005,
         0x2608edb8, 0x22c9f00f, 0x2f8ad6d6, 0x2b4bcb61, 0x350c9b64, 0x31cd86d3, 0x3c8ea00a, 0x384fbdbd,
@@ -370,13 +370,13 @@ static partial class Hash
     /// </summary>
     /// <param name="data">The byte data to calculate the CRC-8 checksum for.</param>
     /// <returns>An 8-bit CRC checksum value.</returns>
-    public static byte CalculateCRC8(ReadOnlySpan<byte> data)
+    public static byte CalculateCrc8(ReadOnlySpan<byte> data)
     {
         byte crc = 0;
 
         for (var i = 0; i < data.Length; i++)
         {
-            crc = s_Crc8Table[crc ^ data[i]];
+            crc = crc8Table[crc ^ data[i]];
         }
 
         return crc;
@@ -387,20 +387,20 @@ static partial class Hash
     /// </summary>
     /// <param name="data">The character data to calculate the CRC-8 checksum for.</param>
     /// <returns>An 8-bit CRC checksum value cast to uint.</returns>
-    public static uint CalculateCRC8(ReadOnlySpan<char> data) => CalculateCRC8(MemoryMarshal.Cast<char, byte>(data));
+    public static uint CalculateCrc8(ReadOnlySpan<char> data) => CalculateCrc8(MemoryMarshal.Cast<char, byte>(data));
 
     /// <summary>
     /// Calculates the CRC-16 checksum for the specified byte data using a lookup table.
     /// </summary>
     /// <param name="data">The byte data to calculate the CRC-16 checksum for.</param>
     /// <returns>A 16-bit CRC checksum value.</returns>
-    public static ushort CalculateCRC16(ReadOnlySpan<byte> data)
+    public static ushort CalculateCrc16(ReadOnlySpan<byte> data)
     {
         ushort crc = 0;
         for (var i = 0; i < data.Length; ++i)
         {
             var index = (byte) (crc >> 8 ^ data[i]);
-            crc = (ushort) (s_CRC16Table[index] ^ (crc << 8));
+            crc = (ushort) (crc16Table[index] ^ (crc << 8));
         }
 
         return crc;
@@ -411,19 +411,19 @@ static partial class Hash
     /// </summary>
     /// <param name="data">The character data to calculate the CRC-16 checksum for.</param>
     /// <returns>A 16-bit CRC checksum value.</returns>
-    public static ushort CalculateCRC16(ReadOnlySpan<char> data) => CalculateCRC8(MemoryMarshal.Cast<char, byte>(data));
+    public static ushort CalculateCrc16(ReadOnlySpan<char> data) => CalculateCrc8(MemoryMarshal.Cast<char, byte>(data));
 
     /// <summary>
     /// Calculates the CRC-32 checksum for the specified byte data using a lookup table.
     /// </summary>
     /// <param name="data">The byte data to calculate the CRC-32 checksum for.</param>
     /// <returns>A 32-bit CRC checksum value.</returns>
-    public static uint CalculateCRC32(ReadOnlySpan<byte> data)
+    public static uint CalculateCrc32(ReadOnlySpan<byte> data)
     {
         uint crc = 0;
         for (var i = 0; i < data.Length; i++)
         {
-            crc = (crc << 8) ^ s_CRC32Table[(crc >> 24) ^ data[i]];
+            crc = (crc << 8) ^ crc32Table[(crc >> 24) ^ data[i]];
         }
 
         return crc;
@@ -434,5 +434,5 @@ static partial class Hash
     /// </summary>
     /// <param name="data">The character data to calculate the CRC-32 checksum for.</param>
     /// <returns>A 32-bit CRC checksum value.</returns>
-    public static uint CalculateCRC32(ReadOnlySpan<char> data) => CalculateCRC32(MemoryMarshal.Cast<char, byte>(data));
+    public static uint CalculateCrc32(ReadOnlySpan<char> data) => CalculateCrc32(MemoryMarshal.Cast<char, byte>(data));
 }

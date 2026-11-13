@@ -312,9 +312,11 @@ public sealed class SpanOperationsGenerator : ISourceGenerator
 
         if (conflictingSurfaces.Count == 0) return targets;
 
-        return targets
-            .Where(t => !conflictingSurfaces.Contains(ToQualifiedName(t.ProxiedInterface)))
-            .ToList();
+        return
+        [
+            .. targets
+                .Where(t => !conflictingSurfaces.Contains(ToQualifiedName(t.ProxiedInterface)))
+        ];
     }
 
     private static IEnumerable<ComponentMember> GetBindableMembers(INamedTypeSymbol component, ITypeSymbol valueType, string? memberOverwrite)
@@ -619,7 +621,7 @@ public sealed class SpanOperationsGenerator : ISourceGenerator
                 var signature = $"{resolved[index].MethodName}({declaration})";
                 if (!signatures.TryGetValue(signature, out var list))
                 {
-                    list = new List<int>();
+                    list = [];
                     signatures.Add(signature, list);
                 }
 
@@ -773,9 +775,8 @@ public sealed class SpanOperationsGenerator : ISourceGenerator
 
     private static IEnumerable<IMethodSymbol> GetOperationMethods(INamedTypeSymbol interfaceType)
     {
-        var methods = new List<IMethodSymbol>();
+        List<IMethodSymbol> methods = [.. interfaceType.GetMembers().OfType<IMethodSymbol>()];
 
-        methods.AddRange(interfaceType.GetMembers().OfType<IMethodSymbol>());
         foreach (var baseInterface in interfaceType.AllInterfaces)
         {
             methods.AddRange(baseInterface.GetMembers().OfType<IMethodSymbol>());
@@ -844,7 +845,7 @@ public sealed class SpanOperationsGenerator : ISourceGenerator
 
     private sealed class ComponentConfig
     {
-        private static readonly IReadOnlyDictionary<string, string> EmptyRenames = new Dictionary<string, string>(StringComparer.Ordinal);
+        private static readonly IReadOnlyDictionary<string, string> emptyRenames = new Dictionary<string, string>(StringComparer.Ordinal);
 
         public ComponentConfig(
             List<INamedTypeSymbol> interfaces,
@@ -852,20 +853,20 @@ public sealed class SpanOperationsGenerator : ISourceGenerator
             Dictionary<string, Dictionary<string, string>> renameByOperation)
         {
             Interfaces = interfaces;
-            _memberByOperation = memberByOperation;
-            _renameByOperation = renameByOperation;
+            m_MemberByOperation = memberByOperation;
+            m_RenameByOperation = renameByOperation;
         }
 
-        private readonly Dictionary<string, string> _memberByOperation;
-        private readonly Dictionary<string, Dictionary<string, string>> _renameByOperation;
+        private readonly Dictionary<string, string> m_MemberByOperation;
+        private readonly Dictionary<string, Dictionary<string, string>> m_RenameByOperation;
 
         public List<INamedTypeSymbol> Interfaces { get; }
 
         public bool TryGetMemberName(INamedTypeSymbol operation, out string memberName)
-            => _memberByOperation.TryGetValue(ToQualifiedName(operation), out memberName!);
+            => m_MemberByOperation.TryGetValue(ToQualifiedName(operation), out memberName!);
 
         public IReadOnlyDictionary<string, string> GetMethodRenames(INamedTypeSymbol operation)
-            => _renameByOperation.TryGetValue(ToQualifiedName(operation), out var map) ? map : EmptyRenames;
+            => m_RenameByOperation.TryGetValue(ToQualifiedName(operation), out var map) ? map : emptyRenames;
     }
 
     private readonly struct ExtensionMethodSpec

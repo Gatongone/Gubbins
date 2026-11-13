@@ -269,7 +269,7 @@ public class DirectedGraph<TVertex, TWeight> : IDirectedWeightedGraph<TVertex, T
             edge = edge.InnerEdge;
         }
 
-        return list.ToArray();
+        return [.. list];
     }
 
     /// <inheritdoc/>
@@ -287,7 +287,7 @@ public class DirectedGraph<TVertex, TWeight> : IDirectedWeightedGraph<TVertex, T
             edge = edge.OuterEdge;
         }
 
-        return list.ToArray();
+        return [.. list];
     }
 
     /// <inheritdoc/>
@@ -305,7 +305,7 @@ public class DirectedGraph<TVertex, TWeight> : IDirectedWeightedGraph<TVertex, T
             edge = edge.InnerEdge;
         }
 
-        return list.ToArray();
+        return [.. list];
     }
 
     /// <inheritdoc/>
@@ -323,7 +323,7 @@ public class DirectedGraph<TVertex, TWeight> : IDirectedWeightedGraph<TVertex, T
             edge = edge.OuterEdge;
         }
 
-        return list.ToArray();
+        return [.. list];
     }
 
     /// <inheritdoc/>

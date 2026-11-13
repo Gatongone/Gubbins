@@ -1,7 +1,6 @@
 ﻿using System.Collections;
 using System.Runtime.CompilerServices;
 using Gubbins.Enhance;
-using Gubbins.Unsafe;
 
 namespace Gubbins.Collections;
 
@@ -231,7 +230,7 @@ public class UndirectedGraph<TVertex, TWeight> : IWeightedGraph<TVertex, TWeight
 
     public TVertex[] GetAdjacencyVertexesOf(TVertex vertex)
     {
-        if (!m_VertexMap.TryGetValue(vertex, out var vertexInfo)) return Array.Empty<TVertex>();
+        if (!m_VertexMap.TryGetValue(vertex, out var vertexInfo)) return [];
 
         var edge = vertexInfo.FirstEdge;
         var list = new List<TVertex>();
@@ -243,12 +242,12 @@ public class UndirectedGraph<TVertex, TWeight> : IWeightedGraph<TVertex, TWeight
             edge = GetNextEdge(edge, vertexInfo);
         }
 
-        return list.ToArray();
+        return [.. list];
     }
 
     public (TVertex AdjacencyVertex, TWeight Weight)[] GetAdjacencyEdgesOf(TVertex vertex)
     {
-        if (!m_VertexMap.TryGetValue(vertex, out var vertexInfo)) return Array.Empty<(TVertex, TWeight)>();
+        if (!m_VertexMap.TryGetValue(vertex, out var vertexInfo)) return [];
 
         var edge = vertexInfo.FirstEdge;
         var list = new List<(TVertex, TWeight)>();
@@ -260,7 +259,7 @@ public class UndirectedGraph<TVertex, TWeight> : IWeightedGraph<TVertex, TWeight
             edge = GetNextEdge(edge, vertexInfo);
         }
 
-        return list.ToArray();
+        return [.. list];
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

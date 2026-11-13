@@ -113,7 +113,7 @@ public class DependencyDecorator :
     /// <inheritdoc/>
     IMultitonBindingDecorator IMultitonBindingDecorator.BindTo(Type[] types)
     {
-        Info.BindTypes ??= new List<Type>();
+        Info.BindTypes ??= [];
         Info.BindTypes.AddRange(types);
         return this;
     }
@@ -121,7 +121,7 @@ public class DependencyDecorator :
     /// <inheritdoc/>
     INotMultitonBindingDecorator INotMultitonBindingDecorator.BindTo(Type[] types)
     {
-        Info.BindTypes ??= new List<Type>();
+        Info.BindTypes ??= [];
         Info.BindTypes.AddRange(types);
         return this;
     }
@@ -129,7 +129,7 @@ public class DependencyDecorator :
     /// <inheritdoc/>
     IBindingDecorator IBindingDecorator.BindTo(Type[] types)
     {
-        Info.BindTypes ??= new List<Type>();
+        Info.BindTypes ??= [];
         Info.BindTypes.AddRange(types);
         return this;
     }

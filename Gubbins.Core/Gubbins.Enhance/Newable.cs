@@ -19,14 +19,14 @@ public interface INewable
 /// </summary>
 public static class Newable
 {
-    private static readonly ConcurrentDictionary<Type?, INewable> s_InstanceCache = new();
+    private static readonly ConcurrentDictionary<Type?, INewable> instanceCache = new();
 
     /// <summary>
     /// Registers a factory for creating instances of the specified type.
     /// </summary>
     /// <typeparam name="T">The type for which to register the factory.</typeparam>
     /// <param name="factory">The factory instance that will be used to create instances of type T.</param>
-    public static void RegisterFactory<T>(INewable factory) => s_InstanceCache[typeof(T)] = factory;
+    public static void RegisterFactory<T>(INewable factory) => instanceCache[typeof(T)] = factory;
 
     /// <summary>
     /// Determines whether the specified type can be instantiated and provides an appropriate factory.
@@ -36,17 +36,17 @@ public static class Newable
     /// <returns>true if the type can be instantiated; otherwise, false.</returns>
     public static bool IsNewable(this Type type, out INewable? newer)
     {
-        if (s_InstanceCache.TryGetValue(type, out newer)) return newer == null!;
+        if (instanceCache.TryGetValue(type, out newer)) return newer == null!;
 
         if (!type.IsValueType && type.GetConstructor([]) is null)
         {
             newer = null!;
-            s_InstanceCache.TryAdd(type, newer);
+            instanceCache.TryAdd(type, newer);
             return false;
         }
 
         newer = new Newer(type);
-        return s_InstanceCache.TryAdd(type, newer);
+        return instanceCache.TryAdd(type, newer);
     }
 
     /// <summary>

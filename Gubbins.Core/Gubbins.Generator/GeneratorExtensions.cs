@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using Microsoft.CodeAnalysis;
 
 namespace Gubbins.Generator;
@@ -110,7 +109,7 @@ internal static class GeneratorExtensions
             result.Add((type.Name, type.TypeKind.ToString().ToLower()));
         }
 
-        return result.ToArray();
+        return [.. result];
     }
 
     internal static void ReportDiagnostic(this GeneratorExecutionContext context, DiagnosticDescriptor descriptor, Location location, params object[] args)
