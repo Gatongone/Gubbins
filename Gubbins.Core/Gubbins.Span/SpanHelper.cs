@@ -1481,8 +1481,8 @@ internal static class VectorMath
         return ((new Vector<double>(s4) * r2 + new Vector<double>(s3))
                 * r4
                 + (new Vector<double>(s2) * r2 + new Vector<double>(s1)))
-            * r3
-            + r;
+               * r3
+               + r;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1501,10 +1501,10 @@ internal static class VectorMath
         var r8 = r4 * r4;
 
         var poly = (new Vector<double>(s6) * r2 + new Vector<double>(s5))
-            * r8
-            + ((new Vector<double>(s4) * r2 + new Vector<double>(s3))
-                * r4
-                + (new Vector<double>(s2) * r2 + new Vector<double>(s1)));
+                   * r8
+                   + ((new Vector<double>(s4) * r2 + new Vector<double>(s3))
+                      * r4
+                      + (new Vector<double>(s2) * r2 + new Vector<double>(s1)));
 
         return poly * r3 + r;
     }
@@ -1521,8 +1521,8 @@ internal static class VectorMath
         var r4 = r2 * r2;
 
         return (new Vector<double>(c4) * r2 + new Vector<double>(c3))
-            * r4
-            + (new Vector<double>(c2) * r2 + new Vector<double>(c1));
+               * r4
+               + (new Vector<double>(c2) * r2 + new Vector<double>(c1));
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1540,10 +1540,10 @@ internal static class VectorMath
         var r8 = r4 * r4;
 
         return (new Vector<double>(c6) * r2 + new Vector<double>(c5))
-            * r8
-            + ((new Vector<double>(c4) * r2 + new Vector<double>(c3))
-                * r4
-                + (new Vector<double>(c2) * r2 + new Vector<double>(c1)));
+               * r8
+               + ((new Vector<double>(c4) * r2 + new Vector<double>(c3))
+                  * r4
+                  + (new Vector<double>(c2) * r2 + new Vector<double>(c1)));
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1562,16 +1562,16 @@ internal static class VectorMath
         var r8 = r4 * r4;
 
         var sinPoly = new Vector<double>(s6)
-            * r8
-            + ((new Vector<double>(s5) * r2 + new Vector<double>(s4))
-                * r4
-                + (new Vector<double>(s3) * r2 + new Vector<double>(s2)));
+                      * r8
+                      + ((new Vector<double>(s5) * r2 + new Vector<double>(s4))
+                         * r4
+                         + (new Vector<double>(s3) * r2 + new Vector<double>(s2)));
 
         return r - new Vector<double>(-s1)
-            * r3
-            + ((rr * new Vector<double>(0.5) - r3 * sinPoly)
-                * r2
-                - rr);
+               * r3
+               + ((rr * new Vector<double>(0.5) - r3 * sinPoly)
+                  * r2
+                  - rr);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1629,9 +1629,9 @@ internal static class VectorMath
         var rtail = npi2 * vPiByTwo2;
         var r = rhead - rtail;
 
-        rtail =  new Vector<double>(vPiByTwo2Tail) * npi2 - (rhead - r - rtail);
-        rhead =  r;
-        r     -= rtail;
+        rtail = new Vector<double>(vPiByTwo2Tail) * npi2 - (rhead - r - rtail);
+        rhead = r;
+        r -= rtail;
 
         return (r, rhead - r - rtail, region);
     }
@@ -1669,308 +1669,343 @@ internal static class VectorMath
 /// <typeparam name="T">The type that provides operator override.</typeparam>
 internal static class Operations<T> where T : struct
 {
-    private static readonly Func<T, T, T>?    s_Add      = (typeof(T).GetMethod("op_Addition", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)?.CreateDelegate(typeof(Func<T, T, T>)) as Func<T, T, T>)!;
-    private static readonly Func<T, T, T>?    s_Sub      = (typeof(T).GetMethod("op_Subtraction", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)?.CreateDelegate(typeof(Func<T, T, T>)) as Func<T, T, T>)!;
-    private static readonly Func<T, T, T>?    s_Mul      = (typeof(T).GetMethod("op_Multiply", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)?.CreateDelegate(typeof(Func<T, T, T>)) as Func<T, T, T>)!;
-    private static readonly Func<T, T, T>?    s_Div      = (typeof(T).GetMethod("op_Division", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)?.CreateDelegate(typeof(Func<T, T, T>)) as Func<T, T, T>)!;
-    private static readonly Func<T, T, T>?    s_Mod      = (typeof(T).GetMethod("op_Modulus", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)?.CreateDelegate(typeof(Func<T, T, T>)) as Func<T, T, T>)!;
-    private static readonly Func<T, T, bool>? s_Gt       = (typeof(T).GetMethod("op_GreaterThan", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)?.CreateDelegate(typeof(Func<T, T, bool>)) as Func<T, T, bool>)!;
-    private static readonly Func<T, T, bool>? s_Lt       = (typeof(T).GetMethod("op_LessThan", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)?.CreateDelegate(typeof(Func<T, T, bool>)) as Func<T, T, bool>)!;
-    private static readonly Func<T, T, bool>? s_Ge       = (typeof(T).GetMethod("op_GreaterThanOrEqual", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)?.CreateDelegate(typeof(Func<T, T, bool>)) as Func<T, T, bool>)!;
-    private static readonly Func<T, T, bool>? s_Le       = (typeof(T).GetMethod("op_LessThanOrEqual", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)?.CreateDelegate(typeof(Func<T, T, bool>)) as Func<T, T, bool>)!;
-    private static readonly TypeCode          s_TypeCode = Type.GetTypeCode(typeof(T));
+    /// <summary>
+    /// Reflection fallback for user-defined structs that declare their own operators. It lives in a nested class
+    /// so the reflection lookups only run when the fallback is actually used; the built-in numeric types never
+    /// touch it.
+    /// </summary>
+    private static class Fallback
+    {
+        internal static readonly Func<T, T, T>?    Add = Arithmetic("op_Addition");
+        internal static readonly Func<T, T, T>?    Sub = Arithmetic("op_Subtraction");
+        internal static readonly Func<T, T, T>?    Mul = Arithmetic("op_Multiply");
+        internal static readonly Func<T, T, T>?    Div = Arithmetic("op_Division");
+        internal static readonly Func<T, T, T>?    Mod = Arithmetic("op_Modulus");
+        internal static readonly Func<T, T, bool>? Gt  = Comparison("op_GreaterThan");
+        internal static readonly Func<T, T, bool>? Lt  = Comparison("op_LessThan");
+        internal static readonly Func<T, T, bool>? Ge  = Comparison("op_GreaterThanOrEqual");
+        internal static readonly Func<T, T, bool>? Le  = Comparison("op_LessThanOrEqual");
+
+        private static Func<T, T, T>? Arithmetic(string name) =>
+            typeof(T).GetMethod(name, BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+                     ?.CreateDelegate(typeof(Func<T, T, T>)) as Func<T, T, T>;
+
+        private static Func<T, T, bool>? Comparison(string name) =>
+            typeof(T).GetMethod(name, BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+                     ?.CreateDelegate(typeof(Func<T, T, bool>)) as Func<T, T, bool>;
+    }
+
+    // `typeof(T) == typeof(...)` is folded to a constant by the JIT for value-type instantiations, so the
+    // built-in cases collapse to a single inlined operation. A `switch` on a runtime TypeCode field cannot
+    // be folded and leaves a branch (and the reflection fallback) in every inner-loop iteration.
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static T Add(T a, T b)
     {
-        switch (s_TypeCode)
+        if (typeof(T) == typeof(int) || typeof(T) == typeof(short) || typeof(T) == typeof(byte))
         {
-            case TypeCode.Byte:
-            case TypeCode.Int16:
-            case TypeCode.Int32:
-            {
-                var value = Native.Cast<T, int>(ref a) + Native.Cast<T, int>(ref b);
-                return Native.Cast<int, T>(ref value);
-            }
-            case TypeCode.Int64:
-            {
-                var value = Native.Cast<T, long>(ref a) + Native.Cast<T, long>(ref b);
-                return Native.Cast<long, T>(ref value);
-            }
-            case TypeCode.SByte:
-            case TypeCode.UInt16:
-            case TypeCode.UInt32:
-            {
-                var value = Native.Cast<T, uint>(ref a) + Native.Cast<T, uint>(ref b);
-                return Native.Cast<uint, T>(ref value);
-            }
-            case TypeCode.UInt64:
-            {
-                var value = Native.Cast<T, ulong>(ref a) + Native.Cast<T, ulong>(ref b);
-                return Native.Cast<ulong, T>(ref value);
-            }
-            case TypeCode.Single:
-            {
-                var value = Native.Cast<T, float>(ref a) + Native.Cast<T, float>(ref b);
-                return Native.Cast<float, T>(ref value);
-            }
-            case TypeCode.Double:
-            {
-                var value = Native.Cast<T, double>(ref a) + Native.Cast<T, double>(ref b);
-                return Native.Cast<double, T>(ref value);
-            }
-            case TypeCode.Decimal:
-            {
-                var value = Native.Cast<T, decimal>(ref a) + Native.Cast<T, decimal>(ref b);
-                return Native.Cast<decimal, T>(ref value);
-            }
-            default: return s_Add.Invoke(a, b);
+            var value = Native.Cast<T, int>(ref a) + Native.Cast<T, int>(ref b);
+            return Native.Cast<int, T>(ref value);
         }
+
+        if (typeof(T) == typeof(long))
+        {
+            var value = Native.Cast<T, long>(ref a) + Native.Cast<T, long>(ref b);
+            return Native.Cast<long, T>(ref value);
+        }
+
+        if (typeof(T) == typeof(uint) || typeof(T) == typeof(ushort) || typeof(T) == typeof(sbyte))
+        {
+            var value = Native.Cast<T, uint>(ref a) + Native.Cast<T, uint>(ref b);
+            return Native.Cast<uint, T>(ref value);
+        }
+
+        if (typeof(T) == typeof(ulong))
+        {
+            var value = Native.Cast<T, ulong>(ref a) + Native.Cast<T, ulong>(ref b);
+            return Native.Cast<ulong, T>(ref value);
+        }
+
+        if (typeof(T) == typeof(float))
+        {
+            var value = Native.Cast<T, float>(ref a) + Native.Cast<T, float>(ref b);
+            return Native.Cast<float, T>(ref value);
+        }
+
+        if (typeof(T) == typeof(double))
+        {
+            var value = Native.Cast<T, double>(ref a) + Native.Cast<T, double>(ref b);
+            return Native.Cast<double, T>(ref value);
+        }
+
+        if (typeof(T) == typeof(decimal))
+        {
+            var value = Native.Cast<T, decimal>(ref a) + Native.Cast<T, decimal>(ref b);
+            return Native.Cast<decimal, T>(ref value);
+        }
+
+        return Fallback.Add!.Invoke(a, b);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static T Subtract(T a, T b)
     {
-        switch (s_TypeCode)
+        if (typeof(T) == typeof(int) || typeof(T) == typeof(short) || typeof(T) == typeof(byte))
         {
-            case TypeCode.Byte:
-            case TypeCode.Int16:
-            case TypeCode.Int32:
-            {
-                var value = Native.Cast<T, int>(ref a) - Native.Cast<T, int>(ref b);
-                return Native.Cast<int, T>(ref value);
-            }
-            case TypeCode.Int64:
-            {
-                var value = Native.Cast<T, long>(ref a) - Native.Cast<T, long>(ref b);
-                return Native.Cast<long, T>(ref value);
-            }
-            case TypeCode.SByte:
-            case TypeCode.UInt16:
-            case TypeCode.UInt32:
-            {
-                var value = Native.Cast<T, uint>(ref a) - Native.Cast<T, uint>(ref b);
-                return Native.Cast<uint, T>(ref value);
-            }
-            case TypeCode.UInt64:
-            {
-                var value = Native.Cast<T, ulong>(ref a) - Native.Cast<T, ulong>(ref b);
-                return Native.Cast<ulong, T>(ref value);
-            }
-            case TypeCode.Single:
-            {
-                var value = Native.Cast<T, float>(ref a) - Native.Cast<T, float>(ref b);
-                return Native.Cast<float, T>(ref value);
-            }
-            case TypeCode.Double:
-            {
-                var value = Native.Cast<T, double>(ref a) - Native.Cast<T, double>(ref b);
-                return Native.Cast<double, T>(ref value);
-            }
-            case TypeCode.Decimal:
-            {
-                var value = Native.Cast<T, decimal>(ref a) - Native.Cast<T, decimal>(ref b);
-                return Native.Cast<decimal, T>(ref value);
-            }
-            default: return s_Sub.Invoke(a, b);
+            var value = Native.Cast<T, int>(ref a) - Native.Cast<T, int>(ref b);
+            return Native.Cast<int, T>(ref value);
         }
+
+        if (typeof(T) == typeof(long))
+        {
+            var value = Native.Cast<T, long>(ref a) - Native.Cast<T, long>(ref b);
+            return Native.Cast<long, T>(ref value);
+        }
+
+        if (typeof(T) == typeof(uint) || typeof(T) == typeof(ushort) || typeof(T) == typeof(sbyte))
+        {
+            var value = Native.Cast<T, uint>(ref a) - Native.Cast<T, uint>(ref b);
+            return Native.Cast<uint, T>(ref value);
+        }
+
+        if (typeof(T) == typeof(ulong))
+        {
+            var value = Native.Cast<T, ulong>(ref a) - Native.Cast<T, ulong>(ref b);
+            return Native.Cast<ulong, T>(ref value);
+        }
+
+        if (typeof(T) == typeof(float))
+        {
+            var value = Native.Cast<T, float>(ref a) - Native.Cast<T, float>(ref b);
+            return Native.Cast<float, T>(ref value);
+        }
+
+        if (typeof(T) == typeof(double))
+        {
+            var value = Native.Cast<T, double>(ref a) - Native.Cast<T, double>(ref b);
+            return Native.Cast<double, T>(ref value);
+        }
+
+        if (typeof(T) == typeof(decimal))
+        {
+            var value = Native.Cast<T, decimal>(ref a) - Native.Cast<T, decimal>(ref b);
+            return Native.Cast<decimal, T>(ref value);
+        }
+
+        return Fallback.Sub!.Invoke(a, b);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static T Multiply(T a, T b)
     {
-        switch (s_TypeCode)
+        if (typeof(T) == typeof(int) || typeof(T) == typeof(short) || typeof(T) == typeof(byte))
         {
-            case TypeCode.Byte:
-            case TypeCode.Int16:
-            case TypeCode.Int32:
-            {
-                var value = Native.Cast<T, int>(ref a) * Native.Cast<T, int>(ref b);
-                return Native.Cast<int, T>(ref value);
-            }
-            case TypeCode.Int64:
-            {
-                var value = Native.Cast<T, long>(ref a) * Native.Cast<T, long>(ref b);
-                return Native.Cast<long, T>(ref value);
-            }
-            case TypeCode.SByte:
-            case TypeCode.UInt16:
-            case TypeCode.UInt32:
-            {
-                var value = Native.Cast<T, uint>(ref a) * Native.Cast<T, uint>(ref b);
-                return Native.Cast<uint, T>(ref value);
-            }
-            case TypeCode.UInt64:
-            {
-                var value = Native.Cast<T, ulong>(ref a) * Native.Cast<T, ulong>(ref b);
-                return Native.Cast<ulong, T>(ref value);
-            }
-            case TypeCode.Single:
-            {
-                var value = Native.Cast<T, float>(ref a) * Native.Cast<T, float>(ref b);
-                return Native.Cast<float, T>(ref value);
-            }
-            case TypeCode.Double:
-            {
-                var value = Native.Cast<T, double>(ref a) * Native.Cast<T, double>(ref b);
-                return Native.Cast<double, T>(ref value);
-            }
-            case TypeCode.Decimal:
-            {
-                var value = Native.Cast<T, decimal>(ref a) * Native.Cast<T, decimal>(ref b);
-                return Native.Cast<decimal, T>(ref value);
-            }
-            default: return s_Mul.Invoke(a, b);
+            var value = Native.Cast<T, int>(ref a) * Native.Cast<T, int>(ref b);
+            return Native.Cast<int, T>(ref value);
         }
+
+        if (typeof(T) == typeof(long))
+        {
+            var value = Native.Cast<T, long>(ref a) * Native.Cast<T, long>(ref b);
+            return Native.Cast<long, T>(ref value);
+        }
+
+        if (typeof(T) == typeof(uint) || typeof(T) == typeof(ushort) || typeof(T) == typeof(sbyte))
+        {
+            var value = Native.Cast<T, uint>(ref a) * Native.Cast<T, uint>(ref b);
+            return Native.Cast<uint, T>(ref value);
+        }
+
+        if (typeof(T) == typeof(ulong))
+        {
+            var value = Native.Cast<T, ulong>(ref a) * Native.Cast<T, ulong>(ref b);
+            return Native.Cast<ulong, T>(ref value);
+        }
+
+        if (typeof(T) == typeof(float))
+        {
+            var value = Native.Cast<T, float>(ref a) * Native.Cast<T, float>(ref b);
+            return Native.Cast<float, T>(ref value);
+        }
+
+        if (typeof(T) == typeof(double))
+        {
+            var value = Native.Cast<T, double>(ref a) * Native.Cast<T, double>(ref b);
+            return Native.Cast<double, T>(ref value);
+        }
+
+        if (typeof(T) == typeof(decimal))
+        {
+            var value = Native.Cast<T, decimal>(ref a) * Native.Cast<T, decimal>(ref b);
+            return Native.Cast<decimal, T>(ref value);
+        }
+
+        return Fallback.Mul!.Invoke(a, b);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static T Divide(T a, T b)
     {
-        switch (s_TypeCode)
+        if (typeof(T) == typeof(int) || typeof(T) == typeof(short) || typeof(T) == typeof(byte))
         {
-            case TypeCode.Byte:
-            case TypeCode.Int16:
-            case TypeCode.Int32:
-            {
-                var value = Native.Cast<T, int>(ref a) / Native.Cast<T, int>(ref b);
-                return Native.Cast<int, T>(ref value);
-            }
-            case TypeCode.Int64:
-            {
-                var value = Native.Cast<T, long>(ref a) / Native.Cast<T, long>(ref b);
-                return Native.Cast<long, T>(ref value);
-            }
-            case TypeCode.SByte:
-            case TypeCode.UInt16:
-            case TypeCode.UInt32:
-            {
-                var value = Native.Cast<T, uint>(ref a) / Native.Cast<T, uint>(ref b);
-                return Native.Cast<uint, T>(ref value);
-            }
-            case TypeCode.UInt64:
-            {
-                var value = Native.Cast<T, ulong>(ref a) / Native.Cast<T, ulong>(ref b);
-                return Native.Cast<ulong, T>(ref value);
-            }
-            case TypeCode.Single:
-            {
-                var value = Native.Cast<T, float>(ref a) / Native.Cast<T, float>(ref b);
-                return Native.Cast<float, T>(ref value);
-            }
-            case TypeCode.Double:
-            {
-                var value = Native.Cast<T, double>(ref a) / Native.Cast<T, double>(ref b);
-                return Native.Cast<double, T>(ref value);
-            }
-            case TypeCode.Decimal:
-            {
-                var value = Native.Cast<T, decimal>(ref a) / Native.Cast<T, decimal>(ref b);
-                return Native.Cast<decimal, T>(ref value);
-            }
-            default: return s_Div.Invoke(a, b);
+            var value = Native.Cast<T, int>(ref a) / Native.Cast<T, int>(ref b);
+            return Native.Cast<int, T>(ref value);
         }
+
+        if (typeof(T) == typeof(long))
+        {
+            var value = Native.Cast<T, long>(ref a) / Native.Cast<T, long>(ref b);
+            return Native.Cast<long, T>(ref value);
+        }
+
+        if (typeof(T) == typeof(uint) || typeof(T) == typeof(ushort) || typeof(T) == typeof(sbyte))
+        {
+            var value = Native.Cast<T, uint>(ref a) / Native.Cast<T, uint>(ref b);
+            return Native.Cast<uint, T>(ref value);
+        }
+
+        if (typeof(T) == typeof(ulong))
+        {
+            var value = Native.Cast<T, ulong>(ref a) / Native.Cast<T, ulong>(ref b);
+            return Native.Cast<ulong, T>(ref value);
+        }
+
+        if (typeof(T) == typeof(float))
+        {
+            var value = Native.Cast<T, float>(ref a) / Native.Cast<T, float>(ref b);
+            return Native.Cast<float, T>(ref value);
+        }
+
+        if (typeof(T) == typeof(double))
+        {
+            var value = Native.Cast<T, double>(ref a) / Native.Cast<T, double>(ref b);
+            return Native.Cast<double, T>(ref value);
+        }
+
+        if (typeof(T) == typeof(decimal))
+        {
+            var value = Native.Cast<T, decimal>(ref a) / Native.Cast<T, decimal>(ref b);
+            return Native.Cast<decimal, T>(ref value);
+        }
+
+        return Fallback.Div!.Invoke(a, b);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static T Modulo(T a, T b)
     {
-        switch (s_TypeCode)
+        if (typeof(T) == typeof(int) || typeof(T) == typeof(short) || typeof(T) == typeof(byte))
         {
-            case TypeCode.Byte:
-            case TypeCode.Int16:
-            case TypeCode.Int32:
-            {
-                var value = Native.Cast<T, int>(ref a) % Native.Cast<T, int>(ref b);
-                return Native.Cast<int, T>(ref value);
-            }
-            case TypeCode.Int64:
-            {
-                var value = Native.Cast<T, long>(ref a) % Native.Cast<T, long>(ref b);
-                return Native.Cast<long, T>(ref value);
-            }
-            case TypeCode.SByte:
-            case TypeCode.UInt16:
-            case TypeCode.UInt32:
-            {
-                var value = Native.Cast<T, uint>(ref a) % Native.Cast<T, uint>(ref b);
-                return Native.Cast<uint, T>(ref value);
-            }
-            case TypeCode.UInt64:
-            {
-                var value = Native.Cast<T, ulong>(ref a) % Native.Cast<T, ulong>(ref b);
-                return Native.Cast<ulong, T>(ref value);
-            }
-            case TypeCode.Single:
-            {
-                var value = Native.Cast<T, float>(ref a) % Native.Cast<T, float>(ref b);
-                return Native.Cast<float, T>(ref value);
-            }
-            case TypeCode.Double:
-            {
-                var value = Native.Cast<T, double>(ref a) % Native.Cast<T, double>(ref b);
-                return Native.Cast<double, T>(ref value);
-            }
-            case TypeCode.Decimal:
-            {
-                var value = Native.Cast<T, decimal>(ref a) % Native.Cast<T, decimal>(ref b);
-                return Native.Cast<decimal, T>(ref value);
-            }
-            default: return s_Mod.Invoke(a, b);
+            var value = Native.Cast<T, int>(ref a) % Native.Cast<T, int>(ref b);
+            return Native.Cast<int, T>(ref value);
         }
+
+        if (typeof(T) == typeof(long))
+        {
+            var value = Native.Cast<T, long>(ref a) % Native.Cast<T, long>(ref b);
+            return Native.Cast<long, T>(ref value);
+        }
+
+        if (typeof(T) == typeof(uint) || typeof(T) == typeof(ushort) || typeof(T) == typeof(sbyte))
+        {
+            var value = Native.Cast<T, uint>(ref a) % Native.Cast<T, uint>(ref b);
+            return Native.Cast<uint, T>(ref value);
+        }
+
+        if (typeof(T) == typeof(ulong))
+        {
+            var value = Native.Cast<T, ulong>(ref a) % Native.Cast<T, ulong>(ref b);
+            return Native.Cast<ulong, T>(ref value);
+        }
+
+        if (typeof(T) == typeof(float))
+        {
+            var value = Native.Cast<T, float>(ref a) % Native.Cast<T, float>(ref b);
+            return Native.Cast<float, T>(ref value);
+        }
+
+        if (typeof(T) == typeof(double))
+        {
+            var value = Native.Cast<T, double>(ref a) % Native.Cast<T, double>(ref b);
+            return Native.Cast<double, T>(ref value);
+        }
+
+        if (typeof(T) == typeof(decimal))
+        {
+            var value = Native.Cast<T, decimal>(ref a) % Native.Cast<T, decimal>(ref b);
+            return Native.Cast<decimal, T>(ref value);
+        }
+
+        return Fallback.Mod!.Invoke(a, b);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static bool GreaterThan(T a, T b) => s_TypeCode switch
+    internal static bool GreaterThan(T a, T b)
     {
-        TypeCode.Byte or TypeCode.Int16 or TypeCode.Int32    => Native.Cast<T, int>(ref a) > Native.Cast<T, int>(ref b),
-        TypeCode.Int64                                       => Native.Cast<T, long>(ref a) > Native.Cast<T, long>(ref b),
-        TypeCode.SByte or TypeCode.UInt16 or TypeCode.UInt32 => Native.Cast<T, uint>(ref a) > Native.Cast<T, uint>(ref b),
-        TypeCode.UInt64                                      => Native.Cast<T, ulong>(ref a) > Native.Cast<T, ulong>(ref b),
-        TypeCode.Single                                      => Native.Cast<T, float>(ref a) > Native.Cast<T, float>(ref b),
-        TypeCode.Double                                      => Native.Cast<T, double>(ref a) > Native.Cast<T, double>(ref b),
-        TypeCode.Decimal                                     => Native.Cast<T, decimal>(ref a) > Native.Cast<T, decimal>(ref b),
-        _                                                    => s_Gt?.Invoke(a, b) ?? throw new NotSupportedException($"Type of {typeof(T)} done not support addition operation.")
-    };
+        if (typeof(T) == typeof(int) || typeof(T) == typeof(short) || typeof(T) == typeof(byte))
+        {
+            return Native.Cast<T, int>(ref a) > Native.Cast<T, int>(ref b);
+        }
+
+        if (typeof(T) == typeof(long)) return Native.Cast<T, long>(ref a) > Native.Cast<T, long>(ref b);
+        if (typeof(T) == typeof(uint) || typeof(T) == typeof(ushort) || typeof(T) == typeof(sbyte)) return Native.Cast<T, uint>(ref a) > Native.Cast<T, uint>(ref b);
+        if (typeof(T) == typeof(ulong)) return Native.Cast<T, ulong>(ref a) > Native.Cast<T, ulong>(ref b);
+        if (typeof(T) == typeof(float)) return Native.Cast<T, float>(ref a) > Native.Cast<T, float>(ref b);
+        if (typeof(T) == typeof(double)) return Native.Cast<T, double>(ref a) > Native.Cast<T, double>(ref b);
+        if (typeof(T) == typeof(decimal)) return Native.Cast<T, decimal>(ref a) > Native.Cast<T, decimal>(ref b);
+        return Fallback.Gt?.Invoke(a, b) ?? throw new NotSupportedException($"Type of {typeof(T)} does not support comparison.");
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static bool LessThan(T a, T b) => s_TypeCode switch
+    internal static bool LessThan(T a, T b)
     {
-        TypeCode.Byte or TypeCode.Int16 or TypeCode.Int32    => Native.Cast<T, int>(ref a) < Native.Cast<T, int>(ref b),
-        TypeCode.Int64                                       => Native.Cast<T, long>(ref a) < Native.Cast<T, long>(ref b),
-        TypeCode.SByte or TypeCode.UInt16 or TypeCode.UInt32 => Native.Cast<T, uint>(ref a) < Native.Cast<T, uint>(ref b),
-        TypeCode.UInt64                                      => Native.Cast<T, ulong>(ref a) < Native.Cast<T, ulong>(ref b),
-        TypeCode.Single                                      => Native.Cast<T, float>(ref a) < Native.Cast<T, float>(ref b),
-        TypeCode.Double                                      => Native.Cast<T, double>(ref a) < Native.Cast<T, double>(ref b),
-        TypeCode.Decimal                                     => Native.Cast<T, decimal>(ref a) < Native.Cast<T, decimal>(ref b),
-        _                                                    => s_Lt?.Invoke(a, b) ?? throw new NotSupportedException($"Type of {typeof(T)} done not support addition operation.")
-    };
+        if (typeof(T) == typeof(int) || typeof(T) == typeof(short) || typeof(T) == typeof(byte))
+        {
+            return Native.Cast<T, int>(ref a) < Native.Cast<T, int>(ref b);
+        }
+
+        if (typeof(T) == typeof(long)) return Native.Cast<T, long>(ref a) < Native.Cast<T, long>(ref b);
+        if (typeof(T) == typeof(uint) || typeof(T) == typeof(ushort) || typeof(T) == typeof(sbyte)) return Native.Cast<T, uint>(ref a) < Native.Cast<T, uint>(ref b);
+        if (typeof(T) == typeof(ulong)) return Native.Cast<T, ulong>(ref a) < Native.Cast<T, ulong>(ref b);
+        if (typeof(T) == typeof(float)) return Native.Cast<T, float>(ref a) < Native.Cast<T, float>(ref b);
+        if (typeof(T) == typeof(double)) return Native.Cast<T, double>(ref a) < Native.Cast<T, double>(ref b);
+        if (typeof(T) == typeof(decimal)) return Native.Cast<T, decimal>(ref a) < Native.Cast<T, decimal>(ref b);
+        return Fallback.Lt?.Invoke(a, b) ?? throw new NotSupportedException($"Type of {typeof(T)} does not support comparison.");
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static bool GreaterThanOrEquals(T a, T b) => s_TypeCode switch
+    internal static bool GreaterThanOrEquals(T a, T b)
     {
-        TypeCode.Byte or TypeCode.Int16 or TypeCode.Int32    => Native.Cast<T, int>(ref a) >= Native.Cast<T, int>(ref b),
-        TypeCode.Int64                                       => Native.Cast<T, long>(ref a) >= Native.Cast<T, long>(ref b),
-        TypeCode.SByte or TypeCode.UInt16 or TypeCode.UInt32 => Native.Cast<T, uint>(ref a) >= Native.Cast<T, uint>(ref b),
-        TypeCode.UInt64                                      => Native.Cast<T, ulong>(ref a) >= Native.Cast<T, ulong>(ref b),
-        TypeCode.Single                                      => Native.Cast<T, float>(ref a) >= Native.Cast<T, float>(ref b),
-        TypeCode.Double                                      => Native.Cast<T, double>(ref a) >= Native.Cast<T, double>(ref b),
-        TypeCode.Decimal                                     => Native.Cast<T, decimal>(ref a) >= Native.Cast<T, decimal>(ref b),
-        _                                                    => s_Ge?.Invoke(a, b) ?? throw new NotSupportedException($"Type of {typeof(T)} done not support addition operation.")
-    };
+        if (typeof(T) == typeof(int) || typeof(T) == typeof(short) || typeof(T) == typeof(byte))
+        {
+            return Native.Cast<T, int>(ref a) >= Native.Cast<T, int>(ref b);
+        }
+
+        if (typeof(T) == typeof(long)) return Native.Cast<T, long>(ref a) >= Native.Cast<T, long>(ref b);
+        if (typeof(T) == typeof(uint) || typeof(T) == typeof(ushort) || typeof(T) == typeof(sbyte)) return Native.Cast<T, uint>(ref a) >= Native.Cast<T, uint>(ref b);
+        if (typeof(T) == typeof(ulong)) return Native.Cast<T, ulong>(ref a) >= Native.Cast<T, ulong>(ref b);
+        if (typeof(T) == typeof(float)) return Native.Cast<T, float>(ref a) >= Native.Cast<T, float>(ref b);
+        if (typeof(T) == typeof(double)) return Native.Cast<T, double>(ref a) >= Native.Cast<T, double>(ref b);
+        if (typeof(T) == typeof(decimal)) return Native.Cast<T, decimal>(ref a) >= Native.Cast<T, decimal>(ref b);
+        return Fallback.Ge?.Invoke(a, b) ?? throw new NotSupportedException($"Type of {typeof(T)} does not support comparison.");
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static bool LessThanOrEquals(T a, T b) => s_TypeCode switch
+    internal static bool LessThanOrEquals(T a, T b)
     {
-        TypeCode.Byte or TypeCode.Int16 or TypeCode.Int32    => Native.Cast<T, int>(ref a) <= Native.Cast<T, int>(ref b),
-        TypeCode.Int64                                       => Native.Cast<T, long>(ref a) <= Native.Cast<T, long>(ref b),
-        TypeCode.SByte or TypeCode.UInt16 or TypeCode.UInt32 => Native.Cast<T, uint>(ref a) <= Native.Cast<T, uint>(ref b),
-        TypeCode.UInt64                                      => Native.Cast<T, ulong>(ref a) <= Native.Cast<T, ulong>(ref b),
-        TypeCode.Single                                      => Native.Cast<T, float>(ref a) <= Native.Cast<T, float>(ref b),
-        TypeCode.Double                                      => Native.Cast<T, double>(ref a) <= Native.Cast<T, double>(ref b),
-        TypeCode.Decimal                                     => Native.Cast<T, decimal>(ref a) <= Native.Cast<T, decimal>(ref b),
-        _                                                    => s_Le?.Invoke(a, b) ?? throw new NotSupportedException($"Type of {typeof(T)} done not support addition operation.")
-    };
+        if (typeof(T) == typeof(int) || typeof(T) == typeof(short) || typeof(T) == typeof(byte))
+        {
+            return Native.Cast<T, int>(ref a) <= Native.Cast<T, int>(ref b);
+        }
+
+        if (typeof(T) == typeof(long)) return Native.Cast<T, long>(ref a) <= Native.Cast<T, long>(ref b);
+        if (typeof(T) == typeof(uint) || typeof(T) == typeof(ushort) || typeof(T) == typeof(sbyte)) return Native.Cast<T, uint>(ref a) <= Native.Cast<T, uint>(ref b);
+        if (typeof(T) == typeof(ulong)) return Native.Cast<T, ulong>(ref a) <= Native.Cast<T, ulong>(ref b);
+        if (typeof(T) == typeof(float)) return Native.Cast<T, float>(ref a) <= Native.Cast<T, float>(ref b);
+        if (typeof(T) == typeof(double)) return Native.Cast<T, double>(ref a) <= Native.Cast<T, double>(ref b);
+        if (typeof(T) == typeof(decimal)) return Native.Cast<T, decimal>(ref a) <= Native.Cast<T, decimal>(ref b);
+        return Fallback.Le?.Invoke(a, b) ?? throw new NotSupportedException($"Type of {typeof(T)} does not support comparison.");
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static bool Equals(T a, T b) => EqualityComparer<T>.Default.Equals(a, b);

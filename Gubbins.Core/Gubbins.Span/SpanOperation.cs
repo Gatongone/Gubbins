@@ -4,7 +4,7 @@
 /// Flags that describe which span operation implementation strategy should be used.
 /// </summary>
 [Flags]
-public enum SpanOperationMask
+public enum IterationMode
 {
     /// <summary>
     /// Automatically select the best available implementation.
@@ -13,19 +13,50 @@ public enum SpanOperationMask
     Auto = -1,
 
     /// <summary>
+    /// Indicates that the operation should run on a single thread.
+    /// </summary>
+    Serial = 1,
+
+    /// <summary>
     /// Indicates that the operation can use SIMD acceleration.
     /// </summary>
     Simd = 2,
 
     /// <summary>
-    /// Indicates that the operation should run on a single thread.
-    /// </summary>
-    Serial = 3,
-
-    /// <summary>
     /// Indicates that the operation can run in parallel.
     /// </summary>
     Parallel = 4
+}
+
+/// <summary>
+/// Selects one scalar number operation from an <see cref="ISpanNumberOperation{T}"/> implementation.
+/// </summary>
+public enum NumberOperation
+{
+    /// <summary>
+    /// Adds the operand to every element.
+    /// </summary>
+    Add,
+
+    /// <summary>
+    /// Subtracts the operand from every element.
+    /// </summary>
+    Subtract,
+
+    /// <summary>
+    /// Multiplies every element by the operand.
+    /// </summary>
+    Multiply,
+
+    /// <summary>
+    /// Divides every element by the operand.
+    /// </summary>
+    Divide,
+
+    /// <summary>
+    /// Replaces every element with its remainder modulo the operand.
+    /// </summary>
+    Modulo
 }
 
 /// <summary>
@@ -49,8 +80,8 @@ public sealed class SpanOperationAttribute : Attribute
     /// <param name="overwrite">A method name that should be overwritten/replaced by generation.</param>
     public SpanOperationAttribute(Type type, string member, string method, string overwrite)
     {
-        Member    = member;
-        Method    = method;
+        Member = member;
+        Method = method;
         Overwrite = overwrite;
     }
 
@@ -110,73 +141,73 @@ public static class SpanOperations
 
     static SpanOperations()
     {
-        RegisterSpanOperation(new SerialNumberOperation<int>(), SpanOperationMask.Serial);
-        RegisterSpanOperation(new SerialNumberOperation<uint>(), SpanOperationMask.Serial);
-        RegisterSpanOperation(new SerialNumberOperation<long>(), SpanOperationMask.Serial);
-        RegisterSpanOperation(new SerialNumberOperation<ulong>(), SpanOperationMask.Serial);
-        RegisterSpanOperation(new SerialNumberOperation<float>(), SpanOperationMask.Serial);
-        RegisterSpanOperation(new SerialNumberOperation<double>(), SpanOperationMask.Serial);
-        RegisterSpanOperation(new SerialIntOperation(), SpanOperationMask.Serial);
-        RegisterSpanOperation(new SerialUintOperation(), SpanOperationMask.Serial);
-        RegisterSpanOperation(new SerialLongOperation(), SpanOperationMask.Serial);
-        RegisterSpanOperation(new SerialUlongOperation(), SpanOperationMask.Serial);
-        RegisterSpanOperation(new SerialFloatOperation(), SpanOperationMask.Serial);
-        RegisterSpanOperation(new SerialDoubleOperation(), SpanOperationMask.Serial);
-        RegisterSpanOperation(new SerialVector2Operation(), SpanOperationMask.Serial);
-        RegisterSpanOperation(new SerialVector3Operation(), SpanOperationMask.Serial);
-        RegisterSpanOperation(new SerialVector4Operation(), SpanOperationMask.Serial);
+        RegisterSpanOperation(new SerialNumberOperation<int>(), IterationMode.Serial);
+        RegisterSpanOperation(new SerialNumberOperation<uint>(), IterationMode.Serial);
+        RegisterSpanOperation(new SerialNumberOperation<long>(), IterationMode.Serial);
+        RegisterSpanOperation(new SerialNumberOperation<ulong>(), IterationMode.Serial);
+        RegisterSpanOperation(new SerialNumberOperation<float>(), IterationMode.Serial);
+        RegisterSpanOperation(new SerialNumberOperation<double>(), IterationMode.Serial);
+        RegisterSpanOperation(new SerialIntOperation(), IterationMode.Serial);
+        RegisterSpanOperation(new SerialUintOperation(), IterationMode.Serial);
+        RegisterSpanOperation(new SerialLongOperation(), IterationMode.Serial);
+        RegisterSpanOperation(new SerialUlongOperation(), IterationMode.Serial);
+        RegisterSpanOperation(new SerialFloatOperation(), IterationMode.Serial);
+        RegisterSpanOperation(new SerialDoubleOperation(), IterationMode.Serial);
+        RegisterSpanOperation(new SerialVector2Operation(), IterationMode.Serial);
+        RegisterSpanOperation(new SerialVector3Operation(), IterationMode.Serial);
+        RegisterSpanOperation(new SerialVector4Operation(), IterationMode.Serial);
 
-        RegisterSpanOperation(new ParallelNumberOperation<int>(), SpanOperationMask.Parallel);
-        RegisterSpanOperation(new ParallelNumberOperation<uint>(), SpanOperationMask.Parallel);
-        RegisterSpanOperation(new ParallelNumberOperation<long>(), SpanOperationMask.Parallel);
-        RegisterSpanOperation(new ParallelNumberOperation<ulong>(), SpanOperationMask.Parallel);
-        RegisterSpanOperation(new ParallelNumberOperation<float>(), SpanOperationMask.Parallel);
-        RegisterSpanOperation(new ParallelNumberOperation<double>(), SpanOperationMask.Parallel);
-        RegisterSpanOperation(new ParallelIntOperation(), SpanOperationMask.Parallel);
-        RegisterSpanOperation(new ParallelUintOperation(), SpanOperationMask.Parallel);
-        RegisterSpanOperation(new ParallelLongOperation(), SpanOperationMask.Parallel);
-        RegisterSpanOperation(new ParallelUlongOperation(), SpanOperationMask.Parallel);
-        RegisterSpanOperation(new ParallelFloatOperation(), SpanOperationMask.Parallel);
-        RegisterSpanOperation(new ParallelDoubleOperation(), SpanOperationMask.Parallel);
-        RegisterSpanOperation(new ParallelVector2Operation(), SpanOperationMask.Parallel);
-        RegisterSpanOperation(new ParallelVector3Operation(), SpanOperationMask.Parallel);
-        RegisterSpanOperation(new ParallelVector4Operation(), SpanOperationMask.Parallel);
+        RegisterSpanOperation(new ParallelNumberOperation<int>(), IterationMode.Parallel);
+        RegisterSpanOperation(new ParallelNumberOperation<uint>(), IterationMode.Parallel);
+        RegisterSpanOperation(new ParallelNumberOperation<long>(), IterationMode.Parallel);
+        RegisterSpanOperation(new ParallelNumberOperation<ulong>(), IterationMode.Parallel);
+        RegisterSpanOperation(new ParallelNumberOperation<float>(), IterationMode.Parallel);
+        RegisterSpanOperation(new ParallelNumberOperation<double>(), IterationMode.Parallel);
+        RegisterSpanOperation(new ParallelIntOperation(), IterationMode.Parallel);
+        RegisterSpanOperation(new ParallelUintOperation(), IterationMode.Parallel);
+        RegisterSpanOperation(new ParallelLongOperation(), IterationMode.Parallel);
+        RegisterSpanOperation(new ParallelUlongOperation(), IterationMode.Parallel);
+        RegisterSpanOperation(new ParallelFloatOperation(), IterationMode.Parallel);
+        RegisterSpanOperation(new ParallelDoubleOperation(), IterationMode.Parallel);
+        RegisterSpanOperation(new ParallelVector2Operation(), IterationMode.Parallel);
+        RegisterSpanOperation(new ParallelVector3Operation(), IterationMode.Parallel);
+        RegisterSpanOperation(new ParallelVector4Operation(), IterationMode.Parallel);
 
-        RegisterSpanOperation(new SimdNumberOperation<int>(), SpanOperationMask.Simd);
-        RegisterSpanOperation(new SimdNumberOperation<uint>(), SpanOperationMask.Simd);
-        RegisterSpanOperation(new SimdNumberOperation<long>(), SpanOperationMask.Simd);
-        RegisterSpanOperation(new SimdNumberOperation<ulong>(), SpanOperationMask.Simd);
-        RegisterSpanOperation(new SimdNumberOperation<float>(), SpanOperationMask.Simd);
-        RegisterSpanOperation(new SimdNumberOperation<double>(), SpanOperationMask.Simd);
+        RegisterSpanOperation(new SimdNumberOperation<int>(), IterationMode.Simd);
+        RegisterSpanOperation(new SimdNumberOperation<uint>(), IterationMode.Simd);
+        RegisterSpanOperation(new SimdNumberOperation<long>(), IterationMode.Simd);
+        RegisterSpanOperation(new SimdNumberOperation<ulong>(), IterationMode.Simd);
+        RegisterSpanOperation(new SimdNumberOperation<float>(), IterationMode.Simd);
+        RegisterSpanOperation(new SimdNumberOperation<double>(), IterationMode.Simd);
 #if NET7_0_OR_GREATER
-        RegisterSpanOperation(new SimdIntOperation(), SpanOperationMask.Simd);
-        RegisterSpanOperation(new SimdUintOperation(), SpanOperationMask.Simd);
-        RegisterSpanOperation(new SimdLongOperation(), SpanOperationMask.Simd);
-        RegisterSpanOperation(new SimdUlongOperation(), SpanOperationMask.Simd);
+        RegisterSpanOperation(new SimdIntOperation(), IterationMode.Simd);
+        RegisterSpanOperation(new SimdUintOperation(), IterationMode.Simd);
+        RegisterSpanOperation(new SimdLongOperation(), IterationMode.Simd);
+        RegisterSpanOperation(new SimdUlongOperation(), IterationMode.Simd);
 #endif
-        RegisterSpanOperation(new SimdFloatOperation(), SpanOperationMask.Simd);
-        RegisterSpanOperation(new SimdDoubleOperation(), SpanOperationMask.Simd);
-        RegisterSpanOperation(new SimdVector2Operation(), SpanOperationMask.Simd);
-        RegisterSpanOperation(new SimdVector3Operation(), SpanOperationMask.Simd);
-        RegisterSpanOperation(new SimdVector4Operation(), SpanOperationMask.Simd);
+        RegisterSpanOperation(new SimdFloatOperation(), IterationMode.Simd);
+        RegisterSpanOperation(new SimdDoubleOperation(), IterationMode.Simd);
+        RegisterSpanOperation(new SimdVector2Operation(), IterationMode.Simd);
+        RegisterSpanOperation(new SimdVector3Operation(), IterationMode.Simd);
+        RegisterSpanOperation(new SimdVector4Operation(), IterationMode.Simd);
 
-        RegisterSpanOperation(new ParallelSimdNumberOperation<int>(), SpanOperationMask.Parallel | SpanOperationMask.Simd);
-        RegisterSpanOperation(new ParallelSimdNumberOperation<uint>(), SpanOperationMask.Parallel | SpanOperationMask.Simd);
-        RegisterSpanOperation(new ParallelSimdNumberOperation<long>(), SpanOperationMask.Parallel | SpanOperationMask.Simd);
-        RegisterSpanOperation(new ParallelSimdNumberOperation<ulong>(), SpanOperationMask.Parallel | SpanOperationMask.Simd);
-        RegisterSpanOperation(new ParallelSimdNumberOperation<float>(), SpanOperationMask.Parallel | SpanOperationMask.Simd);
-        RegisterSpanOperation(new ParallelSimdNumberOperation<double>(), SpanOperationMask.Parallel | SpanOperationMask.Simd);
+        RegisterSpanOperation(new ParallelSimdNumberOperation<int>(), IterationMode.Parallel | IterationMode.Simd);
+        RegisterSpanOperation(new ParallelSimdNumberOperation<uint>(), IterationMode.Parallel | IterationMode.Simd);
+        RegisterSpanOperation(new ParallelSimdNumberOperation<long>(), IterationMode.Parallel | IterationMode.Simd);
+        RegisterSpanOperation(new ParallelSimdNumberOperation<ulong>(), IterationMode.Parallel | IterationMode.Simd);
+        RegisterSpanOperation(new ParallelSimdNumberOperation<float>(), IterationMode.Parallel | IterationMode.Simd);
+        RegisterSpanOperation(new ParallelSimdNumberOperation<double>(), IterationMode.Parallel | IterationMode.Simd);
 #if NET7_0_OR_GREATER
-        RegisterSpanOperation(new ParallelSimdIntOperation(), SpanOperationMask.Parallel | SpanOperationMask.Simd);
-        RegisterSpanOperation(new ParallelSimdUintOperation(), SpanOperationMask.Parallel | SpanOperationMask.Simd);
-        RegisterSpanOperation(new ParallelSimdLongOperation(), SpanOperationMask.Parallel | SpanOperationMask.Simd);
-        RegisterSpanOperation(new ParallelSimdUlongOperation(), SpanOperationMask.Parallel | SpanOperationMask.Simd);
+        RegisterSpanOperation(new ParallelSimdIntOperation(), IterationMode.Parallel | IterationMode.Simd);
+        RegisterSpanOperation(new ParallelSimdUintOperation(), IterationMode.Parallel | IterationMode.Simd);
+        RegisterSpanOperation(new ParallelSimdLongOperation(), IterationMode.Parallel | IterationMode.Simd);
+        RegisterSpanOperation(new ParallelSimdUlongOperation(), IterationMode.Parallel | IterationMode.Simd);
 #endif
-        RegisterSpanOperation(new ParallelSimdFloatOperation(), SpanOperationMask.Parallel | SpanOperationMask.Simd);
-        RegisterSpanOperation(new ParallelSimdDoubleOperation(), SpanOperationMask.Parallel | SpanOperationMask.Simd);
-        RegisterSpanOperation(new ParallelSimdVector2Operation(), SpanOperationMask.Parallel | SpanOperationMask.Simd);
-        RegisterSpanOperation(new ParallelSimdVector3Operation(), SpanOperationMask.Parallel | SpanOperationMask.Simd);
-        RegisterSpanOperation(new ParallelSimdVector4Operation(), SpanOperationMask.Parallel | SpanOperationMask.Simd);
+        RegisterSpanOperation(new ParallelSimdFloatOperation(), IterationMode.Parallel | IterationMode.Simd);
+        RegisterSpanOperation(new ParallelSimdDoubleOperation(), IterationMode.Parallel | IterationMode.Simd);
+        RegisterSpanOperation(new ParallelSimdVector2Operation(), IterationMode.Parallel | IterationMode.Simd);
+        RegisterSpanOperation(new ParallelSimdVector3Operation(), IterationMode.Parallel | IterationMode.Simd);
+        RegisterSpanOperation(new ParallelSimdVector4Operation(), IterationMode.Parallel | IterationMode.Simd);
     }
 
     /// <summary>
@@ -188,11 +219,11 @@ public static class SpanOperations
     /// The strategy flags that determine which internal queue receives the operation.
     /// If no explicit SIMD/Parallel match is found, registration falls back to the serial queue.
     /// </param>
-    public static void RegisterSpanOperation<T>(ISpanOperation<T> operation, SpanOperationMask mask)
+    public static void RegisterSpanOperation<T>(ISpanOperation<T> operation, IterationMode mask)
     {
-        if ((mask & SpanOperationMask.Simd) == SpanOperationMask.Simd)
+        if ((mask & IterationMode.Simd) == IterationMode.Simd)
         {
-            if ((mask & SpanOperationMask.Parallel) == SpanOperationMask.Parallel)
+            if ((mask & IterationMode.Parallel) == IterationMode.Parallel)
             {
                 SimdParallel<T>.Operations.Enqueue(operation);
             }
@@ -201,11 +232,11 @@ public static class SpanOperations
                 Simd<T>.Operations.Enqueue(operation);
             }
         }
-        else if ((mask & SpanOperationMask.Serial) == SpanOperationMask.Serial)
+        else if (mask == IterationMode.Serial)
         {
             Serial<T>.Operations.Enqueue(operation);
         }
-        else if ((mask & SpanOperationMask.Parallel) == SpanOperationMask.Parallel)
+        else if ((mask & IterationMode.Parallel) == IterationMode.Parallel)
         {
             Parallel<T>.Operations.Enqueue(operation);
         }
@@ -220,69 +251,67 @@ public static class SpanOperations
     /// </summary>
     /// <typeparam name="T">The component type the operation applies to.</typeparam>
     /// <typeparam name="TOperation">The specific operation interface/class to resolve.</typeparam>
-    /// <param name="mask">The strategy flags used to choose candidate queues. Defaults to <see cref="SpanOperationMask.Auto"/>.</param>
+    /// <param name="mask">The strategy flags used to choose candidate queues. Defaults to <see cref="IterationMode.Auto"/>.</param>
     /// <returns>
     /// The first supported operation of type <typeparamref name="TOperation"/>, or <see langword="null"/> when no matching supported operation is available.
     /// </returns>
     /// <remarks>
-    /// This method dequeues candidates while searching, so registrations are consumed as they are evaluated.
-    /// With <see cref="SpanOperationMask.Auto"/>, lookup preference is SIMD + Parallel, then SIMD, then Parallel, then Serial.
+    /// Candidates are inspected without being removed from their registration queues.
+    /// With <see cref="IterationMode.Auto"/>, lookup preference is SIMD + Parallel, then SIMD, then Parallel, then Serial.
     /// </remarks>
-    public static TOperation? GetOperation<T, TOperation>(SpanOperationMask mask = SpanOperationMask.Auto) where TOperation : class, ISpanOperation<T>
+    public static TOperation? GetOperation<T, TOperation>(IterationMode mask = IterationMode.Auto) where TOperation : class, ISpanOperation<T>
     {
-        if ((mask & SpanOperationMask.Auto) == SpanOperationMask.Auto)
+        if ((mask & IterationMode.Auto) == IterationMode.Auto)
         {
-            while (SimdParallel<T>.Operations.TryDequeue(out var operation))
+            foreach (var operation in SimdParallel<T>.Operations)
             {
-                if (operation is TOperation {Supported: true} result) return result;
+                if (operation is TOperation { Supported: true } result) return result;
             }
 
-            while (Simd<T>.Operations.TryDequeue(out var operation))
+            foreach (var operation in Simd<T>.Operations)
             {
-                if (operation is TOperation {Supported: true} result) return result;
+                if (operation is TOperation { Supported: true } result) return result;
             }
 
-            while (Parallel<T>.Operations.TryDequeue(out var operation))
+            foreach (var operation in Parallel<T>.Operations)
             {
-                if (operation is TOperation {Supported: true} result) return result;
+                if (operation is TOperation { Supported: true } result) return result;
             }
 
-            while (Serial<T>.Operations.TryDequeue(out var operation))
+            foreach (var operation in Serial<T>.Operations)
             {
-                if (operation is TOperation {Supported: true} result) return result;
+                if (operation is TOperation { Supported: true } result) return result;
             }
         }
 
-        if ((mask & SpanOperationMask.Simd) == SpanOperationMask.Simd)
+        if ((mask & IterationMode.Simd) == IterationMode.Simd)
         {
-            if ((mask & SpanOperationMask.Parallel) == SpanOperationMask.Parallel)
+            if ((mask & IterationMode.Parallel) == IterationMode.Parallel)
             {
-                while (SimdParallel<T>.Operations.TryDequeue(out var operation))
+                foreach (var operation in SimdParallel<T>.Operations)
                 {
-                    if (operation is TOperation {Supported: true} result) return result;
+                    if (operation is TOperation { Supported: true } result) return result;
                 }
             }
             else
             {
-                while (Simd<T>.Operations.TryDequeue(out var operation))
+                foreach (var operation in Simd<T>.Operations)
                 {
-                    if (operation is TOperation {Supported: true} result) return result;
+                    if (operation is TOperation { Supported: true } result) return result;
                 }
             }
         }
-        else if ((mask & SpanOperationMask.Parallel) == SpanOperationMask.Parallel)
+        else if ((mask & IterationMode.Parallel) == IterationMode.Parallel)
         {
-            while (Parallel<T>.Operations.TryDequeue(out var operation))
+            foreach (var operation in Parallel<T>.Operations)
             {
-                if (operation is TOperation {Supported: true} result) return result;
+                if (operation is TOperation { Supported: true } result) return result;
             }
         }
-
-        while (Serial<T>.Operations.TryDequeue(out var operation))
+        foreach (var operation in Serial<T>.Operations)
         {
-            if (operation is TOperation {Supported: true} result) return result;
+            if (operation is TOperation { Supported: true } result) return result;
         }
-
         return null;
     }
 }

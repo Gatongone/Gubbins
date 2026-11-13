@@ -1,7 +1,41 @@
 ﻿using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace Gubbins.Span;
+
+/// <summary>
+/// Vector load/store helpers shared by the SIMD runners.
+/// </summary>
+internal static class SimdVector<T> where T : unmanaged
+{
+    /// <summary>
+    /// The number of elements in one vector.
+    /// </summary>
+    public static readonly int Size = Vector<T>.Count;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Vector<T> Load(Span<T> span, int offset)
+    {
+#if NET5_0_OR_GREATER
+        ref var reference = ref MemoryMarshal.GetReference(span);
+        return Vector.LoadUnsafe(ref reference, (nuint)offset);
+#else
+        return new Vector<T>(span.Slice(offset, Size));
+#endif
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void Store(Vector<T> vector, Span<T> span, int offset)
+    {
+#if NET5_0_OR_GREATER
+        ref var reference = ref MemoryMarshal.GetReference(span);
+        Vector.StoreUnsafe(vector, ref reference, (nuint)offset);
+#else
+        vector.CopyTo(span.Slice(offset, Size));
+#endif
+    }
+}
 
 /// <summary>
 /// SIMD span operation.
@@ -11,35 +45,108 @@ internal sealed class SimdNumberOperation<T> : ISpanNumberOperation<T> where T :
     /// <inheritdoc/>
     public bool Supported => Vector.IsHardwareAccelerated;
 
-    private static readonly int s_VectorSize = Vector<T>.Count;
+    private static readonly int vectorSize = Vector<T>.Count;
 
-    private delegate Vector<T> VectorOperandOp(Vector<T> left, Vector<T> right);
-
-    private delegate T ScalarOperandOp(T left, T right);
-
-    private delegate Vector<T> VectorPairOp(Vector<T> left, Vector<T> right);
-
-    private delegate T ScalarPairOp(T left, T right);
-
-    private static void RunOperand(Span<T> src, T operand, Span<T> result, VectorOperandOp vectorOp, ScalarOperandOp scalarOp)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Vector<T> Load(Span<T> span, int offset)
     {
-        var i = 0;
-        var length = src.Length - s_VectorSize;
-        var vb = new Vector<T>(operand);
+#if NET5_0_OR_GREATER
+        ref var reference = ref MemoryMarshal.GetReference(span);
+        return Vector.LoadUnsafe(ref reference, (nuint)offset);
+#else
+        return new Vector<T>(span.Slice(offset, vectorSize));
+#endif
+    }
 
-        for (; i <= length; i += s_VectorSize)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void Store(Vector<T> vector, Span<T> span, int offset)
+    {
+#if NET5_0_OR_GREATER
+        ref var reference = ref MemoryMarshal.GetReference(span);
+        Vector.StoreUnsafe(vector, ref reference, (nuint)offset);
+#else
+        vector.CopyTo(span.Slice(offset, vectorSize));
+#endif
+    }
+
+    // Each operation gets its own loop. Expressing the vector operation as a delegate blocks the JIT from
+    // inlining the loop body, which dominates as soon as the data stops fitting in L1.
+    private static void RunAdd(Span<T> src, T operand, Span<T> result)
+    {
+        var vb = new Vector<T>(operand);
+        var i = 0;
+        for (; i <= src.Length - vectorSize; i += vectorSize)
         {
-            var va = new Vector<T>(src.Slice(i, s_VectorSize));
-            vectorOp(va, vb).CopyTo(result.Slice(i, s_VectorSize));
+            Store(Load(src, i) + vb, result, i);
         }
 
         for (; i < src.Length; i++)
         {
-            result[i] = scalarOp(src[i], operand);
+            result[i] = Operations<T>.Add(src[i], operand);
         }
     }
 
-    private static void RunPair(Span<T> left, Span<T> right, Span<T> result, VectorPairOp vectorOp, ScalarPairOp scalarOp)
+    private static void RunSubtract(Span<T> src, T operand, Span<T> result)
+    {
+        var vb = new Vector<T>(operand);
+        var i = 0;
+        for (; i <= src.Length - vectorSize; i += vectorSize)
+        {
+            Store(Load(src, i) - vb, result, i);
+        }
+
+        for (; i < src.Length; i++)
+        {
+            result[i] = Operations<T>.Subtract(src[i], operand);
+        }
+    }
+
+    private static void RunMultiply(Span<T> src, T operand, Span<T> result)
+    {
+        var vb = new Vector<T>(operand);
+        var i = 0;
+        for (; i <= src.Length - vectorSize; i += vectorSize)
+        {
+            Store(Load(src, i) * vb, result, i);
+        }
+
+        for (; i < src.Length; i++)
+        {
+            result[i] = Operations<T>.Multiply(src[i], operand);
+        }
+    }
+
+    private static void RunDivide(Span<T> src, T operand, Span<T> result)
+    {
+        var vb = new Vector<T>(operand);
+        var i = 0;
+        for (; i <= src.Length - vectorSize; i += vectorSize)
+        {
+            Store(Load(src, i) / vb, result, i);
+        }
+
+        for (; i < src.Length; i++)
+        {
+            result[i] = Operations<T>.Divide(src[i], operand);
+        }
+    }
+
+    private static void RunModulo(Span<T> src, T operand, Span<T> result)
+    {
+        var vb = new Vector<T>(operand);
+        var i = 0;
+        for (; i <= src.Length - vectorSize; i += vectorSize)
+        {
+            Store(VectorMath.Modulo(Load(src, i), vb), result, i);
+        }
+
+        for (; i < src.Length; i++)
+        {
+            result[i] = Operations<T>.Modulo(src[i], operand);
+        }
+    }
+
+    private static void RunMax(Span<T> left, Span<T> right, Span<T> result)
     {
         if (left.Length != right.Length)
         {
@@ -47,43 +154,53 @@ internal sealed class SimdNumberOperation<T> : ISpanNumberOperation<T> where T :
         }
 
         var i = 0;
-        var length = left.Length - s_VectorSize;
-        for (; i <= length; i += s_VectorSize)
+        for (; i <= left.Length - vectorSize; i += vectorSize)
         {
-            var va = new Vector<T>(left.Slice(i, s_VectorSize));
-            var vb = new Vector<T>(right.Slice(i, s_VectorSize));
-            vectorOp(va, vb).CopyTo(result.Slice(i, s_VectorSize));
+            Store(Vector.Max(Load(left, i), Load(right, i)), result, i);
         }
 
         for (; i < left.Length; i++)
         {
-            result[i] = scalarOp(left[i], right[i]);
+            result[i] = Operations<T>.GreaterThan(left[i], right[i]) ? left[i] : right[i];
+        }
+    }
+
+    private static void RunMin(Span<T> left, Span<T> right, Span<T> result)
+    {
+        if (left.Length != right.Length)
+        {
+            throw new ArgumentException("Left and right spans must have the same length.");
+        }
+
+        var i = 0;
+        for (; i <= left.Length - vectorSize; i += vectorSize)
+        {
+            Store(Vector.Min(Load(left, i), Load(right, i)), result, i);
+        }
+
+        for (; i < left.Length; i++)
+        {
+            result[i] = Operations<T>.LessThan(left[i], right[i]) ? left[i] : right[i];
         }
     }
 
     /// <inheritdoc/>
-    public void Add(Span<T> src, T operand, Span<T> result) =>
-        RunOperand(src, operand, result, static (va, vb) => va + vb, Operations<T>.Add);
+    public void Add(Span<T> src, T operand, Span<T> result) => RunAdd(src, operand, result);
 
     /// <inheritdoc/>
-    public void Subtract(Span<T> src, T operand, Span<T> result) =>
-        RunOperand(src, operand, result, static (va, vb) => va - vb, Operations<T>.Subtract);
+    public void Subtract(Span<T> src, T operand, Span<T> result) => RunSubtract(src, operand, result);
 
     /// <inheritdoc/>
-    public void Multiply(Span<T> src, T operand, Span<T> result) =>
-        RunOperand(src, operand, result, static (va, vb) => va * vb, Operations<T>.Multiply);
+    public void Multiply(Span<T> src, T operand, Span<T> result) => RunMultiply(src, operand, result);
 
     /// <inheritdoc/>
-    public void Divide(Span<T> src, T operand, Span<T> result) =>
-        RunOperand(src, operand, result, static (va, vb) => va / vb, Operations<T>.Divide);
+    public void Divide(Span<T> src, T operand, Span<T> result) => RunDivide(src, operand, result);
 
     /// <inheritdoc/>
-    public void Modulo(Span<T> src, T operand, Span<T> result) =>
-        RunOperand(src, operand, result, static (va, vb) => VectorMath.Modulo(va, vb), Operations<T>.Modulo);
+    public void Modulo(Span<T> src, T operand, Span<T> result) => RunModulo(src, operand, result);
 
     /// <inheritdoc />
-    public void Max(Span<T> left, Span<T> right, Span<T> result) =>
-        RunPair(left, right, result, Vector.Max, static (l, r) => Operations<T>.GreaterThan(l, r) ? l : r);
+    public void Max(Span<T> left, Span<T> right, Span<T> result) => RunMax(left, right, result);
 
     public T GetMax(Span<T> span)
     {
@@ -96,17 +213,15 @@ internal sealed class SimdNumberOperation<T> : ISpanNumberOperation<T> where T :
             return FindMinScalar(span);
         }
 
-        var minVector = new Vector<T>(span);
+        var accumulator = Load(span, 0);
         var processedCount = Vector<T>.Count;
 
-        while (processedCount <= span.Length - Vector<T>.Count)
+        for (; processedCount <= span.Length - Vector<T>.Count; processedCount += Vector<T>.Count)
         {
-            var nextVector = new Vector<T>(span[processedCount..]);
-            minVector      =  Vector.Max(minVector, nextVector);
-            processedCount += Vector<T>.Count;
+            accumulator = Vector.Max(accumulator, Load(span, processedCount));
         }
 
-        var min = ExtractMinFromVector(minVector);
+        var min = ExtractMinFromVector(accumulator);
         for (var i = processedCount; i < span.Length; i++)
         {
             if (Operations<T>.GreaterThan(span[i], min))
@@ -147,8 +262,7 @@ internal sealed class SimdNumberOperation<T> : ISpanNumberOperation<T> where T :
     }
 
     /// <inheritdoc />
-    public void Min(Span<T> left, Span<T> right, Span<T> result) =>
-        RunPair(left, right, result, Vector.Min, static (l, r) => Operations<T>.LessThan(l, r) ? l : r);
+    public void Min(Span<T> left, Span<T> right, Span<T> result) => RunMin(left, right, result);
 
     public T GetMin(Span<T> span)
     {
@@ -162,18 +276,16 @@ internal sealed class SimdNumberOperation<T> : ISpanNumberOperation<T> where T :
         }
 
 
-        var minVector = new Vector<T>(span);
+        var accumulator = Load(span, 0);
         var processedCount = Vector<T>.Count;
 
 
-        while (processedCount <= span.Length - Vector<T>.Count)
+        for (; processedCount <= span.Length - Vector<T>.Count; processedCount += Vector<T>.Count)
         {
-            var nextVector = new Vector<T>(span[processedCount..]);
-            minVector      =  Vector.Min(minVector, nextVector);
-            processedCount += Vector<T>.Count;
+            accumulator = Vector.Min(accumulator, Load(span, processedCount));
         }
 
-        var min = ExtractMinFromVector(minVector);
+        var min = ExtractMinFromVector(accumulator);
         for (var i = processedCount; i < span.Length; i++)
         {
             if (Operations<T>.LessThan(span[i], min))
@@ -221,16 +333,15 @@ internal static class SimdShiftRunner<T> where T : unmanaged
 
     public delegate T ScalarShiftOp(T value, int count);
 
-    private static readonly int s_VectorSize = Vector<T>.Count;
+    private static readonly int vectorSize = Vector<T>.Count;
 
     public static void Run(Span<T> src, int count, Span<T> result, VectorShiftOp vectorOp, ScalarShiftOp scalarOp)
     {
         var i = 0;
-        var length = src.Length - s_VectorSize;
-        for (; i <= length; i += s_VectorSize)
+        var length = src.Length - vectorSize;
+        for (; i <= length; i += vectorSize)
         {
-            var va = new Vector<T>(src.Slice(i, s_VectorSize));
-            vectorOp(va, count).CopyTo(result.Slice(i, s_VectorSize));
+            SimdVector<T>.Store(vectorOp(SimdVector<T>.Load(src, i), count), result, i);
         }
 
         for (; i < src.Length; i++)
@@ -315,16 +426,15 @@ internal static class SimdRealRunner<T> where T : unmanaged
 
     public delegate T TernaryScalarOp(T a, T b, T c);
 
-    private static readonly int s_VectorSize = Vector<T>.Count;
+    private static readonly int vectorSize = Vector<T>.Count;
 
     public static void RunUnary(Span<T> src, Span<T> result, UnaryVectorOp vectorOp, UnaryScalarOp scalarOp)
     {
         var i = 0;
-        var length = src.Length - s_VectorSize;
-        for (; i <= length; i += s_VectorSize)
+        var length = src.Length - vectorSize;
+        for (; i <= length; i += vectorSize)
         {
-            var va = new Vector<T>(src.Slice(i, s_VectorSize));
-            vectorOp(va).CopyTo(result.Slice(i, s_VectorSize));
+            SimdVector<T>.Store(vectorOp(SimdVector<T>.Load(src, i)), result, i);
         }
 
         for (; i < src.Length; i++)
@@ -336,12 +446,10 @@ internal static class SimdRealRunner<T> where T : unmanaged
     public static void RunBinary(Span<T> left, Span<T> right, Span<T> result, BinaryVectorOp vectorOp, BinaryScalarOp scalarOp)
     {
         var i = 0;
-        var length = left.Length - s_VectorSize;
-        for (; i <= length; i += s_VectorSize)
+        var length = left.Length - vectorSize;
+        for (; i <= length; i += vectorSize)
         {
-            var va = new Vector<T>(left.Slice(i, s_VectorSize));
-            var vb = new Vector<T>(right.Slice(i, s_VectorSize));
-            vectorOp(va, vb).CopyTo(result.Slice(i, s_VectorSize));
+            SimdVector<T>.Store(vectorOp(SimdVector<T>.Load(left, i), SimdVector<T>.Load(right, i)), result, i);
         }
 
         for (; i < left.Length; i++)
@@ -353,12 +461,11 @@ internal static class SimdRealRunner<T> where T : unmanaged
     public static void RunBinaryRightScalar(Span<T> left, T right, Span<T> result, BinaryVectorOp vectorOp, BinaryScalarOp scalarOp)
     {
         var i = 0;
-        var length = left.Length - s_VectorSize;
+        var length = left.Length - vectorSize;
         var vb = new Vector<T>(right);
-        for (; i <= length; i += s_VectorSize)
+        for (; i <= length; i += vectorSize)
         {
-            var va = new Vector<T>(left.Slice(i, s_VectorSize));
-            vectorOp(va, vb).CopyTo(result.Slice(i, s_VectorSize));
+            SimdVector<T>.Store(vectorOp(SimdVector<T>.Load(left, i), vb), result, i);
         }
 
         for (; i < left.Length; i++)
@@ -370,13 +477,10 @@ internal static class SimdRealRunner<T> where T : unmanaged
     public static void RunTernary(Span<T> a, Span<T> b, Span<T> c, Span<T> result, TernaryVectorOp vectorOp, TernaryScalarOp scalarOp)
     {
         var i = 0;
-        var length = a.Length - s_VectorSize;
-        for (; i <= length; i += s_VectorSize)
+        var length = a.Length - vectorSize;
+        for (; i <= length; i += vectorSize)
         {
-            var va = new Vector<T>(a.Slice(i, s_VectorSize));
-            var vb = new Vector<T>(b.Slice(i, s_VectorSize));
-            var vc = new Vector<T>(c.Slice(i, s_VectorSize));
-            vectorOp(va, vb, vc).CopyTo(result.Slice(i, s_VectorSize));
+            SimdVector<T>.Store(vectorOp(SimdVector<T>.Load(a, i), SimdVector<T>.Load(b, i), SimdVector<T>.Load(c, i)), result, i);
         }
 
         for (; i < a.Length; i++)
@@ -388,13 +492,11 @@ internal static class SimdRealRunner<T> where T : unmanaged
     public static void RunTernaryMiddleScalar(Span<T> a, T b, Span<T> c, Span<T> result, TernaryVectorOp vectorOp, TernaryScalarOp scalarOp)
     {
         var i = 0;
-        var length = a.Length - s_VectorSize;
+        var length = a.Length - vectorSize;
         var vb = new Vector<T>(b);
-        for (; i <= length; i += s_VectorSize)
+        for (; i <= length; i += vectorSize)
         {
-            var va = new Vector<T>(a.Slice(i, s_VectorSize));
-            var vc = new Vector<T>(c.Slice(i, s_VectorSize));
-            vectorOp(va, vb, vc).CopyTo(result.Slice(i, s_VectorSize));
+            SimdVector<T>.Store(vectorOp(SimdVector<T>.Load(a, i), vb, SimdVector<T>.Load(c, i)), result, i);
         }
 
         for (; i < a.Length; i++)
@@ -406,13 +508,12 @@ internal static class SimdRealRunner<T> where T : unmanaged
     public static void RunUnaryWithTwoScalars(Span<T> src, T b, T c, Span<T> result, TernaryVectorOp vectorOp, TernaryScalarOp scalarOp)
     {
         var i = 0;
-        var length = src.Length - s_VectorSize;
+        var length = src.Length - vectorSize;
         var vb = new Vector<T>(b);
         var vc = new Vector<T>(c);
-        for (; i <= length; i += s_VectorSize)
+        for (; i <= length; i += vectorSize)
         {
-            var va = new Vector<T>(src.Slice(i, s_VectorSize));
-            vectorOp(va, vb, vc).CopyTo(result.Slice(i, s_VectorSize));
+            SimdVector<T>.Store(vectorOp(SimdVector<T>.Load(src, i), vb, vc), result, i);
         }
 
         for (; i < src.Length; i++)
@@ -424,15 +525,15 @@ internal static class SimdRealRunner<T> where T : unmanaged
 
 internal static class SimdFloatRunner
 {
-    private static readonly int s_VectorSize = Vector<float>.Count;
+    private static readonly int vectorSize = Vector<float>.Count;
 
     public static void ApplySqrt(Span<float> values, int count)
     {
         var i = 0;
-        var simdLength = count - count % s_VectorSize;
-        for (; i < simdLength; i += s_VectorSize)
+        var simdLength = count - count % vectorSize;
+        for (; i < simdLength; i += vectorSize)
         {
-            Vector.SquareRoot(new Vector<float>(values.Slice(i, s_VectorSize))).CopyTo(values.Slice(i, s_VectorSize));
+            SimdVector<float>.Store(Vector.SquareRoot(SimdVector<float>.Load(values, i)), values, i);
         }
 
         for (; i < count; i++)
@@ -669,8 +770,8 @@ internal sealed class SimdDoubleOperation : ISpanRealOperation<double>
 
 internal sealed class SimdVector2Operation : ISpanVectorOperation<Vector2>
 {
-    private static readonly int s_FloatVectorSize  = Vector<float>.Count;
-    private static readonly int s_Vector2BatchSize = Vector<float>.Count / 2;
+    private static readonly int floatVectorSize  = Vector<float>.Count;
+    private static readonly int vector2BatchSize = Vector<float>.Count / 2;
 
     public bool Supported => Vector.IsHardwareAccelerated;
 
@@ -679,18 +780,18 @@ internal sealed class SimdVector2Operation : ISpanVectorOperation<Vector2>
         var leftValues = MemoryMarshal.Cast<Vector2, float>(left);
         var rightValues = MemoryMarshal.Cast<Vector2, float>(right);
         var i = 0;
-        var simdLength = left.Length - left.Length % s_Vector2BatchSize;
-        Span<float> productBuffer = stackalloc float[s_FloatVectorSize];
-        Span<float> dotPairs = stackalloc float[s_Vector2BatchSize];
+        var simdLength = left.Length - left.Length % vector2BatchSize;
+        Span<float> productBuffer = stackalloc float[floatVectorSize];
+        Span<float> dotPairs = stackalloc float[vector2BatchSize];
 
-        for (; i < simdLength; i += s_Vector2BatchSize)
+        for (; i < simdLength; i += vector2BatchSize)
         {
             var offset = i * 2;
-            var va = new Vector<float>(leftValues.Slice(offset, s_FloatVectorSize));
-            var vb = new Vector<float>(rightValues.Slice(offset, s_FloatVectorSize));
+            var va = new Vector<float>(leftValues.Slice(offset, floatVectorSize));
+            var vb = new Vector<float>(rightValues.Slice(offset, floatVectorSize));
             (va * vb).CopyTo(productBuffer);
-            SimdPackedFloatRunner.SumGroups(productBuffer, dotPairs, 2, s_Vector2BatchSize);
-            WriteReplicatedScalars(dotPairs, result, i, s_Vector2BatchSize);
+            SimdPackedFloatRunner.SumGroups(productBuffer, dotPairs, 2, vector2BatchSize);
+            WriteReplicatedScalars(dotPairs, result, i, vector2BatchSize);
         }
 
         for (; i < left.Length; i++)
@@ -706,26 +807,26 @@ internal sealed class SimdVector2Operation : ISpanVectorOperation<Vector2>
         var rightValues = MemoryMarshal.Cast<Vector2, float>(right);
         var resultValues = MemoryMarshal.Cast<Vector2, float>(result);
         var i = 0;
-        var simdLength = left.Length - left.Length % s_Vector2BatchSize;
-        Span<float> leftBuffer = stackalloc float[s_FloatVectorSize];
-        Span<float> rightBuffer = stackalloc float[s_FloatVectorSize];
-        Span<float> crossPairs = stackalloc float[s_Vector2BatchSize];
-        Span<float> crossExpanded = stackalloc float[s_FloatVectorSize];
+        var simdLength = left.Length - left.Length % vector2BatchSize;
+        Span<float> leftBuffer = stackalloc float[floatVectorSize];
+        Span<float> rightBuffer = stackalloc float[floatVectorSize];
+        Span<float> crossPairs = stackalloc float[vector2BatchSize];
+        Span<float> crossExpanded = stackalloc float[floatVectorSize];
 
-        for (; i < simdLength; i += s_Vector2BatchSize)
+        for (; i < simdLength; i += vector2BatchSize)
         {
             var offset = i * 2;
-            new Vector<float>(leftValues.Slice(offset, s_FloatVectorSize)).CopyTo(leftBuffer);
-            new Vector<float>(rightValues.Slice(offset, s_FloatVectorSize)).CopyTo(rightBuffer);
+            new Vector<float>(leftValues.Slice(offset, floatVectorSize)).CopyTo(leftBuffer);
+            new Vector<float>(rightValues.Slice(offset, floatVectorSize)).CopyTo(rightBuffer);
 
-            for (var pair = 0; pair < s_Vector2BatchSize; pair++)
+            for (var pair = 0; pair < vector2BatchSize; pair++)
             {
                 var lane = pair * 2;
                 crossPairs[pair] = leftBuffer[lane] * rightBuffer[lane + 1] - leftBuffer[lane + 1] * rightBuffer[lane];
             }
 
-            SimdPackedFloatRunner.ExpandGroups(crossPairs, crossExpanded, 2, s_Vector2BatchSize);
-            new Vector<float>(crossExpanded).CopyTo(resultValues.Slice(offset, s_FloatVectorSize));
+            SimdPackedFloatRunner.ExpandGroups(crossPairs, crossExpanded, 2, vector2BatchSize);
+            new Vector<float>(crossExpanded).CopyTo(resultValues.Slice(offset, floatVectorSize));
         }
 
         for (; i < left.Length; i++)
@@ -742,25 +843,25 @@ internal sealed class SimdVector2Operation : ISpanVectorOperation<Vector2>
         var srcValues = MemoryMarshal.Cast<Vector2, float>(src);
         var resultValues = MemoryMarshal.Cast<Vector2, float>(result);
         var i = 0;
-        var simdLength = src.Length - src.Length % s_Vector2BatchSize;
-        Span<float> squaredBuffer = stackalloc float[s_FloatVectorSize];
-        Span<float> lengths = stackalloc float[s_Vector2BatchSize];
-        Span<float> expandedLengths = stackalloc float[s_FloatVectorSize];
+        var simdLength = src.Length - src.Length % vector2BatchSize;
+        Span<float> squaredBuffer = stackalloc float[floatVectorSize];
+        Span<float> lengths = stackalloc float[vector2BatchSize];
+        Span<float> expandedLengths = stackalloc float[floatVectorSize];
 
-        for (; i < simdLength; i += s_Vector2BatchSize)
+        for (; i < simdLength; i += vector2BatchSize)
         {
             var offset = i * 2;
-            var va = new Vector<float>(srcValues.Slice(offset, s_FloatVectorSize));
+            var va = new Vector<float>(srcValues.Slice(offset, floatVectorSize));
             (va * va).CopyTo(squaredBuffer);
-            SimdPackedFloatRunner.SumGroups(squaredBuffer, lengths, 2, s_Vector2BatchSize);
+            SimdPackedFloatRunner.SumGroups(squaredBuffer, lengths, 2, vector2BatchSize);
 
-            for (var pair = 0; pair < s_Vector2BatchSize; pair++)
+            for (var pair = 0; pair < vector2BatchSize; pair++)
             {
                 lengths[pair] = MathF.Sqrt(lengths[pair]);
             }
 
-            SimdPackedFloatRunner.ExpandGroups(lengths, expandedLengths, 2, s_Vector2BatchSize);
-            (va / new Vector<float>(expandedLengths)).CopyTo(resultValues.Slice(offset, s_FloatVectorSize));
+            SimdPackedFloatRunner.ExpandGroups(lengths, expandedLengths, 2, vector2BatchSize);
+            (va / new Vector<float>(expandedLengths)).CopyTo(resultValues.Slice(offset, floatVectorSize));
         }
 
         for (; i < src.Length; i++)
@@ -774,27 +875,27 @@ internal sealed class SimdVector2Operation : ISpanVectorOperation<Vector2>
         var leftValues = MemoryMarshal.Cast<Vector2, float>(left);
         var rightValues = MemoryMarshal.Cast<Vector2, float>(right);
         var i = 0;
-        var simdLength = left.Length - left.Length % s_Vector2BatchSize;
-        Span<float> pairBuffer = stackalloc float[s_FloatVectorSize];
-        Span<float> dotPairs = stackalloc float[s_Vector2BatchSize];
-        Span<float> leftLengths = stackalloc float[s_Vector2BatchSize];
-        Span<float> rightLengths = stackalloc float[s_Vector2BatchSize];
-        for (; i < simdLength; i += s_Vector2BatchSize)
+        var simdLength = left.Length - left.Length % vector2BatchSize;
+        Span<float> pairBuffer = stackalloc float[floatVectorSize];
+        Span<float> dotPairs = stackalloc float[vector2BatchSize];
+        Span<float> leftLengths = stackalloc float[vector2BatchSize];
+        Span<float> rightLengths = stackalloc float[vector2BatchSize];
+        for (; i < simdLength; i += vector2BatchSize)
         {
             var offset = i * 2;
-            var vl = new Vector<float>(leftValues.Slice(offset, s_FloatVectorSize));
-            var vr = new Vector<float>(rightValues.Slice(offset, s_FloatVectorSize));
+            var vl = new Vector<float>(leftValues.Slice(offset, floatVectorSize));
+            var vr = new Vector<float>(rightValues.Slice(offset, floatVectorSize));
 
             (vl * vr).CopyTo(pairBuffer);
-            SimdPackedFloatRunner.SumGroups(pairBuffer, dotPairs, 2, s_Vector2BatchSize);
+            SimdPackedFloatRunner.SumGroups(pairBuffer, dotPairs, 2, vector2BatchSize);
 
             (vl * vl).CopyTo(pairBuffer);
-            SimdPackedFloatRunner.SumGroups(pairBuffer, leftLengths, 2, s_Vector2BatchSize);
+            SimdPackedFloatRunner.SumGroups(pairBuffer, leftLengths, 2, vector2BatchSize);
 
             (vr * vr).CopyTo(pairBuffer);
-            SimdPackedFloatRunner.SumGroups(pairBuffer, rightLengths, 2, s_Vector2BatchSize);
+            SimdPackedFloatRunner.SumGroups(pairBuffer, rightLengths, 2, vector2BatchSize);
 
-            for (var pair = 0; pair < s_Vector2BatchSize; pair++)
+            for (var pair = 0; pair < vector2BatchSize; pair++)
             {
                 var denominator = MathF.Sqrt(leftLengths[pair]) * MathF.Sqrt(rightLengths[pair]);
                 result[i + pair] = denominator <= 0f
@@ -825,20 +926,20 @@ internal sealed class SimdVector2Operation : ISpanVectorOperation<Vector2>
         var normalValues = MemoryMarshal.Cast<Vector2, float>(normal);
         var resultValues = MemoryMarshal.Cast<Vector2, float>(result);
         var i = 0;
-        var simdLength = src.Length - src.Length % s_Vector2BatchSize;
-        Span<float> productBuffer = stackalloc float[s_FloatVectorSize];
-        Span<float> dotPairs = stackalloc float[s_Vector2BatchSize];
-        Span<float> expandedDots = stackalloc float[s_FloatVectorSize];
+        var simdLength = src.Length - src.Length % vector2BatchSize;
+        Span<float> productBuffer = stackalloc float[floatVectorSize];
+        Span<float> dotPairs = stackalloc float[vector2BatchSize];
+        Span<float> expandedDots = stackalloc float[floatVectorSize];
 
-        for (; i < simdLength; i += s_Vector2BatchSize)
+        for (; i < simdLength; i += vector2BatchSize)
         {
             var offset = i * 2;
-            var vs = new Vector<float>(srcValues.Slice(offset, s_FloatVectorSize));
-            var vn = new Vector<float>(normalValues.Slice(offset, s_FloatVectorSize));
+            var vs = new Vector<float>(srcValues.Slice(offset, floatVectorSize));
+            var vn = new Vector<float>(normalValues.Slice(offset, floatVectorSize));
             (vs * vn).CopyTo(productBuffer);
-            SimdPackedFloatRunner.SumGroups(productBuffer, dotPairs, 2, s_Vector2BatchSize);
-            SimdPackedFloatRunner.ExpandGroups(dotPairs, expandedDots, 2, s_Vector2BatchSize);
-            (vs - vn * (new Vector<float>(expandedDots) + new Vector<float>(expandedDots))).CopyTo(resultValues.Slice(offset, s_FloatVectorSize));
+            SimdPackedFloatRunner.SumGroups(productBuffer, dotPairs, 2, vector2BatchSize);
+            SimdPackedFloatRunner.ExpandGroups(dotPairs, expandedDots, 2, vector2BatchSize);
+            (vs - vn * (new Vector<float>(expandedDots) + new Vector<float>(expandedDots))).CopyTo(resultValues.Slice(offset, floatVectorSize));
         }
 
         for (; i < src.Length; i++)
@@ -856,23 +957,23 @@ internal sealed class SimdVector2Operation : ISpanVectorOperation<Vector2>
         var resultValues = MemoryMarshal.Cast<Vector2, float>(result);
         var etaVector = new Vector<float>(etaRatio);
         var i = 0;
-        var simdLength = src.Length - src.Length % s_Vector2BatchSize;
-        Span<float> productBuffer = stackalloc float[s_FloatVectorSize];
-        Span<float> dotPairs = stackalloc float[s_Vector2BatchSize];
-        Span<float> kPairs = stackalloc float[s_Vector2BatchSize];
-        Span<float> factorPairs = stackalloc float[s_Vector2BatchSize];
-        Span<float> expandedK = stackalloc float[s_FloatVectorSize];
-        Span<float> expandedFactors = stackalloc float[s_FloatVectorSize];
+        var simdLength = src.Length - src.Length % vector2BatchSize;
+        Span<float> productBuffer = stackalloc float[floatVectorSize];
+        Span<float> dotPairs = stackalloc float[vector2BatchSize];
+        Span<float> kPairs = stackalloc float[vector2BatchSize];
+        Span<float> factorPairs = stackalloc float[vector2BatchSize];
+        Span<float> expandedK = stackalloc float[floatVectorSize];
+        Span<float> expandedFactors = stackalloc float[floatVectorSize];
 
-        for (; i < simdLength; i += s_Vector2BatchSize)
+        for (; i < simdLength; i += vector2BatchSize)
         {
             var offset = i * 2;
-            var vs = new Vector<float>(srcValues.Slice(offset, s_FloatVectorSize));
-            var vn = new Vector<float>(normalValues.Slice(offset, s_FloatVectorSize));
+            var vs = new Vector<float>(srcValues.Slice(offset, floatVectorSize));
+            var vn = new Vector<float>(normalValues.Slice(offset, floatVectorSize));
             (vs * vn).CopyTo(productBuffer);
-            SimdPackedFloatRunner.SumGroups(productBuffer, dotPairs, 2, s_Vector2BatchSize);
+            SimdPackedFloatRunner.SumGroups(productBuffer, dotPairs, 2, vector2BatchSize);
 
-            for (var pair = 0; pair < s_Vector2BatchSize; pair++)
+            for (var pair = 0; pair < vector2BatchSize; pair++)
             {
                 var dot = dotPairs[pair];
                 var k = 1f - etaRatio * etaRatio * (1f - dot * dot);
@@ -880,12 +981,12 @@ internal sealed class SimdVector2Operation : ISpanVectorOperation<Vector2>
                 factorPairs[pair] = etaRatio * dot + (k < 0f ? 0f : MathF.Sqrt(k));
             }
 
-            SimdPackedFloatRunner.ExpandGroups(kPairs, expandedK, 2, s_Vector2BatchSize);
-            SimdPackedFloatRunner.ExpandGroups(factorPairs, expandedFactors, 2, s_Vector2BatchSize);
+            SimdPackedFloatRunner.ExpandGroups(kPairs, expandedK, 2, vector2BatchSize);
+            SimdPackedFloatRunner.ExpandGroups(factorPairs, expandedFactors, 2, vector2BatchSize);
 
             var refracted = etaVector * vs - vn * new Vector<float>(expandedFactors);
             var zeroMask = Vector.LessThan(new Vector<float>(expandedK), Vector<float>.Zero);
-            Vector.ConditionalSelect(zeroMask, Vector<float>.Zero, refracted).CopyTo(resultValues.Slice(offset, s_FloatVectorSize));
+            Vector.ConditionalSelect(zeroMask, Vector<float>.Zero, refracted).CopyTo(resultValues.Slice(offset, floatVectorSize));
         }
 
         for (; i < src.Length; i++)
@@ -906,34 +1007,34 @@ internal sealed class SimdVector2Operation : ISpanVectorOperation<Vector2>
         var targetValues = MemoryMarshal.Cast<Vector2, float>(target);
         var resultValues = MemoryMarshal.Cast<Vector2, float>(result);
         var i = 0;
-        var simdLength = src.Length - src.Length % s_Vector2BatchSize;
-        Span<float> squaredBuffer = stackalloc float[s_FloatVectorSize];
-        Span<float> distances = stackalloc float[s_Vector2BatchSize];
-        Span<float> expandedDistances = stackalloc float[s_FloatVectorSize];
-        Span<float> expandedMaxDelta = stackalloc float[s_FloatVectorSize];
+        var simdLength = src.Length - src.Length % vector2BatchSize;
+        Span<float> squaredBuffer = stackalloc float[floatVectorSize];
+        Span<float> distances = stackalloc float[vector2BatchSize];
+        Span<float> expandedDistances = stackalloc float[floatVectorSize];
+        Span<float> expandedMaxDelta = stackalloc float[floatVectorSize];
 
-        for (; i < simdLength; i += s_Vector2BatchSize)
+        for (; i < simdLength; i += vector2BatchSize)
         {
             var offset = i * 2;
-            var vs = new Vector<float>(srcValues.Slice(offset, s_FloatVectorSize));
-            var vt = new Vector<float>(targetValues.Slice(offset, s_FloatVectorSize));
+            var vs = new Vector<float>(srcValues.Slice(offset, floatVectorSize));
+            var vt = new Vector<float>(targetValues.Slice(offset, floatVectorSize));
             var vd = vt - vs;
             (vd * vd).CopyTo(squaredBuffer);
-            SimdPackedFloatRunner.SumGroups(squaredBuffer, distances, 2, s_Vector2BatchSize);
+            SimdPackedFloatRunner.SumGroups(squaredBuffer, distances, 2, vector2BatchSize);
 
-            for (var pair = 0; pair < s_Vector2BatchSize; pair++)
+            for (var pair = 0; pair < vector2BatchSize; pair++)
             {
                 distances[pair] = MathF.Sqrt(distances[pair]);
             }
 
-            SimdPackedFloatRunner.ExpandGroups(distances, expandedDistances, 2, s_Vector2BatchSize);
-            SimdPackedFloatRunner.ExpandGroups(maxDistanceDelta.Slice(i, s_Vector2BatchSize), expandedMaxDelta, 2, s_Vector2BatchSize);
+            SimdPackedFloatRunner.ExpandGroups(distances, expandedDistances, 2, vector2BatchSize);
+            SimdPackedFloatRunner.ExpandGroups(maxDistanceDelta.Slice(i, vector2BatchSize), expandedMaxDelta, 2, vector2BatchSize);
 
             var vDistance = new Vector<float>(expandedDistances);
             var vMaxDelta = new Vector<float>(expandedMaxDelta);
             var moved = vs + vd / vDistance * vMaxDelta;
             var useTargetMask = Vector.LessThanOrEqual(vDistance, vMaxDelta) | Vector.Equals(vDistance, Vector<float>.Zero);
-            Vector.ConditionalSelect(useTargetMask, vt, moved).CopyTo(resultValues.Slice(offset, s_FloatVectorSize));
+            Vector.ConditionalSelect(useTargetMask, vt, moved).CopyTo(resultValues.Slice(offset, floatVectorSize));
         }
 
         for (; i < src.Length; i++)
@@ -964,16 +1065,16 @@ internal sealed class SimdVector2Operation : ISpanVectorOperation<Vector2>
     {
         var srcValues = MemoryMarshal.Cast<Vector2, float>(src);
         var i = 0;
-        var simdLength = src.Length - src.Length % s_Vector2BatchSize;
-        Span<float> sqrBuffer = stackalloc float[s_FloatVectorSize];
+        var simdLength = src.Length - src.Length % vector2BatchSize;
+        Span<float> sqrBuffer = stackalloc float[floatVectorSize];
 
-        for (; i < simdLength; i += s_Vector2BatchSize)
+        for (; i < simdLength; i += vector2BatchSize)
         {
             var offset = i * 2;
-            var va = new Vector<float>(srcValues.Slice(offset, s_FloatVectorSize));
+            var va = new Vector<float>(srcValues.Slice(offset, floatVectorSize));
             (va * va).CopyTo(sqrBuffer);
 
-            SimdPackedFloatRunner.SumGroups(sqrBuffer, result.Slice(i, s_Vector2BatchSize), 2, s_Vector2BatchSize);
+            SimdPackedFloatRunner.SumGroups(sqrBuffer, result.Slice(i, vector2BatchSize), 2, vector2BatchSize);
         }
 
         for (; i < src.Length; i++)
@@ -994,18 +1095,18 @@ internal sealed class SimdVector2Operation : ISpanVectorOperation<Vector2>
         var leftValues = MemoryMarshal.Cast<Vector2, float>(left);
         var rightValues = MemoryMarshal.Cast<Vector2, float>(right);
         var i = 0;
-        var simdLength = left.Length - left.Length % s_Vector2BatchSize;
-        Span<float> sqrBuffer = stackalloc float[s_FloatVectorSize];
+        var simdLength = left.Length - left.Length % vector2BatchSize;
+        Span<float> sqrBuffer = stackalloc float[floatVectorSize];
 
-        for (; i < simdLength; i += s_Vector2BatchSize)
+        for (; i < simdLength; i += vector2BatchSize)
         {
             var offset = i * 2;
-            var va = new Vector<float>(leftValues.Slice(offset, s_FloatVectorSize));
-            var vb = new Vector<float>(rightValues.Slice(offset, s_FloatVectorSize));
+            var va = new Vector<float>(leftValues.Slice(offset, floatVectorSize));
+            var vb = new Vector<float>(rightValues.Slice(offset, floatVectorSize));
             var vd = va - vb;
             (vd * vd).CopyTo(sqrBuffer);
 
-            SimdPackedFloatRunner.SumGroups(sqrBuffer, result.Slice(i, s_Vector2BatchSize), 2, s_Vector2BatchSize);
+            SimdPackedFloatRunner.SumGroups(sqrBuffer, result.Slice(i, vector2BatchSize), 2, vector2BatchSize);
         }
 
         for (; i < left.Length; i++)
@@ -1019,16 +1120,16 @@ internal sealed class SimdVector2Operation : ISpanVectorOperation<Vector2>
         var srcValues = MemoryMarshal.Cast<Vector2, float>(src);
         var resultValues = MemoryMarshal.Cast<Vector2, float>(result);
         var i = 0;
-        var simdLength = src.Length - src.Length % s_Vector2BatchSize;
-        Span<float> expandedIncident = stackalloc float[s_FloatVectorSize];
+        var simdLength = src.Length - src.Length % vector2BatchSize;
+        Span<float> expandedIncident = stackalloc float[floatVectorSize];
 
-        for (; i < simdLength; i += s_Vector2BatchSize)
+        for (; i < simdLength; i += vector2BatchSize)
         {
             var offset = i * 2;
-            SimdPackedFloatRunner.ExpandGroups(incident.Slice(i, s_Vector2BatchSize), expandedIncident, 2, s_Vector2BatchSize);
-            var vs = new Vector<float>(srcValues.Slice(offset, s_FloatVectorSize));
+            SimdPackedFloatRunner.ExpandGroups(incident.Slice(i, vector2BatchSize), expandedIncident, 2, vector2BatchSize);
+            var vs = new Vector<float>(srcValues.Slice(offset, floatVectorSize));
             var mask = Vector.LessThan(new Vector<float>(expandedIncident), Vector<float>.Zero);
-            Vector.ConditionalSelect(mask, vs, -vs).CopyTo(resultValues.Slice(offset, s_FloatVectorSize));
+            Vector.ConditionalSelect(mask, vs, -vs).CopyTo(resultValues.Slice(offset, floatVectorSize));
         }
 
         for (; i < src.Length; i++)
@@ -1043,21 +1144,21 @@ internal sealed class SimdVector2Operation : ISpanVectorOperation<Vector2>
         var normalValues = MemoryMarshal.Cast<Vector2, float>(normal);
         var resultValues = MemoryMarshal.Cast<Vector2, float>(result);
         var i = 0;
-        var simdLength = src.Length - src.Length % s_Vector2BatchSize;
-        Span<float> productBuffer = stackalloc float[s_FloatVectorSize];
-        Span<float> dotPairs = stackalloc float[s_Vector2BatchSize];
-        Span<float> expandedDots = stackalloc float[s_FloatVectorSize];
+        var simdLength = src.Length - src.Length % vector2BatchSize;
+        Span<float> productBuffer = stackalloc float[floatVectorSize];
+        Span<float> dotPairs = stackalloc float[vector2BatchSize];
+        Span<float> expandedDots = stackalloc float[floatVectorSize];
 
-        for (; i < simdLength; i += s_Vector2BatchSize)
+        for (; i < simdLength; i += vector2BatchSize)
         {
             var offset = i * 2;
-            var vs = new Vector<float>(srcValues.Slice(offset, s_FloatVectorSize));
-            var vn = new Vector<float>(normalValues.Slice(offset, s_FloatVectorSize));
+            var vs = new Vector<float>(srcValues.Slice(offset, floatVectorSize));
+            var vn = new Vector<float>(normalValues.Slice(offset, floatVectorSize));
             (vs * vn).CopyTo(productBuffer);
-            SimdPackedFloatRunner.SumGroups(productBuffer, dotPairs, 2, s_Vector2BatchSize);
-            SimdPackedFloatRunner.ExpandGroups(dotPairs, expandedDots, 2, s_Vector2BatchSize);
+            SimdPackedFloatRunner.SumGroups(productBuffer, dotPairs, 2, vector2BatchSize);
+            SimdPackedFloatRunner.ExpandGroups(dotPairs, expandedDots, 2, vector2BatchSize);
             var mask = Vector.LessThan(new Vector<float>(expandedDots), Vector<float>.Zero);
-            Vector.ConditionalSelect(mask, vs, -vs).CopyTo(resultValues.Slice(offset, s_FloatVectorSize));
+            Vector.ConditionalSelect(mask, vs, -vs).CopyTo(resultValues.Slice(offset, floatVectorSize));
         }
 
         for (; i < src.Length; i++)
@@ -1078,30 +1179,30 @@ internal sealed class SimdVector2Operation : ISpanVectorOperation<Vector2>
 
 internal sealed class SimdVector3Operation : ISpanVectorOperation<Vector3>
 {
-    private static readonly int s_BatchSize = Vector<float>.Count;
+    private static readonly int batchSize = Vector<float>.Count;
 
     public bool Supported => Vector.IsHardwareAccelerated;
 
     public void Dot(Span<Vector3> left, Span<Vector3> right, Span<Vector3> result)
     {
         var i = 0;
-        var simdLength = left.Length - left.Length % s_BatchSize;
-        Span<float> lx = stackalloc float[s_BatchSize];
-        Span<float> ly = stackalloc float[s_BatchSize];
-        Span<float> lz = stackalloc float[s_BatchSize];
-        Span<float> rx = stackalloc float[s_BatchSize];
-        Span<float> ry = stackalloc float[s_BatchSize];
-        Span<float> rz = stackalloc float[s_BatchSize];
-        Span<float> dots = stackalloc float[s_BatchSize];
+        var simdLength = left.Length - left.Length % batchSize;
+        Span<float> lx = stackalloc float[batchSize];
+        Span<float> ly = stackalloc float[batchSize];
+        Span<float> lz = stackalloc float[batchSize];
+        Span<float> rx = stackalloc float[batchSize];
+        Span<float> ry = stackalloc float[batchSize];
+        Span<float> rz = stackalloc float[batchSize];
+        Span<float> dots = stackalloc float[batchSize];
 
-        for (; i < simdLength; i += s_BatchSize)
+        for (; i < simdLength; i += batchSize)
         {
-            Gather(left, i, lx, ly, lz, s_BatchSize);
-            Gather(right, i, rx, ry, rz, s_BatchSize);
+            Gather(left, i, lx, ly, lz, batchSize);
+            Gather(right, i, rx, ry, rz, batchSize);
             (new Vector<float>(lx) * new Vector<float>(rx)
                 + new Vector<float>(ly) * new Vector<float>(ry)
                 + new Vector<float>(lz) * new Vector<float>(rz)).CopyTo(dots);
-            ScatterReplicated(result, i, dots, s_BatchSize);
+            ScatterReplicated(result, i, dots, batchSize);
         }
 
         for (; i < left.Length; i++)
@@ -1114,26 +1215,26 @@ internal sealed class SimdVector3Operation : ISpanVectorOperation<Vector3>
     public void Cross(Span<Vector3> left, Span<Vector3> right, Span<Vector3> result)
     {
         var i = 0;
-        var simdLength = left.Length - left.Length % s_BatchSize;
-        Span<float> lx = stackalloc float[s_BatchSize];
-        Span<float> ly = stackalloc float[s_BatchSize];
-        Span<float> lz = stackalloc float[s_BatchSize];
-        Span<float> rx = stackalloc float[s_BatchSize];
-        Span<float> ry = stackalloc float[s_BatchSize];
-        Span<float> rz = stackalloc float[s_BatchSize];
-        Span<float> x = stackalloc float[s_BatchSize];
-        Span<float> y = stackalloc float[s_BatchSize];
-        Span<float> z = stackalloc float[s_BatchSize];
+        var simdLength = left.Length - left.Length % batchSize;
+        Span<float> lx = stackalloc float[batchSize];
+        Span<float> ly = stackalloc float[batchSize];
+        Span<float> lz = stackalloc float[batchSize];
+        Span<float> rx = stackalloc float[batchSize];
+        Span<float> ry = stackalloc float[batchSize];
+        Span<float> rz = stackalloc float[batchSize];
+        Span<float> x = stackalloc float[batchSize];
+        Span<float> y = stackalloc float[batchSize];
+        Span<float> z = stackalloc float[batchSize];
 
-        for (; i < simdLength; i += s_BatchSize)
+        for (; i < simdLength; i += batchSize)
         {
-            Gather(left, i, lx, ly, lz, s_BatchSize);
-            Gather(right, i, rx, ry, rz, s_BatchSize);
+            Gather(left, i, lx, ly, lz, batchSize);
+            Gather(right, i, rx, ry, rz, batchSize);
 
             (new Vector<float>(ly) * new Vector<float>(rz) - new Vector<float>(lz) * new Vector<float>(ry)).CopyTo(x);
             (new Vector<float>(lz) * new Vector<float>(rx) - new Vector<float>(lx) * new Vector<float>(rz)).CopyTo(y);
             (new Vector<float>(lx) * new Vector<float>(ry) - new Vector<float>(ly) * new Vector<float>(rx)).CopyTo(z);
-            Scatter(result, i, x, y, z, s_BatchSize);
+            Scatter(result, i, x, y, z, batchSize);
         }
 
         for (; i < left.Length; i++)
@@ -1145,15 +1246,15 @@ internal sealed class SimdVector3Operation : ISpanVectorOperation<Vector3>
     public void Normalize(Span<Vector3> src, Span<Vector3> result)
     {
         var i = 0;
-        var simdLength = src.Length - src.Length % s_BatchSize;
-        Span<float> x = stackalloc float[s_BatchSize];
-        Span<float> y = stackalloc float[s_BatchSize];
-        Span<float> z = stackalloc float[s_BatchSize];
-        Span<float> lengths = stackalloc float[s_BatchSize];
+        var simdLength = src.Length - src.Length % batchSize;
+        Span<float> x = stackalloc float[batchSize];
+        Span<float> y = stackalloc float[batchSize];
+        Span<float> z = stackalloc float[batchSize];
+        Span<float> lengths = stackalloc float[batchSize];
 
-        for (; i < simdLength; i += s_BatchSize)
+        for (; i < simdLength; i += batchSize)
         {
-            Gather(src, i, x, y, z, s_BatchSize);
+            Gather(src, i, x, y, z, batchSize);
 
             var vx = new Vector<float>(x);
             var vy = new Vector<float>(y);
@@ -1163,7 +1264,7 @@ internal sealed class SimdVector3Operation : ISpanVectorOperation<Vector3>
             (vx / new Vector<float>(lengths)).CopyTo(x);
             (vy / new Vector<float>(lengths)).CopyTo(y);
             (vz / new Vector<float>(lengths)).CopyTo(z);
-            Scatter(result, i, x, y, z, s_BatchSize);
+            Scatter(result, i, x, y, z, batchSize);
         }
 
         for (; i < src.Length; i++)
@@ -1175,21 +1276,21 @@ internal sealed class SimdVector3Operation : ISpanVectorOperation<Vector3>
     public void Angle(Span<Vector3> left, Span<Vector3> right, Span<float> result)
     {
         var i = 0;
-        var simdLength = left.Length - left.Length % s_BatchSize;
-        Span<float> lx = stackalloc float[s_BatchSize];
-        Span<float> ly = stackalloc float[s_BatchSize];
-        Span<float> lz = stackalloc float[s_BatchSize];
-        Span<float> rx = stackalloc float[s_BatchSize];
-        Span<float> ry = stackalloc float[s_BatchSize];
-        Span<float> rz = stackalloc float[s_BatchSize];
-        Span<float> dots = stackalloc float[s_BatchSize];
-        Span<float> leftLengths = stackalloc float[s_BatchSize];
-        Span<float> rightLengths = stackalloc float[s_BatchSize];
+        var simdLength = left.Length - left.Length % batchSize;
+        Span<float> lx = stackalloc float[batchSize];
+        Span<float> ly = stackalloc float[batchSize];
+        Span<float> lz = stackalloc float[batchSize];
+        Span<float> rx = stackalloc float[batchSize];
+        Span<float> ry = stackalloc float[batchSize];
+        Span<float> rz = stackalloc float[batchSize];
+        Span<float> dots = stackalloc float[batchSize];
+        Span<float> leftLengths = stackalloc float[batchSize];
+        Span<float> rightLengths = stackalloc float[batchSize];
 
-        for (; i < simdLength; i += s_BatchSize)
+        for (; i < simdLength; i += batchSize)
         {
-            Gather(left, i, lx, ly, lz, s_BatchSize);
-            Gather(right, i, rx, ry, rz, s_BatchSize);
+            Gather(left, i, lx, ly, lz, batchSize);
+            Gather(right, i, rx, ry, rz, batchSize);
 
             var vlx = new Vector<float>(lx);
             var vly = new Vector<float>(ly);
@@ -1202,7 +1303,7 @@ internal sealed class SimdVector3Operation : ISpanVectorOperation<Vector3>
             Vector.SquareRoot(vlx * vlx + vly * vly + vlz * vlz).CopyTo(leftLengths);
             Vector.SquareRoot(vrx * vrx + vry * vry + vrz * vrz).CopyTo(rightLengths);
 
-            for (var lane = 0; lane < s_BatchSize; lane++)
+            for (var lane = 0; lane < batchSize; lane++)
             {
                 var denominator = leftLengths[lane] * rightLengths[lane];
                 result[i + lane] = denominator <= 0f
@@ -1223,19 +1324,19 @@ internal sealed class SimdVector3Operation : ISpanVectorOperation<Vector3>
     public void Reflect(Span<Vector3> src, Span<Vector3> normal, Span<Vector3> result)
     {
         var i = 0;
-        var simdLength = src.Length - src.Length % s_BatchSize;
-        Span<float> sx = stackalloc float[s_BatchSize];
-        Span<float> sy = stackalloc float[s_BatchSize];
-        Span<float> sz = stackalloc float[s_BatchSize];
-        Span<float> nx = stackalloc float[s_BatchSize];
-        Span<float> ny = stackalloc float[s_BatchSize];
-        Span<float> nz = stackalloc float[s_BatchSize];
-        Span<float> dots = stackalloc float[s_BatchSize];
+        var simdLength = src.Length - src.Length % batchSize;
+        Span<float> sx = stackalloc float[batchSize];
+        Span<float> sy = stackalloc float[batchSize];
+        Span<float> sz = stackalloc float[batchSize];
+        Span<float> nx = stackalloc float[batchSize];
+        Span<float> ny = stackalloc float[batchSize];
+        Span<float> nz = stackalloc float[batchSize];
+        Span<float> dots = stackalloc float[batchSize];
 
-        for (; i < simdLength; i += s_BatchSize)
+        for (; i < simdLength; i += batchSize)
         {
-            Gather(src, i, sx, sy, sz, s_BatchSize);
-            Gather(normal, i, nx, ny, nz, s_BatchSize);
+            Gather(src, i, sx, sy, sz, batchSize);
+            Gather(normal, i, nx, ny, nz, batchSize);
 
             var vsx = new Vector<float>(sx);
             var vsy = new Vector<float>(sy);
@@ -1248,7 +1349,7 @@ internal sealed class SimdVector3Operation : ISpanVectorOperation<Vector3>
             (vsx - vnx * new Vector<float>(dots)).CopyTo(sx);
             (vsy - vny * new Vector<float>(dots)).CopyTo(sy);
             (vsz - vnz * new Vector<float>(dots)).CopyTo(sz);
-            Scatter(result, i, sx, sy, sz, s_BatchSize);
+            Scatter(result, i, sx, sy, sz, batchSize);
         }
 
         for (; i < src.Length; i++)
@@ -1261,21 +1362,21 @@ internal sealed class SimdVector3Operation : ISpanVectorOperation<Vector3>
     {
         var etaRatio = eta.X;
         var i = 0;
-        var simdLength = src.Length - src.Length % s_BatchSize;
-        Span<float> sx = stackalloc float[s_BatchSize];
-        Span<float> sy = stackalloc float[s_BatchSize];
-        Span<float> sz = stackalloc float[s_BatchSize];
-        Span<float> nx = stackalloc float[s_BatchSize];
-        Span<float> ny = stackalloc float[s_BatchSize];
-        Span<float> nz = stackalloc float[s_BatchSize];
-        Span<float> dots = stackalloc float[s_BatchSize];
-        Span<float> ks = stackalloc float[s_BatchSize];
-        Span<float> factors = stackalloc float[s_BatchSize];
+        var simdLength = src.Length - src.Length % batchSize;
+        Span<float> sx = stackalloc float[batchSize];
+        Span<float> sy = stackalloc float[batchSize];
+        Span<float> sz = stackalloc float[batchSize];
+        Span<float> nx = stackalloc float[batchSize];
+        Span<float> ny = stackalloc float[batchSize];
+        Span<float> nz = stackalloc float[batchSize];
+        Span<float> dots = stackalloc float[batchSize];
+        Span<float> ks = stackalloc float[batchSize];
+        Span<float> factors = stackalloc float[batchSize];
 
-        for (; i < simdLength; i += s_BatchSize)
+        for (; i < simdLength; i += batchSize)
         {
-            Gather(src, i, sx, sy, sz, s_BatchSize);
-            Gather(normal, i, nx, ny, nz, s_BatchSize);
+            Gather(src, i, sx, sy, sz, batchSize);
+            Gather(normal, i, nx, ny, nz, batchSize);
 
             var vsx = new Vector<float>(sx);
             var vsy = new Vector<float>(sy);
@@ -1285,7 +1386,7 @@ internal sealed class SimdVector3Operation : ISpanVectorOperation<Vector3>
             var vnz = new Vector<float>(nz);
             (vsx * vnx + vsy * vny + vsz * vnz).CopyTo(dots);
 
-            for (var lane = 0; lane < s_BatchSize; lane++)
+            for (var lane = 0; lane < batchSize; lane++)
             {
                 var dot = dots[lane];
                 var k = 1f - etaRatio * etaRatio * (1f - dot * dot);
@@ -1298,7 +1399,7 @@ internal sealed class SimdVector3Operation : ISpanVectorOperation<Vector3>
             (new Vector<float>(etaRatio) * vsy - vny * vf).CopyTo(sy);
             (new Vector<float>(etaRatio) * vsz - vnz * vf).CopyTo(sz);
 
-            for (var lane = 0; lane < s_BatchSize; lane++)
+            for (var lane = 0; lane < batchSize; lane++)
             {
                 if (ks[lane] < 0f)
                 {
@@ -1308,7 +1409,7 @@ internal sealed class SimdVector3Operation : ISpanVectorOperation<Vector3>
                 }
             }
 
-            Scatter(result, i, sx, sy, sz, s_BatchSize);
+            Scatter(result, i, sx, sy, sz, batchSize);
         }
 
         for (; i < src.Length; i++)
@@ -1320,19 +1421,19 @@ internal sealed class SimdVector3Operation : ISpanVectorOperation<Vector3>
     public void MoveTowards(Span<Vector3> src, Span<Vector3> target, Span<float> maxDistanceDelta, Span<Vector3> result)
     {
         var i = 0;
-        var simdLength = src.Length - src.Length % s_BatchSize;
-        Span<float> sx = stackalloc float[s_BatchSize];
-        Span<float> sy = stackalloc float[s_BatchSize];
-        Span<float> sz = stackalloc float[s_BatchSize];
-        Span<float> tx = stackalloc float[s_BatchSize];
-        Span<float> ty = stackalloc float[s_BatchSize];
-        Span<float> tz = stackalloc float[s_BatchSize];
-        Span<float> distances = stackalloc float[s_BatchSize];
+        var simdLength = src.Length - src.Length % batchSize;
+        Span<float> sx = stackalloc float[batchSize];
+        Span<float> sy = stackalloc float[batchSize];
+        Span<float> sz = stackalloc float[batchSize];
+        Span<float> tx = stackalloc float[batchSize];
+        Span<float> ty = stackalloc float[batchSize];
+        Span<float> tz = stackalloc float[batchSize];
+        Span<float> distances = stackalloc float[batchSize];
 
-        for (; i < simdLength; i += s_BatchSize)
+        for (; i < simdLength; i += batchSize)
         {
-            Gather(src, i, sx, sy, sz, s_BatchSize);
-            Gather(target, i, tx, ty, tz, s_BatchSize);
+            Gather(src, i, sx, sy, sz, batchSize);
+            Gather(target, i, tx, ty, tz, batchSize);
 
             var vsx = new Vector<float>(sx);
             var vsy = new Vector<float>(sy);
@@ -1343,7 +1444,7 @@ internal sealed class SimdVector3Operation : ISpanVectorOperation<Vector3>
             var vdx = vtx - vsx;
             var vdy = vty - vsy;
             var vdz = vtz - vsz;
-            var vMaxDelta = new Vector<float>(maxDistanceDelta.Slice(i, s_BatchSize));
+            var vMaxDelta = new Vector<float>(maxDistanceDelta.Slice(i, batchSize));
             var vDistance = Vector.SquareRoot(vdx * vdx + vdy * vdy + vdz * vdz);
             vDistance.CopyTo(distances);
 
@@ -1355,7 +1456,7 @@ internal sealed class SimdVector3Operation : ISpanVectorOperation<Vector3>
             Vector.ConditionalSelect(useTargetMask, vtx, movedX).CopyTo(sx);
             Vector.ConditionalSelect(useTargetMask, vty, movedY).CopyTo(sy);
             Vector.ConditionalSelect(useTargetMask, vtz, movedZ).CopyTo(sz);
-            Scatter(result, i, sx, sy, sz, s_BatchSize);
+            Scatter(result, i, sx, sy, sz, batchSize);
         }
 
         for (; i < src.Length; i++)
@@ -1374,17 +1475,17 @@ internal sealed class SimdVector3Operation : ISpanVectorOperation<Vector3>
     public void LengthSquared(Span<Vector3> src, Span<float> result)
     {
         var i = 0;
-        var simdLength = src.Length - src.Length % s_BatchSize;
-        Span<float> x = stackalloc float[s_BatchSize];
-        Span<float> y = stackalloc float[s_BatchSize];
-        Span<float> z = stackalloc float[s_BatchSize];
+        var simdLength = src.Length - src.Length % batchSize;
+        Span<float> x = stackalloc float[batchSize];
+        Span<float> y = stackalloc float[batchSize];
+        Span<float> z = stackalloc float[batchSize];
 
-        for (; i < simdLength; i += s_BatchSize)
+        for (; i < simdLength; i += batchSize)
         {
-            Gather(src, i, x, y, z, s_BatchSize);
+            Gather(src, i, x, y, z, batchSize);
             (new Vector<float>(x) * new Vector<float>(x)
                 + new Vector<float>(y) * new Vector<float>(y)
-                + new Vector<float>(z) * new Vector<float>(z)).CopyTo(result.Slice(i, s_BatchSize));
+                + new Vector<float>(z) * new Vector<float>(z)).CopyTo(result.Slice(i, batchSize));
         }
 
         for (; i < src.Length; i++)
@@ -1403,23 +1504,23 @@ internal sealed class SimdVector3Operation : ISpanVectorOperation<Vector3>
     public void DistanceSquared(Span<Vector3> left, Span<Vector3> right, Span<float> result)
     {
         var i = 0;
-        var simdLength = left.Length - left.Length % s_BatchSize;
-        Span<float> lx = stackalloc float[s_BatchSize];
-        Span<float> ly = stackalloc float[s_BatchSize];
-        Span<float> lz = stackalloc float[s_BatchSize];
-        Span<float> rx = stackalloc float[s_BatchSize];
-        Span<float> ry = stackalloc float[s_BatchSize];
-        Span<float> rz = stackalloc float[s_BatchSize];
+        var simdLength = left.Length - left.Length % batchSize;
+        Span<float> lx = stackalloc float[batchSize];
+        Span<float> ly = stackalloc float[batchSize];
+        Span<float> lz = stackalloc float[batchSize];
+        Span<float> rx = stackalloc float[batchSize];
+        Span<float> ry = stackalloc float[batchSize];
+        Span<float> rz = stackalloc float[batchSize];
 
-        for (; i < simdLength; i += s_BatchSize)
+        for (; i < simdLength; i += batchSize)
         {
-            Gather(left, i, lx, ly, lz, s_BatchSize);
-            Gather(right, i, rx, ry, rz, s_BatchSize);
+            Gather(left, i, lx, ly, lz, batchSize);
+            Gather(right, i, rx, ry, rz, batchSize);
 
             var dx = new Vector<float>(lx) - new Vector<float>(rx);
             var dy = new Vector<float>(ly) - new Vector<float>(ry);
             var dz = new Vector<float>(lz) - new Vector<float>(rz);
-            (dx * dx + dy * dy + dz * dz).CopyTo(result.Slice(i, s_BatchSize));
+            (dx * dx + dy * dy + dz * dz).CopyTo(result.Slice(i, batchSize));
         }
 
         for (; i < left.Length; i++)
@@ -1431,20 +1532,20 @@ internal sealed class SimdVector3Operation : ISpanVectorOperation<Vector3>
     public void FaceForward(Span<Vector3> src, Span<Vector3> normal, Span<float> incident, Span<Vector3> result)
     {
         var i = 0;
-        var simdLength = src.Length - src.Length % s_BatchSize;
-        Span<float> x = stackalloc float[s_BatchSize];
-        Span<float> y = stackalloc float[s_BatchSize];
-        Span<float> z = stackalloc float[s_BatchSize];
+        var simdLength = src.Length - src.Length % batchSize;
+        Span<float> x = stackalloc float[batchSize];
+        Span<float> y = stackalloc float[batchSize];
+        Span<float> z = stackalloc float[batchSize];
 
-        for (; i < simdLength; i += s_BatchSize)
+        for (; i < simdLength; i += batchSize)
         {
-            Gather(src, i, x, y, z, s_BatchSize);
-            var incidentVector = new Vector<float>(incident.Slice(i, s_BatchSize));
+            Gather(src, i, x, y, z, batchSize);
+            var incidentVector = new Vector<float>(incident.Slice(i, batchSize));
             var mask = Vector.LessThan(incidentVector, Vector<float>.Zero);
             Vector.ConditionalSelect(mask, new Vector<float>(x), -new Vector<float>(x)).CopyTo(x);
             Vector.ConditionalSelect(mask, new Vector<float>(y), -new Vector<float>(y)).CopyTo(y);
             Vector.ConditionalSelect(mask, new Vector<float>(z), -new Vector<float>(z)).CopyTo(z);
-            Scatter(result, i, x, y, z, s_BatchSize);
+            Scatter(result, i, x, y, z, batchSize);
         }
 
         for (; i < src.Length; i++)
@@ -1456,19 +1557,19 @@ internal sealed class SimdVector3Operation : ISpanVectorOperation<Vector3>
     public void FaceForward(Span<Vector3> src, Span<Vector3> normal, Span<Vector3> result)
     {
         var i = 0;
-        var simdLength = src.Length - src.Length % s_BatchSize;
-        Span<float> sx = stackalloc float[s_BatchSize];
-        Span<float> sy = stackalloc float[s_BatchSize];
-        Span<float> sz = stackalloc float[s_BatchSize];
-        Span<float> nx = stackalloc float[s_BatchSize];
-        Span<float> ny = stackalloc float[s_BatchSize];
-        Span<float> nz = stackalloc float[s_BatchSize];
-        Span<float> dots = stackalloc float[s_BatchSize];
+        var simdLength = src.Length - src.Length % batchSize;
+        Span<float> sx = stackalloc float[batchSize];
+        Span<float> sy = stackalloc float[batchSize];
+        Span<float> sz = stackalloc float[batchSize];
+        Span<float> nx = stackalloc float[batchSize];
+        Span<float> ny = stackalloc float[batchSize];
+        Span<float> nz = stackalloc float[batchSize];
+        Span<float> dots = stackalloc float[batchSize];
 
-        for (; i < simdLength; i += s_BatchSize)
+        for (; i < simdLength; i += batchSize)
         {
-            Gather(src, i, sx, sy, sz, s_BatchSize);
-            Gather(normal, i, nx, ny, nz, s_BatchSize);
+            Gather(src, i, sx, sy, sz, batchSize);
+            Gather(normal, i, nx, ny, nz, batchSize);
             (new Vector<float>(sx) * new Vector<float>(nx)
                 + new Vector<float>(sy) * new Vector<float>(ny)
                 + new Vector<float>(sz) * new Vector<float>(nz)).CopyTo(dots);
@@ -1477,7 +1578,7 @@ internal sealed class SimdVector3Operation : ISpanVectorOperation<Vector3>
             Vector.ConditionalSelect(mask, new Vector<float>(sx), -new Vector<float>(sx)).CopyTo(sx);
             Vector.ConditionalSelect(mask, new Vector<float>(sy), -new Vector<float>(sy)).CopyTo(sy);
             Vector.ConditionalSelect(mask, new Vector<float>(sz), -new Vector<float>(sz)).CopyTo(sz);
-            Scatter(result, i, sx, sy, sz, s_BatchSize);
+            Scatter(result, i, sx, sy, sz, batchSize);
         }
 
         for (; i < src.Length; i++)
@@ -1536,8 +1637,8 @@ internal sealed class SimdVector3Operation : ISpanVectorOperation<Vector3>
 
 internal sealed class SimdVector4Operation : ISpanVectorOperation<Vector4>
 {
-    private static readonly int s_FloatVectorSize  = Vector<float>.Count;
-    private static readonly int s_Vector4BatchSize = Vector<float>.Count / 4;
+    private static readonly int floatVectorSize  = Vector<float>.Count;
+    private static readonly int vector4BatchSize = Vector<float>.Count / 4;
 
     public bool Supported => Vector.IsHardwareAccelerated;
 
@@ -1546,17 +1647,17 @@ internal sealed class SimdVector4Operation : ISpanVectorOperation<Vector4>
         var leftValues = MemoryMarshal.Cast<Vector4, float>(left);
         var rightValues = MemoryMarshal.Cast<Vector4, float>(right);
         var i = 0;
-        var simdLength = left.Length - left.Length % s_Vector4BatchSize;
-        Span<float> productBuffer = stackalloc float[s_FloatVectorSize];
-        Span<float> dots = stackalloc float[s_Vector4BatchSize];
+        var simdLength = left.Length - left.Length % vector4BatchSize;
+        Span<float> productBuffer = stackalloc float[floatVectorSize];
+        Span<float> dots = stackalloc float[vector4BatchSize];
 
-        for (; i < simdLength; i += s_Vector4BatchSize)
+        for (; i < simdLength; i += vector4BatchSize)
         {
             var offset = i * 4;
-            (new Vector<float>(leftValues.Slice(offset, s_FloatVectorSize))
-                * new Vector<float>(rightValues.Slice(offset, s_FloatVectorSize))).CopyTo(productBuffer);
-            SimdPackedFloatRunner.SumGroups(productBuffer, dots, 4, s_Vector4BatchSize);
-            WriteReplicatedScalars(dots, result, i, s_Vector4BatchSize);
+            (new Vector<float>(leftValues.Slice(offset, floatVectorSize))
+                * new Vector<float>(rightValues.Slice(offset, floatVectorSize))).CopyTo(productBuffer);
+            SimdPackedFloatRunner.SumGroups(productBuffer, dots, 4, vector4BatchSize);
+            WriteReplicatedScalars(dots, result, i, vector4BatchSize);
         }
 
         for (; i < left.Length; i++)
@@ -1572,18 +1673,18 @@ internal sealed class SimdVector4Operation : ISpanVectorOperation<Vector4>
         var rightValues = MemoryMarshal.Cast<Vector4, float>(right);
         var resultValues = MemoryMarshal.Cast<Vector4, float>(result);
         var i = 0;
-        var simdLength = left.Length - left.Length % s_Vector4BatchSize;
-        Span<float> leftBuffer = stackalloc float[s_FloatVectorSize];
-        Span<float> rightBuffer = stackalloc float[s_FloatVectorSize];
-        Span<float> crossBuffer = stackalloc float[s_FloatVectorSize];
+        var simdLength = left.Length - left.Length % vector4BatchSize;
+        Span<float> leftBuffer = stackalloc float[floatVectorSize];
+        Span<float> rightBuffer = stackalloc float[floatVectorSize];
+        Span<float> crossBuffer = stackalloc float[floatVectorSize];
 
-        for (; i < simdLength; i += s_Vector4BatchSize)
+        for (; i < simdLength; i += vector4BatchSize)
         {
             var offset = i * 4;
-            new Vector<float>(leftValues.Slice(offset, s_FloatVectorSize)).CopyTo(leftBuffer);
-            new Vector<float>(rightValues.Slice(offset, s_FloatVectorSize)).CopyTo(rightBuffer);
+            new Vector<float>(leftValues.Slice(offset, floatVectorSize)).CopyTo(leftBuffer);
+            new Vector<float>(rightValues.Slice(offset, floatVectorSize)).CopyTo(rightBuffer);
 
-            for (var lane = 0; lane < s_Vector4BatchSize; lane++)
+            for (var lane = 0; lane < vector4BatchSize; lane++)
             {
                 var quad = lane * 4;
                 var cross = CrossScalar(
@@ -1595,7 +1696,7 @@ internal sealed class SimdVector4Operation : ISpanVectorOperation<Vector4>
                 crossBuffer[quad + 3] = cross.W;
             }
 
-            new Vector<float>(crossBuffer).CopyTo(resultValues.Slice(offset, s_FloatVectorSize));
+            new Vector<float>(crossBuffer).CopyTo(resultValues.Slice(offset, floatVectorSize));
         }
 
         for (; i < left.Length; i++)
@@ -1609,25 +1710,25 @@ internal sealed class SimdVector4Operation : ISpanVectorOperation<Vector4>
         var srcValues = MemoryMarshal.Cast<Vector4, float>(src);
         var resultValues = MemoryMarshal.Cast<Vector4, float>(result);
         var i = 0;
-        var simdLength = src.Length - src.Length % s_Vector4BatchSize;
-        Span<float> squaredBuffer = stackalloc float[s_FloatVectorSize];
-        Span<float> lengths = stackalloc float[s_Vector4BatchSize];
-        Span<float> expandedLengths = stackalloc float[s_FloatVectorSize];
+        var simdLength = src.Length - src.Length % vector4BatchSize;
+        Span<float> squaredBuffer = stackalloc float[floatVectorSize];
+        Span<float> lengths = stackalloc float[vector4BatchSize];
+        Span<float> expandedLengths = stackalloc float[floatVectorSize];
 
-        for (; i < simdLength; i += s_Vector4BatchSize)
+        for (; i < simdLength; i += vector4BatchSize)
         {
             var offset = i * 4;
-            var va = new Vector<float>(srcValues.Slice(offset, s_FloatVectorSize));
+            var va = new Vector<float>(srcValues.Slice(offset, floatVectorSize));
             (va * va).CopyTo(squaredBuffer);
-            SimdPackedFloatRunner.SumGroups(squaredBuffer, lengths, 4, s_Vector4BatchSize);
+            SimdPackedFloatRunner.SumGroups(squaredBuffer, lengths, 4, vector4BatchSize);
 
-            for (var lane = 0; lane < s_Vector4BatchSize; lane++)
+            for (var lane = 0; lane < vector4BatchSize; lane++)
             {
                 lengths[lane] = MathF.Sqrt(lengths[lane]);
             }
 
-            SimdPackedFloatRunner.ExpandGroups(lengths, expandedLengths, 4, s_Vector4BatchSize);
-            (va / new Vector<float>(expandedLengths)).CopyTo(resultValues.Slice(offset, s_FloatVectorSize));
+            SimdPackedFloatRunner.ExpandGroups(lengths, expandedLengths, 4, vector4BatchSize);
+            (va / new Vector<float>(expandedLengths)).CopyTo(resultValues.Slice(offset, floatVectorSize));
         }
 
         for (; i < src.Length; i++)
@@ -1641,25 +1742,25 @@ internal sealed class SimdVector4Operation : ISpanVectorOperation<Vector4>
         var leftValues = MemoryMarshal.Cast<Vector4, float>(left);
         var rightValues = MemoryMarshal.Cast<Vector4, float>(right);
         var i = 0;
-        var simdLength = left.Length - left.Length % s_Vector4BatchSize;
-        Span<float> pairBuffer = stackalloc float[s_FloatVectorSize];
-        Span<float> dots = stackalloc float[s_Vector4BatchSize];
-        Span<float> leftLengths = stackalloc float[s_Vector4BatchSize];
-        Span<float> rightLengths = stackalloc float[s_Vector4BatchSize];
+        var simdLength = left.Length - left.Length % vector4BatchSize;
+        Span<float> pairBuffer = stackalloc float[floatVectorSize];
+        Span<float> dots = stackalloc float[vector4BatchSize];
+        Span<float> leftLengths = stackalloc float[vector4BatchSize];
+        Span<float> rightLengths = stackalloc float[vector4BatchSize];
 
-        for (; i < simdLength; i += s_Vector4BatchSize)
+        for (; i < simdLength; i += vector4BatchSize)
         {
             var offset = i * 4;
-            var vl = new Vector<float>(leftValues.Slice(offset, s_FloatVectorSize));
-            var vr = new Vector<float>(rightValues.Slice(offset, s_FloatVectorSize));
+            var vl = new Vector<float>(leftValues.Slice(offset, floatVectorSize));
+            var vr = new Vector<float>(rightValues.Slice(offset, floatVectorSize));
             (vl * vr).CopyTo(pairBuffer);
-            SimdPackedFloatRunner.SumGroups(pairBuffer, dots, 4, s_Vector4BatchSize);
+            SimdPackedFloatRunner.SumGroups(pairBuffer, dots, 4, vector4BatchSize);
             (vl * vl).CopyTo(pairBuffer);
-            SimdPackedFloatRunner.SumGroups(pairBuffer, leftLengths, 4, s_Vector4BatchSize);
+            SimdPackedFloatRunner.SumGroups(pairBuffer, leftLengths, 4, vector4BatchSize);
             (vr * vr).CopyTo(pairBuffer);
-            SimdPackedFloatRunner.SumGroups(pairBuffer, rightLengths, 4, s_Vector4BatchSize);
+            SimdPackedFloatRunner.SumGroups(pairBuffer, rightLengths, 4, vector4BatchSize);
 
-            for (var lane = 0; lane < s_Vector4BatchSize; lane++)
+            for (var lane = 0; lane < vector4BatchSize; lane++)
             {
                 var denominator = MathF.Sqrt(leftLengths[lane]) * MathF.Sqrt(rightLengths[lane]);
                 result[i + lane] = denominator <= 0f
@@ -1683,21 +1784,21 @@ internal sealed class SimdVector4Operation : ISpanVectorOperation<Vector4>
         var normalValues = MemoryMarshal.Cast<Vector4, float>(normal);
         var resultValues = MemoryMarshal.Cast<Vector4, float>(result);
         var i = 0;
-        var simdLength = src.Length - src.Length % s_Vector4BatchSize;
-        Span<float> productBuffer = stackalloc float[s_FloatVectorSize];
-        Span<float> dots = stackalloc float[s_Vector4BatchSize];
-        Span<float> expandedDots = stackalloc float[s_FloatVectorSize];
+        var simdLength = src.Length - src.Length % vector4BatchSize;
+        Span<float> productBuffer = stackalloc float[floatVectorSize];
+        Span<float> dots = stackalloc float[vector4BatchSize];
+        Span<float> expandedDots = stackalloc float[floatVectorSize];
 
-        for (; i < simdLength; i += s_Vector4BatchSize)
+        for (; i < simdLength; i += vector4BatchSize)
         {
             var offset = i * 4;
-            var vs = new Vector<float>(srcValues.Slice(offset, s_FloatVectorSize));
-            var vn = new Vector<float>(normalValues.Slice(offset, s_FloatVectorSize));
+            var vs = new Vector<float>(srcValues.Slice(offset, floatVectorSize));
+            var vn = new Vector<float>(normalValues.Slice(offset, floatVectorSize));
             (vs * vn).CopyTo(productBuffer);
-            SimdPackedFloatRunner.SumGroups(productBuffer, dots, 4, s_Vector4BatchSize);
-            for (var lane = 0; lane < s_Vector4BatchSize; lane++) dots[lane] += dots[lane];
-            SimdPackedFloatRunner.ExpandGroups(dots, expandedDots, 4, s_Vector4BatchSize);
-            (vs - vn * new Vector<float>(expandedDots)).CopyTo(resultValues.Slice(offset, s_FloatVectorSize));
+            SimdPackedFloatRunner.SumGroups(productBuffer, dots, 4, vector4BatchSize);
+            for (var lane = 0; lane < vector4BatchSize; lane++) dots[lane] += dots[lane];
+            SimdPackedFloatRunner.ExpandGroups(dots, expandedDots, 4, vector4BatchSize);
+            (vs - vn * new Vector<float>(expandedDots)).CopyTo(resultValues.Slice(offset, floatVectorSize));
         }
 
         for (; i < src.Length; i++)
@@ -1713,22 +1814,22 @@ internal sealed class SimdVector4Operation : ISpanVectorOperation<Vector4>
         var normalValues = MemoryMarshal.Cast<Vector4, float>(normal);
         var resultValues = MemoryMarshal.Cast<Vector4, float>(result);
         var i = 0;
-        var simdLength = src.Length - src.Length % s_Vector4BatchSize;
-        Span<float> productBuffer = stackalloc float[s_FloatVectorSize];
-        Span<float> dots = stackalloc float[s_Vector4BatchSize];
-        Span<float> ks = stackalloc float[s_Vector4BatchSize];
-        Span<float> factors = stackalloc float[s_Vector4BatchSize];
-        Span<float> expandedFactors = stackalloc float[s_FloatVectorSize];
+        var simdLength = src.Length - src.Length % vector4BatchSize;
+        Span<float> productBuffer = stackalloc float[floatVectorSize];
+        Span<float> dots = stackalloc float[vector4BatchSize];
+        Span<float> ks = stackalloc float[vector4BatchSize];
+        Span<float> factors = stackalloc float[vector4BatchSize];
+        Span<float> expandedFactors = stackalloc float[floatVectorSize];
 
-        for (; i < simdLength; i += s_Vector4BatchSize)
+        for (; i < simdLength; i += vector4BatchSize)
         {
             var offset = i * 4;
-            var vs = new Vector<float>(srcValues.Slice(offset, s_FloatVectorSize));
-            var vn = new Vector<float>(normalValues.Slice(offset, s_FloatVectorSize));
+            var vs = new Vector<float>(srcValues.Slice(offset, floatVectorSize));
+            var vn = new Vector<float>(normalValues.Slice(offset, floatVectorSize));
             (vs * vn).CopyTo(productBuffer);
-            SimdPackedFloatRunner.SumGroups(productBuffer, dots, 4, s_Vector4BatchSize);
+            SimdPackedFloatRunner.SumGroups(productBuffer, dots, 4, vector4BatchSize);
 
-            for (var lane = 0; lane < s_Vector4BatchSize; lane++)
+            for (var lane = 0; lane < vector4BatchSize; lane++)
             {
                 var dot = dots[lane];
                 var k = 1f - etaRatio * etaRatio * (1f - dot * dot);
@@ -1736,10 +1837,10 @@ internal sealed class SimdVector4Operation : ISpanVectorOperation<Vector4>
                 factors[lane] = etaRatio * dot + (k < 0f ? 0f : MathF.Sqrt(k));
             }
 
-            SimdPackedFloatRunner.ExpandGroups(factors, expandedFactors, 4, s_Vector4BatchSize);
+            SimdPackedFloatRunner.ExpandGroups(factors, expandedFactors, 4, vector4BatchSize);
             var refracted = new Vector<float>(etaRatio) * vs - vn * new Vector<float>(expandedFactors);
-            var mask = SimdPackedFloatRunner.BuildNegativeMask(ks, 4, s_Vector4BatchSize);
-            Vector.ConditionalSelect(mask, Vector<float>.Zero, refracted).CopyTo(resultValues.Slice(offset, s_FloatVectorSize));
+            var mask = SimdPackedFloatRunner.BuildNegativeMask(ks, 4, vector4BatchSize);
+            Vector.ConditionalSelect(mask, Vector<float>.Zero, refracted).CopyTo(resultValues.Slice(offset, floatVectorSize));
         }
 
         for (; i < src.Length; i++)
@@ -1754,29 +1855,29 @@ internal sealed class SimdVector4Operation : ISpanVectorOperation<Vector4>
         var targetValues = MemoryMarshal.Cast<Vector4, float>(target);
         var resultValues = MemoryMarshal.Cast<Vector4, float>(result);
         var i = 0;
-        var simdLength = src.Length - src.Length % s_Vector4BatchSize;
-        Span<float> squaredBuffer = stackalloc float[s_FloatVectorSize];
-        Span<float> distances = stackalloc float[s_Vector4BatchSize];
-        Span<float> expandedDistances = stackalloc float[s_FloatVectorSize];
-        Span<float> expandedMaxDelta = stackalloc float[s_FloatVectorSize];
+        var simdLength = src.Length - src.Length % vector4BatchSize;
+        Span<float> squaredBuffer = stackalloc float[floatVectorSize];
+        Span<float> distances = stackalloc float[vector4BatchSize];
+        Span<float> expandedDistances = stackalloc float[floatVectorSize];
+        Span<float> expandedMaxDelta = stackalloc float[floatVectorSize];
 
-        for (; i < simdLength; i += s_Vector4BatchSize)
+        for (; i < simdLength; i += vector4BatchSize)
         {
             var offset = i * 4;
-            var vs = new Vector<float>(srcValues.Slice(offset, s_FloatVectorSize));
-            var vt = new Vector<float>(targetValues.Slice(offset, s_FloatVectorSize));
+            var vs = new Vector<float>(srcValues.Slice(offset, floatVectorSize));
+            var vt = new Vector<float>(targetValues.Slice(offset, floatVectorSize));
             var vd = vt - vs;
             (vd * vd).CopyTo(squaredBuffer);
-            SimdPackedFloatRunner.SumGroups(squaredBuffer, distances, 4, s_Vector4BatchSize);
-            for (var lane = 0; lane < s_Vector4BatchSize; lane++) distances[lane] = MathF.Sqrt(distances[lane]);
-            SimdPackedFloatRunner.ExpandGroups(distances, expandedDistances, 4, s_Vector4BatchSize);
-            SimdPackedFloatRunner.ExpandGroups(maxDistanceDelta.Slice(i, s_Vector4BatchSize), expandedMaxDelta, 4, s_Vector4BatchSize);
+            SimdPackedFloatRunner.SumGroups(squaredBuffer, distances, 4, vector4BatchSize);
+            for (var lane = 0; lane < vector4BatchSize; lane++) distances[lane] = MathF.Sqrt(distances[lane]);
+            SimdPackedFloatRunner.ExpandGroups(distances, expandedDistances, 4, vector4BatchSize);
+            SimdPackedFloatRunner.ExpandGroups(maxDistanceDelta.Slice(i, vector4BatchSize), expandedMaxDelta, 4, vector4BatchSize);
 
             var vDistance = new Vector<float>(expandedDistances);
             var vMaxDelta = new Vector<float>(expandedMaxDelta);
             var moved = vs + vd / vDistance * vMaxDelta;
             var useTargetMask = Vector.LessThanOrEqual(vDistance, vMaxDelta) | Vector.Equals(vDistance, Vector<float>.Zero);
-            Vector.ConditionalSelect(useTargetMask, vt, moved).CopyTo(resultValues.Slice(offset, s_FloatVectorSize));
+            Vector.ConditionalSelect(useTargetMask, vt, moved).CopyTo(resultValues.Slice(offset, floatVectorSize));
         }
 
         for (; i < src.Length; i++)
@@ -1796,17 +1897,17 @@ internal sealed class SimdVector4Operation : ISpanVectorOperation<Vector4>
     {
         var srcValues = MemoryMarshal.Cast<Vector4, float>(src);
         var i = 0;
-        var simdLength = src.Length - src.Length % s_Vector4BatchSize;
-        Span<float> squaredBuffer = stackalloc float[s_FloatVectorSize];
-        Span<float> lengths = stackalloc float[s_Vector4BatchSize];
+        var simdLength = src.Length - src.Length % vector4BatchSize;
+        Span<float> squaredBuffer = stackalloc float[floatVectorSize];
+        Span<float> lengths = stackalloc float[vector4BatchSize];
 
-        for (; i < simdLength; i += s_Vector4BatchSize)
+        for (; i < simdLength; i += vector4BatchSize)
         {
             var offset = i * 4;
-            var va = new Vector<float>(srcValues.Slice(offset, s_FloatVectorSize));
+            var va = new Vector<float>(srcValues.Slice(offset, floatVectorSize));
             (va * va).CopyTo(squaredBuffer);
-            SimdPackedFloatRunner.SumGroups(squaredBuffer, lengths, 4, s_Vector4BatchSize);
-            lengths.CopyTo(result.Slice(i, s_Vector4BatchSize));
+            SimdPackedFloatRunner.SumGroups(squaredBuffer, lengths, 4, vector4BatchSize);
+            lengths.CopyTo(result.Slice(i, vector4BatchSize));
         }
 
         for (; i < src.Length; i++)
@@ -1827,17 +1928,17 @@ internal sealed class SimdVector4Operation : ISpanVectorOperation<Vector4>
         var leftValues = MemoryMarshal.Cast<Vector4, float>(left);
         var rightValues = MemoryMarshal.Cast<Vector4, float>(right);
         var i = 0;
-        var simdLength = left.Length - left.Length % s_Vector4BatchSize;
-        Span<float> squaredBuffer = stackalloc float[s_FloatVectorSize];
-        Span<float> lengths = stackalloc float[s_Vector4BatchSize];
+        var simdLength = left.Length - left.Length % vector4BatchSize;
+        Span<float> squaredBuffer = stackalloc float[floatVectorSize];
+        Span<float> lengths = stackalloc float[vector4BatchSize];
 
-        for (; i < simdLength; i += s_Vector4BatchSize)
+        for (; i < simdLength; i += vector4BatchSize)
         {
             var offset = i * 4;
-            var vd = new Vector<float>(leftValues.Slice(offset, s_FloatVectorSize)) - new Vector<float>(rightValues.Slice(offset, s_FloatVectorSize));
+            var vd = new Vector<float>(leftValues.Slice(offset, floatVectorSize)) - new Vector<float>(rightValues.Slice(offset, floatVectorSize));
             (vd * vd).CopyTo(squaredBuffer);
-            SimdPackedFloatRunner.SumGroups(squaredBuffer, lengths, 4, s_Vector4BatchSize);
-            lengths.CopyTo(result.Slice(i, s_Vector4BatchSize));
+            SimdPackedFloatRunner.SumGroups(squaredBuffer, lengths, 4, vector4BatchSize);
+            lengths.CopyTo(result.Slice(i, vector4BatchSize));
         }
 
         for (; i < left.Length; i++)
@@ -1851,16 +1952,16 @@ internal sealed class SimdVector4Operation : ISpanVectorOperation<Vector4>
         var srcValues = MemoryMarshal.Cast<Vector4, float>(src);
         var resultValues = MemoryMarshal.Cast<Vector4, float>(result);
         var i = 0;
-        var simdLength = src.Length - src.Length % s_Vector4BatchSize;
-        Span<float> expandedIncident = stackalloc float[s_FloatVectorSize];
+        var simdLength = src.Length - src.Length % vector4BatchSize;
+        Span<float> expandedIncident = stackalloc float[floatVectorSize];
 
-        for (; i < simdLength; i += s_Vector4BatchSize)
+        for (; i < simdLength; i += vector4BatchSize)
         {
             var offset = i * 4;
-            SimdPackedFloatRunner.ExpandGroups(incident.Slice(i, s_Vector4BatchSize), expandedIncident, 4, s_Vector4BatchSize);
-            var vs = new Vector<float>(srcValues.Slice(offset, s_FloatVectorSize));
+            SimdPackedFloatRunner.ExpandGroups(incident.Slice(i, vector4BatchSize), expandedIncident, 4, vector4BatchSize);
+            var vs = new Vector<float>(srcValues.Slice(offset, floatVectorSize));
             var mask = Vector.LessThan(new Vector<float>(expandedIncident), Vector<float>.Zero);
-            Vector.ConditionalSelect(mask, vs, -vs).CopyTo(resultValues.Slice(offset, s_FloatVectorSize));
+            Vector.ConditionalSelect(mask, vs, -vs).CopyTo(resultValues.Slice(offset, floatVectorSize));
         }
 
         for (; i < src.Length; i++)
@@ -1875,20 +1976,20 @@ internal sealed class SimdVector4Operation : ISpanVectorOperation<Vector4>
         var normalValues = MemoryMarshal.Cast<Vector4, float>(normal);
         var resultValues = MemoryMarshal.Cast<Vector4, float>(result);
         var i = 0;
-        var simdLength = src.Length - src.Length % s_Vector4BatchSize;
-        Span<float> productBuffer = stackalloc float[s_FloatVectorSize];
-        Span<float> dots = stackalloc float[s_Vector4BatchSize];
-        Span<float> expandedDots = stackalloc float[s_FloatVectorSize];
+        var simdLength = src.Length - src.Length % vector4BatchSize;
+        Span<float> productBuffer = stackalloc float[floatVectorSize];
+        Span<float> dots = stackalloc float[vector4BatchSize];
+        Span<float> expandedDots = stackalloc float[floatVectorSize];
 
-        for (; i < simdLength; i += s_Vector4BatchSize)
+        for (; i < simdLength; i += vector4BatchSize)
         {
             var offset = i * 4;
-            (new Vector<float>(srcValues.Slice(offset, s_FloatVectorSize)) * new Vector<float>(normalValues.Slice(offset, s_FloatVectorSize))).CopyTo(productBuffer);
-            SimdPackedFloatRunner.SumGroups(productBuffer, dots, 4, s_Vector4BatchSize);
-            SimdPackedFloatRunner.ExpandGroups(dots, expandedDots, 4, s_Vector4BatchSize);
+            (new Vector<float>(srcValues.Slice(offset, floatVectorSize)) * new Vector<float>(normalValues.Slice(offset, floatVectorSize))).CopyTo(productBuffer);
+            SimdPackedFloatRunner.SumGroups(productBuffer, dots, 4, vector4BatchSize);
+            SimdPackedFloatRunner.ExpandGroups(dots, expandedDots, 4, vector4BatchSize);
             var mask = Vector.LessThan(new Vector<float>(expandedDots), Vector<float>.Zero);
-            var vs = new Vector<float>(srcValues.Slice(offset, s_FloatVectorSize));
-            Vector.ConditionalSelect(mask, vs, -vs).CopyTo(resultValues.Slice(offset, s_FloatVectorSize));
+            var vs = new Vector<float>(srcValues.Slice(offset, floatVectorSize));
+            Vector.ConditionalSelect(mask, vs, -vs).CopyTo(resultValues.Slice(offset, floatVectorSize));
         }
 
         for (; i < src.Length; i++)
