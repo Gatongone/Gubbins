@@ -13,3 +13,6 @@
 [Bb]in
 [Oo]bj
 [Ll]og
+
+# Benchmark results
+BenchmarkDotNet.Artifacts/

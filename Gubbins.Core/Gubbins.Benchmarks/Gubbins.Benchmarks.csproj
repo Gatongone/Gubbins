@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net10.0</TargetFramework>
+        <LangVersion>latestmajor</LangVersion>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <IsPackable>false</IsPackable>
+        <Optimize>true</Optimize>
+        <!-- The benchmark project must not copy its output into the Unity/Godot plugin folders. -->
+        <SkipDefaultPostBuild>true</SkipDefaultPostBuild>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="BenchmarkDotNet" Version="0.16.0-preview.2" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Gubbins.Unsafe\Gubbins.Unsafe.csproj" />
+        <ProjectReference Include="..\Gubbins.Unmanaged\Gubbins.Unmanaged.csproj" />
+        <ProjectReference Include="..\Gubbins.Entities\Gubbins.Entities.csproj" />
+    </ItemGroup>
+
+</Project>
