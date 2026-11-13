@@ -1,7 +1,7 @@
-<#@ template language="C#" #>
+﻿<#@ template language="C#" #>
+<#@ import namespace="System" #>
 <#@ import namespace="System.Linq" #>
-using System.Collections.Concurrent;
-using Gubbins.Spawner;
+using Gubbins.Async;
 
 namespace Gubbins.Entities;
 
@@ -9,356 +9,218 @@ public static class ChunksForeachAsync
 {
     extension(Chunks chunks)
     {
-        /// <summary>
-        /// Iterates in parallel over each element in chunks in the collection and applies the specified action to it.
-        /// </summary>
-        /// <param name="action">The action to perform on each element in chunk.</param>
-        /// <param name="taskKind">Specifies whether the task is short or long running.</param>
-        /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
-        /// <exception cref="InvalidOperationException">Thrown when a work item cannot be queued for execution.</exception>
-        /// <exception cref="AggregateException">Thrown when one or more exceptions occur during the execution of the action on the elements.</exception>
-        public async ValueTask ForEachAsync(ElementForeach action, TaskKind taskKind, CancellationToken cancellationToken = default)
-        {
-            if (cancellationToken.IsCancellationRequested) return;
-            using var entities = chunks.GetComponents<Entity>();
-            var segments0 = entities.Segments;
-            var blockCount = segments0.Count;
-            if (blockCount == 0) return;
-            var exceptions = Pool<ConcurrentQueue<Exception>>.Default.Spawn();
-            var countdown = CountdownEventPool.Default.Spawn(blockCount);
-            var state = new LoopState
-            {
-                Action            = action,
-                Segments0         = segments0,
-                CancellationToken = cancellationToken,
-                Exceptions        = exceptions,
-                Countdown         = countdown
-            };
-            for (var i = 0; i < blockCount; i++)
-            {
-                if (ThreadPool.QueueUserWorkItem(static s =>
-                {
-                    var state = s.State;
-                    if (state.CancellationToken.IsCancellationRequested) return;
-                    try
-                    {
-                        var index = s.Index;
-                        var count = state.Segments0[index].Length;
-                        var entities = state.Segments0[index];
-                        for (var i = 0; i < count; i++)
-                        {
-                            state.Action(in entities[i]);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        state.Exceptions.Enqueue(ex);
-                    }
-                    finally
-                    {
-                        state.Countdown.Signal();
-                    }
-                }, (State: state, Index: i), false)) continue;
-
-                CountdownEventPool.Default.Recycle(countdown);
-                exceptions.Clear();
-                Pool<ConcurrentQueue<Exception>>.Default.Recycle(exceptions);
-                throw new InvalidOperationException("Failed to queue work item for chunk foreach iteration.");
-            }
-
-            await countdown.WaitAsync(cancellationToken, taskKind == TaskKind.Short);
-            CountdownEventPool.Default.Recycle(countdown);
-            if (!exceptions.IsEmpty)
-            {
-                try
-                {
-                    throw new AggregateException(exceptions);
-                }
-                finally
-                {
-                    exceptions.Clear();
-                    Pool<ConcurrentQueue<Exception>>.Default.Recycle(exceptions);
-                }
-            }
-        }
-
-        /// <summary>
-        /// Iterates in parallel over each element in chunks in the collection and applies the specified action to it.
-        /// </summary>
-        /// <param name="action">The action to perform on each element in chunk.</param>
-        /// <param name="taskKind">Specifies whether the task is short or long running.</param>
-        /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
-        /// <exception cref="InvalidOperationException">Thrown when a work item cannot be queued for execution.</exception>
-        /// <exception cref="AggregateException">Thrown when one or more exceptions occur during the execution of the action on the elements.</exception>
-        public async ValueTask ForEachAsync<T>(ElementForeach<T> action, TaskKind taskKind, CancellationToken cancellationToken = default) where T : unmanaged
-        {
-            if (cancellationToken.IsCancellationRequested) return;
-            using var entities = chunks.GetComponents<Entity>();
-            using var components = chunks.GetComponents<T>();
-            var segments0 = entities.Segments;
-            var segments1 = components.Segments;
-            var blockCount = segments0.Count;
-            if (blockCount == 0) return;
-            var exceptions = Pool<ConcurrentQueue<Exception>>.Default.Spawn();
-            var countdown = CountdownEventPool.Default.Spawn(blockCount);
-            var state = new LoopState<T>
-            {
-                Action            = action,
-                Segments0          = segments0,
-                Segments1          = segments1,
-                CancellationToken = cancellationToken,
-                Exceptions        = exceptions,
-                Countdown         = countdown
-            };
-            for (var i = 0; i < blockCount; i++)
-            {
-                if (ThreadPool.QueueUserWorkItem(static s =>
-                {
-                    var state = s.State;
-                    if (state.CancellationToken.IsCancellationRequested) return;
-                    try
-                    {
-                        var index = s.Index;
-                        var count = state.Segments0[index].Length;
-                        var entities = state.Segments0[index];
-                        var components = state.Segments1[index];
-                        for (var i = 0; i < count; i++)
-                        {
-                            state.Action(in entities[i], ref components[i]);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        state.Exceptions.Enqueue(ex);
-                    }
-                    finally
-                    {
-                        state.Countdown.Signal();
-                    }
-                }, (State: state, Index: i), false)) continue;
-
-                CountdownEventPool.Default.Recycle(countdown);
-                exceptions.Clear();
-                Pool<ConcurrentQueue<Exception>>.Default.Recycle(exceptions);
-                throw new InvalidOperationException("Failed to queue work item for chunk foreach iteration.");
-            }
-
-            await countdown.WaitAsync(cancellationToken, taskKind == TaskKind.Short);
-            CountdownEventPool.Default.Recycle(countdown);
-            if (!exceptions.IsEmpty)
-            {
-                try
-                {
-                    throw new AggregateException(exceptions);
-                }
-                finally
-                {
-                    exceptions.Clear();
-                    Pool<ConcurrentQueue<Exception>>.Default.Recycle(exceptions);
-                }
-            }
-        }
 <#
-    for (var i = 2; i <= 16; i++)
+    for (var arity = 0; arity <= 16; arity++)
     {
-        var genericTypes = string.Join(", ", from index in Enumerable.Range(1, i) select $"T{index}");
-        var genericConstraints = string.Join(" ", from index in Enumerable.Range(1, i) select $"where T{index} : unmanaged");
-        var componentUsings = string.Join(Environment.NewLine, from index in Enumerable.Range(1, i) select $"using var components{index} = chunks.GetComponents<T{index}>();");
-        var componentSegments = string.Join(Environment.NewLine, from index in Enumerable.Range(1, i) select $"var segments{index} = components{index}.Segments;");
-        var segmentInit = string.Join(Environment.NewLine, from index in Enumerable.Range(1, i) select $"Segments{index} = segments{index},");
-        var componentState = string.Join(Environment.NewLine, from index in Enumerable.Range(1, i) select $"var components{index} = state.Segments{index}[index];");
-        var componentParameters = string.Join(", ", from index in Enumerable.Range(1, i) select $"ref components{index}[i]");
+        var typeArguments = arity == 0 ? string.Empty : $"<{string.Join(", ", Enumerable.Range(1, arity).Select(i => $"T{i}"))}>";
+        var constraints = arity == 0 ? string.Empty : " " + string.Join(" ", Enumerable.Range(1, arity).Select(i => $"where T{i} : unmanaged"));
+        var actionType = "ElementForeach" + typeArguments;
 #>
         /// <summary>
         /// Iterates in parallel over each element in chunks in the collection and applies the specified action to it.
         /// </summary>
         /// <param name="action">The action to perform on each element in chunk.</param>
-        /// <param name="taskKind">Specifies whether the task is short or long running.</param>
         /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
-        /// <exception cref="InvalidOperationException">Thrown when a work item cannot be queued for execution.</exception>
-        /// <exception cref="AggregateException">Thrown when one or more exceptions occur during the execution of the action on the elements.</exception>
-        public async ValueTask ForEachAsync<<#= genericTypes #>>(ElementForeach<<#= genericTypes #>> action, TaskKind taskKind, CancellationToken cancellationToken = default) <#= genericConstraints #>
+        /// <returns>An awaitable that completes when every element has been processed.</returns>
+        /// <exception cref="AggregateException">Thrown asynchronously when one or more exceptions occur during the execution of the action.</exception>
+        /// <remarks>The returned awaitable must be awaited exactly once.</remarks>
+        public Asynchronous ForEachAsync<#= typeArguments #>(<#= actionType #> action, CancellationToken cancellationToken = default)<#= constraints #>
+            => ForEachAsyncOperation<#= typeArguments #>.Start(chunks, action, cancellationToken);
+<#
+    }
+#>
+    }
+
+<#
+    for (var arity = 0; arity <= 16; arity++)
+    {
+        var typeArguments = arity == 0 ? string.Empty : $"<{string.Join(", ", Enumerable.Range(1, arity).Select(i => $"T{i}"))}>";
+        var constraints = arity == 0 ? string.Empty : " " + string.Join(" ", Enumerable.Range(1, arity).Select(i => $"where T{i} : unmanaged"));
+        var actionType = "ElementForeach" + typeArguments;
+
+        var componentFields = arity == 0 ? string.Empty : string.Join(Environment.NewLine,
+            Enumerable.Range(1, arity).Select(i => $"        private Components<T{i}> m_Components{i};"));
+        var segmentFields = arity == 0 ? string.Empty : string.Join(Environment.NewLine,
+            Enumerable.Range(1, arity).Select(i => $"        private Components<T{i}>.SegmentsEnumerable m_Segments{i};"));
+        var componentUsings = arity == 0 ? string.Empty : string.Join(Environment.NewLine,
+            Enumerable.Range(1, arity).Select(i => $"            var components{i} = chunks.GetComponents<T{i}>();"));
+        var segmentLocals = arity == 0 ? string.Empty : string.Join(Environment.NewLine,
+            Enumerable.Range(1, arity).Select(i => $"            var segments{i} = components{i}.Segments;"));
+        var assignments = arity == 0 ? string.Empty : string.Join(Environment.NewLine,
+            Enumerable.Range(1, arity).Select(i => $"            operation.m_Components{i} = components{i};{Environment.NewLine}            operation.m_Segments{i} = segments{i};"));
+        // Dispose in reverse allocation order: arena-backed allocators can only reclaim the most recent
+        // allocation, so the first component must be released last.
+        var disposeLocals = string.Join(Environment.NewLine,
+            Enumerable.Range(1, arity).Reverse().Select(i => $"                components{i}.Dispose();")
+                .Append("                components0.Dispose();"));
+        var disposeFields = string.Join(Environment.NewLine,
+            Enumerable.Range(1, arity).Reverse().Select(i => $"            m_Components{i}.Dispose();")
+                .Append("            m_Components0.Dispose();"));
+        var clearFields = arity == 0 ? string.Empty : string.Join(Environment.NewLine,
+            Enumerable.Range(1, arity).Select(i => $"            m_Components{i} = default;{Environment.NewLine}            m_Segments{i} = default;"));
+        var segmentSpans = arity == 0 ? string.Empty : string.Join(Environment.NewLine,
+            Enumerable.Range(1, arity).Select(i => $"                var component{i} = m_Segments{i}[index];"));
+        var invocationArguments = "in entities[i]" + (arity == 0 ? string.Empty : ", " + string.Join(", ", Enumerable.Range(1, arity).Select(i => $"ref component{i}[i]")));
+#>
+    internal sealed class ForEachAsyncOperation<#= typeArguments #> : PooledValueTaskSource<#= constraints #>
+    {
+        private <#= actionType #> m_Action = null!;
+        private Components<Entity> m_Components0;
+        private Components<Entity>.SegmentsEnumerable m_Segments0;
+<#= componentFields #>
+<#= segmentFields #>
+
+        public static Asynchronous Start(Chunks chunks, <#= actionType #> action, CancellationToken cancellationToken)
         {
-            if (cancellationToken.IsCancellationRequested) return;
-            using var entities = chunks.GetComponents<Entity>();
-            <#= componentUsings #>
-            var segments0 = entities.Segments;
-            <#= componentSegments #>
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return default;
+            }
+
+            var components0 = chunks.GetComponents<Entity>();
+<#= componentUsings #>
+            var segments0 = components0.Segments;
+<#= segmentLocals #>
+
             var blockCount = segments0.Count;
-            if (blockCount == 0) return;
-            var exceptions = Pool<ConcurrentQueue<Exception>>.Default.Spawn();
-            var countdown = CountdownEventPool.Default.Spawn(blockCount);
-            var state = new LoopState<<#= genericTypes #>>
+            if (blockCount == 0)
             {
-                Action            = action,
-                Segments0          = segments0,
-                <#= segmentInit #>
-                CancellationToken = cancellationToken,
-                Exceptions        = exceptions,
-                Countdown         = countdown
-            };
-            for (var i = 0; i < blockCount; i++)
-            {
-                if (ThreadPool.QueueUserWorkItem(static s =>
-                {
-                    var state = s.State;
-                    if (state.CancellationToken.IsCancellationRequested) return;
-                    try
-                    {
-                        var index = s.Index;
-                        var count = state.Segments0[index].Length;
-                        var entities = state.Segments0[index];
-                        <#= componentState #>
-                        for (var i = 0; i < count; i++)
-                        {
-                            state.Action(in entities[i], <#= componentParameters #>);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        state.Exceptions.Enqueue(ex);
-                    }
-                    finally
-                    {
-                        state.Countdown.Signal();
-                    }
-                }, (State: state, Index: i), false)) continue;
-
-                CountdownEventPool.Default.Recycle(countdown);
-                exceptions.Clear();
-                Pool<ConcurrentQueue<Exception>>.Default.Recycle(exceptions);
-                throw new InvalidOperationException("Failed to queue work item for chunk foreach iteration.");
+<#= disposeLocals #>
+                return default;
             }
 
-            await countdown.WaitAsync(cancellationToken, taskKind == TaskKind.Short);
-            CountdownEventPool.Default.Recycle(countdown);
-            if (!exceptions.IsEmpty)
+            var workerCount = Math.Min(Environment.ProcessorCount, blockCount);
+            var chunkSize = (blockCount + workerCount - 1) / workerCount;
+
+            var operation = OperationPool<ForEachAsyncOperation<#= typeArguments #>>.Rent();
+            operation.m_Action = action;
+            operation.m_Components0 = components0;
+            operation.m_Segments0 = segments0;
+<#= assignments #>
+
+            try
             {
-                try
+                operation.Prepare(blockCount, workerCount, chunkSize, cancellationToken);
+                operation.Run();
+            }
+            catch
+            {
+<#= disposeLocals #>
+                operation.Clear();
+                OperationPool<ForEachAsyncOperation<#= typeArguments #>>.Return(operation);
+                throw;
+            }
+
+            return operation.CreateTask();
+        }
+
+        protected override void ExecuteRange(int start, int end)
+        {
+            for (var index = start; index < end; index++)
+            {
+                if (IsCancellationRequested)
                 {
-                    throw new AggregateException(exceptions);
+                    return;
                 }
-                finally
+
+                var count = m_Segments0[index].Length;
+                var entities = m_Segments0[index];
+<#= segmentSpans #>
+                for (var i = 0; i < count; i++)
                 {
-                    exceptions.Clear();
-                    Pool<ConcurrentQueue<Exception>>.Default.Recycle(exceptions);
+                    m_Action(<#= invocationArguments #>);
                 }
             }
         }
-<#
-    }
-#>
-    }
 
-    private class CountdownEventPool
-    {
-        public static CountdownEventPool Default { get; } = new();
-        private readonly ConcurrentQueue<CountdownEvent> m_Pool = new();
-
-        public CountdownEvent Spawn(int initialCount)
+        protected override void DisposeResources()
         {
-            if (m_Pool.TryDequeue(out var countdown))
-            {
-                countdown.Reset(initialCount);
-                return countdown;
-            }
-
-            return new CountdownEvent(initialCount);
+<#= disposeFields #>
         }
 
-        public void Recycle(CountdownEvent countdown)
+        protected override void ReturnToPool()
         {
-            countdown.Reset();
-            m_Pool.Enqueue(countdown);
+            Clear();
+            OperationPool<ForEachAsyncOperation<#= typeArguments #>>.Return(this);
         }
-    }
 
-    private static async ValueTask WaitAsync(this CountdownEvent countdown, CancellationToken cancellationToken, bool isShortTask)
-    {
-        if (isShortTask)
+        private void Clear()
         {
-            // Short tasks can use a busy-wait loop to avoid context switching overhead.
-            while (!countdown.IsSet || !cancellationToken.IsCancellationRequested)
-            {
-                await Task.Yield();
-            }
+            m_Action = null!;
+            m_Components0 = default;
+            m_Segments0 = default;
+<#= clearFields #>
         }
-        else
-        {
-            // Long tasks should use a cancellation token registration to avoid blocking the thread pool.
-            await using var registration = cancellationToken.Register(static state =>
-            {
-                var countdown = (CountdownEvent) state!;
-                while (!countdown.IsSet)
-                {
-                    countdown.Signal();
-                }
-            }, countdown);
-            var state = Pool<CountdownState>.Default.Spawn();
-            state.Countdown = countdown;
-            state.CancellationToken = cancellationToken;
-            await Task.Factory.StartNew(static arg =>
-            {
-                var state = (CountdownState) arg!;
-                state.Countdown.Wait(state.CancellationToken);
-            }, state, cancellationToken, TaskCreationOptions.LongRunning, TaskScheduler.Default);
-        }
-    }
-
-    private class CountdownState
-    {
-        public CountdownEvent Countdown;
-        public CancellationToken CancellationToken;
-    }
-
-    private struct LoopState
-    {
-        public ElementForeach                     Action;
-        public Components<Entity>.SegmentsEnumerable Segments0;
-        public CancellationToken                     CancellationToken;
-        public ConcurrentQueue<Exception>            Exceptions;
-        public CountdownEvent                        Countdown;
-    }
-
-    private struct LoopState<T> where T : unmanaged
-    {
-        public ElementForeach<T>                     Action;
-        public Components<Entity>.SegmentsEnumerable Segments0;
-        public Components<T>.SegmentsEnumerable      Segments1;
-        public CancellationToken                     CancellationToken;
-        public ConcurrentQueue<Exception>            Exceptions;
-        public CountdownEvent                        Countdown;
-    }
-<#
-    for
-
-    (var i = 2; i <= 16; i++)
-    {
-        var genericTypes = string.Join(", ", from index in Enumerable.Range(1, i) select $"T{index}");
-        var genericConstraints = string.Join(" ", from index in Enumerable.Range(1, i) select $"where T{index} : unmanaged");
-        var componentSegments = string.Join(Environment.NewLine, from index in Enumerable.Range(1, i) select $"public Components<T{index}>.SegmentsEnumerable Segments{index};");
-#>
-    private struct LoopState<<#= genericTypes #>> <#= genericConstraints #>
-    {
-        public ElementForeach<<#= genericTypes #>>   Action;
-        public Components<Entity>.SegmentsEnumerable Segments0;
-        <#= componentSegments #>
-        public CancellationToken                     CancellationToken;
-        public ConcurrentQueue<Exception>            Exceptions;
-        public CountdownEvent                        Countdown;
     }
 <#
     }
 #>
 }
-/// <summary>
-/// Specifies the kind of task to be executed in the ForEachAsync method.
-/// </summary>
-public enum TaskKind
-{
-    /// <summary>Indicates that the task is expected to be short-running and may benefit from a busy-wait loop.</summary>
-    Short,
 
-    /// <summary>Indicates that the task is expected to be long-running and should use a cancellation token registration to avoid blocking the thread pool.</summary>
-    Long
+/// <summary>
+/// Provides a minimal pool of reusable asynchronous operations.
+/// </summary>
+/// <remarks>
+/// Rent and return never allocate once the pool is warm. The fast path is a thread-local single slot, which
+/// serves the common sequential case without any synchronization. When the slot is already occupied, the
+/// operation goes through a <see cref="SpinLock"/>-guarded stack, so no queue nodes are ever allocated.
+/// </remarks>
+/// <typeparam name="TOperation">The operation type. It must expose a public parameterless constructor.</typeparam>
+public static class OperationPool<TOperation> where TOperation : class, new()
+{
+    [ThreadStatic]
+    private static TOperation? t_Cached;
+
+    private static readonly Stack<TOperation> s_Items = new();
+    private static SpinLock s_Lock = new(false);
+
+    /// <summary>
+    /// Gets a cleared operation from the pool, or creates a new one when the pool is empty.
+    /// </summary>
+    /// <returns>The rented operation.</returns>
+    public static TOperation Rent()
+    {
+        var cached = t_Cached;
+
+        if (cached is not null)
+        {
+            t_Cached = null;
+            return cached;
+        }
+
+        var taken = false;
+        s_Lock.Enter(ref taken);
+        try
+        {
+            return s_Items.Count > 0 ? s_Items.Pop() : new TOperation();
+        }
+        finally
+        {
+            s_Lock.Exit();
+        }
+    }
+
+    /// <summary>
+    /// Returns an operation to the pool after it has been awaited and its resources released.
+    /// </summary>
+    /// <param name="operation">The operation to recycle.</param>
+    public static void Return(TOperation operation)
+    {
+        if (t_Cached is null)
+        {
+            t_Cached = operation;
+            return;
+        }
+
+        var taken = false;
+        s_Lock.Enter(ref taken);
+        try
+        {
+            s_Items.Push(operation);
+        }
+        finally
+        {
+            s_Lock.Exit();
+        }
+    }
 }

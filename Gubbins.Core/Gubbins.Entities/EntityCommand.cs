@@ -1,7 +1,6 @@
 ﻿
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using Gubbins.Spawner;
 using Gubbins.Unsafe;
 
 namespace Gubbins.Entities;
@@ -20,7 +19,7 @@ public static class EntityCommandExtensions
         {
             var size1 = (int) Native.GetStackSize(typeof(T1));
             var rg1 = new Range(0, size1);
-            var types = FixedArrayPool<Type>.Instance.Rent(1);
+            var types = new Type[1];
 
             types[0] = typeof(T1);
 
@@ -29,7 +28,6 @@ public static class EntityCommandExtensions
             MemoryMarshal.Write(data[rg1], ref component1);
 
             var result = command.Insert(data, types);
-            FixedArrayPool<Type>.Instance.Return(types);
             return result;
         }
         /// <summary>
@@ -41,7 +39,7 @@ public static class EntityCommandExtensions
             var size2 = (int) Native.GetStackSize(typeof(T2));
             var rg1 = new Range(0, size1);
             var rg2 = new Range(rg1.End, rg1.End.Value + size2);
-            var types = FixedArrayPool<Type>.Instance.Rent(2);
+            var types = new Type[2];
 
             types[0] = typeof(T1);
             types[1] = typeof(T2);
@@ -52,7 +50,6 @@ public static class EntityCommandExtensions
             MemoryMarshal.Write(data[rg2], ref component2);
 
             var result = command.Insert(data, types);
-            FixedArrayPool<Type>.Instance.Return(types);
             return result;
         }
         /// <summary>
@@ -66,7 +63,7 @@ public static class EntityCommandExtensions
             var rg1 = new Range(0, size1);
             var rg2 = new Range(rg1.End, rg1.End.Value + size2);
             var rg3 = new Range(rg2.End, rg2.End.Value + size3);
-            var types = FixedArrayPool<Type>.Instance.Rent(3);
+            var types = new Type[3];
 
             types[0] = typeof(T1);
             types[1] = typeof(T2);
@@ -79,7 +76,6 @@ public static class EntityCommandExtensions
             MemoryMarshal.Write(data[rg3], ref component3);
 
             var result = command.Insert(data, types);
-            FixedArrayPool<Type>.Instance.Return(types);
             return result;
         }
         /// <summary>
@@ -95,7 +91,7 @@ public static class EntityCommandExtensions
             var rg2 = new Range(rg1.End, rg1.End.Value + size2);
             var rg3 = new Range(rg2.End, rg2.End.Value + size3);
             var rg4 = new Range(rg3.End, rg3.End.Value + size4);
-            var types = FixedArrayPool<Type>.Instance.Rent(4);
+            var types = new Type[4];
 
             types[0] = typeof(T1);
             types[1] = typeof(T2);
@@ -110,7 +106,6 @@ public static class EntityCommandExtensions
             MemoryMarshal.Write(data[rg4], ref component4);
 
             var result = command.Insert(data, types);
-            FixedArrayPool<Type>.Instance.Return(types);
             return result;
         }
         /// <summary>
@@ -128,7 +123,7 @@ public static class EntityCommandExtensions
             var rg3 = new Range(rg2.End, rg2.End.Value + size3);
             var rg4 = new Range(rg3.End, rg3.End.Value + size4);
             var rg5 = new Range(rg4.End, rg4.End.Value + size5);
-            var types = FixedArrayPool<Type>.Instance.Rent(5);
+            var types = new Type[5];
 
             types[0] = typeof(T1);
             types[1] = typeof(T2);
@@ -145,7 +140,6 @@ public static class EntityCommandExtensions
             MemoryMarshal.Write(data[rg5], ref component5);
 
             var result = command.Insert(data, types);
-            FixedArrayPool<Type>.Instance.Return(types);
             return result;
         }
         /// <summary>
@@ -165,7 +159,7 @@ public static class EntityCommandExtensions
             var rg4 = new Range(rg3.End, rg3.End.Value + size4);
             var rg5 = new Range(rg4.End, rg4.End.Value + size5);
             var rg6 = new Range(rg5.End, rg5.End.Value + size6);
-            var types = FixedArrayPool<Type>.Instance.Rent(6);
+            var types = new Type[6];
 
             types[0] = typeof(T1);
             types[1] = typeof(T2);
@@ -184,7 +178,6 @@ public static class EntityCommandExtensions
             MemoryMarshal.Write(data[rg6], ref component6);
 
             var result = command.Insert(data, types);
-            FixedArrayPool<Type>.Instance.Return(types);
             return result;
         }
         /// <summary>
@@ -206,7 +199,7 @@ public static class EntityCommandExtensions
             var rg5 = new Range(rg4.End, rg4.End.Value + size5);
             var rg6 = new Range(rg5.End, rg5.End.Value + size6);
             var rg7 = new Range(rg6.End, rg6.End.Value + size7);
-            var types = FixedArrayPool<Type>.Instance.Rent(7);
+            var types = new Type[7];
 
             types[0] = typeof(T1);
             types[1] = typeof(T2);
@@ -227,7 +220,6 @@ public static class EntityCommandExtensions
             MemoryMarshal.Write(data[rg7], ref component7);
 
             var result = command.Insert(data, types);
-            FixedArrayPool<Type>.Instance.Return(types);
             return result;
         }
         /// <summary>
@@ -251,7 +243,7 @@ public static class EntityCommandExtensions
             var rg6 = new Range(rg5.End, rg5.End.Value + size6);
             var rg7 = new Range(rg6.End, rg6.End.Value + size7);
             var rg8 = new Range(rg7.End, rg7.End.Value + size8);
-            var types = FixedArrayPool<Type>.Instance.Rent(8);
+            var types = new Type[8];
 
             types[0] = typeof(T1);
             types[1] = typeof(T2);
@@ -274,7 +266,6 @@ public static class EntityCommandExtensions
             MemoryMarshal.Write(data[rg8], ref component8);
 
             var result = command.Insert(data, types);
-            FixedArrayPool<Type>.Instance.Return(types);
             return result;
         }
         /// <summary>
@@ -300,7 +291,7 @@ public static class EntityCommandExtensions
             var rg7 = new Range(rg6.End, rg6.End.Value + size7);
             var rg8 = new Range(rg7.End, rg7.End.Value + size8);
             var rg9 = new Range(rg8.End, rg8.End.Value + size9);
-            var types = FixedArrayPool<Type>.Instance.Rent(9);
+            var types = new Type[9];
 
             types[0] = typeof(T1);
             types[1] = typeof(T2);
@@ -325,7 +316,6 @@ public static class EntityCommandExtensions
             MemoryMarshal.Write(data[rg9], ref component9);
 
             var result = command.Insert(data, types);
-            FixedArrayPool<Type>.Instance.Return(types);
             return result;
         }
         /// <summary>
@@ -353,7 +343,7 @@ public static class EntityCommandExtensions
             var rg8 = new Range(rg7.End, rg7.End.Value + size8);
             var rg9 = new Range(rg8.End, rg8.End.Value + size9);
             var rg10 = new Range(rg9.End, rg9.End.Value + size10);
-            var types = FixedArrayPool<Type>.Instance.Rent(10);
+            var types = new Type[10];
 
             types[0] = typeof(T1);
             types[1] = typeof(T2);
@@ -380,7 +370,6 @@ public static class EntityCommandExtensions
             MemoryMarshal.Write(data[rg10], ref component10);
 
             var result = command.Insert(data, types);
-            FixedArrayPool<Type>.Instance.Return(types);
             return result;
         }
         /// <summary>
@@ -410,7 +399,7 @@ public static class EntityCommandExtensions
             var rg9 = new Range(rg8.End, rg8.End.Value + size9);
             var rg10 = new Range(rg9.End, rg9.End.Value + size10);
             var rg11 = new Range(rg10.End, rg10.End.Value + size11);
-            var types = FixedArrayPool<Type>.Instance.Rent(11);
+            var types = new Type[11];
 
             types[0] = typeof(T1);
             types[1] = typeof(T2);
@@ -439,7 +428,6 @@ public static class EntityCommandExtensions
             MemoryMarshal.Write(data[rg11], ref component11);
 
             var result = command.Insert(data, types);
-            FixedArrayPool<Type>.Instance.Return(types);
             return result;
         }
         /// <summary>
@@ -471,7 +459,7 @@ public static class EntityCommandExtensions
             var rg10 = new Range(rg9.End, rg9.End.Value + size10);
             var rg11 = new Range(rg10.End, rg10.End.Value + size11);
             var rg12 = new Range(rg11.End, rg11.End.Value + size12);
-            var types = FixedArrayPool<Type>.Instance.Rent(12);
+            var types = new Type[12];
 
             types[0] = typeof(T1);
             types[1] = typeof(T2);
@@ -502,7 +490,6 @@ public static class EntityCommandExtensions
             MemoryMarshal.Write(data[rg12], ref component12);
 
             var result = command.Insert(data, types);
-            FixedArrayPool<Type>.Instance.Return(types);
             return result;
         }
         /// <summary>
@@ -536,7 +523,7 @@ public static class EntityCommandExtensions
             var rg11 = new Range(rg10.End, rg10.End.Value + size11);
             var rg12 = new Range(rg11.End, rg11.End.Value + size12);
             var rg13 = new Range(rg12.End, rg12.End.Value + size13);
-            var types = FixedArrayPool<Type>.Instance.Rent(13);
+            var types = new Type[13];
 
             types[0] = typeof(T1);
             types[1] = typeof(T2);
@@ -569,7 +556,6 @@ public static class EntityCommandExtensions
             MemoryMarshal.Write(data[rg13], ref component13);
 
             var result = command.Insert(data, types);
-            FixedArrayPool<Type>.Instance.Return(types);
             return result;
         }
         /// <summary>
@@ -605,7 +591,7 @@ public static class EntityCommandExtensions
             var rg12 = new Range(rg11.End, rg11.End.Value + size12);
             var rg13 = new Range(rg12.End, rg12.End.Value + size13);
             var rg14 = new Range(rg13.End, rg13.End.Value + size14);
-            var types = FixedArrayPool<Type>.Instance.Rent(14);
+            var types = new Type[14];
 
             types[0] = typeof(T1);
             types[1] = typeof(T2);
@@ -640,7 +626,6 @@ public static class EntityCommandExtensions
             MemoryMarshal.Write(data[rg14], ref component14);
 
             var result = command.Insert(data, types);
-            FixedArrayPool<Type>.Instance.Return(types);
             return result;
         }
         /// <summary>
@@ -678,7 +663,7 @@ public static class EntityCommandExtensions
             var rg13 = new Range(rg12.End, rg12.End.Value + size13);
             var rg14 = new Range(rg13.End, rg13.End.Value + size14);
             var rg15 = new Range(rg14.End, rg14.End.Value + size15);
-            var types = FixedArrayPool<Type>.Instance.Rent(15);
+            var types = new Type[15];
 
             types[0] = typeof(T1);
             types[1] = typeof(T2);
@@ -715,7 +700,6 @@ public static class EntityCommandExtensions
             MemoryMarshal.Write(data[rg15], ref component15);
 
             var result = command.Insert(data, types);
-            FixedArrayPool<Type>.Instance.Return(types);
             return result;
         }
         /// <summary>
@@ -755,7 +739,7 @@ public static class EntityCommandExtensions
             var rg14 = new Range(rg13.End, rg13.End.Value + size14);
             var rg15 = new Range(rg14.End, rg14.End.Value + size15);
             var rg16 = new Range(rg15.End, rg15.End.Value + size16);
-            var types = FixedArrayPool<Type>.Instance.Rent(16);
+            var types = new Type[16];
 
             types[0] = typeof(T1);
             types[1] = typeof(T2);
@@ -794,7 +778,6 @@ public static class EntityCommandExtensions
             MemoryMarshal.Write(data[rg16], ref component16);
 
             var result = command.Insert(data, types);
-            FixedArrayPool<Type>.Instance.Return(types);
             return result;
         }
 

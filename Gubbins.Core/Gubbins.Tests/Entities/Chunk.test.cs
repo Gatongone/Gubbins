@@ -17,19 +17,19 @@ public class ChunkBehaviorTests
     [Test]
     public void Ctor_NullTypes_ShouldThrowNullReferenceException()
     {
-        Assert.Throws<NullReferenceException>(() => _ = new Chunk(null!));
+        Assert.Throws<NullReferenceException>(() => _ = new Chunk(null!, TestAllocator.Shared));
     }
 
     [Test]
     public void Ctor_EmptyTypes_ShouldThrowIndexOutOfRangeException()
     {
-        Assert.Throws<IndexOutOfRangeException>(() => _ = new Chunk([]));
+        Assert.Throws<IndexOutOfRangeException>(() => _ = new Chunk([], TestAllocator.Shared));
     }
 
     [Test]
     public void Ctor_WithoutEntity_ShouldAutomaticallyProvideEntityColumn()
     {
-        using var chunk = new Chunk([typeof(CompA)]);
+        using var chunk = new Chunk([typeof(CompA)], TestAllocator.Shared);
         var types = new[] {typeof(CompA)};
 
         var index = chunk.Add(CreateSingleData(7), types);
@@ -41,9 +41,9 @@ public class ChunkBehaviorTests
     [Test]
     public void Ctor_OnlyEntityType_ShouldAllowAddWithNoComponentPayload()
     {
-        using var chunk = new Chunk([typeof(Entity)]);
+        using var chunk = new Chunk([typeof(Entity)], TestAllocator.Shared);
 
-        var index = chunk.Add(Array.Empty<byte>(), Array.Empty<Type>());
+        var index = chunk.Add([], []);
         chunk.Set(index, new Entity {Index = 9, Version = 1});
 
         Assert.Multiple(() =>
@@ -57,7 +57,7 @@ public class ChunkBehaviorTests
     [Test]
     public void Add_LengthMismatch_ShouldThrowArgumentOutOfRangeException()
     {
-        using var chunk = new Chunk([typeof(CompA), typeof(CompB)]);
+        using var chunk = new Chunk([typeof(CompA), typeof(CompB)], TestAllocator.Shared);
 
         var invalidData = new byte[sizeof(int)];
         var types = new[] {typeof(CompA), typeof(CompB)};
@@ -68,7 +68,7 @@ public class ChunkBehaviorTests
     [Test]
     public void Add_UnknownType_ShouldThrowInvalidOperationException()
     {
-        using var chunk = new Chunk([typeof(CompA), typeof(CompB)]);
+        using var chunk = new Chunk([typeof(CompA), typeof(CompB)], TestAllocator.Shared);
 
         var data = CreateData(11, 22).ToArray();
         var invalidTypes = new[] {typeof(CompA), typeof(CompC)};
@@ -79,7 +79,7 @@ public class ChunkBehaviorTests
     [Test]
     public void Add_MissingComponentType_ShouldThrowInvalidOperationException()
     {
-        using var chunk = new Chunk([typeof(CompA), typeof(CompB)]);
+        using var chunk = new Chunk([typeof(CompA), typeof(CompB)], TestAllocator.Shared);
 
         var data = CreateData(11, 22).ToArray();
         var missingTypeSet = new[] {typeof(CompA)};
@@ -90,7 +90,7 @@ public class ChunkBehaviorTests
     [Test]
     public void Add_DuplicateTypes_ShouldThrowInvalidOperationException()
     {
-        using var chunk = new Chunk([typeof(CompA), typeof(CompB)]);
+        using var chunk = new Chunk([typeof(CompA), typeof(CompB)], TestAllocator.Shared);
 
         var data = CreateData(11, 22).ToArray();
         var duplicateTypes = new[] {typeof(CompA), typeof(CompA)};
@@ -101,7 +101,7 @@ public class ChunkBehaviorTests
     [Test]
     public void Add_WithEntityTypeInInputTypes_ShouldThrowInvalidOperationException()
     {
-        using var chunk = new Chunk([typeof(CompA), typeof(CompB)]);
+        using var chunk = new Chunk([typeof(CompA), typeof(CompB)], TestAllocator.Shared);
 
         var data = CreateData(11, 22).ToArray();
         var invalidTypes = new[] {typeof(Entity), typeof(CompA)};
@@ -112,7 +112,7 @@ public class ChunkBehaviorTests
     [Test]
     public void Add_WithReorderedTypes_ShouldMapToCorrectComponents()
     {
-        using var chunk = new Chunk([typeof(CompA), typeof(CompB)]);
+        using var chunk = new Chunk([typeof(CompA), typeof(CompB)], TestAllocator.Shared);
 
         var types = new[] {typeof(CompB), typeof(CompA)};
         var data = CreateData(700, 900);
@@ -129,7 +129,7 @@ public class ChunkBehaviorTests
     [Test]
     public void Add_CanonicalTypes_WithSwappedPayloadSegments_ShouldFollowPayloadLayout()
     {
-        using var chunk = new Chunk([typeof(CompA), typeof(CompB)]);
+        using var chunk = new Chunk([typeof(CompA), typeof(CompB)], TestAllocator.Shared);
 
         var intendedA = 70;
         var intendedB = 90;
@@ -149,7 +149,7 @@ public class ChunkBehaviorTests
     [Test]
     public void Add_ToCapacity_ShouldSetIsFull_AndNextAddShouldThrow()
     {
-        using var chunk = new Chunk([typeof(HugeComp)]);
+        using var chunk = new Chunk([typeof(HugeComp)], TestAllocator.Shared);
         var types = new[] {typeof(HugeComp)};
 
         for (var i = 0; i < chunk.Capacity; i++)
@@ -168,7 +168,7 @@ public class ChunkBehaviorTests
     [Test]
     public void Remove_FromFullChunk_ShouldClearIsFull()
     {
-        using var chunk = new Chunk([typeof(HugeComp)]);
+        using var chunk = new Chunk([typeof(HugeComp)], TestAllocator.Shared);
         var types = new[] {typeof(HugeComp)};
 
         for (var i = 0; i < chunk.Capacity; i++)
@@ -189,7 +189,7 @@ public class ChunkBehaviorTests
     [Test]
     public void Remove_InvalidIndex_ShouldReturnFalse()
     {
-        using var chunk = new Chunk([typeof(CompA), typeof(CompB)]);
+        using var chunk = new Chunk([typeof(CompA), typeof(CompB)], TestAllocator.Shared);
         var types = new[] {typeof(CompA), typeof(CompB)};
 
         var index = chunk.Add(CreateData(1, 2), types);
@@ -210,7 +210,7 @@ public class ChunkBehaviorTests
     [Test]
     public void Remove_EmptyChunk_ShouldReturnFalse()
     {
-        using var chunk = new Chunk([typeof(CompA), typeof(CompB)]);
+        using var chunk = new Chunk([typeof(CompA), typeof(CompB)], TestAllocator.Shared);
 
         var removed = chunk.Remove(0, out var movedEntity, out var movedFromIndex);
 
@@ -226,7 +226,7 @@ public class ChunkBehaviorTests
     [Test]
     public void Remove_IndexEqualCount_ShouldReturnFalse()
     {
-        using var chunk = new Chunk([typeof(CompA), typeof(CompB)]);
+        using var chunk = new Chunk([typeof(CompA), typeof(CompB)], TestAllocator.Shared);
         var types = new[] {typeof(CompA), typeof(CompB)};
         chunk.Add(CreateData(1, 2), types);
 
@@ -244,7 +244,7 @@ public class ChunkBehaviorTests
     [Test]
     public void Remove_IndexGreaterThanCount_ShouldReturnFalse()
     {
-        using var chunk = new Chunk([typeof(CompA), typeof(CompB)]);
+        using var chunk = new Chunk([typeof(CompA), typeof(CompB)], TestAllocator.Shared);
         var types = new[] {typeof(CompA), typeof(CompB)};
         chunk.Add(CreateData(1, 2), types);
 
@@ -262,7 +262,7 @@ public class ChunkBehaviorTests
     [Test]
     public void Remove_LastEntity_ShouldNotReturnMovedEntity()
     {
-        using var chunk = new Chunk([typeof(CompA), typeof(CompB)]);
+        using var chunk = new Chunk([typeof(CompA), typeof(CompB)], TestAllocator.Shared);
         var types = new[] {typeof(CompA), typeof(CompB)};
 
         var index = chunk.Add(CreateData(1, 2), types);
@@ -283,7 +283,7 @@ public class ChunkBehaviorTests
     [Test]
     public void Remove_SingleEntityAtZero_ShouldNotReturnMovedEntity()
     {
-        using var chunk = new Chunk([typeof(CompA), typeof(CompB)]);
+        using var chunk = new Chunk([typeof(CompA), typeof(CompB)], TestAllocator.Shared);
         var types = new[] {typeof(CompA), typeof(CompB)};
 
         chunk.Add(CreateData(10, 20), types);
@@ -302,7 +302,7 @@ public class ChunkBehaviorTests
     [Test]
     public void Remove_MiddleEntity_ShouldMoveLastEntityIntoRemovedSlot()
     {
-        using var chunk = new Chunk([typeof(CompA), typeof(CompB)]);
+        using var chunk = new Chunk([typeof(CompA), typeof(CompB)], TestAllocator.Shared);
         var types = new[] {typeof(CompA), typeof(CompB)};
 
         var first = chunk.Add(CreateData(1, 11), types);
@@ -330,7 +330,7 @@ public class ChunkBehaviorTests
     [Test]
     public void Get_UnmatchedType_ShouldThrowArgumentException()
     {
-        using var chunk = new Chunk([typeof(CompA), typeof(CompB)]);
+        using var chunk = new Chunk([typeof(CompA), typeof(CompB)], TestAllocator.Shared);
         var types = new[] {typeof(CompA), typeof(CompB)};
         chunk.Add(CreateData(1, 2), types);
 
@@ -340,7 +340,7 @@ public class ChunkBehaviorTests
     [Test]
     public void Get_NegativeIndex_ShouldThrowArgumentOutOfRangeException()
     {
-        using var chunk = new Chunk([typeof(CompA), typeof(CompB)]);
+        using var chunk = new Chunk([typeof(CompA), typeof(CompB)], TestAllocator.Shared);
         var types = new[] {typeof(CompA), typeof(CompB)};
         chunk.Add(CreateData(1, 2), types);
 
@@ -350,7 +350,7 @@ public class ChunkBehaviorTests
     [Test]
     public void Get_IndexEqualCount_ShouldThrowArgumentOutOfRangeException()
     {
-        using var chunk = new Chunk([typeof(CompA), typeof(CompB)]);
+        using var chunk = new Chunk([typeof(CompA), typeof(CompB)], TestAllocator.Shared);
         var types = new[] {typeof(CompA), typeof(CompB)};
         chunk.Add(CreateData(1, 2), types);
 
@@ -360,7 +360,7 @@ public class ChunkBehaviorTests
     [Test]
     public void GetAll_UnmatchedType_ShouldThrowArgumentException()
     {
-        using var chunk = new Chunk([typeof(CompA), typeof(CompB)]);
+        using var chunk = new Chunk([typeof(CompA), typeof(CompB)], TestAllocator.Shared);
         var types = new[] {typeof(CompA), typeof(CompB)};
         chunk.Add(CreateData(1, 2), types);
 
@@ -370,7 +370,7 @@ public class ChunkBehaviorTests
     [Test]
     public void GetAll_ShouldReturnLiveViewWithCountLength()
     {
-        using var chunk = new Chunk([typeof(CompA), typeof(CompB)]);
+        using var chunk = new Chunk([typeof(CompA), typeof(CompB)], TestAllocator.Shared);
         var types = new[] {typeof(CompA), typeof(CompB)};
         var index = chunk.Add(CreateData(7, 8), types);
 
@@ -386,7 +386,7 @@ public class ChunkBehaviorTests
     [Test]
     public void GetAll_OnEmptyChunk_ShouldReturnEmptySnippet()
     {
-        using var chunk = new Chunk([typeof(CompA)]);
+        using var chunk = new Chunk([typeof(CompA)], TestAllocator.Shared);
 
         var snippet = chunk.GetAll<CompA>();
 
@@ -396,7 +396,7 @@ public class ChunkBehaviorTests
     [Test]
     public void GetAll_Entity_OnEmptyChunk_ShouldReturnEmptySnippet()
     {
-        using var chunk = new Chunk([typeof(CompA)]);
+        using var chunk = new Chunk([typeof(CompA)], TestAllocator.Shared);
 
         var snippet = chunk.GetAll<Entity>();
 

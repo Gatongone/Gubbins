@@ -18,7 +18,7 @@ public readonly struct ComponentFilter
     /// <summary> Returns a new filter that includes the specified component types. This method creates a new filter instance with the added component types, allowing for method chaining to build complex filters.</summary>
     public ComponentFilter Include(params Type[] types)
     {
-        return new ComponentFilter(Includes.Concat(types).ToArray(), Excludes);
+        return new ComponentFilter([.. Includes, .. types], Excludes);
     }
 
     /// <summary>Returns a new filter that includes the specified component type. This method creates a new filter instance with the added component type, allowing for method chaining to build complex filters.</summary>
@@ -87,7 +87,7 @@ public readonly struct ComponentFilter
 
     /// <summary>Returns a new filter that excludes the specified component types. This method creates a new filter instance with the added excluded component types, allowing for method chaining to build complex filters.</summary>
     public ComponentFilter Exclude(params Type[] types)
-        => new(Includes, Excludes.Concat(types).ToArray());
+        => new(Includes, [.. Excludes, .. types]);
 
     /// <summary>Returns a new filter that excludes the specified component type. This method creates a new filter instance with the added excluded component types, allowing for method chaining to build complex filters.</summary>
     public ComponentFilter Exclude<TE>() where TE : unmanaged

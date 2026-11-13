@@ -38,10 +38,14 @@ public static class ChunksForeachExtensions
         public void ForEach(ElementForeach action)
         {
             using var entities = chunks.GetComponents<Entity>();
-            var elements = entities.Elements;
-            for (var i = 0; i < elements.Count; i++)
+            var segments = entities.Segments;
+            for (var i = 0; i < segments.Count; i++)
             {
-                action(in elements[i]);
+                var span = segments[i];
+                for (var j = 0; j < span.Length; j++)
+                {
+                    action(in span[j]);
+                }
             }
         }
 
@@ -53,11 +57,16 @@ public static class ChunksForeachExtensions
         {
             using var entities = chunks.GetComponents<Entity>();
             using var components = chunks.GetComponents<T>();
-            var elements0 = entities.Elements;
-            var elements1 = components.Elements;
-            for (var i = 0; i < elements0.Count; i++)
+            var segments0 = entities.Segments;
+            var segments1 = components.Segments;
+            for (var i = 0; i < segments0.Count; i++)
             {
-                action(in elements0[i], ref elements1[i]);
+                var span0 = segments0[i];
+                var span1 = segments1[i];
+                for (var j = 0; j < span0.Length; j++)
+                {
+                    action(in span0[j], ref span1[j]);
+                }
             }
         }
 <#
@@ -66,7 +75,8 @@ public static class ChunksForeachExtensions
         var genericTypes = string.Join(", ", from index in Enumerable.Range(1, i) select $"T{index}");
         var genericConstraints = string.Join(" ", from index in Enumerable.Range(1, i) select $"where T{index} : unmanaged");
         var componentStatements = string.Join(Environment.NewLine, from index in Enumerable.Range(1, i) select $"using var components{index} = chunks.GetComponents<T{index}>();");
-        var componentElements = string.Join(Environment.NewLine, from index in Enumerable.Range(1, i) select $"var elements{index} = components{index}.Elements;");
+        var componentSegments = string.Join(Environment.NewLine, from index in Enumerable.Range(1, i) select $"var segments{index} = components{index}.Segments;");
+        var segmentSpans = string.Join(Environment.NewLine, from index in Enumerable.Range(1, i) select $"var span{index} = segments{index}[i];");
 #>
         /// <summary>
         /// Iterates over each element in chunks in the collection and applies the specified action to it.
@@ -76,11 +86,16 @@ public static class ChunksForeachExtensions
         {
             using var entities = chunks.GetComponents<Entity>();
             <#= componentStatements #>
-            var elements0 = entities.Elements;
-            <#= componentElements #>
-            for (var i = 0; i < elements0.Count; i++)
+            var segments0 = entities.Segments;
+            <#= componentSegments #>
+            for (var i = 0; i < segments0.Count; i++)
             {
-                action(in elements0[i], <#= string.Join(", ", from index in Enumerable.Range(1, i) select $"ref elements{index}[i]") #>);
+                var span0 = segments0[i];
+                <#= segmentSpans #>
+                for (var j = 0; j < span0.Length; j++)
+                {
+                    action(in span0[j], <#= string.Join(", ", from index in Enumerable.Range(1, i) select $"ref span{index}[j]") #>);
+                }
             }
         }
 <#

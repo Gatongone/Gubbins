@@ -8,7 +8,7 @@ public class EntityCommandTests
     [Test]
     public void Insert_ShouldSetEntityVersionAndIncreaseCount()
     {
-        var repository = new EntityRepository();
+        using var repository = new EntityRepository(TestAllocator.Shared);
 
         var entity = repository.Insert(new CompA {Value = 7});
         var record = repository.GetRecord(entity.Index);
@@ -26,7 +26,7 @@ public class EntityCommandTests
     [Test]
     public void Delete_ShouldUpdateMovedEntityRecordIndexInChunk()
     {
-        var repository = new EntityRepository();
+        using var repository = new EntityRepository(TestAllocator.Shared);
 
         var first = repository.Insert(new CompA {Value  = 10});
         var second = repository.Insert(new CompA {Value = 11});
@@ -46,7 +46,7 @@ public class EntityCommandTests
     [Test]
     public void Delete_InvalidIndex_ShouldReturnFalseAndKeepCount()
     {
-        var repository = new EntityRepository();
+        using var repository = new EntityRepository(TestAllocator.Shared);
         repository.Insert(new CompA {Value = 1});
 
         var before = repository.Count;
@@ -64,7 +64,7 @@ public class EntityCommandTests
     [Test]
     public void Delete_SameEntityTwice_ShouldOnlyDeleteOnce()
     {
-        var repository = new EntityRepository();
+        using var repository = new EntityRepository(TestAllocator.Shared);
         var entity = repository.Insert(new CompA {Value = 1});
 
         var firstDelete = repository.Delete(entity.Index);
@@ -82,7 +82,7 @@ public class EntityCommandTests
     [Test]
     public void Insert_AfterDelete_ShouldReuseRemovedIndex()
     {
-        var repository = new EntityRepository();
+        using var repository = new EntityRepository(TestAllocator.Shared);
         var first = repository.Insert(new CompA {Value  = 1});
         var second = repository.Insert(new CompA {Value = 2});
 
@@ -102,7 +102,7 @@ public class EntityCommandTests
     [Test]
     public void Update_WithStaleEntityHandle_ShouldThrowInvalidOperationException()
     {
-        var repository = new EntityRepository();
+        using var repository = new EntityRepository(TestAllocator.Shared);
         var stale = repository.Insert(new CompA {Value = 1});
         repository.Delete(stale.Index);
         repository.Insert(new CompA {Value = 2});
@@ -113,7 +113,7 @@ public class EntityCommandTests
     [Test]
     public void Update_WithCurrentEntityHandle_ShouldUpdateComponent()
     {
-        var repository = new EntityRepository();
+        using var repository = new EntityRepository(TestAllocator.Shared);
         var entity = repository.Insert(new CompA {Value = 1});
 
         repository.Update(entity, new CompA {Value = 9});
@@ -126,7 +126,7 @@ public class EntityCommandTests
     [Test]
     public void Contains_WithStaleAndCurrentEntityHandle_ShouldReflectVersion()
     {
-        var repository = new EntityRepository();
+        using var repository = new EntityRepository(TestAllocator.Shared);
         var stale = repository.Insert(new CompA {Value = 1});
 
         repository.Delete(stale.Index);
@@ -144,7 +144,7 @@ public class EntityCommandTests
     [Test]
     public void Contains_IndexAndEntity_ShouldDifferForStaleHandleAfterReuse()
     {
-        var repository = new EntityRepository();
+        using var repository = new EntityRepository(TestAllocator.Shared);
         var stale = repository.Insert(new CompA {Value = 1});
 
         repository.Delete(stale.Index);
@@ -161,7 +161,7 @@ public class EntityCommandTests
     [Test]
     public void Delete_WithStaleEntityHandle_ShouldReturnFalseAndKeepCount()
     {
-        var repository = new EntityRepository();
+        using var repository = new EntityRepository(TestAllocator.Shared);
         var stale = repository.Insert(new CompA {Value = 1});
 
         repository.Delete(stale.Index);
@@ -181,7 +181,7 @@ public class EntityCommandTests
     [Test]
     public void Delete_WithCurrentEntityHandle_ShouldSucceed()
     {
-        var repository = new EntityRepository();
+        using var repository = new EntityRepository(TestAllocator.Shared);
         var entity = repository.Insert(new CompA {Value = 1});
 
         var deleted = repository.Delete(entity);
@@ -198,7 +198,7 @@ public class EntityCommandTests
     [Test]
     public void Insert_AfterMultipleDeletes_ShouldReuseIndexesInFifoOrder()
     {
-        var repository = new EntityRepository();
+        using var repository = new EntityRepository(TestAllocator.Shared);
         var e0 = repository.Insert(new CompA {Value = 0});
         var e1 = repository.Insert(new CompA {Value = 1});
         var e2 = repository.Insert(new CompA {Value = 2});
@@ -221,7 +221,7 @@ public class EntityCommandTests
     [Test]
     public void DeleteAll_ShouldDecreaseCountOncePerEntity()
     {
-        var repository = new EntityRepository();
+        using var repository = new EntityRepository(TestAllocator.Shared);
 
         var e1 = repository.Insert(new CompA {Value = 1});
         var e2 = repository.Insert(new CompA {Value = 2});
@@ -241,7 +241,7 @@ public class EntityCommandTests
     [Test]
     public void Update_DeletedEntity_ShouldThrowInvalidOperationException()
     {
-        var repository = new EntityRepository();
+        using var repository = new EntityRepository(TestAllocator.Shared);
         var entity = repository.Insert(new CompA {Value = 1});
         repository.Delete(entity.Index);
 
@@ -251,7 +251,7 @@ public class EntityCommandTests
     [Test]
     public void DeleteAll_WithMixedIndexes_ShouldOnlyDeleteExistingValidEntities()
     {
-        var repository = new EntityRepository();
+        using var repository = new EntityRepository(TestAllocator.Shared);
         var e1 = repository.Insert(new CompA {Value = 1});
         var e2 = repository.Insert(new CompA {Value = 2});
         var e3 = repository.Insert(new CompA {Value = 3});
@@ -274,7 +274,7 @@ public class EntityCommandTests
     [Test]
     public void DeleteAll_WithReusedIndex_ShouldDeleteCurrentGenerationOnlyOnce()
     {
-        var repository = new EntityRepository();
+        using var repository = new EntityRepository(TestAllocator.Shared);
         var stale = repository.Insert(new CompA {Value = 1});
         var survivor = repository.Insert(new CompA {Value = 2});
 
@@ -299,7 +299,7 @@ public class EntityCommandTests
     [Test]
     public void DeleteAll_AfterReuse_WhenReinsertedAgain_ShouldKeepVersionMonotonic()
     {
-        var repository = new EntityRepository();
+        using var repository = new EntityRepository(TestAllocator.Shared);
         var first = repository.Insert(new CompA {Value = 1});
 
         repository.Delete(first.Index);
@@ -323,7 +323,7 @@ public class EntityCommandTests
     [Test]
     public void Delete_StaleThenDeleteAll_ByIndex_ShouldOnlyRemoveCurrentGeneration()
     {
-        var repository = new EntityRepository();
+        using var repository = new EntityRepository(TestAllocator.Shared);
         var stale = repository.Insert(new CompA {Value = 1});
         var survivor = repository.Insert(new CompA {Value = 2});
 

@@ -1,6 +1,4 @@
-﻿using Gubbins.Unsafe;
-
-namespace Gubbins.Entities.Tests;
+﻿namespace Gubbins.Entities.Tests;
 
 internal static class EntityBatchTestExtensions
 {

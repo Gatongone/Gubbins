@@ -16,7 +16,7 @@ public class ComponentFilterSemanticsTests
     [Test]
     public void SimpleTest()
     {
-        var repository = new EntityRepository();
+        using var repository = new EntityRepository(TestAllocator.Shared);
         var target = repository.Insert(new CompB {Value = 1});
         var chunks = repository.Search(new ComponentFilter().Include<CompA>());
         var entities = chunks.GetComponents<Entity>();
@@ -26,7 +26,7 @@ public class ComponentFilterSemanticsTests
     [Test]
     public void Include_ChainedCalls_ShouldAccumulateAllRequiredComponents()
     {
-        var repository = new EntityRepository();
+        using var repository = new EntityRepository(TestAllocator.Shared);
 
         var abc = repository.Insert(new CompA {Value = 1}, new CompB {Value = 2}, new CompC {Value = 3});
         repository.Insert(new CompA {Value = 4}, new CompC {Value = 5});
@@ -40,7 +40,7 @@ public class ComponentFilterSemanticsTests
     [Test]
     public void Exclude_ChainedCalls_ShouldAccumulateAllExcludedComponents()
     {
-        var repository = new EntityRepository();
+        using var repository = new EntityRepository(TestAllocator.Shared);
 
         var target = repository.Insert(new CompA(), new CompB(), new CompC());
         repository.Insert(new CompA(), new CompB(), new CompC(), new CompD());
@@ -56,7 +56,7 @@ public class ComponentFilterSemanticsTests
     [Test]
     public void Include_OrderShouldNotChangeMatchedEntities()
     {
-        var repository = new EntityRepository();
+        using var repository = new EntityRepository(TestAllocator.Shared);
 
         var target = repository.Insert(new CompA(), new CompB(), new CompC());
         repository.Insert(new CompA(), new CompB());
@@ -80,7 +80,7 @@ public class ComponentFilterSemanticsTests
     [Test]
     public void Include_DuplicateCalls_ShouldNotChangeMatchedEntities()
     {
-        var repository = new EntityRepository();
+        using var repository = new EntityRepository(TestAllocator.Shared);
 
         var target = repository.Insert(new CompA(), new CompB());
         repository.Insert(new CompA());
@@ -103,7 +103,7 @@ public class ComponentFilterSemanticsTests
     [Test]
     public void Exclude_DuplicateCalls_ShouldNotChangeMatchedEntities()
     {
-        var repository = new EntityRepository();
+        using var repository = new EntityRepository(TestAllocator.Shared);
 
         var target = repository.Insert(new CompA(), new CompB());
         repository.Insert(new CompA(), new CompB(), new CompC());
@@ -126,7 +126,7 @@ public class ComponentFilterSemanticsTests
     [Test]
     public void IncludeExclude_AlternatingChainPermutation_ShouldMatchSameEntities()
     {
-        var repository = new EntityRepository();
+        using var repository = new EntityRepository(TestAllocator.Shared);
 
         var target1 = repository.Insert(new CompA(), new CompB(), new CompC());
         var target2 = repository.Insert(new CompA(), new CompB(), new CompC(), new CompE());
@@ -153,7 +153,7 @@ public class ComponentFilterSemanticsTests
     [Test]
     public void IncludeExclude_AlternatingChainWithDuplicateExclude_ShouldMatchSingleExclude()
     {
-        var repository = new EntityRepository();
+        using var repository = new EntityRepository(TestAllocator.Shared);
 
         var target = repository.Insert(new CompA(), new CompB(), new CompC());
         repository.Insert(new CompA(), new CompB(), new CompC(), new CompD());
@@ -176,7 +176,7 @@ public class ComponentFilterSemanticsTests
     [Test]
     public void IncludeExclude_EquivalentContexts_ShouldPreserveMatchDeterminism()
     {
-        var repository = new EntityRepository();
+        using var repository = new EntityRepository(TestAllocator.Shared);
 
         var target = repository.Insert(new CompA(), new CompB(), new CompC());
         repository.Insert(new CompA(), new CompB(), new CompD());

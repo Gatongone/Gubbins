@@ -79,10 +79,14 @@ public static class ChunksForeachExtensions
         public void ForEach(ElementForeach action)
         {
             using var entities = chunks.GetComponents<Entity>();
-            var elements = entities.Elements;
-            for (var i = 0; i < elements.Count; i++)
+            var segments = entities.Segments;
+            for (var i = 0; i < segments.Count; i++)
             {
-                action(in elements[i]);
+                var span = segments[i];
+                for (var j = 0; j < span.Length; j++)
+                {
+                    action(in span[j]);
+                }
             }
         }
 
@@ -94,11 +98,16 @@ public static class ChunksForeachExtensions
         {
             using var entities = chunks.GetComponents<Entity>();
             using var components = chunks.GetComponents<T>();
-            var elements0 = entities.Elements;
-            var elements1 = components.Elements;
-            for (var i = 0; i < elements0.Count; i++)
+            var segments0 = entities.Segments;
+            var segments1 = components.Segments;
+            for (var i = 0; i < segments0.Count; i++)
             {
-                action(in elements0[i], ref elements1[i]);
+                var span0 = segments0[i];
+                var span1 = segments1[i];
+                for (var j = 0; j < span0.Length; j++)
+                {
+                    action(in span0[j], ref span1[j]);
+                }
             }
         }
 
@@ -111,12 +120,18 @@ public static class ChunksForeachExtensions
             using var entities = chunks.GetComponents<Entity>();
             using var components1 = chunks.GetComponents<T1>();
             using var components2 = chunks.GetComponents<T2>();
-            var elements0 = entities.Elements;
-            var elements1 = components1.Elements;
-            var elements2 = components2.Elements;
-            for (var i = 0; i < elements0.Count; i++)
+            var segments0 = entities.Segments;
+            var segments1 = components1.Segments;
+            var segments2 = components2.Segments;
+            for (var i = 0; i < segments0.Count; i++)
             {
-                action(in elements0[i], ref elements1[i], ref elements2[i]);
+                var span0 = segments0[i];
+                var span1 = segments1[i];
+                var span2 = segments2[i];
+                for (var j = 0; j < span0.Length; j++)
+                {
+                    action(in span0[j], ref span1[j], ref span2[j]);
+                }
             }
         }
 
@@ -130,13 +145,20 @@ public static class ChunksForeachExtensions
             using var components1 = chunks.GetComponents<T1>();
             using var components2 = chunks.GetComponents<T2>();
             using var components3 = chunks.GetComponents<T3>();
-            var elements0 = entities.Elements;
-            var elements1 = components1.Elements;
-            var elements2 = components2.Elements;
-            var elements3 = components3.Elements;
-            for (var i = 0; i < elements0.Count; i++)
+            var segments0 = entities.Segments;
+            var segments1 = components1.Segments;
+            var segments2 = components2.Segments;
+            var segments3 = components3.Segments;
+            for (var i = 0; i < segments0.Count; i++)
             {
-                action(in elements0[i], ref elements1[i], ref elements2[i], ref elements3[i]);
+                var span0 = segments0[i];
+                var span1 = segments1[i];
+                var span2 = segments2[i];
+                var span3 = segments3[i];
+                for (var j = 0; j < span0.Length; j++)
+                {
+                    action(in span0[j], ref span1[j], ref span2[j], ref span3[j]);
+                }
             }
         }
 
@@ -151,14 +173,22 @@ public static class ChunksForeachExtensions
             using var components2 = chunks.GetComponents<T2>();
             using var components3 = chunks.GetComponents<T3>();
             using var components4 = chunks.GetComponents<T4>();
-            var elements0 = entities.Elements;
-            var elements1 = components1.Elements;
-            var elements2 = components2.Elements;
-            var elements3 = components3.Elements;
-            var elements4 = components4.Elements;
-            for (var i = 0; i < elements0.Count; i++)
+            var segments0 = entities.Segments;
+            var segments1 = components1.Segments;
+            var segments2 = components2.Segments;
+            var segments3 = components3.Segments;
+            var segments4 = components4.Segments;
+            for (var i = 0; i < segments0.Count; i++)
             {
-                action(in elements0[i], ref elements1[i], ref elements2[i], ref elements3[i], ref elements4[i]);
+                var span0 = segments0[i];
+                var span1 = segments1[i];
+                var span2 = segments2[i];
+                var span3 = segments3[i];
+                var span4 = segments4[i];
+                for (var j = 0; j < span0.Length; j++)
+                {
+                    action(in span0[j], ref span1[j], ref span2[j], ref span3[j], ref span4[j]);
+                }
             }
         }
 
@@ -174,15 +204,24 @@ public static class ChunksForeachExtensions
             using var components3 = chunks.GetComponents<T3>();
             using var components4 = chunks.GetComponents<T4>();
             using var components5 = chunks.GetComponents<T5>();
-            var elements0 = entities.Elements;
-            var elements1 = components1.Elements;
-            var elements2 = components2.Elements;
-            var elements3 = components3.Elements;
-            var elements4 = components4.Elements;
-            var elements5 = components5.Elements;
-            for (var i = 0; i < elements0.Count; i++)
+            var segments0 = entities.Segments;
+            var segments1 = components1.Segments;
+            var segments2 = components2.Segments;
+            var segments3 = components3.Segments;
+            var segments4 = components4.Segments;
+            var segments5 = components5.Segments;
+            for (var i = 0; i < segments0.Count; i++)
             {
-                action(in elements0[i], ref elements1[i], ref elements2[i], ref elements3[i], ref elements4[i], ref elements5[i]);
+                var span0 = segments0[i];
+                var span1 = segments1[i];
+                var span2 = segments2[i];
+                var span3 = segments3[i];
+                var span4 = segments4[i];
+                var span5 = segments5[i];
+                for (var j = 0; j < span0.Length; j++)
+                {
+                    action(in span0[j], ref span1[j], ref span2[j], ref span3[j], ref span4[j], ref span5[j]);
+                }
             }
         }
 
@@ -199,16 +238,26 @@ public static class ChunksForeachExtensions
             using var components4 = chunks.GetComponents<T4>();
             using var components5 = chunks.GetComponents<T5>();
             using var components6 = chunks.GetComponents<T6>();
-            var elements0 = entities.Elements;
-            var elements1 = components1.Elements;
-            var elements2 = components2.Elements;
-            var elements3 = components3.Elements;
-            var elements4 = components4.Elements;
-            var elements5 = components5.Elements;
-            var elements6 = components6.Elements;
-            for (var i = 0; i < elements0.Count; i++)
+            var segments0 = entities.Segments;
+            var segments1 = components1.Segments;
+            var segments2 = components2.Segments;
+            var segments3 = components3.Segments;
+            var segments4 = components4.Segments;
+            var segments5 = components5.Segments;
+            var segments6 = components6.Segments;
+            for (var i = 0; i < segments0.Count; i++)
             {
-                action(in elements0[i], ref elements1[i], ref elements2[i], ref elements3[i], ref elements4[i], ref elements5[i], ref elements6[i]);
+                var span0 = segments0[i];
+                var span1 = segments1[i];
+                var span2 = segments2[i];
+                var span3 = segments3[i];
+                var span4 = segments4[i];
+                var span5 = segments5[i];
+                var span6 = segments6[i];
+                for (var j = 0; j < span0.Length; j++)
+                {
+                    action(in span0[j], ref span1[j], ref span2[j], ref span3[j], ref span4[j], ref span5[j], ref span6[j]);
+                }
             }
         }
 
@@ -226,17 +275,28 @@ public static class ChunksForeachExtensions
             using var components5 = chunks.GetComponents<T5>();
             using var components6 = chunks.GetComponents<T6>();
             using var components7 = chunks.GetComponents<T7>();
-            var elements0 = entities.Elements;
-            var elements1 = components1.Elements;
-            var elements2 = components2.Elements;
-            var elements3 = components3.Elements;
-            var elements4 = components4.Elements;
-            var elements5 = components5.Elements;
-            var elements6 = components6.Elements;
-            var elements7 = components7.Elements;
-            for (var i = 0; i < elements0.Count; i++)
+            var segments0 = entities.Segments;
+            var segments1 = components1.Segments;
+            var segments2 = components2.Segments;
+            var segments3 = components3.Segments;
+            var segments4 = components4.Segments;
+            var segments5 = components5.Segments;
+            var segments6 = components6.Segments;
+            var segments7 = components7.Segments;
+            for (var i = 0; i < segments0.Count; i++)
             {
-                action(in elements0[i], ref elements1[i], ref elements2[i], ref elements3[i], ref elements4[i], ref elements5[i], ref elements6[i], ref elements7[i]);
+                var span0 = segments0[i];
+                var span1 = segments1[i];
+                var span2 = segments2[i];
+                var span3 = segments3[i];
+                var span4 = segments4[i];
+                var span5 = segments5[i];
+                var span6 = segments6[i];
+                var span7 = segments7[i];
+                for (var j = 0; j < span0.Length; j++)
+                {
+                    action(in span0[j], ref span1[j], ref span2[j], ref span3[j], ref span4[j], ref span5[j], ref span6[j], ref span7[j]);
+                }
             }
         }
 
@@ -255,18 +315,30 @@ public static class ChunksForeachExtensions
             using var components6 = chunks.GetComponents<T6>();
             using var components7 = chunks.GetComponents<T7>();
             using var components8 = chunks.GetComponents<T8>();
-            var elements0 = entities.Elements;
-            var elements1 = components1.Elements;
-            var elements2 = components2.Elements;
-            var elements3 = components3.Elements;
-            var elements4 = components4.Elements;
-            var elements5 = components5.Elements;
-            var elements6 = components6.Elements;
-            var elements7 = components7.Elements;
-            var elements8 = components8.Elements;
-            for (var i = 0; i < elements0.Count; i++)
+            var segments0 = entities.Segments;
+            var segments1 = components1.Segments;
+            var segments2 = components2.Segments;
+            var segments3 = components3.Segments;
+            var segments4 = components4.Segments;
+            var segments5 = components5.Segments;
+            var segments6 = components6.Segments;
+            var segments7 = components7.Segments;
+            var segments8 = components8.Segments;
+            for (var i = 0; i < segments0.Count; i++)
             {
-                action(in elements0[i], ref elements1[i], ref elements2[i], ref elements3[i], ref elements4[i], ref elements5[i], ref elements6[i], ref elements7[i], ref elements8[i]);
+                var span0 = segments0[i];
+                var span1 = segments1[i];
+                var span2 = segments2[i];
+                var span3 = segments3[i];
+                var span4 = segments4[i];
+                var span5 = segments5[i];
+                var span6 = segments6[i];
+                var span7 = segments7[i];
+                var span8 = segments8[i];
+                for (var j = 0; j < span0.Length; j++)
+                {
+                    action(in span0[j], ref span1[j], ref span2[j], ref span3[j], ref span4[j], ref span5[j], ref span6[j], ref span7[j], ref span8[j]);
+                }
             }
         }
 
@@ -286,19 +358,32 @@ public static class ChunksForeachExtensions
             using var components7 = chunks.GetComponents<T7>();
             using var components8 = chunks.GetComponents<T8>();
             using var components9 = chunks.GetComponents<T9>();
-            var elements0 = entities.Elements;
-            var elements1 = components1.Elements;
-            var elements2 = components2.Elements;
-            var elements3 = components3.Elements;
-            var elements4 = components4.Elements;
-            var elements5 = components5.Elements;
-            var elements6 = components6.Elements;
-            var elements7 = components7.Elements;
-            var elements8 = components8.Elements;
-            var elements9 = components9.Elements;
-            for (var i = 0; i < elements0.Count; i++)
+            var segments0 = entities.Segments;
+            var segments1 = components1.Segments;
+            var segments2 = components2.Segments;
+            var segments3 = components3.Segments;
+            var segments4 = components4.Segments;
+            var segments5 = components5.Segments;
+            var segments6 = components6.Segments;
+            var segments7 = components7.Segments;
+            var segments8 = components8.Segments;
+            var segments9 = components9.Segments;
+            for (var i = 0; i < segments0.Count; i++)
             {
-                action(in elements0[i], ref elements1[i], ref elements2[i], ref elements3[i], ref elements4[i], ref elements5[i], ref elements6[i], ref elements7[i], ref elements8[i], ref elements9[i]);
+                var span0 = segments0[i];
+                var span1 = segments1[i];
+                var span2 = segments2[i];
+                var span3 = segments3[i];
+                var span4 = segments4[i];
+                var span5 = segments5[i];
+                var span6 = segments6[i];
+                var span7 = segments7[i];
+                var span8 = segments8[i];
+                var span9 = segments9[i];
+                for (var j = 0; j < span0.Length; j++)
+                {
+                    action(in span0[j], ref span1[j], ref span2[j], ref span3[j], ref span4[j], ref span5[j], ref span6[j], ref span7[j], ref span8[j], ref span9[j]);
+                }
             }
         }
 
@@ -319,20 +404,34 @@ public static class ChunksForeachExtensions
             using var components8 = chunks.GetComponents<T8>();
             using var components9 = chunks.GetComponents<T9>();
             using var components10 = chunks.GetComponents<T10>();
-            var elements0 = entities.Elements;
-            var elements1 = components1.Elements;
-            var elements2 = components2.Elements;
-            var elements3 = components3.Elements;
-            var elements4 = components4.Elements;
-            var elements5 = components5.Elements;
-            var elements6 = components6.Elements;
-            var elements7 = components7.Elements;
-            var elements8 = components8.Elements;
-            var elements9 = components9.Elements;
-            var elements10 = components10.Elements;
-            for (var i = 0; i < elements0.Count; i++)
+            var segments0 = entities.Segments;
+            var segments1 = components1.Segments;
+            var segments2 = components2.Segments;
+            var segments3 = components3.Segments;
+            var segments4 = components4.Segments;
+            var segments5 = components5.Segments;
+            var segments6 = components6.Segments;
+            var segments7 = components7.Segments;
+            var segments8 = components8.Segments;
+            var segments9 = components9.Segments;
+            var segments10 = components10.Segments;
+            for (var i = 0; i < segments0.Count; i++)
             {
-                action(in elements0[i], ref elements1[i], ref elements2[i], ref elements3[i], ref elements4[i], ref elements5[i], ref elements6[i], ref elements7[i], ref elements8[i], ref elements9[i], ref elements10[i]);
+                var span0 = segments0[i];
+                var span1 = segments1[i];
+                var span2 = segments2[i];
+                var span3 = segments3[i];
+                var span4 = segments4[i];
+                var span5 = segments5[i];
+                var span6 = segments6[i];
+                var span7 = segments7[i];
+                var span8 = segments8[i];
+                var span9 = segments9[i];
+                var span10 = segments10[i];
+                for (var j = 0; j < span0.Length; j++)
+                {
+                    action(in span0[j], ref span1[j], ref span2[j], ref span3[j], ref span4[j], ref span5[j], ref span6[j], ref span7[j], ref span8[j], ref span9[j], ref span10[j]);
+                }
             }
         }
 
@@ -354,21 +453,36 @@ public static class ChunksForeachExtensions
             using var components9 = chunks.GetComponents<T9>();
             using var components10 = chunks.GetComponents<T10>();
             using var components11 = chunks.GetComponents<T11>();
-            var elements0 = entities.Elements;
-            var elements1 = components1.Elements;
-            var elements2 = components2.Elements;
-            var elements3 = components3.Elements;
-            var elements4 = components4.Elements;
-            var elements5 = components5.Elements;
-            var elements6 = components6.Elements;
-            var elements7 = components7.Elements;
-            var elements8 = components8.Elements;
-            var elements9 = components9.Elements;
-            var elements10 = components10.Elements;
-            var elements11 = components11.Elements;
-            for (var i = 0; i < elements0.Count; i++)
+            var segments0 = entities.Segments;
+            var segments1 = components1.Segments;
+            var segments2 = components2.Segments;
+            var segments3 = components3.Segments;
+            var segments4 = components4.Segments;
+            var segments5 = components5.Segments;
+            var segments6 = components6.Segments;
+            var segments7 = components7.Segments;
+            var segments8 = components8.Segments;
+            var segments9 = components9.Segments;
+            var segments10 = components10.Segments;
+            var segments11 = components11.Segments;
+            for (var i = 0; i < segments0.Count; i++)
             {
-                action(in elements0[i], ref elements1[i], ref elements2[i], ref elements3[i], ref elements4[i], ref elements5[i], ref elements6[i], ref elements7[i], ref elements8[i], ref elements9[i], ref elements10[i], ref elements11[i]);
+                var span0 = segments0[i];
+                var span1 = segments1[i];
+                var span2 = segments2[i];
+                var span3 = segments3[i];
+                var span4 = segments4[i];
+                var span5 = segments5[i];
+                var span6 = segments6[i];
+                var span7 = segments7[i];
+                var span8 = segments8[i];
+                var span9 = segments9[i];
+                var span10 = segments10[i];
+                var span11 = segments11[i];
+                for (var j = 0; j < span0.Length; j++)
+                {
+                    action(in span0[j], ref span1[j], ref span2[j], ref span3[j], ref span4[j], ref span5[j], ref span6[j], ref span7[j], ref span8[j], ref span9[j], ref span10[j], ref span11[j]);
+                }
             }
         }
 
@@ -391,22 +505,38 @@ public static class ChunksForeachExtensions
             using var components10 = chunks.GetComponents<T10>();
             using var components11 = chunks.GetComponents<T11>();
             using var components12 = chunks.GetComponents<T12>();
-            var elements0 = entities.Elements;
-            var elements1 = components1.Elements;
-            var elements2 = components2.Elements;
-            var elements3 = components3.Elements;
-            var elements4 = components4.Elements;
-            var elements5 = components5.Elements;
-            var elements6 = components6.Elements;
-            var elements7 = components7.Elements;
-            var elements8 = components8.Elements;
-            var elements9 = components9.Elements;
-            var elements10 = components10.Elements;
-            var elements11 = components11.Elements;
-            var elements12 = components12.Elements;
-            for (var i = 0; i < elements0.Count; i++)
+            var segments0 = entities.Segments;
+            var segments1 = components1.Segments;
+            var segments2 = components2.Segments;
+            var segments3 = components3.Segments;
+            var segments4 = components4.Segments;
+            var segments5 = components5.Segments;
+            var segments6 = components6.Segments;
+            var segments7 = components7.Segments;
+            var segments8 = components8.Segments;
+            var segments9 = components9.Segments;
+            var segments10 = components10.Segments;
+            var segments11 = components11.Segments;
+            var segments12 = components12.Segments;
+            for (var i = 0; i < segments0.Count; i++)
             {
-                action(in elements0[i], ref elements1[i], ref elements2[i], ref elements3[i], ref elements4[i], ref elements5[i], ref elements6[i], ref elements7[i], ref elements8[i], ref elements9[i], ref elements10[i], ref elements11[i], ref elements12[i]);
+                var span0 = segments0[i];
+                var span1 = segments1[i];
+                var span2 = segments2[i];
+                var span3 = segments3[i];
+                var span4 = segments4[i];
+                var span5 = segments5[i];
+                var span6 = segments6[i];
+                var span7 = segments7[i];
+                var span8 = segments8[i];
+                var span9 = segments9[i];
+                var span10 = segments10[i];
+                var span11 = segments11[i];
+                var span12 = segments12[i];
+                for (var j = 0; j < span0.Length; j++)
+                {
+                    action(in span0[j], ref span1[j], ref span2[j], ref span3[j], ref span4[j], ref span5[j], ref span6[j], ref span7[j], ref span8[j], ref span9[j], ref span10[j], ref span11[j], ref span12[j]);
+                }
             }
         }
 
@@ -430,23 +560,40 @@ public static class ChunksForeachExtensions
             using var components11 = chunks.GetComponents<T11>();
             using var components12 = chunks.GetComponents<T12>();
             using var components13 = chunks.GetComponents<T13>();
-            var elements0 = entities.Elements;
-            var elements1 = components1.Elements;
-            var elements2 = components2.Elements;
-            var elements3 = components3.Elements;
-            var elements4 = components4.Elements;
-            var elements5 = components5.Elements;
-            var elements6 = components6.Elements;
-            var elements7 = components7.Elements;
-            var elements8 = components8.Elements;
-            var elements9 = components9.Elements;
-            var elements10 = components10.Elements;
-            var elements11 = components11.Elements;
-            var elements12 = components12.Elements;
-            var elements13 = components13.Elements;
-            for (var i = 0; i < elements0.Count; i++)
+            var segments0 = entities.Segments;
+            var segments1 = components1.Segments;
+            var segments2 = components2.Segments;
+            var segments3 = components3.Segments;
+            var segments4 = components4.Segments;
+            var segments5 = components5.Segments;
+            var segments6 = components6.Segments;
+            var segments7 = components7.Segments;
+            var segments8 = components8.Segments;
+            var segments9 = components9.Segments;
+            var segments10 = components10.Segments;
+            var segments11 = components11.Segments;
+            var segments12 = components12.Segments;
+            var segments13 = components13.Segments;
+            for (var i = 0; i < segments0.Count; i++)
             {
-                action(in elements0[i], ref elements1[i], ref elements2[i], ref elements3[i], ref elements4[i], ref elements5[i], ref elements6[i], ref elements7[i], ref elements8[i], ref elements9[i], ref elements10[i], ref elements11[i], ref elements12[i], ref elements13[i]);
+                var span0 = segments0[i];
+                var span1 = segments1[i];
+                var span2 = segments2[i];
+                var span3 = segments3[i];
+                var span4 = segments4[i];
+                var span5 = segments5[i];
+                var span6 = segments6[i];
+                var span7 = segments7[i];
+                var span8 = segments8[i];
+                var span9 = segments9[i];
+                var span10 = segments10[i];
+                var span11 = segments11[i];
+                var span12 = segments12[i];
+                var span13 = segments13[i];
+                for (var j = 0; j < span0.Length; j++)
+                {
+                    action(in span0[j], ref span1[j], ref span2[j], ref span3[j], ref span4[j], ref span5[j], ref span6[j], ref span7[j], ref span8[j], ref span9[j], ref span10[j], ref span11[j], ref span12[j], ref span13[j]);
+                }
             }
         }
 
@@ -471,24 +618,42 @@ public static class ChunksForeachExtensions
             using var components12 = chunks.GetComponents<T12>();
             using var components13 = chunks.GetComponents<T13>();
             using var components14 = chunks.GetComponents<T14>();
-            var elements0 = entities.Elements;
-            var elements1 = components1.Elements;
-            var elements2 = components2.Elements;
-            var elements3 = components3.Elements;
-            var elements4 = components4.Elements;
-            var elements5 = components5.Elements;
-            var elements6 = components6.Elements;
-            var elements7 = components7.Elements;
-            var elements8 = components8.Elements;
-            var elements9 = components9.Elements;
-            var elements10 = components10.Elements;
-            var elements11 = components11.Elements;
-            var elements12 = components12.Elements;
-            var elements13 = components13.Elements;
-            var elements14 = components14.Elements;
-            for (var i = 0; i < elements0.Count; i++)
+            var segments0 = entities.Segments;
+            var segments1 = components1.Segments;
+            var segments2 = components2.Segments;
+            var segments3 = components3.Segments;
+            var segments4 = components4.Segments;
+            var segments5 = components5.Segments;
+            var segments6 = components6.Segments;
+            var segments7 = components7.Segments;
+            var segments8 = components8.Segments;
+            var segments9 = components9.Segments;
+            var segments10 = components10.Segments;
+            var segments11 = components11.Segments;
+            var segments12 = components12.Segments;
+            var segments13 = components13.Segments;
+            var segments14 = components14.Segments;
+            for (var i = 0; i < segments0.Count; i++)
             {
-                action(in elements0[i], ref elements1[i], ref elements2[i], ref elements3[i], ref elements4[i], ref elements5[i], ref elements6[i], ref elements7[i], ref elements8[i], ref elements9[i], ref elements10[i], ref elements11[i], ref elements12[i], ref elements13[i], ref elements14[i]);
+                var span0 = segments0[i];
+                var span1 = segments1[i];
+                var span2 = segments2[i];
+                var span3 = segments3[i];
+                var span4 = segments4[i];
+                var span5 = segments5[i];
+                var span6 = segments6[i];
+                var span7 = segments7[i];
+                var span8 = segments8[i];
+                var span9 = segments9[i];
+                var span10 = segments10[i];
+                var span11 = segments11[i];
+                var span12 = segments12[i];
+                var span13 = segments13[i];
+                var span14 = segments14[i];
+                for (var j = 0; j < span0.Length; j++)
+                {
+                    action(in span0[j], ref span1[j], ref span2[j], ref span3[j], ref span4[j], ref span5[j], ref span6[j], ref span7[j], ref span8[j], ref span9[j], ref span10[j], ref span11[j], ref span12[j], ref span13[j], ref span14[j]);
+                }
             }
         }
 
@@ -514,25 +679,44 @@ public static class ChunksForeachExtensions
             using var components13 = chunks.GetComponents<T13>();
             using var components14 = chunks.GetComponents<T14>();
             using var components15 = chunks.GetComponents<T15>();
-            var elements0 = entities.Elements;
-            var elements1 = components1.Elements;
-            var elements2 = components2.Elements;
-            var elements3 = components3.Elements;
-            var elements4 = components4.Elements;
-            var elements5 = components5.Elements;
-            var elements6 = components6.Elements;
-            var elements7 = components7.Elements;
-            var elements8 = components8.Elements;
-            var elements9 = components9.Elements;
-            var elements10 = components10.Elements;
-            var elements11 = components11.Elements;
-            var elements12 = components12.Elements;
-            var elements13 = components13.Elements;
-            var elements14 = components14.Elements;
-            var elements15 = components15.Elements;
-            for (var i = 0; i < elements0.Count; i++)
+            var segments0 = entities.Segments;
+            var segments1 = components1.Segments;
+            var segments2 = components2.Segments;
+            var segments3 = components3.Segments;
+            var segments4 = components4.Segments;
+            var segments5 = components5.Segments;
+            var segments6 = components6.Segments;
+            var segments7 = components7.Segments;
+            var segments8 = components8.Segments;
+            var segments9 = components9.Segments;
+            var segments10 = components10.Segments;
+            var segments11 = components11.Segments;
+            var segments12 = components12.Segments;
+            var segments13 = components13.Segments;
+            var segments14 = components14.Segments;
+            var segments15 = components15.Segments;
+            for (var i = 0; i < segments0.Count; i++)
             {
-                action(in elements0[i], ref elements1[i], ref elements2[i], ref elements3[i], ref elements4[i], ref elements5[i], ref elements6[i], ref elements7[i], ref elements8[i], ref elements9[i], ref elements10[i], ref elements11[i], ref elements12[i], ref elements13[i], ref elements14[i], ref elements15[i]);
+                var span0 = segments0[i];
+                var span1 = segments1[i];
+                var span2 = segments2[i];
+                var span3 = segments3[i];
+                var span4 = segments4[i];
+                var span5 = segments5[i];
+                var span6 = segments6[i];
+                var span7 = segments7[i];
+                var span8 = segments8[i];
+                var span9 = segments9[i];
+                var span10 = segments10[i];
+                var span11 = segments11[i];
+                var span12 = segments12[i];
+                var span13 = segments13[i];
+                var span14 = segments14[i];
+                var span15 = segments15[i];
+                for (var j = 0; j < span0.Length; j++)
+                {
+                    action(in span0[j], ref span1[j], ref span2[j], ref span3[j], ref span4[j], ref span5[j], ref span6[j], ref span7[j], ref span8[j], ref span9[j], ref span10[j], ref span11[j], ref span12[j], ref span13[j], ref span14[j], ref span15[j]);
+                }
             }
         }
 
@@ -559,26 +743,46 @@ public static class ChunksForeachExtensions
             using var components14 = chunks.GetComponents<T14>();
             using var components15 = chunks.GetComponents<T15>();
             using var components16 = chunks.GetComponents<T16>();
-            var elements0 = entities.Elements;
-            var elements1 = components1.Elements;
-            var elements2 = components2.Elements;
-            var elements3 = components3.Elements;
-            var elements4 = components4.Elements;
-            var elements5 = components5.Elements;
-            var elements6 = components6.Elements;
-            var elements7 = components7.Elements;
-            var elements8 = components8.Elements;
-            var elements9 = components9.Elements;
-            var elements10 = components10.Elements;
-            var elements11 = components11.Elements;
-            var elements12 = components12.Elements;
-            var elements13 = components13.Elements;
-            var elements14 = components14.Elements;
-            var elements15 = components15.Elements;
-            var elements16 = components16.Elements;
-            for (var i = 0; i < elements0.Count; i++)
+            var segments0 = entities.Segments;
+            var segments1 = components1.Segments;
+            var segments2 = components2.Segments;
+            var segments3 = components3.Segments;
+            var segments4 = components4.Segments;
+            var segments5 = components5.Segments;
+            var segments6 = components6.Segments;
+            var segments7 = components7.Segments;
+            var segments8 = components8.Segments;
+            var segments9 = components9.Segments;
+            var segments10 = components10.Segments;
+            var segments11 = components11.Segments;
+            var segments12 = components12.Segments;
+            var segments13 = components13.Segments;
+            var segments14 = components14.Segments;
+            var segments15 = components15.Segments;
+            var segments16 = components16.Segments;
+            for (var i = 0; i < segments0.Count; i++)
             {
-                action(in elements0[i], ref elements1[i], ref elements2[i], ref elements3[i], ref elements4[i], ref elements5[i], ref elements6[i], ref elements7[i], ref elements8[i], ref elements9[i], ref elements10[i], ref elements11[i], ref elements12[i], ref elements13[i], ref elements14[i], ref elements15[i], ref elements16[i]);
+                var span0 = segments0[i];
+                var span1 = segments1[i];
+                var span2 = segments2[i];
+                var span3 = segments3[i];
+                var span4 = segments4[i];
+                var span5 = segments5[i];
+                var span6 = segments6[i];
+                var span7 = segments7[i];
+                var span8 = segments8[i];
+                var span9 = segments9[i];
+                var span10 = segments10[i];
+                var span11 = segments11[i];
+                var span12 = segments12[i];
+                var span13 = segments13[i];
+                var span14 = segments14[i];
+                var span15 = segments15[i];
+                var span16 = segments16[i];
+                for (var j = 0; j < span0.Length; j++)
+                {
+                    action(in span0[j], ref span1[j], ref span2[j], ref span3[j], ref span4[j], ref span5[j], ref span6[j], ref span7[j], ref span8[j], ref span9[j], ref span10[j], ref span11[j], ref span12[j], ref span13[j], ref span14[j], ref span15[j], ref span16[j]);
+                }
             }
         }
 

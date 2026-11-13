@@ -3,7 +3,6 @@
 
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using Gubbins.Spawner;
 using Gubbins.Unsafe;
 
 namespace Gubbins.Entities;
@@ -34,7 +33,7 @@ public static class EntityCommandExtensions
         {
 <#= getSizes #>
 <#= getRanges #>
-            var types = FixedArrayPool<Type>.Instance.Rent(<#= i #>);
+            var types = new Type[<#= i #>];
 
 <#= setTypes #>
 
@@ -43,7 +42,6 @@ public static class EntityCommandExtensions
 <#= setData #>
 
             var result = command.Insert(data, types);
-            FixedArrayPool<Type>.Instance.Return(types);
             return result;
         }
 <#

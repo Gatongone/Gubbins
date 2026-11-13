@@ -20,11 +20,11 @@ public class EntityQueryTests
     [Test]
     public void Query_WithSingleGenericContext_ShouldMatchAllArchetypesContainingComponent()
     {
-        var repository = new EntityRepository();
+        using var repository = new EntityRepository(TestAllocator.Shared);
 
         var onlyA1 = repository.Insert(new CompA {Value = 1});
         var onlyA2 = repository.Insert(new CompA {Value = 2});
-        var withAB = repository.Insert(new CompA {Value = 3}, new CompB {Value = 30});
+        var withAb = repository.Insert(new CompA {Value = 3}, new CompB {Value = 30});
         var filter = new ComponentFilter().Include<CompA>();
         using var chunks = repository.Search(filter);
         using var entities = chunks.GetComponents<Entity>();
@@ -34,14 +34,14 @@ public class EntityQueryTests
         {
             Assert.That(entities.Elements.Count, Is.EqualTo(3));
             Assert.That(values.Elements.Count, Is.EqualTo(3));
-            CollectionAssert.AreEquivalent(new[] {onlyA1.Index, onlyA2.Index, withAB.Index}, entities.Batch.GetIndexes());
+            CollectionAssert.AreEquivalent(new[] {onlyA1.Index, onlyA2.Index, withAb.Index}, entities.Batch.GetIndexes());
         });
     }
 
     [Test]
     public void Query_WithIncludeExclude_ShouldFilterExpectedArchetype()
     {
-        var repository = new EntityRepository();
+        using var repository = new EntityRepository(TestAllocator.Shared);
 
         var target = repository.Insert(new CompA {Value = 1}, new CompB {Value = 10});
         repository.Insert(new CompA {Value = 2}, new CompB {Value = 20}, new CompC {Value = 200});
@@ -64,7 +64,7 @@ public class EntityQueryTests
     [Test]
     public void Query_ShouldAggregateAllChunksForSameArchetype()
     {
-        var repository = new EntityRepository();
+        using var repository = new EntityRepository(TestAllocator.Shared);
         var insertedIndexes = new List<int>();
 
         for (var i = 0; i < 10; i++)
@@ -90,7 +90,7 @@ public class EntityQueryTests
     [Test]
     public void Get_InvalidIndex_ShouldThrow()
     {
-        var repository = new EntityRepository();
+        using var repository = new EntityRepository(TestAllocator.Shared);
         repository.Insert(new CompA {Value = 1});
 
         Assert.Throws<IndexOutOfRangeException>(() => _ = repository.GetRecord(-1));

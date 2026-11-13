@@ -1,6 +1,6 @@
 ﻿using System.Runtime.CompilerServices;
 using Gubbins.Collections;
-using Gubbins.Spawner;
+using Gubbins.Unsafe;
 
 namespace Gubbins.Entities;
 
@@ -8,58 +8,58 @@ namespace Gubbins.Entities;
 /// Provides an in-memory implementation of an entity repository that manages entities using an archetype-based storage system.
 /// Elements are organized by their component types into archetypes, with efficient storage and retrieval mechanisms.
 /// </summary>
-public class EntityRepository : IEntityQuery, IEntityCommand
+/// <remarks>
+/// The repository allocates all chunk storage from the <see cref="Allocator"/> passed to its constructor, leaving the
+/// allocation policy (native heap, arena, virtual memory, …) to the business layer.
+/// </remarks>
+public class EntityRepository : IEntityQuery, IEntityCommand, IDisposable
 {
     private const uint INITIAL_ENTITY_VERSION = 1;
 
+    private readonly Allocator                 m_Allocator;
+    private readonly int                       m_ChunkSize;
     private readonly List<Archetype>           m_Archetypes     = [];
     private readonly ExpandArray<EntityRecord> m_Entities       = [];
     private readonly Queue<int>                m_RemovedIndexes = new();
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Initializes a repository whose chunks use the default buffer size.
+    /// </summary>
+    /// <param name="allocator">The allocator used for chunk storage.</param>
+    public EntityRepository(Allocator allocator) : this(allocator, Chunk.DefaultChunkSize) { }
+
+    /// <summary>
+    /// Initializes a repository whose chunks use the specified buffer size.
+    /// </summary>
+    /// <param name="allocator">The allocator used for chunk storage.</param>
+    /// <param name="chunkSizeBytes">The size, in bytes, of each chunk buffer.</param>
+    public EntityRepository(Allocator allocator, int chunkSizeBytes)
+    {
+        if (chunkSizeBytes <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(chunkSizeBytes));
+        }
+
+        m_Allocator = allocator;
+        m_ChunkSize = chunkSizeBytes;
+    }
+
+    /// <inheritdoc/>
     public int Count { get; private set; }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public bool Contains(int index) => index >= 0 && m_Entities.Count > index && m_Entities[index].IndexInChunk >= 0;
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public bool Contains(Entity entity) => Contains(entity.Index) && m_Entities[entity.Index].Entity.Version == entity.Version;
 
-    /// <inheritdoc />
-    public Chunks Search(ComponentFilter filter)
-    {
-        var pool = Pool<List<Chunk>>.Default;
-        var chunks = pool.Spawn();
-        for (var i = 0; i < m_Archetypes.Count; i++)
-        {
-            var archetype = m_Archetypes[i];
-            if (archetype.MatchComponents(filter))
-            {
-                chunks.AddRange(archetype.Chunks);
-            }
-        }
+    /// <inheritdoc/>
+    public Chunks Search(ComponentFilter filter) => new(m_Archetypes, m_Allocator, filter);
 
-        return new Chunks(chunks, pool);
-    }
+    /// <inheritdoc/>
+    public Chunks Search(ComponentTypesMatching filter) => new(m_Archetypes, m_Allocator, filter);
 
-    /// <inheritdoc />
-    public Chunks Search(ComponentTypesMatching filter)
-    {
-        var pool = Pool<List<Chunk>>.Default;
-        var chunks = pool.Spawn();
-        for (var i = 0; i < m_Archetypes.Count; i++)
-        {
-            var archetype = m_Archetypes[i];
-            if (filter.Invoke(archetype.Types))
-            {
-                chunks.AddRange(archetype.Chunks);
-            }
-        }
-
-        return new Chunks(chunks, pool);
-    }
-
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public void Update<T>(int index, T component) where T : unmanaged
     {
         if (!Contains(index))
@@ -71,7 +71,7 @@ public class EntityRepository : IEntityQuery, IEntityCommand
         record.Chunk.Set(record.IndexInChunk, component);
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Entity Insert(Span<byte> data, Span<Type> componentTypes)
     {
@@ -81,7 +81,7 @@ public class EntityRepository : IEntityQuery, IEntityCommand
         return AddEntity(chunk, chunkInIndex);
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public void InsertAll(int count, Span<byte> data, Span<Type> componentTypes)
     {
         var archetype = RequireArcheType(componentTypes);
@@ -93,7 +93,7 @@ public class EntityRepository : IEntityQuery, IEntityCommand
         }
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Delete(int index)
     {
@@ -123,7 +123,7 @@ public class EntityRepository : IEntityQuery, IEntityCommand
         return true;
     }
 
-    /// <inheritdoc />
+    /// <inheritdoc/>
     public int DeleteAll(params Span<int> indexes)
     {
         var removedCount = 0;
@@ -198,11 +198,27 @@ public class EntityRepository : IEntityQuery, IEntityCommand
 
         if (archetype == null)
         {
-            archetype = new Archetype(componentTypes.ToArray());
+            archetype = new Archetype(componentTypes, m_Allocator, m_ChunkSize);
             m_Archetypes.Add(archetype);
         }
 
         return archetype;
+    }
+
+    /// <summary>
+    /// Releases all chunk storage owned by the repository.
+    /// </summary>
+    public void Dispose()
+    {
+        for (var i = 0; i < m_Archetypes.Count; i++)
+        {
+            m_Archetypes[i].Dispose();
+        }
+
+        m_Archetypes.Clear();
+        m_Entities.Clear();
+        m_RemovedIndexes.Clear();
+        Count = 0;
     }
 
     /// <summary>
@@ -218,19 +234,19 @@ public class EntityRepository : IEntityQuery, IEntityCommand
         if (m_RemovedIndexes.TryDequeue(out var removedIndex))
         {
             ref var record = ref m_Entities[removedIndex];
-            record.Entity       = new Entity {Index = removedIndex, Version = record.Entity.Version};
-            record.Chunk        = chunk;
+            record.Entity = record.Entity with { Index = removedIndex };
+            record.Chunk = chunk;
             record.IndexInChunk = chunkInIndex;
             chunk.Set(chunkInIndex, record.Entity);
             Count++;
             return record.Entity;
         }
 
-        var entity = new Entity {Index = m_Entities.Count, Version = INITIAL_ENTITY_VERSION};
+        var entity = new Entity { Index = m_Entities.Count, Version = INITIAL_ENTITY_VERSION };
         m_Entities.Add(new EntityRecord
         {
-            Entity       = entity,
-            Chunk        = chunk,
+            Entity = entity,
+            Chunk = chunk,
             IndexInChunk = chunkInIndex
         });
         chunk.Set(chunkInIndex, entity);

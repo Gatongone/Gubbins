@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Runtime.CompilerServices;
 using Gubbins.Unsafe;
 
@@ -8,16 +8,26 @@ namespace Gubbins.Entities;
 /// Represents an archetype that groups entities with the same set of component types into chunks for efficient storage and processing.
 /// </summary>
 /// <param name="componentTypes">An array of component types that define this archetype.</param>
-internal sealed class Archetype(Type[] componentTypes)
+/// <param name="allocator">The allocator used to create chunk buffers.</param>
+/// <param name="chunkSizeBytes">The size, in bytes, of each chunk buffer.</param>
+internal class Archetype(ReadOnlySpan<Type> componentTypes, Allocator allocator, int chunkSizeBytes) : IDisposable
 {
-    private readonly List<Chunk>    m_Chunks         = [];
-    private readonly ComponentsInfo m_ComponentsInfo = new([..componentTypes]);
-    private readonly Type[]         m_ComponentTypes = componentTypes.ToArray();
+    private readonly Type[] m_ComponentTypes = [..componentTypes];
+    private readonly List<Chunk> m_Chunks = [];
+    private readonly ComponentsInfo m_ComponentsInfo = new([.. componentTypes]);
     public IReadOnlyList<Chunk> Chunks => m_Chunks;
-    public ReadOnlySpan<Type> Types => m_ComponentTypes;
-    private readonly BloomFilter m_ComponentFilter = new(componentTypes);
+
+    /// <summary>
+    /// The chunk list as a concrete <see cref="List{T}"/>, so hot query paths can use
+    /// <see cref="System.Runtime.InteropServices.CollectionsMarshal.AsSpan{T}"/> and avoid interface dispatch per
+    /// chunk when they walk the archetype.
+    /// </summary>
+    internal List<Chunk> ChunkList => m_Chunks;
+    public ReadOnlySpan<Type> Types => m_ComponentTypes.AsSpan();
 #if NET9_0_OR_GREATER
-    private readonly System.Collections.Frozen.FrozenSet<Type> m_FrozenSet = System.Collections.Frozen.FrozenSet.Create(componentTypes);
+    private readonly System.Collections.Frozen.FrozenSet<Type> m_FrozenSet = [.. componentTypes];
+#else
+    private readonly BloomFilter m_ComponentFilter = new(componentTypes);
 #endif
 
     internal bool MatchComponents(ComponentFilter filter)
@@ -32,86 +42,37 @@ internal sealed class Archetype(Type[] componentTypes)
 
         // Final check to ensure that the archetype contains all included components and none of the excluded components.
         return ContainsTypes(filter.Includes) && NotContainsTypes(filter.Excludes);
-#if NET9_0_OR_GREATER
-        bool ContainsTypes(ReadOnlySpan<Type> componentTypes)
-        {
-            for (var i = 0; i < componentTypes.Length; i++)
-            {
-                if (!m_FrozenSet.Contains(componentTypes[i]))
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        bool NotContainsTypes(ReadOnlySpan<Type> componentTypes)
-        {
-            for (var i = 0; i < componentTypes.Length; i++)
-            {
-                if (m_FrozenSet.Contains(componentTypes[i]))
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-#else
-        bool ContainsTypes(ReadOnlySpan<Type> componentTypes)
-        {
-            for (var i = 0; i < componentTypes.Length; i++)
-            {
-                if (!m_ComponentsInfo.Types.Contains(componentTypes[i]))
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        bool NotContainsTypes(ReadOnlySpan<Type> componentTypes)
-        {
-            for (var i = 0; i < componentTypes.Length; i++)
-            {
-                if (m_ComponentsInfo.Types.Contains(componentTypes[i]))
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-#endif
     }
 
-    /// <summary>
-    /// Determines whether this archetype matches the specified component types exactly.
-    /// </summary>
-    /// <param name="componentTypes">A span of component types to match against this archetype.</param>
-    /// <returns>True if the archetype contains exactly the same component types; otherwise, false.</returns>
-    public bool MatchComponents(ReadOnlySpan<Type> componentTypes)
-    {
-        if (componentTypes.Length != m_ComponentsInfo.Types.Count)
-        {
-            return false;
-        }
 #if NET9_0_OR_GREATER
-        for (var i = 0; i < componentTypes.Length; i++)
+    private bool ContainsTypes(ReadOnlySpan<Type> compTypes)
+    {
+        for (var i = 0; i < compTypes.Length; i++)
         {
-            if (!m_FrozenSet.Contains(componentTypes[i]))
+            if (!m_FrozenSet.Contains(compTypes[i]))
             {
                 return false;
             }
         }
-#else
-        if (!m_ComponentFilter.MayContainsAll(componentTypes))
+
+        return true;
+    }
+
+    private bool NotContainsTypes(ReadOnlySpan<Type> compTypes)
+    {
+        for (var i = 0; i < compTypes.Length; i++)
         {
-            return false;
+            if (m_FrozenSet.Contains(compTypes[i]))
+            {
+                return false;
+            }
         }
 
+        return true;
+    }
+#else
+    private bool ContainsTypes(ReadOnlySpan<Type> componentTypes)
+    {
         for (var i = 0; i < componentTypes.Length; i++)
         {
             if (!m_ComponentsInfo.Types.Contains(componentTypes[i]))
@@ -119,8 +80,76 @@ internal sealed class Archetype(Type[] componentTypes)
                 return false;
             }
         }
+
+        return true;
+    }
+
+    private bool NotContainsTypes(ReadOnlySpan<Type> componentTypes)
+    {
+        for (var i = 0; i < componentTypes.Length; i++)
+        {
+            if (m_ComponentsInfo.Types.Contains(componentTypes[i]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+#endif
+
+    /// <summary>
+    /// Determines whether this archetype matches the specified component types exactly.
+    /// </summary>
+    /// <param name="compTypes">A span of component types to match against this archetype.</param>
+    /// <returns>True if the archetype contains exactly the same component types; otherwise, false.</returns>
+    public bool MatchComponents(ReadOnlySpan<Type> compTypes)
+    {
+        if (compTypes.Length != m_ComponentsInfo.Types.Count)
+        {
+            return false;
+        }
+#if NET9_0_OR_GREATER
+        for (var i = 0; i < compTypes.Length; i++)
+        {
+            if (!m_FrozenSet.Contains(compTypes[i]))
+            {
+                return false;
+            }
+        }
+#else
+        if (!m_ComponentFilter.MayContainsAll(compTypes))
+        {
+            return false;
+        }
+
+        for (var i = 0; i < compTypes.Length; i++)
+        {
+            if (!m_ComponentsInfo.Types.Contains(compTypes[i]))
+            {
+                return false;
+            }
+        }
 #endif
         return true;
+    }
+
+    /// <summary>
+    /// Resolves the column index of the specified component type for every chunk in this archetype.
+    /// </summary>
+    /// <typeparam name="T">The component type.</typeparam>
+    /// <returns>The column index shared by all of this archetype's chunks.</returns>
+    /// <exception cref="ArgumentException">Thrown when the archetype does not contain the type.</exception>
+    /// <remarks>
+    /// Chunks are always constructed from the same component type list, so the column index is identical for all
+    /// of them. Resolving it once here keeps the per-chunk cost of a query down to a pointer addition instead of a
+    /// type-list scan.
+    /// </remarks>
+    internal int ResolveColumn<T>()
+    {
+        var column = m_Chunks[0].IndexOfColumn(typeof(T));
+        if (column == -1) throw new ArgumentException($"Unmatched type '{typeof(T)}' in the chunk.");
+        return column;
     }
 
     /// <summary>
@@ -131,10 +160,15 @@ internal sealed class Archetype(Type[] componentTypes)
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void GetComponents<T>(List<Snippet<T>> result)
     {
+        if (m_Chunks.Count == 0)
+        {
+            return;
+        }
+
+        var column = ResolveColumn<T>();
         foreach (var chunk in m_Chunks)
         {
-            var mem = chunk.GetAll<T>();
-            result.Add(mem);
+            result.Add(chunk.GetAllAt<T>(column));
         }
     }
 
@@ -144,21 +178,36 @@ internal sealed class Archetype(Type[] componentTypes)
     /// <returns>A chunk that has available space for storing entities.</returns>
     public Chunk GetPartiallyFilledChunk()
     {
-        Chunk targetChunk = null!;
+        Chunk targetChunk = default;
+        var found = false;
         foreach (var chunk in m_Chunks)
         {
             if (chunk.IsFull) continue;
             targetChunk = chunk;
+            found = true;
             break;
         }
 
-        if (targetChunk == null!)
+        if (!found)
         {
-            targetChunk = new Chunk(m_ComponentTypes);
+            targetChunk = new Chunk(m_ComponentTypes, allocator, chunkSizeBytes);
             m_Chunks.Add(targetChunk);
         }
 
         return targetChunk;
+    }
+
+    /// <summary>
+    /// Releases every chunk buffer owned by this archetype.
+    /// </summary>
+    public void Dispose()
+    {
+        for (var i = 0; i < m_Chunks.Count; i++)
+        {
+            m_Chunks[i].Dispose();
+        }
+
+        m_Chunks.Clear();
     }
 
     /// <summary>
@@ -227,7 +276,9 @@ internal class BloomFilter
     /// <param name="types">
     /// Each type will be processed to compute its hash positions, and the corresponding bits in the bit array will be set to true, indicating that these types are likely present in the filter.
     /// </param>
-    internal BloomFilter(ReadOnlySpan<Type> types) : this(256, types) { }
+    internal BloomFilter(ReadOnlySpan<Type> types) : this(256, types)
+    {
+    }
 
     /// <summary>
     /// The hash code is computed by compressing the bit array into a 32-bit integer,
@@ -255,16 +306,18 @@ internal class BloomFilter
     /// The method computes multiple hash positions for the given type and sets the corresponding bits in the bit array to true, indicating that the type is likely present in the filter.
     /// Note that Bloom filters can have false positives, meaning that they may indicate that a type is present when it is not, but they will never indicate that a type is absent if it is indeed present.
     /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Add(Type type)
     {
         var (h1, h2) = GetHashes(type);
-        m_Bits[h1]   = true;
-        m_Bits[h2]   = true;
+        m_Bits[h1] = true;
+        m_Bits[h2] = true;
     }
 
     /// <summary>
     /// Checks whether the Bloom filter might contain the specified type. This method computes multiple hash positions for the given type and checks if all corresponding bits in the bit array are set to true.
     /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool MayContains(Type type)
     {
         var (h1, h2) = GetHashes(type);
@@ -274,6 +327,7 @@ internal class BloomFilter
     /// <summary>
     /// Checks whether the Bloom filter might contain all of the specified types. This method iterates through each type, computes its hash positions, and checks if all corresponding bits in the bit array are set to true.
     /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool MayContainsAll(params ReadOnlySpan<Type> types)
     {
         for (var i = 0; i < types.Length; i++)
@@ -290,6 +344,7 @@ internal class BloomFilter
     /// <summary>
     /// Checks whether the Bloom filter might contain any of the specified types. This method iterates through each type, computes its hash positions, and checks if any corresponding bits in the bit array are set to true.
     /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool MayContainsAny(params ReadOnlySpan<Type> types)
     {
         for (var i = 0; i < types.Length; i++)
@@ -306,6 +361,7 @@ internal class BloomFilter
     /// <summary>
     /// Simulating two different hash functions through high-low transformations
     /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private (int, int) GetHashes(Type type)
     {
         var hash = type.GetHashCode();
@@ -318,6 +374,7 @@ internal class BloomFilter
     /// Checks whether the Bloom filter is empty (i.e., contains no elements). This method iterates through the bit array to determine if any bits are set to true,
     /// indicating that at least one element has been added to the filter. If all bits are false, the filter is considered empty.
     /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool IsEmpty()
     {
         for (var index = 0; index < m_Bits.Count; index++)
