@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+        <RootNamespace>Gubbins.Async</RootNamespace>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+
+</Project>
