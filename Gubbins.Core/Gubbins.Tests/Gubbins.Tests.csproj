@@ -31,6 +31,7 @@
       <ProjectReference Include="..\Gubbins.Context\Gubbins.Context.csproj" />
       <ProjectReference Include="..\Gubbins.Enhance\Gubbins.Enhance.csproj" />
       <ProjectReference Include="..\Gubbins.Events\Gubbins.Events.csproj" />
+      <ProjectReference Include="..\Gubbins.Graphic\Gubbins.Graphic.csproj" />
       <ProjectReference Include="..\Gubbins.Network\Gubbins.Network.csproj" />
       <ProjectReference Include="..\Gubbins.Resource\Gubbins.Resource.csproj" />
       <ProjectReference Include="..\Gubbins.Span\Gubbins.Span.csproj" />
