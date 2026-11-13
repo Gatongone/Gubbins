@@ -14,6 +14,7 @@
     "allowUnsafeCode": false,
     "overrideReferences": true,
     "precompiledReferences": [
+        "Gubbins.Async.dll",
         "Gubbins.Unsafe.dll",
         "Gubbins.Enhance.dll",
         "Gubbins.Context.dll",

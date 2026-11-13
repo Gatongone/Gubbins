@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using Gubbins.Unsafe;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
+using Allocator = Unity.Collections.Allocator;
 
 namespace Gubbins.Enhance
 {
