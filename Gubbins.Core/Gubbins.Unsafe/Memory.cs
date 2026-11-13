@@ -6,13 +6,18 @@ namespace Gubbins.Unsafe;
 
 public unsafe class Memory
 {
+    /// <summary>
+    /// Runtime-specific memory backend used by this facade.
+    /// </summary>
+    internal static Memory Default = new();
+    
 #if !NATIVEAOT
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, uint> s_SizeOfMaps = new();
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, uint> sizeOfMaps = new();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static uint DynamicSizeOf(Type type)
     {
-        if (s_SizeOfMaps.TryGetValue(type, out var size))
+        if (sizeOfMaps.TryGetValue(type, out var size))
             return size;
 
         var dynamicSizeOf = new System.Reflection.Emit.DynamicMethod("GetManagedSizeImpl", typeof(uint), null, true);
@@ -23,66 +28,10 @@ public unsafe class Memory
 
         var sizeOfFunc = (Func<uint>) dynamicSizeOf.CreateDelegate(typeof(Func<uint>));
         size = (uint) checked((int) sizeOfFunc());
-        s_SizeOfMaps.TryAdd(type, size);
+        sizeOfMaps.TryAdd(type, size);
         return size;
     }
 #endif
-
-    public virtual IntPtr Alloc(int size)
-    {
-#if NET6_0_OR_GREATER
-        return (IntPtr) NativeMemory.Alloc((uint) size);
-#else
-        return Marshal.AllocHGlobal(size);
-#endif
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public virtual IntPtr AlignedAlloc(int size, int align)
-    {
-#if NET6_0_OR_GREATER
-        var ptr = NativeMemory.AlignedAlloc((nuint) size, (nuint) align);
-        return (IntPtr) ptr;
-#else
-        // The alignment value must be 2 to the power of 2.
-        if ((align & (align - 1)) != 0)
-            throw new ArgumentException("Alignment must be a power of 2.", nameof(align));
-
-        // AlignedAlloc extra space for alignment offset storage
-        // An additional align-1 byte is needed to align + 1 byte of storage offset
-        var totalSize = size + align - 1 + sizeof(nint);
-
-        var rawPtr = Marshal.AllocHGlobal(totalSize);
-
-        nint raw = rawPtr;
-        var aligned = (raw + sizeof(nint) + align - 1) & ~(nint) (align - 1);
-
-        // Offsets are stored before aligned addresses for future freeing.
-        *(nint*) (aligned - sizeof(nint)) = aligned - raw;
-
-        return aligned;
-#endif
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public virtual void AlignedFree(IntPtr ptr)
-    {
-#if NET6_0_OR_GREATER
-        NativeMemory.AlignedFree((void*) ptr);
-#else
-        Marshal.FreeHGlobal(ptr);
-#endif
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public virtual void Free(IntPtr ptr)
-    {
-#if NET6_0_OR_GREATER
-        NativeMemory.Free((void*) ptr);
-#else
-        Marshal.FreeHGlobal(ptr);
-#endif
-    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public virtual uint GetFieldOffset(FieldInfo fieldInfo)
@@ -95,28 +44,9 @@ public unsafe class Memory
 #pragma warning disable CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
     public virtual T ConvertToStructure<T>(void* ptr) where T : struct => *(T*) ptr;
 #pragma warning restore CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
-
+    
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public virtual void CopyMemory(void* source, void* destination, uint offset)
-    {
-#if NET5_0_OR_GREATER
-        System.Runtime.CompilerServices.Unsafe.CopyBlock(destination, source, offset);
-#else
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        {
-            Memcpy((IntPtr) destination, (IntPtr) source, (UIntPtr) offset);
-        }
-        else
-        {
-            var src = new Span<byte>(source, (int) offset);
-            var dst = new Span<byte>(destination, (int) offset);
-            src.CopyTo(dst);
-        }
-#endif
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public virtual void SetObjectAddress(object source, void* destination) => *(IntPtr*) destination = (IntPtr) Native.GetAddress(source);
+    public virtual void SetObjectAddress(object source, void* destination) => *(IntPtr*)destination = (IntPtr)Native.GetAddress(source);
 
     public virtual uint GetStackSize<T>()
     {
@@ -160,6 +90,25 @@ public unsafe class Memory
                 break;
         }
         throw new ArgumentException($"Invalid operation for managed struct. Type: {type}. ");
+#endif
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public virtual void CopyMemory(void* source, void* destination, uint offset)
+    {
+#if NET5_0_OR_GREATER
+        System.Runtime.CompilerServices.Unsafe.CopyBlock(destination, source, offset);
+#else
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            Memcpy((IntPtr) destination, (IntPtr) source, (UIntPtr) offset);
+        }
+        else
+        {
+            var src = new Span<byte>(source, (int) offset);
+            var dst = new Span<byte>(destination, (int) offset);
+            src.CopyTo(dst);
+        }
 #endif
     }
 

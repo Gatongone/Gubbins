@@ -228,7 +228,7 @@ public static class Reflection
         if (genericParameters.Length > 0)
         {
             var nameBuilder = new StringBuilder();
-            var genericStrs = string.Join(",", genericParameters.Select(genericParameter => $"[{genericParameter.AssemblyQualifiedName}]").ToArray());
+            var genericStrs = string.Join(",", [.. genericParameters.Select(genericParameter => $"[{genericParameter.AssemblyQualifiedName}]")]);
             nameBuilder.Append($"{typeName}`{genericParameters.Length}[");
             nameBuilder.Append(genericStrs);
             nameBuilder.Append(']');
@@ -247,12 +247,12 @@ internal static class ReflectionCache
     /// <summary>
     /// Stores per-type checker instances.
     /// </summary>
-    private static readonly Dictionary<Type, TypeChecker> s_CheckerMaps = new();
+    private static readonly Dictionary<Type, TypeChecker> checkerMaps = new();
 
     /// <summary>
     /// Stores cached reflected members by declaring type and member name.
     /// </summary>
-    private static readonly Dictionary<Type, Dictionary<string, ValuableMember>> s_CacheMaps = new();
+    private static readonly Dictionary<Type, Dictionary<string, ValuableMember>> cacheMaps = new();
 
     /// <summary>
     /// Default binding flags used when resolving instance fields and properties.
@@ -267,10 +267,10 @@ internal static class ReflectionCache
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static TypeChecker CheckType(this Type type)
     {
-        if (s_CheckerMaps.TryGetValue(type, out var checker))
+        if (checkerMaps.TryGetValue(type, out var checker))
             return checker;
         checker = new TypeChecker(type);
-        s_CheckerMaps.Add(type, checker);
+        checkerMaps.Add(type, checker);
         return checker;
     }
 
@@ -297,10 +297,10 @@ internal static class ReflectionCache
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static ValuableMember? GetProperty(Type type, string name, BindingFlags flags)
     {
-        if (!s_CacheMaps.TryGetValue(type, out var memberMaps))
+        if (!cacheMaps.TryGetValue(type, out var memberMaps))
         {
             memberMaps = new Dictionary<string, ValuableMember>();
-            s_CacheMaps.Add(type, memberMaps);
+            cacheMaps.Add(type, memberMaps);
         }
 
         if (memberMaps.TryGetValue(name, out var unsafeProperty))
@@ -325,10 +325,10 @@ internal static class ReflectionCache
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static ValuableMember? GetField(Type type, string name, BindingFlags flags)
     {
-        if (!s_CacheMaps.TryGetValue(type, out var memberMaps))
+        if (!cacheMaps.TryGetValue(type, out var memberMaps))
         {
             memberMaps = new Dictionary<string, ValuableMember>();
-            s_CacheMaps.Add(type, memberMaps);
+            cacheMaps.Add(type, memberMaps);
         }
 
         if (memberMaps.TryGetValue(name, out var unsafeField))
@@ -421,7 +421,7 @@ public static class ReflectionExtensions
         if (!isVoidReturn)
             genericTypes.Add(method.ReturnType);
 
-        var delegateType = Reflection.GetType(typeName, genericTypes.ToArray());
+        var delegateType = Reflection.GetType(typeName, [.. genericTypes]);
         ListPool<Type>.Default.Recycle(genericTypes);
         return delegateType != null ? method.CreateDelegate(delegateType) : null;
     }
@@ -431,13 +431,13 @@ file class ListPool<T>
 {
     public static readonly ListPool<T> Default = new();
 
-    public readonly ConcurrentQueue<List<T>> m_Queue = new();
+    public readonly ConcurrentQueue<List<T>> MQueue = new();
 
-    public List<T> Spawn() => m_Queue.TryDequeue(out var list) ? list : [];
+    public List<T> Spawn() => MQueue.TryDequeue(out var list) ? list : [];
 
     public void Recycle(List<T> list)
     {
         list.Clear();
-        m_Queue.Enqueue(list);
+        MQueue.Enqueue(list);
     }
 }

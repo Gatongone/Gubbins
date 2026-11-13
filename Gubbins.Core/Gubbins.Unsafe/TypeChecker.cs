@@ -21,7 +21,7 @@ public struct TypeChecker
     /// <summary>
     /// Caches types that have been determined to be unmanaged.
     /// </summary>
-    private static readonly HashSet<Type?> s_UnmanagedTypeCache = [];
+    private static readonly HashSet<Type?> unmanagedTypeCache = [];
     
     /// <summary>
     /// The alignment of the type in bytes, which is determined by the type's size and the platform's alignment requirements.
@@ -145,7 +145,7 @@ public struct TypeChecker
     /// <returns>True if the type is unmanaged; otherwise, false.</returns>
     private static bool CheckIsTypeUnmanaged(Type type)
     {
-        if (s_UnmanagedTypeCache.Contains(type) || type.IsPrimitive || type.IsPointer || type.IsEnum)
+        if (unmanagedTypeCache.Contains(type) || type.IsPrimitive || type.IsPointer || type.IsEnum)
             return true;
         if (!type.IsValueType)
             return false;
@@ -154,7 +154,7 @@ public struct TypeChecker
         var isUnmanaged = !type.GetFields().Any(f => f.FieldType != type && !CheckIsTypeUnmanaged(f.FieldType));
 
         if (isUnmanaged)
-            s_UnmanagedTypeCache.Add(type);
+            unmanagedTypeCache.Add(type);
         return isUnmanaged;
     }
 }

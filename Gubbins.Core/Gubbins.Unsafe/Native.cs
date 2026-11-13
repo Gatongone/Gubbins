@@ -21,43 +21,52 @@ public sealed unsafe class Native
     internal static Memory Operation = new();
 
     /// <summary>
-    /// Allocates an unmanaged aligned memory block.
-    /// </summary>
-    /// <param name="size">The number of bytes to allocate.</param>
-    /// <returns>A pointer to the allocated memory block.</returns>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static IntPtr Alloc(int size) => Operation.Alloc(size);
-
-    /// <summary>
-    /// Allocates an unmanaged aligned memory block.
-    /// </summary>
-    /// <param name="size">The number of bytes to allocate.</param>
-    /// <param name="align">The requested byte alignment.</param>
-    /// <returns>A pointer to the allocated memory block.</returns>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static IntPtr AlignedAlloc(int size, int align) => Operation.AlignedAlloc(size, align);
-
-    /// <summary>
-    /// Frees a previously allocated unmanaged aligned memory block.
-    /// </summary>
-    /// <param name="ptr">The pointer returned by <see cref="AlignedAlloc"/>.</param>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void AlignedFree(IntPtr ptr) => Operation.AlignedFree(ptr);
-
-    /// <summary>
-    /// Frees a previously allocated unmanaged memory block.
-    /// </summary>
-    /// <param name="ptr">The pointer returned by <see cref="AlignedAlloc"/>.</param>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void Free(IntPtr ptr) => Operation.Free(ptr);
-
-    /// <summary>
     /// Gets the natural alignment for the unmanaged representation of <typeparamref name="T"/>.
     /// </summary>
     /// <typeparam name="T">The value type to inspect.</typeparam>
     /// <returns>The alignment in bytes (1, 2, 4, or 8).</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static byte GetAlignment<T>() => GetAlignment((int)GetStackSize<T>());
+
+    /// <summary>
+    /// Rounds an address forward to the next multiple of <paramref name="alignment"/>.
+    /// </summary>
+    /// <param name="value">The value to round up.</param>
+    /// <param name="alignment">A non-zero power of two, normally the OS page size.</param>
+    /// <returns>The rounded value, or <see langword="0"/> if the rounding would overflow.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static nuint AlignForward(nuint value, byte alignment)
+    {
+        // Alignment 0 or 1 needs no adjustment. This also avoids the underflow of `alignment - 1`,
+        // which would otherwise align every address down to zero.
+        if (alignment <= 1)
+        {
+            return value;
+        }
+
+        var mask = (nuint)alignment - 1;
+        return (value + mask) & ~mask;
+    }
+
+    /// <summary>
+    /// Rounds an address forward to the next multiple of <paramref name="alignment"/>.
+    /// </summary>
+    /// <param name="value">The value to round up.</param>
+    /// <param name="alignment">A non-zero power of two, normally the OS page size.</param>
+    /// <returns>The rounded value, or <see langword="0"/> if the rounding would overflow.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static nuint AlignForward(nuint value, nuint alignment)
+    {
+        // Alignment 0 or 1 needs no adjustment. This also avoids the underflow of `alignment - 1`,
+        // which would otherwise align every address down to zero.
+        if (alignment <= 1)
+        {
+            return value;
+        }
+
+        var mask = alignment - 1;
+        return (value + mask) & ~mask;
+    }
 
     /// <summary>
     /// Gets an alignment value based on a byte size.
@@ -131,6 +140,12 @@ public sealed unsafe class Native
 #endif
     }
 
+    /// <summary>
+    /// Reinterprets an unmanaged pointer as a managed reference.
+    /// </summary>
+    /// <typeparam name="TTo">The type to bind the reference to.</typeparam>
+    /// <param name="src">The pointer to reinterpret.</param>
+    /// <returns>A reference bound to the memory at <paramref name="src"/>.</returns>
     public static ref TTo Cast<TTo>(void* src)
     {
 #if NET5_0_OR_GREATER
@@ -221,6 +236,24 @@ public sealed unsafe class Native
     }
 
     /// <summary>
+    /// Returns the address of a value as a native signed integer.
+    /// </summary>
+    /// <typeparam name="T">The type of the value.</typeparam>
+    /// <param name="value">The value whose address is returned.</param>
+    /// <returns>The address of <paramref name="value"/>.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static nint AsPointerSafe<T>(ref T value) => (nint)AsPointer(ref value);
+
+    /// <summary>
+    /// Returns the address of the first element of a span as a native signed integer.
+    /// </summary>
+    /// <typeparam name="T">The element type of the span.</typeparam>
+    /// <param name="span">The span whose data address is returned.</param>
+    /// <returns>The address of the first element, or zero for an empty span.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static nint AsPointerSafe<T>(Span<T> span) => (nint)AsPointer(ref MemoryMarshal.GetReference(span));
+
+    /// <summary>
     /// Returns a pointer to the first element of a span.
     /// </summary>
     /// <param name="span">The span to get the pointer from.</param>
@@ -251,7 +284,6 @@ public sealed unsafe class Native
 #if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
         return System.Runtime.CompilerServices.Unsafe.AsPointer(ref value[0]);
 #else
-
         fixed (void* ptr = value)
 
         {
@@ -272,7 +304,6 @@ public sealed unsafe class Native
 #if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
         return System.Runtime.CompilerServices.Unsafe.AsPointer(ref value[0]);
 #else
-
         fixed (void* ptr = value)
 
         {
@@ -309,7 +340,6 @@ public sealed unsafe class Native
 #if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
         return System.Runtime.CompilerServices.Unsafe.AsPointer(ref structure);
 #else
-
         fixed (void* ptr = &structure)
 
         {
@@ -329,7 +359,6 @@ public sealed unsafe class Native
 #if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
         return *(void**)System.Runtime.CompilerServices.Unsafe.AsPointer(ref instance);
 #else
-
         return *(void**)&instance;
 
 #endif
@@ -347,7 +376,6 @@ public sealed unsafe class Native
 #if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
         return System.Runtime.CompilerServices.Unsafe.IsAddressLessThan(ref System.Runtime.CompilerServices.Unsafe.AsRef(in left), ref System.Runtime.CompilerServices.Unsafe.AsRef(in right));
 #else
-
         fixed (void* leftPtr = &left)
         fixed (void* rightPtr = &right)
 
@@ -369,7 +397,6 @@ public sealed unsafe class Native
 #if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
         return System.Runtime.CompilerServices.Unsafe.IsAddressGreaterThan(ref System.Runtime.CompilerServices.Unsafe.AsRef(in left), ref System.Runtime.CompilerServices.Unsafe.AsRef(in right));
 #else
-
         fixed (void* leftPtr = &left)
         fixed (void* rightPtr = &right)
 
@@ -391,7 +418,6 @@ public sealed unsafe class Native
 #if NET10_0_OR_GREATER
         return System.Runtime.CompilerServices.Unsafe.IsAddressLessThanOrEqualTo(ref System.Runtime.CompilerServices.Unsafe.AsRef(in left), ref System.Runtime.CompilerServices.Unsafe.AsRef(in right));
 #else
-
         fixed (void* leftPtr = &left)
         fixed (void* rightPtr = &right)
 
@@ -433,7 +459,6 @@ public sealed unsafe class Native
 #if NET6_0_OR_GREATER
         return System.Runtime.CompilerServices.Unsafe.AreSame(ref System.Runtime.CompilerServices.Unsafe.AsRef(in left), ref System.Runtime.CompilerServices.Unsafe.AsRef(in right));
 #else
-
         fixed (void* leftPtr = &left)
         fixed (void* rightPtr = &right)
 
@@ -456,7 +481,6 @@ public sealed unsafe class Native
 #if NET6_0_OR_GREATER
         return ref System.Runtime.CompilerServices.Unsafe.AddByteOffset(ref source, byteOffset);
 #else
-
         fixed (void* ptr = &source)
 
         {
@@ -480,7 +504,6 @@ public sealed unsafe class Native
 #if NET6_0_OR_GREATER
         return ref System.Runtime.CompilerServices.Unsafe.Add(ref source, elementOffset);
 #else
-
         fixed (void* ptr = &source)
         {
             var bytePtr = (byte*)ptr;
@@ -592,7 +615,6 @@ public sealed unsafe class Native
 #if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
         return ref System.Runtime.CompilerServices.Unsafe.AsRef<TResult>(ptr);
 #else
-
         return ref *(TResult*)ptr;
 
 #endif
@@ -610,7 +632,6 @@ public sealed unsafe class Native
 #if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
         return ref System.Runtime.CompilerServices.Unsafe.As<TFrom, TResult>(ref MemoryMarshal.GetReference(span));
 #else
-
         fixed (void* p = span)
 
         {
@@ -683,7 +704,6 @@ public sealed unsafe class Native
 #if NET5_0_OR_GREATER || NETCOREAPP3_0_OR_GREATER
         return System.Runtime.CompilerServices.Unsafe.Read<T>(ptr);
 #else
-
         return *(T*)ptr;
 
 #endif

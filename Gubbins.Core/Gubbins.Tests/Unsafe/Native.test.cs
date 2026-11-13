@@ -48,7 +48,11 @@ public sealed unsafe class NativeTests
     [Test]
     public void Allocate_ValidSizeProvided_ShouldReturnWritablePointer()
     {
-        var ptr = Native.AlignedAlloc(sizeof(int), 16);
+        const int size = sizeof(int);
+        const byte alignment = 16;
+        var unmanagedAllocator = new UnmanagedAllocator();
+        var allocator = unmanagedAllocator.GetAllocator();
+        var ptr = allocator.Alloc((nuint)size, alignment);
         try
         {
             *(int*) ptr = 321;
@@ -56,7 +60,7 @@ public sealed unsafe class NativeTests
         }
         finally
         {
-            Native.AlignedFree(ptr);
+            allocator.Free(ptr, (nuint)size, alignment);
         }
     }
 
