@@ -1,0 +1,23 @@
+{
+  "name": "com.gatongone.gubbins.context",
+  "version": "0.0.1",
+  "license": "MIT",
+  "displayName": "Gubbins Context",
+  "description": "ScriptableObject and MonoBehaviour contexts for the Gubbins dependency container.",
+  "author": {
+    "name": "Gatongone",
+    "email": "gatongone@gmail.com",
+    "url": "https://www.github.com/gatongone"
+  },
+  "unity": "2021.3",
+  "type": "tools",
+  "keywords": [
+    "Utils"
+  ],
+  "dependencies": {
+    "com.gatongone.gubbins.enhance": "0.0.1",
+    "com.gatongone.gubbins.events": "0.0.1",
+    "com.gatongone.gubbins.spawner": "0.0.1",
+    "com.gatongone.gubbins.unsafe": "0.0.1"
+  }
+}

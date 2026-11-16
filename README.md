@@ -16,8 +16,7 @@ Basic components of the Gubbins collection, including:
 * `Gubbins.Context`: IOC (Inversion of Control) container for managing dependencies and services.
 * `Gubbins.Enhance`: Improving for . NET development, like duck typing, Unit type, atomic, etc.
 * `Gubbins.Entities`: A archetype design for entities with CQS (Command-Query Separation) pattern.
-* `Gubbins.Events`: Event system for decoupling components and enabling event-driven programming.
-* `Gubbins.Generator`: Roslyn-based code generation tools for automating repetitive coding tasks and improving productivity.
+* `Gubbins.Events`: Event system for decoupling components and enabling event-driven programming, with `EventStream` for basic reactive composition (`Where`, `Select`, `DistinctUntilChanged`, `Take`).
 * `Gubbins.Network`: Networking utilities and tools for working with network protocols and communication.
 * `Gubbins.Pipeline`: Fluent, strongly-typed processing pipelines composed of chained phases, plus reactive pipelines.
 * `Gubbins.Resource`: Managing resources, such as file handling, memory management, and resource pooling.
@@ -25,11 +24,18 @@ Basic components of the Gubbins collection, including:
 * `Gubbins.Spawner`: Factory and object pooling system for efficient object creation and management.
 * `Gubbins.Unsafe`: Unsafe code utilities for performance-critical operations and low-level programming.
 * `Gubbins.Unmanaged`: Unmanaged types collections.
-* `Gubbins.Tests`: Unit testing.
 
-### Install
+Source generators, tests, benchmarks and engine integrations live inside the module they belong to:
 
-Since the current version has not yet been released, it can be used at this stage by referencing the source code project.
+```text
+Unsafe/
+  Core/
+    Gubbins.Unsafe.csproj
+  Unity/
+  Godot/
+  Generator/
+  Tests/
+```
 
 ## Unity
 
@@ -37,22 +43,28 @@ Adapts Gubbins for Unity, integrating the Core modules with the engine's lifecyc
 
 ### Install
 
-Append the following URL to `Window/Package Manager/Add package from git URL` :
+The Unity integration is split into one package per core module. Each module package carries its own core assembly and generator analyzer; install the module packages you use together with their dependencies, for example:
 
 ```
-https://github.com/gatongone/Gubbins.git?path=/Gubbins.Unity
+https://github.com/gatongone/Gubbins.git?path=/Events/Unity
+https://github.com/gatongone/Gubbins.git?path=/Enhance/Unity
+https://github.com/gatongone/Gubbins.git?path=/Unsafe/Unity
 ```
 
-Or append the following entry to `Packages/manifest.json` :
+Or append entries to `Packages/manifest.json` :
 
 ```json
 {
   "dependencies":
   {
-    "com.gatongone.gubbins": "https://github.com/gatongone/Gubbins.git?path=/Gubbins.Unity"
+    "com.gatongone.gubbins.events": "https://github.com/gatongone/Gubbins.git?path=/Events/Unity",
+    "com.gatongone.gubbins.enhance": "https://github.com/gatongone/Gubbins.git?path=/Enhance/Unity",
+    "com.gatongone.gubbins.unsafe": "https://github.com/gatongone/Gubbins.git?path=/Unsafe/Unity"
   }
 }
 ```
+
+Editor tooling is provided by `Editor/Unity`.
 
 ## Godot
 
@@ -60,7 +72,7 @@ Adapts Gubbins for Godot, integrating the Core modules with the engine's C# runt
 
 ### Install
 
-Clone `Gubbins.Godot` into the addons directory of your Godot project, then enable Gubbins in ProjectSettings/Plugins and trigger a rebuild. This will automatically add a references to Gubbins in the project's root `.csproj` file.
+The Godot integration is split into one addon per core module. Copy the module addons you use into the `addons/` directory of your Godot project, then enable them in `ProjectSettings/Plugins` and trigger a rebuild. Each module addon injects its own assembly references and generator analyzer; enable the module addons for the dependencies you use as well.
 
 ## License
 

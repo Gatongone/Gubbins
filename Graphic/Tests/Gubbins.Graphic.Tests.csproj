@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <Import Project="..\..\Gubbins.Test.props" />
+
+    <ItemGroup>
+        <ProjectReference Include="..\Core\Gubbins.Graphic.csproj" />
+        <ProjectReference Include="..\..\Entities\Core\Gubbins.Entities.csproj" />
+        <ProjectReference Include="..\..\Unsafe\Core\Gubbins.Unsafe.csproj" />
+    </ItemGroup>
+
+    <!-- The kernel compiler is a tool for the build, so the tests that read its translation live with the one target
+         framework it is built for. -->
+    <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
+        <ProjectReference Include="..\Kernel\Gubbins.Graphic.Kernels.csproj" />
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(TargetFramework)' != 'net8.0'">
+        <Compile Remove="Kernel.test.cs" />
+    </ItemGroup>
+
+</Project>

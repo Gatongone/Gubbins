@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <Import Project="..\..\Gubbins.Test.props" />
+
+    <ItemGroup>
+        <ProjectReference Include="..\Core\Gubbins.Context.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Content Include="Assets\context.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+        <Content Include="Assets\context.xml">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+    </ItemGroup>
+
+</Project>

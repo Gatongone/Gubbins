@@ -1,0 +1,20 @@
+{
+  "name": "com.gatongone.gubbins.spawner",
+  "version": "0.0.1",
+  "license": "MIT",
+  "displayName": "Gubbins Spawner",
+  "description": "Object pooling and spawner utilities for Unity.",
+  "author": {
+    "name": "Gatongone",
+    "email": "gatongone@gmail.com",
+    "url": "https://www.github.com/gatongone"
+  },
+  "unity": "2021.3",
+  "type": "tools",
+  "keywords": [
+    "Utils"
+  ],
+  "dependencies": {
+    "com.gatongone.gubbins.enhance": "0.0.1"
+  }
+}

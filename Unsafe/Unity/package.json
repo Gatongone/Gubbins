@@ -1,0 +1,20 @@
+{
+  "name": "com.gatongone.gubbins.unsafe",
+  "version": "0.0.1",
+  "license": "MIT",
+  "displayName": "Gubbins Unsafe",
+  "description": "Unsafe memory helpers for Unity.",
+  "author": {
+    "name": "Gatongone",
+    "email": "gatongone@gmail.com",
+    "url": "https://www.github.com/gatongone"
+  },
+  "unity": "2021.3",
+  "type": "tools",
+  "keywords": [
+    "Utils"
+  ],
+  "dependencies": {
+    "com.unity.collections": "1.5.2"
+  }
+}

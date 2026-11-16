@@ -16,3 +16,8 @@
 
 # Benchmark results
 BenchmarkDotNet.Artifacts/
+.bdn/
+.bdntmp/
+
+test-results/
+TestResult.xml

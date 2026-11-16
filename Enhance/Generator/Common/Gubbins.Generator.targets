@@ -1,0 +1,13 @@
+<Project>
+    <Target Name="CopyGeneratorToEnginePlugins" AfterTargets="Build">
+        <PropertyGroup>
+            <ModuleRoot>$(MSBuildProjectDirectory)\..</ModuleRoot>
+        </PropertyGroup>
+        <ItemGroup>
+            <GeneratorOutput Include="$(TargetPath)" />
+            <GeneratorOutput Include="$(TargetDir)$(TargetName).pdb" Condition="Exists('$(TargetDir)$(TargetName).pdb')" />
+        </ItemGroup>
+        <Copy SourceFiles="@(GeneratorOutput)" DestinationFolder="$(ModuleRoot)\Unity\Plugins" SkipUnchangedFiles="true" />
+        <Copy SourceFiles="@(GeneratorOutput)" DestinationFolder="$(ModuleRoot)\Godot\Plugins" SkipUnchangedFiles="true" />
+    </Target>
+</Project>

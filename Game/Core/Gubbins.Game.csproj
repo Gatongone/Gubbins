@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\Events\Core\Gubbins.Events.csproj" />
+        <ProjectReference Include="..\..\Span\Core\Gubbins.Span.csproj" />
+        <ProjectReference Include="..\..\Entities\Generator\Gubbins.Entities.Generator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+        <ProjectReference Include="..\..\Span\Generator\Gubbins.Span.Generator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Reference Include="Gubbins.Events">
+        <HintPath>..\..\Events\Core\bin\Debug\netstandard2.1\Gubbins.Events.dll</HintPath>
+      </Reference>
+    </ItemGroup>
+
+</Project>

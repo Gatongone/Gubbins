@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <Import Project="..\..\Gubbins.Test.props" />
+
+    <ItemGroup>
+        <ProjectReference Include="..\Core\Gubbins.Span.csproj" />
+        <ProjectReference Include="..\..\Unsafe\Core\Gubbins.Unsafe.csproj" />
+    </ItemGroup>
+
+</Project>

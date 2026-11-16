@@ -1,0 +1,23 @@
+{
+  "name": "com.gatongone.gubbins.editor",
+  "version": "0.0.1",
+  "license": "MIT",
+  "displayName": "Gubbins Editor",
+  "description": "Unity editor tooling for the Gubbins packages.",
+  "author": {
+    "name": "Gatongone",
+    "email": "gatongone@gmail.com",
+    "url": "https://www.github.com/gatongone"
+  },
+  "unity": "2021.3",
+  "type": "tools",
+  "keywords": [
+    "Utils"
+  ],
+  "dependencies": {
+    "com.gatongone.gubbins.enhance": "0.0.1",
+    "com.gatongone.gubbins.entities": "0.0.1",
+    "com.gatongone.gubbins.context": "0.0.1",
+    "com.gatongone.gubbins.spawner": "0.0.1"
+  }
+}

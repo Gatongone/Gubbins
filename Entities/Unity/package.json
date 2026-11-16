@@ -1,0 +1,27 @@
+{
+  "name": "com.gatongone.gubbins.entities",
+  "version": "0.0.1",
+  "license": "MIT",
+  "displayName": "Gubbins Entities",
+  "description": "Archetype ECS integration for Unity.",
+  "author": {
+    "name": "Gatongone",
+    "email": "gatongone@gmail.com",
+    "url": "https://www.github.com/gatongone"
+  },
+  "unity": "2021.3",
+  "type": "tools",
+  "keywords": [
+    "Utils"
+  ],
+  "dependencies": {
+    "com.gatongone.gubbins.async": "0.0.1",
+    "com.gatongone.gubbins.collections": "0.0.1",
+    "com.gatongone.gubbins.unmanaged": "0.0.1",
+    "com.gatongone.gubbins.unsafe": "0.0.1",
+    "com.gatongone.gubbins.span": "0.0.1",
+    "com.unity.mathematics": "1.2.6",
+    "com.unity.burst": "1.8.26",
+    "com.unity.collections": "1.5.2"
+  }
+}

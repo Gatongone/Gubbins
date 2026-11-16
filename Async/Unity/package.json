@@ -1,0 +1,18 @@
+{
+  "name": "com.gatongone.gubbins.async",
+  "version": "0.0.1",
+  "license": "MIT",
+  "displayName": "Gubbins Async",
+  "description": "Gubbins Async Unity integration.",
+  "author": {
+    "name": "Gatongone",
+    "email": "gatongone@gmail.com",
+    "url": "https://www.github.com/gatongone"
+  },
+  "unity": "2021.3",
+  "type": "tools",
+  "keywords": [
+    "Utils"
+  ],
+  "dependencies": {}
+}

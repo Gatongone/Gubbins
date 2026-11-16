@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+        <RootNamespace>Gubins.Pipeline</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\Context\Core\Gubbins.Context.csproj" />
+      <ProjectReference Include="..\..\Enhance\Core\Gubbins.Enhance.csproj" />
+      <ProjectReference Include="..\..\Events\Core\Gubbins.Events.csproj" />
+    </ItemGroup>
+
+</Project>

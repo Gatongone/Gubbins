@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <Import Project="..\..\Gubbins.Test.props" />
+
+    <ItemGroup>
+        <ProjectReference Include="..\Core\Gubbins.Entities.csproj" />
+        <ProjectReference Include="..\..\Span\Core\Gubbins.Span.csproj" />
+        <ProjectReference Include="..\..\Unsafe\Core\Gubbins.Unsafe.csproj" />
+        <ProjectReference Include="..\Generator\Gubbins.Entities.Generator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+        <ProjectReference Include="..\..\Span\Generator\Gubbins.Span.Generator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    </ItemGroup>
+
+</Project>

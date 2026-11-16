@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <Import Project="..\..\Gubbins.Test.props" />
+
+    <ItemGroup>
+        <ProjectReference Include="..\Core\Gubbins.Enhance.csproj" />
+        <ProjectReference Include="..\Generator\Gubbins.Enhance.Generator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    </ItemGroup>
+
+</Project>

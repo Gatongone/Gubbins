@@ -1,0 +1,1011 @@
+E:\Projects\CSharp\Gubbins\Entities\Benchmarks\InsertBenchmarks.cs(19,29): warning CS8618: Non-nullable field 'm_Handle' must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring the field as nullable. [E:\Projects\CSharp\Gubbins\Entities\Benchmarks\Gubbins.Entities.Benchmarks.csproj]
+E:\Projects\CSharp\Gubbins\Entities\Benchmarks\InsertBenchmarks.cs(20,30): warning CS8618: Non-nullable field 'm_Repository' must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring the field as nullable. [E:\Projects\CSharp\Gubbins\Entities\Benchmarks\Gubbins.Entities.Benchmarks.csproj]
+E:\Projects\CSharp\Gubbins\Entities\Benchmarks\EntitiesBenchmarks.cs(13,29): warning CS8618: Non-nullable field 'm_Handle' must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring the field as nullable. [E:\Projects\CSharp\Gubbins\Entities\Benchmarks\Gubbins.Entities.Benchmarks.csproj]
+E:\Projects\CSharp\Gubbins\Entities\Benchmarks\EntitiesBenchmarks.cs(14,30): warning CS8618: Non-nullable field 'm_Repository' must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring the field as nullable. [E:\Projects\CSharp\Gubbins\Entities\Benchmarks\Gubbins.Entities.Benchmarks.csproj]
+// Validating benchmarks:
+// ***** BenchmarkRunner: Start   *****
+// ***** Found 7 benchmark(s) in total *****
+// ***** Building 1 exe(s) in Parallel: Start   *****
+// start dotnet restore gen.csproj /p:ArtifactsPath=E:\Projects\CSharp\Gubbins\Entities\Benchmarks\.bdn\1\a /p:BenchmarkDotNetGatherReferences=true --nodeReuse:false /p:UseSharedCompilation=false /p:Deterministic=true /p:Optimize=true in E:\Projects\CSharp\Gubbins\Entities\Benchmarks\.bdn\1
+// command took 2.93 sec and exited with 0
+// start dotnet build gen.csproj -f net10.0 -c Release /p:ArtifactsPath=E:\Projects\CSharp\Gubbins\Entities\Benchmarks\.bdn\1\a /p:BenchmarkDotNetGatherReferences=true --no-restore --nodeReuse:false /p:UseSharedCompilation=false /p:Deterministic=true /p:Optimize=true in E:\Projects\CSharp\Gubbins\Entities\Benchmarks\.bdn\1
+// command took 18.27 sec and exited with 0
+// E:\Projects\CSharp\Gubbins\Async\Core\AsynchronousMethodBuilder.cs(240,13): warning CS8618: Non-nullable field 'm_StateMachine' must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring the field as nullable. [E:\Projects\CSharp\Gubbins\Async\Core\Gubbins.Async.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Unsafe\Core\Reflection.cs(378,37): warning CS8604: Possible null reference argument for parameter 'method' in 'Delegate? ReflectionExtensions.CreateGetSetDelegate(MethodInfo method)'. [E:\Projects\CSharp\Gubbins\Unsafe\Core\Gubbins.Unsafe.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Unsafe\Core\Reflection.cs(388,37): warning CS8604: Possible null reference argument for parameter 'method' in 'Delegate? ReflectionExtensions.CreateGetSetDelegate(MethodInfo method)'. [E:\Projects\CSharp\Gubbins\Unsafe\Core\Gubbins.Unsafe.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Unsafe\Core\ValuableProperty.cs(97,43): warning CS8601: Possible null reference assignment. [E:\Projects\CSharp\Gubbins\Unsafe\Core\Gubbins.Unsafe.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Unsafe\Core\ValuableProperty.cs(104,43): warning CS8601: Possible null reference assignment. [E:\Projects\CSharp\Gubbins\Unsafe\Core\Gubbins.Unsafe.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Unsafe\Core\ValuableProperty.cs(121,43): warning CS8601: Possible null reference assignment. [E:\Projects\CSharp\Gubbins\Unsafe\Core\Gubbins.Unsafe.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Unsafe\Core\ValuableProperty.cs(126,43): warning CS8601: Possible null reference assignment. [E:\Projects\CSharp\Gubbins\Unsafe\Core\Gubbins.Unsafe.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Unsafe\Core\ValuableProperty.cs(66,14): warning CS8618: Non-nullable field 'm_StructValueGetWrapper' must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring the field as nullable. [E:\Projects\CSharp\Gubbins\Unsafe\Core\Gubbins.Unsafe.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Unsafe\Core\ValuableProperty.cs(66,14): warning CS8618: Non-nullable field 'm_GetMethod' must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring the field as nullable. [E:\Projects\CSharp\Gubbins\Unsafe\Core\Gubbins.Unsafe.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Unsafe\Core\ValuableProperty.cs(66,14): warning CS8618: Non-nullable field 'm_StructValueSetWrapper' must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring the field as nullable. [E:\Projects\CSharp\Gubbins\Unsafe\Core\Gubbins.Unsafe.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Unsafe\Core\ValuableProperty.cs(66,14): warning CS8618: Non-nullable field 'm_SetMethod' must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring the field as nullable. [E:\Projects\CSharp\Gubbins\Unsafe\Core\Gubbins.Unsafe.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Unsafe\Core\Reflection.cs(82,22): warning CS8601: Possible null reference assignment. [E:\Projects\CSharp\Gubbins\Unsafe\Core\Gubbins.Unsafe.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Enhance\Core\Result.cs(282,53): warning CS8604: Possible null reference argument for parameter 'arg' in 'TR Func<T, TR>.Invoke(T arg)'. [E:\Projects\CSharp\Gubbins\Enhance\Core\Gubbins.Enhance.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Spawner\Core\ISpawner.cs(14,14): warning CS0108: 'ISpawner<TProduct>.Spawn()' hides inherited member 'ISpawner.Spawn()'. Use the new keyword if hiding was intended. [E:\Projects\CSharp\Gubbins\Spawner\Core\Gubbins.Spawner.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Collections\Core\ExpandArray.cs(693,15): warning CS8769: Nullability of reference types in type of parameter 'item' doesn't match implemented member 'int IList.IndexOf(object? value)' (possibly because of nullability attributes). [E:\Projects\CSharp\Gubbins\Collections\Core\Gubbins.Collections.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Collections\Core\ExpandArray.cs(761,16): warning CS8769: Nullability of reference types in type of parameter 'item' doesn't match implemented member 'void IList.Insert(int index, object? value)' (possibly because of nullability attributes). [E:\Projects\CSharp\Gubbins\Collections\Core\Gubbins.Collections.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Collections\Core\RankPairing.cs(145,21): warning CS8767: Nullability of reference types in type of parameter 'other' of 'bool Vertex.Equals(Vertex other)' doesn't match implicitly implemented member 'bool IEquatable<Vertex>.Equals(Vertex? other)' (possibly because of nullability attributes). [E:\Projects\CSharp\Gubbins\Collections\Core\Gubbins.Collections.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Collections\Core\RankPairing.cs(148,21): warning CS8767: Nullability of reference types in type of parameter 'x' of 'bool Vertex.Equals(Vertex x, Vertex y)' doesn't match implicitly implemented member 'bool IEqualityComparer<Vertex>.Equals(Vertex? x, Vertex? y)' (possibly because of nullability attributes). [E:\Projects\CSharp\Gubbins\Collections\Core\Gubbins.Collections.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Collections\Core\RankPairing.cs(148,21): warning CS8767: Nullability of reference types in type of parameter 'y' of 'bool Vertex.Equals(Vertex x, Vertex y)' doesn't match implicitly implemented member 'bool IEqualityComparer<Vertex>.Equals(Vertex? x, Vertex? y)' (possibly because of nullability attributes). [E:\Projects\CSharp\Gubbins\Collections\Core\Gubbins.Collections.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Collections\Core\Interfaces\IBimap.cs(100,10): warning CS0108: 'IBimap<TForward, TReverse>.Clear()' hides inherited member 'ICollection<KeyValuePair<TForward, TReverse>>.Clear()'. Use the new keyword if hiding was intended. [E:\Projects\CSharp\Gubbins\Collections\Core\Gubbins.Collections.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Collections\Core\UndirectedGraph.cs(14,54): warning CS8714: The type 'TVertex' cannot be used as type parameter 'TKey' in the generic type or method 'Dictionary<TKey, TValue>'. Nullability of type argument 'TVertex' doesn't match 'notnull' constraint. [E:\Projects\CSharp\Gubbins\Collections\Core\Gubbins.Collections.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Collections\Core\DirectedGraph.cs(18,54): warning CS8714: The type 'TVertex' cannot be used as type parameter 'TKey' in the generic type or method 'Dictionary<TKey, TValue>'. Nullability of type argument 'TVertex' doesn't match 'notnull' constraint. [E:\Projects\CSharp\Gubbins\Collections\Core\Gubbins.Collections.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Collections\Core\SetGroup.cs(103,39): warning CS8714: The type 'T' cannot be used as type parameter 'TKey' in the generic type or method 'Dictionary<TKey, TValue>'. Nullability of type argument 'T' doesn't match 'notnull' constraint. [E:\Projects\CSharp\Gubbins\Collections\Core\Gubbins.Collections.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Collections\Core\SetGroup.cs(104,41): warning CS8714: The type 'T' cannot be used as type parameter 'TKey' in the generic type or method 'Dictionary<TKey, TValue>'. Nullability of type argument 'T' doesn't match 'notnull' constraint. [E:\Projects\CSharp\Gubbins\Collections\Core\Gubbins.Collections.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Collections\Core\DirectedGraph.cs(543,86): warning CS8714: The type 'TVertex' cannot be used as type parameter 'TKey' in the generic type or method 'Dictionary<TKey, TValue>'. Nullability of type argument 'TVertex' doesn't match 'notnull' constraint. [E:\Projects\CSharp\Gubbins\Collections\Core\Gubbins.Collections.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Collections\Core\DirectedGraph.cs(545,74): warning CS8714: The type 'TVertex' cannot be used as type parameter 'TKey' in the generic type or method 'Dictionary<TKey, TValue>'. Nullability of type argument 'TVertex' doesn't match 'notnull' constraint. [E:\Projects\CSharp\Gubbins\Collections\Core\Gubbins.Collections.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Collections\Core\Bimap.cs(665,109): warning CS8601: Possible null reference assignment. [E:\Projects\CSharp\Gubbins\Collections\Core\Gubbins.Collections.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Collections\Core\Bimap.cs(672,109): warning CS8601: Possible null reference assignment. [E:\Projects\CSharp\Gubbins\Collections\Core\Gubbins.Collections.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Collections\Core\Bimap.cs(747,44): warning CS8601: Possible null reference assignment. [E:\Projects\CSharp\Gubbins\Collections\Core\Gubbins.Collections.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Collections\Core\Bimap.cs(763,44): warning CS8601: Possible null reference assignment. [E:\Projects\CSharp\Gubbins\Collections\Core\Gubbins.Collections.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Collections\Core\RankPairing.cs(26,24): warning CS8602: Dereference of a possibly null reference. [E:\Projects\CSharp\Gubbins\Collections\Core\Gubbins.Collections.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Collections\Core\RankPairing.cs(38,55): warning CS8602: Dereference of a possibly null reference. [E:\Projects\CSharp\Gubbins\Collections\Core\Gubbins.Collections.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Collections\Core\RedBlackTree.cs(217,16): warning CS8603: Possible null reference return. [E:\Projects\CSharp\Gubbins\Collections\Core\Gubbins.Collections.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Collections\Core\RedBlackTree.cs(224,26): warning CS8602: Dereference of a possibly null reference. [E:\Projects\CSharp\Gubbins\Collections\Core\Gubbins.Collections.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Collections\Core\RedBlackTree.cs(229,17): warning CS8602: Dereference of a possibly null reference. [E:\Projects\CSharp\Gubbins\Collections\Core\Gubbins.Collections.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Collections\Core\RedBlackTree.cs(238,25): warning CS8602: Dereference of a possibly null reference. [E:\Projects\CSharp\Gubbins\Collections\Core\Gubbins.Collections.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Collections\Core\RedBlackTree.cs(248,21): warning CS8602: Dereference of a possibly null reference. [E:\Projects\CSharp\Gubbins\Collections\Core\Gubbins.Collections.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Collections\Core\RedBlackTree.cs(255,21): warning CS8602: Dereference of a possibly null reference. [E:\Projects\CSharp\Gubbins\Collections\Core\Gubbins.Collections.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Collections\Core\RedBlackTree.cs(261,17): warning CS8602: Dereference of a possibly null reference. [E:\Projects\CSharp\Gubbins\Collections\Core\Gubbins.Collections.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Collections\Core\RedBlackTree.cs(265,21): warning CS8602: Dereference of a possibly null reference. [E:\Projects\CSharp\Gubbins\Collections\Core\Gubbins.Collections.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Collections\Core\RedBlackTree.cs(270,21): warning CS8602: Dereference of a possibly null reference. [E:\Projects\CSharp\Gubbins\Collections\Core\Gubbins.Collections.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Collections\Core\RedBlackTree.cs(285,34): warning CS8602: Dereference of a possibly null reference. [E:\Projects\CSharp\Gubbins\Collections\Core\Gubbins.Collections.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Collections\Core\RedBlackTree.cs(289,25): warning CS8602: Dereference of a possibly null reference. [E:\Projects\CSharp\Gubbins\Collections\Core\Gubbins.Collections.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Collections\Core\RedBlackTree.cs(294,17): warning CS8602: Dereference of a possibly null reference. [E:\Projects\CSharp\Gubbins\Collections\Core\Gubbins.Collections.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Collections\Core\RedBlackTree.cs(309,21): warning CS8602: Dereference of a possibly null reference. [E:\Projects\CSharp\Gubbins\Collections\Core\Gubbins.Collections.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Collections\Core\RedBlackTree.cs(322,21): warning CS8602: Dereference of a possibly null reference. [E:\Projects\CSharp\Gubbins\Collections\Core\Gubbins.Collections.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Collections\Core\RedBlackTree.cs(329,9): warning CS8602: Dereference of a possibly null reference. [E:\Projects\CSharp\Gubbins\Collections\Core\Gubbins.Collections.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Collections\Core\RedBlackTree.cs(336,22): warning CS8602: Dereference of a possibly null reference. [E:\Projects\CSharp\Gubbins\Collections\Core\Gubbins.Collections.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Collections\Core\RedBlackTree.cs(354,21): warning CS8602: Dereference of a possibly null reference. [E:\Projects\CSharp\Gubbins\Collections\Core\Gubbins.Collections.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Unmanaged\Core\Ulist.cs(354,15): warning CS8769: Nullability of reference types in type of parameter 'value' doesn't match implemented member 'int IList.IndexOf(object? value)' (possibly because of nullability attributes). [E:\Projects\CSharp\Gubbins\Unmanaged\Core\Gubbins.Unmanaged.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Unmanaged\Core\Ulist.cs(357,16): warning CS8769: Nullability of reference types in type of parameter 'value' doesn't match implemented member 'void IList.Insert(int index, object? value)' (possibly because of nullability attributes). [E:\Projects\CSharp\Gubbins\Unmanaged\Core\Gubbins.Unmanaged.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Unmanaged\Core\Ulist.cs(360,16): warning CS8769: Nullability of reference types in type of parameter 'value' doesn't match implemented member 'void IList.Remove(object? value)' (possibly because of nullability attributes). [E:\Projects\CSharp\Gubbins\Unmanaged\Core\Gubbins.Unmanaged.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Unmanaged\Core\Ustring.cs(16,22): warning CS0660: 'Ustring' defines operator == or operator != but does not override Object.Equals(object o) [E:\Projects\CSharp\Gubbins\Unmanaged\Core\Gubbins.Unmanaged.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Unmanaged\Core\Ustring.cs(16,22): warning CS0661: 'Ustring' defines operator == or operator != but does not override Object.GetHashCode() [E:\Projects\CSharp\Gubbins\Unmanaged\Core\Gubbins.Unmanaged.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Unmanaged\Core\Ulist.cs(75,9): warning CS8769: Nullability of reference types in type of parameter 'value' doesn't match implemented member 'void IList.this[int index].set' (possibly because of nullability attributes). [E:\Projects\CSharp\Gubbins\Unmanaged\Core\Gubbins.Unmanaged.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Unmanaged\Core\Uarray.cs(141,9): warning CS8769: Nullability of reference types in type of parameter 'value' doesn't match implemented member 'void IList.this[int index].set' (possibly because of nullability attributes). [E:\Projects\CSharp\Gubbins\Unmanaged\Core\Gubbins.Unmanaged.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Unmanaged\Core\Ulist.cs(74,16): warning CS8603: Possible null reference return. [E:\Projects\CSharp\Gubbins\Unmanaged\Core\Gubbins.Unmanaged.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Unmanaged\Core\Uset.cs(171,24): warning CS8602: Dereference of a possibly null reference. [E:\Projects\CSharp\Gubbins\Unmanaged\Core\Gubbins.Unmanaged.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Unmanaged\Core\Uset.cs(312,24): warning CS8602: Dereference of a possibly null reference. [E:\Projects\CSharp\Gubbins\Unmanaged\Core\Gubbins.Unmanaged.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Unmanaged\Core\Uset.cs(414,28): warning CS8602: Dereference of a possibly null reference. [E:\Projects\CSharp\Gubbins\Unmanaged\Core\Gubbins.Unmanaged.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Unmanaged\Core\Umap.cs(658,17): warning CS8602: Dereference of a possibly null reference. [E:\Projects\CSharp\Gubbins\Unmanaged\Core\Gubbins.Unmanaged.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Unmanaged\Core\Uset.cs(758,24): warning CS8603: Possible null reference return. [E:\Projects\CSharp\Gubbins\Unmanaged\Core\Gubbins.Unmanaged.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Unmanaged\Core\Uset.cs(653,24): warning CS8603: Possible null reference return. [E:\Projects\CSharp\Gubbins\Unmanaged\Core\Gubbins.Unmanaged.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Unmanaged\Core\Uarray.cs(789,53): warning CS8604: Possible null reference argument for parameter 'obj' in 'int IEqualityComparer.GetHashCode(object obj)'. [E:\Projects\CSharp\Gubbins\Unmanaged\Core\Gubbins.Unmanaged.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Entities\Core\Chunk\Archetype.cs(181,29): warning CS8600: Converting null literal or possible null value to non-nullable type. [E:\Projects\CSharp\Gubbins\Entities\Core\Gubbins.Entities.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Entities\Core\Chunk\Archetype.cs(197,16): warning CS8603: Possible null reference return. [E:\Projects\CSharp\Gubbins\Entities\Core\Gubbins.Entities.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Entities\Core\ComponentsBuffer.cs(60,58): warning CS9084: Struct member returns 'this' or other instance members by reference [E:\Projects\CSharp\Gubbins\Entities\Core\Gubbins.Entities.csproj::TargetFramework=net8.0]
+// E:\Projects\CSharp\Gubbins\Entities\Benchmarks\InsertBenchmarks.cs(19,29): warning CS8618: Non-nullable field 'm_Handle' must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring the field as nullable. [E:\Projects\CSharp\Gubbins\Entities\Benchmarks\Gubbins.Entities.Benchmarks.csproj]
+// E:\Projects\CSharp\Gubbins\Entities\Benchmarks\InsertBenchmarks.cs(20,30): warning CS8618: Non-nullable field 'm_Repository' must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring the field as nullable. [E:\Projects\CSharp\Gubbins\Entities\Benchmarks\Gubbins.Entities.Benchmarks.csproj]
+// E:\Projects\CSharp\Gubbins\Entities\Benchmarks\EntitiesBenchmarks.cs(13,29): warning CS8618: Non-nullable field 'm_Handle' must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring the field as nullable. [E:\Projects\CSharp\Gubbins\Entities\Benchmarks\Gubbins.Entities.Benchmarks.csproj]
+// E:\Projects\CSharp\Gubbins\Entities\Benchmarks\EntitiesBenchmarks.cs(14,30): warning CS8618: Non-nullable field 'm_Repository' must contain a non-null value when exiting constructor. Consider adding the 'required' modifier or declaring the field as nullable. [E:\Projects\CSharp\Gubbins\Entities\Benchmarks\Gubbins.Entities.Benchmarks.csproj]
+// start dotnet build gen.csproj -f net10.0 -c Release /p:ArtifactsPath=E:\Projects\CSharp\Gubbins\Entities\Benchmarks\.bdn\1\a --nodeReuse:false /p:UseSharedCompilation=false /p:Deterministic=true /p:Optimize=true in E:\Projects\CSharp\Gubbins\Entities\Benchmarks\.bdn\1
+// command took 6.64 sec and exited with 0
+// ***** Done, took 00:00:27 (28 sec)   *****
+// Found 7 benchmarks:
+//   EntitiesInsertBenchmarks.TypedInsert: Job-MJLQTR(InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3) [Count=200000]
+//   EntitiesInsertBenchmarks.TypedInsertAll: Job-MJLQTR(InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3) [Count=200000]
+//   EntitiesInsertBenchmarks.ComponentsInsertPerCall: Job-MJLQTR(InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3) [Count=200000]
+//   EntitiesInsertBenchmarks.ComponentsInsertHoisted: Job-MJLQTR(InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3) [Count=200000]
+//   EntitiesInsertBenchmarks.ComponentsInsertAll: Job-MJLQTR(InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3) [Count=200000]
+//   EntitiesInsertBenchmarks.TypedInsertManyArchetypes: Job-MJLQTR(InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3) [Count=200000]
+//   EntitiesInsertBenchmarks.ComponentsInsertManyArchetypes: Job-MJLQTR(InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3) [Count=200000]
+
+Cannot setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c)
+// **************************
+// Benchmark: EntitiesInsertBenchmarks.TypedInsert: Job-MJLQTR(InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3) [Count=200000]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Gubbins.Entities.Benchmarks-gen.dll --ipcPort 51941 --benchmarkName "Gubbins.Entities.Benchmarks.EntitiesInsertBenchmarks.TypedInsert(Count: 200000)" --job "InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3" --diagnoserRunMode 3 --benchmarkId 0 in E:\Projects\CSharp\Gubbins\Entities\Benchmarks\.bdn\1\b
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.16.0-preview.2
+// Runtime=.NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: Job-MJLQTR(InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3)
+
+WorkloadJitting  1: 1 op, 45555600.00 ns, 45.5556 ms/op
+WorkloadJitting  2: 1 op, 26703900.00 ns, 26.7039 ms/op
+WorkloadJitting  3: 1 op, 25941000.00 ns, 25.9410 ms/op
+WorkloadJitting  4: 1 op, 27963300.00 ns, 27.9633 ms/op
+WorkloadJitting  5: 1 op, 27173300.00 ns, 27.1733 ms/op
+WorkloadJitting  6: 1 op, 27455200.00 ns, 27.4552 ms/op
+WorkloadJitting  7: 1 op, 27469800.00 ns, 27.4698 ms/op
+WorkloadJitting  8: 1 op, 25734000.00 ns, 25.7340 ms/op
+WorkloadJitting  9: 1 op, 25645500.00 ns, 25.6455 ms/op
+WorkloadJitting 10: 1 op, 26668700.00 ns, 26.6687 ms/op
+WorkloadJitting 11: 1 op, 26067800.00 ns, 26.0678 ms/op
+WorkloadJitting 12: 1 op, 27465400.00 ns, 27.4654 ms/op
+WorkloadJitting 13: 1 op, 25325500.00 ns, 25.3255 ms/op
+WorkloadJitting 14: 1 op, 25712500.00 ns, 25.7125 ms/op
+WorkloadJitting 15: 1 op, 25486000.00 ns, 25.4860 ms/op
+WorkloadJitting 16: 1 op, 25205800.00 ns, 25.2058 ms/op
+WorkloadJitting 17: 1 op, 25354800.00 ns, 25.3548 ms/op
+WorkloadJitting 18: 1 op, 25626900.00 ns, 25.6269 ms/op
+WorkloadJitting 19: 1 op, 25570200.00 ns, 25.5702 ms/op
+WorkloadJitting 20: 1 op, 25983800.00 ns, 25.9838 ms/op
+WorkloadJitting 21: 1 op, 25957900.00 ns, 25.9579 ms/op
+WorkloadJitting 22: 1 op, 25877700.00 ns, 25.8777 ms/op
+WorkloadJitting 23: 1 op, 25755500.00 ns, 25.7555 ms/op
+WorkloadJitting 24: 1 op, 25523000.00 ns, 25.5230 ms/op
+WorkloadJitting 25: 1 op, 25597700.00 ns, 25.5977 ms/op
+WorkloadJitting 26: 1 op, 25718500.00 ns, 25.7185 ms/op
+WorkloadJitting 27: 1 op, 25351700.00 ns, 25.3517 ms/op
+WorkloadJitting 28: 1 op, 25545000.00 ns, 25.5450 ms/op
+WorkloadJitting 29: 1 op, 25446000.00 ns, 25.4460 ms/op
+WorkloadJitting 30: 1 op, 25556400.00 ns, 25.5564 ms/op
+WorkloadJitting 31: 1 op, 26597700.00 ns, 26.5977 ms/op
+WorkloadJitting 32: 1 op, 25779100.00 ns, 25.7791 ms/op
+WorkloadJitting 33: 1 op, 27661800.00 ns, 27.6618 ms/op
+WorkloadJitting 34: 1 op, 27313000.00 ns, 27.3130 ms/op
+WorkloadJitting 35: 1 op, 25245800.00 ns, 25.2458 ms/op
+WorkloadJitting 36: 1 op, 25356800.00 ns, 25.3568 ms/op
+WorkloadJitting 37: 1 op, 25194800.00 ns, 25.1948 ms/op
+WorkloadJitting 38: 1 op, 25215100.00 ns, 25.2151 ms/op
+WorkloadJitting 39: 1 op, 25348400.00 ns, 25.3484 ms/op
+WorkloadJitting 40: 1 op, 25362600.00 ns, 25.3626 ms/op
+WorkloadJitting 41: 1 op, 25717400.00 ns, 25.7174 ms/op
+WorkloadJitting 42: 1 op, 25461000.00 ns, 25.4610 ms/op
+WorkloadJitting 43: 1 op, 25356900.00 ns, 25.3569 ms/op
+WorkloadJitting 44: 1 op, 25827000.00 ns, 25.8270 ms/op
+WorkloadJitting 45: 1 op, 25784200.00 ns, 25.7842 ms/op
+WorkloadJitting 46: 1 op, 27859500.00 ns, 27.8595 ms/op
+WorkloadJitting 47: 1 op, 27829800.00 ns, 27.8298 ms/op
+WorkloadJitting 48: 1 op, 34545400.00 ns, 34.5454 ms/op
+WorkloadJitting 49: 1 op, 35272000.00 ns, 35.2720 ms/op
+WorkloadJitting 50: 1 op, 30517800.00 ns, 30.5178 ms/op
+WorkloadJitting 51: 1 op, 30763000.00 ns, 30.7630 ms/op
+WorkloadJitting 52: 1 op, 29557900.00 ns, 29.5579 ms/op
+WorkloadJitting 53: 1 op, 35413700.00 ns, 35.4137 ms/op
+WorkloadJitting 54: 1 op, 29880600.00 ns, 29.8806 ms/op
+WorkloadJitting 55: 1 op, 28286800.00 ns, 28.2868 ms/op
+WorkloadJitting 56: 1 op, 28542600.00 ns, 28.5426 ms/op
+WorkloadJitting 57: 1 op, 28945000.00 ns, 28.9450 ms/op
+WorkloadJitting 58: 1 op, 28358000.00 ns, 28.3580 ms/op
+WorkloadJitting 59: 1 op, 29262300.00 ns, 29.2623 ms/op
+WorkloadJitting 60: 1 op, 31920500.00 ns, 31.9205 ms/op
+WorkloadJitting 61: 1 op, 35155800.00 ns, 35.1558 ms/op
+WorkloadJitting 62: 1 op, 25820500.00 ns, 25.8205 ms/op
+
+WorkloadWarmup   1: 1 op, 23829900.00 ns, 23.8299 ms/op
+WorkloadWarmup   2: 1 op, 25072900.00 ns, 25.0729 ms/op
+WorkloadWarmup   3: 1 op, 22234900.00 ns, 22.2349 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 1 op, 22276200.00 ns, 22.2762 ms/op
+WorkloadActual   2: 1 op, 22662500.00 ns, 22.6625 ms/op
+WorkloadActual   3: 1 op, 22612800.00 ns, 22.6128 ms/op
+WorkloadActual   4: 1 op, 22473200.00 ns, 22.4732 ms/op
+WorkloadActual   5: 1 op, 22266900.00 ns, 22.2669 ms/op
+
+// AfterActualRun
+// BeforeExtraIteration
+// AfterExtraIteration
+WorkloadExtra    1: 1 op, 22048600.00 ns, 22.0486 ms/op
+WorkloadResult   1: 1 op, 22276200.00 ns, 22.2762 ms/op
+WorkloadResult   2: 1 op, 22662500.00 ns, 22.6625 ms/op
+WorkloadResult   3: 1 op, 22612800.00 ns, 22.6128 ms/op
+WorkloadResult   4: 1 op, 22473200.00 ns, 22.4732 ms/op
+WorkloadResult   5: 1 op, 22266900.00 ns, 22.2669 ms/op
+// GC:  0 0 0 12638304 1
+
+// AfterAll
+// Benchmark Process 23484 has exited with code 0.
+
+Mean = 22.458 ms, StdErr = 0.082 ms (0.37%), N = 5, StdDev = 0.184 ms
+Min = 22.267 ms, Q1 = 22.276 ms, Median = 22.473 ms, Q3 = 22.613 ms, Max = 22.663 ms
+IQR = 0.337 ms, LowerFence = 21.771 ms, UpperFence = 23.118 ms
+ConfidenceInterval = [21.749 ms; 23.167 ms] (CI 99.9%), Margin = 0.709 ms (3.16% of Mean)
+Skewness = -0.03, Kurtosis = 0.83, MValue = 2
+
+// ** Remained 6 (85.7%) benchmark(s) to run. Estimated finish 2026-11-23 19:03 (0h 0m from now) **
+Cannot setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c)
+// **************************
+// Benchmark: EntitiesInsertBenchmarks.TypedInsertAll: Job-MJLQTR(InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3) [Count=200000]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Gubbins.Entities.Benchmarks-gen.dll --ipcPort 51960 --benchmarkName "Gubbins.Entities.Benchmarks.EntitiesInsertBenchmarks.TypedInsertAll(Count: 200000)" --job "InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3" --diagnoserRunMode 3 --benchmarkId 1 in E:\Projects\CSharp\Gubbins\Entities\Benchmarks\.bdn\1\b
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.16.0-preview.2
+// Runtime=.NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: Job-MJLQTR(InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3)
+
+WorkloadJitting  1: 1 op, 67289800.00 ns, 67.2898 ms/op
+WorkloadJitting  2: 1 op, 17230500.00 ns, 17.2305 ms/op
+WorkloadJitting  3: 1 op, 16495800.00 ns, 16.4958 ms/op
+WorkloadJitting  4: 1 op, 15930200.00 ns, 15.9302 ms/op
+WorkloadJitting  5: 1 op, 15975700.00 ns, 15.9757 ms/op
+WorkloadJitting  6: 1 op, 15735900.00 ns, 15.7359 ms/op
+WorkloadJitting  7: 1 op, 16094600.00 ns, 16.0946 ms/op
+WorkloadJitting  8: 1 op, 15979700.00 ns, 15.9797 ms/op
+WorkloadJitting  9: 1 op, 15468100.00 ns, 15.4681 ms/op
+WorkloadJitting 10: 1 op, 15470600.00 ns, 15.4706 ms/op
+WorkloadJitting 11: 1 op, 15820800.00 ns, 15.8208 ms/op
+WorkloadJitting 12: 1 op, 15819500.00 ns, 15.8195 ms/op
+WorkloadJitting 13: 1 op, 16745300.00 ns, 16.7453 ms/op
+WorkloadJitting 14: 1 op, 15980100.00 ns, 15.9801 ms/op
+WorkloadJitting 15: 1 op, 15937500.00 ns, 15.9375 ms/op
+WorkloadJitting 16: 1 op, 16111400.00 ns, 16.1114 ms/op
+WorkloadJitting 17: 1 op, 15667500.00 ns, 15.6675 ms/op
+WorkloadJitting 18: 1 op, 15535000.00 ns, 15.5350 ms/op
+WorkloadJitting 19: 1 op, 15655800.00 ns, 15.6558 ms/op
+WorkloadJitting 20: 1 op, 16400900.00 ns, 16.4009 ms/op
+WorkloadJitting 21: 1 op, 16894600.00 ns, 16.8946 ms/op
+WorkloadJitting 22: 1 op, 17749400.00 ns, 17.7494 ms/op
+WorkloadJitting 23: 1 op, 16846000.00 ns, 16.8460 ms/op
+WorkloadJitting 24: 1 op, 17471700.00 ns, 17.4717 ms/op
+WorkloadJitting 25: 1 op, 18130100.00 ns, 18.1301 ms/op
+WorkloadJitting 26: 1 op, 16836700.00 ns, 16.8367 ms/op
+WorkloadJitting 27: 1 op, 15955800.00 ns, 15.9558 ms/op
+WorkloadJitting 28: 1 op, 16120900.00 ns, 16.1209 ms/op
+WorkloadJitting 29: 1 op, 15750500.00 ns, 15.7505 ms/op
+WorkloadJitting 30: 1 op, 16269500.00 ns, 16.2695 ms/op
+WorkloadJitting 31: 1 op, 15997400.00 ns, 15.9974 ms/op
+WorkloadJitting 32: 1 op, 15849300.00 ns, 15.8493 ms/op
+WorkloadJitting 33: 1 op, 15931500.00 ns, 15.9315 ms/op
+WorkloadJitting 34: 1 op, 16078500.00 ns, 16.0785 ms/op
+WorkloadJitting 35: 1 op, 16122600.00 ns, 16.1226 ms/op
+WorkloadJitting 36: 1 op, 16203800.00 ns, 16.2038 ms/op
+WorkloadJitting 37: 1 op, 16434200.00 ns, 16.4342 ms/op
+WorkloadJitting 38: 1 op, 16120500.00 ns, 16.1205 ms/op
+WorkloadJitting 39: 1 op, 16086300.00 ns, 16.0863 ms/op
+WorkloadJitting 40: 1 op, 16570900.00 ns, 16.5709 ms/op
+WorkloadJitting 41: 1 op, 16413800.00 ns, 16.4138 ms/op
+WorkloadJitting 42: 1 op, 17357300.00 ns, 17.3573 ms/op
+WorkloadJitting 43: 1 op, 16838000.00 ns, 16.8380 ms/op
+WorkloadJitting 44: 1 op, 15908100.00 ns, 15.9081 ms/op
+WorkloadJitting 45: 1 op, 16352200.00 ns, 16.3522 ms/op
+WorkloadJitting 46: 1 op, 16221700.00 ns, 16.2217 ms/op
+WorkloadJitting 47: 1 op, 16149700.00 ns, 16.1497 ms/op
+WorkloadJitting 48: 1 op, 16275100.00 ns, 16.2751 ms/op
+WorkloadJitting 49: 1 op, 16037500.00 ns, 16.0375 ms/op
+WorkloadJitting 50: 1 op, 15897400.00 ns, 15.8974 ms/op
+WorkloadJitting 51: 1 op, 16008500.00 ns, 16.0085 ms/op
+WorkloadJitting 52: 1 op, 15966900.00 ns, 15.9669 ms/op
+WorkloadJitting 53: 1 op, 16754300.00 ns, 16.7543 ms/op
+WorkloadJitting 54: 1 op, 16192200.00 ns, 16.1922 ms/op
+WorkloadJitting 55: 1 op, 16096600.00 ns, 16.0966 ms/op
+WorkloadJitting 56: 1 op, 16057300.00 ns, 16.0573 ms/op
+WorkloadJitting 57: 1 op, 15917000.00 ns, 15.9170 ms/op
+WorkloadJitting 58: 1 op, 16259500.00 ns, 16.2595 ms/op
+WorkloadJitting 59: 1 op, 16754300.00 ns, 16.7543 ms/op
+WorkloadJitting 60: 1 op, 18664400.00 ns, 18.6644 ms/op
+WorkloadJitting 61: 1 op, 19072500.00 ns, 19.0725 ms/op
+WorkloadJitting 62: 1 op, 18797700.00 ns, 18.7977 ms/op
+
+WorkloadWarmup   1: 1 op, 17303300.00 ns, 17.3033 ms/op
+WorkloadWarmup   2: 1 op, 15530200.00 ns, 15.5302 ms/op
+WorkloadWarmup   3: 1 op, 15467500.00 ns, 15.4675 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 1 op, 15540900.00 ns, 15.5409 ms/op
+WorkloadActual   2: 1 op, 15288800.00 ns, 15.2888 ms/op
+WorkloadActual   3: 1 op, 16259600.00 ns, 16.2596 ms/op
+WorkloadActual   4: 1 op, 15500400.00 ns, 15.5004 ms/op
+WorkloadActual   5: 1 op, 15838600.00 ns, 15.8386 ms/op
+
+// AfterActualRun
+// BeforeExtraIteration
+// AfterExtraIteration
+WorkloadExtra    1: 1 op, 15909600.00 ns, 15.9096 ms/op
+WorkloadResult   1: 1 op, 15540900.00 ns, 15.5409 ms/op
+WorkloadResult   2: 1 op, 15288800.00 ns, 15.2888 ms/op
+WorkloadResult   3: 1 op, 16259600.00 ns, 16.2596 ms/op
+WorkloadResult   4: 1 op, 15500400.00 ns, 15.5004 ms/op
+WorkloadResult   5: 1 op, 15838600.00 ns, 15.8386 ms/op
+// GC:  0 0 0 12638304 1
+
+// AfterAll
+// Benchmark Process 42976 has exited with code 0.
+
+Mean = 15.686 ms, StdErr = 0.168 ms (1.07%), N = 5, StdDev = 0.376 ms
+Min = 15.289 ms, Q1 = 15.500 ms, Median = 15.541 ms, Q3 = 15.839 ms, Max = 16.260 ms
+IQR = 0.338 ms, LowerFence = 14.993 ms, UpperFence = 16.346 ms
+ConfidenceInterval = [14.238 ms; 17.134 ms] (CI 99.9%), Margin = 1.448 ms (9.23% of Mean)
+Skewness = 0.45, Kurtosis = 1.36, MValue = 2
+
+// ** Remained 5 (71.4%) benchmark(s) to run. Estimated finish 2026-11-23 19:03 (0h 0m from now) **
+Cannot setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c)
+// **************************
+// Benchmark: EntitiesInsertBenchmarks.ComponentsInsertPerCall: Job-MJLQTR(InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3) [Count=200000]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Gubbins.Entities.Benchmarks-gen.dll --ipcPort 51965 --benchmarkName "Gubbins.Entities.Benchmarks.EntitiesInsertBenchmarks.ComponentsInsertPerCall(Count: 200000)" --job "InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3" --diagnoserRunMode 3 --benchmarkId 2 in E:\Projects\CSharp\Gubbins\Entities\Benchmarks\.bdn\1\b
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.16.0-preview.2
+// Runtime=.NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: Job-MJLQTR(InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3)
+
+WorkloadJitting  1: 1 op, 79467900.00 ns, 79.4679 ms/op
+WorkloadJitting  2: 1 op, 23719000.00 ns, 23.7190 ms/op
+WorkloadJitting  3: 1 op, 23344500.00 ns, 23.3445 ms/op
+WorkloadJitting  4: 1 op, 23008700.00 ns, 23.0087 ms/op
+WorkloadJitting  5: 1 op, 23033500.00 ns, 23.0335 ms/op
+WorkloadJitting  6: 1 op, 22679900.00 ns, 22.6799 ms/op
+WorkloadJitting  7: 1 op, 23393800.00 ns, 23.3938 ms/op
+WorkloadJitting  8: 1 op, 23238800.00 ns, 23.2388 ms/op
+WorkloadJitting  9: 1 op, 22986300.00 ns, 22.9863 ms/op
+WorkloadJitting 10: 1 op, 22914100.00 ns, 22.9141 ms/op
+WorkloadJitting 11: 1 op, 22924500.00 ns, 22.9245 ms/op
+WorkloadJitting 12: 1 op, 23158600.00 ns, 23.1586 ms/op
+WorkloadJitting 13: 1 op, 23505000.00 ns, 23.5050 ms/op
+WorkloadJitting 14: 1 op, 25154300.00 ns, 25.1543 ms/op
+WorkloadJitting 15: 1 op, 23693100.00 ns, 23.6931 ms/op
+WorkloadJitting 16: 1 op, 23292500.00 ns, 23.2925 ms/op
+WorkloadJitting 17: 1 op, 23081700.00 ns, 23.0817 ms/op
+WorkloadJitting 18: 1 op, 23722100.00 ns, 23.7221 ms/op
+WorkloadJitting 19: 1 op, 23425800.00 ns, 23.4258 ms/op
+WorkloadJitting 20: 1 op, 23756900.00 ns, 23.7569 ms/op
+WorkloadJitting 21: 1 op, 24244500.00 ns, 24.2445 ms/op
+WorkloadJitting 22: 1 op, 29424300.00 ns, 29.4243 ms/op
+WorkloadJitting 23: 1 op, 24436200.00 ns, 24.4362 ms/op
+WorkloadJitting 24: 1 op, 23585400.00 ns, 23.5854 ms/op
+WorkloadJitting 25: 1 op, 23655900.00 ns, 23.6559 ms/op
+WorkloadJitting 26: 1 op, 22909700.00 ns, 22.9097 ms/op
+WorkloadJitting 27: 1 op, 22991400.00 ns, 22.9914 ms/op
+WorkloadJitting 28: 1 op, 23435500.00 ns, 23.4355 ms/op
+WorkloadJitting 29: 1 op, 23542100.00 ns, 23.5421 ms/op
+WorkloadJitting 30: 1 op, 25241800.00 ns, 25.2418 ms/op
+WorkloadJitting 31: 1 op, 24374600.00 ns, 24.3746 ms/op
+WorkloadJitting 32: 1 op, 23613500.00 ns, 23.6135 ms/op
+WorkloadJitting 33: 1 op, 23342400.00 ns, 23.3424 ms/op
+WorkloadJitting 34: 1 op, 23278100.00 ns, 23.2781 ms/op
+WorkloadJitting 35: 1 op, 23410100.00 ns, 23.4101 ms/op
+WorkloadJitting 36: 1 op, 23381900.00 ns, 23.3819 ms/op
+WorkloadJitting 37: 1 op, 23349800.00 ns, 23.3498 ms/op
+WorkloadJitting 38: 1 op, 23248100.00 ns, 23.2481 ms/op
+WorkloadJitting 39: 1 op, 23578400.00 ns, 23.5784 ms/op
+WorkloadJitting 40: 1 op, 23681100.00 ns, 23.6811 ms/op
+WorkloadJitting 41: 1 op, 23748800.00 ns, 23.7488 ms/op
+WorkloadJitting 42: 1 op, 23478600.00 ns, 23.4786 ms/op
+WorkloadJitting 43: 1 op, 23025800.00 ns, 23.0258 ms/op
+WorkloadJitting 44: 1 op, 23420800.00 ns, 23.4208 ms/op
+WorkloadJitting 45: 1 op, 23609400.00 ns, 23.6094 ms/op
+WorkloadJitting 46: 1 op, 23487500.00 ns, 23.4875 ms/op
+WorkloadJitting 47: 1 op, 23167100.00 ns, 23.1671 ms/op
+WorkloadJitting 48: 1 op, 22965300.00 ns, 22.9653 ms/op
+WorkloadJitting 49: 1 op, 23099800.00 ns, 23.0998 ms/op
+WorkloadJitting 50: 1 op, 23874300.00 ns, 23.8743 ms/op
+WorkloadJitting 51: 1 op, 23436100.00 ns, 23.4361 ms/op
+WorkloadJitting 52: 1 op, 24055900.00 ns, 24.0559 ms/op
+WorkloadJitting 53: 1 op, 24935200.00 ns, 24.9352 ms/op
+WorkloadJitting 54: 1 op, 24598600.00 ns, 24.5986 ms/op
+WorkloadJitting 55: 1 op, 22732900.00 ns, 22.7329 ms/op
+WorkloadJitting 56: 1 op, 23321500.00 ns, 23.3215 ms/op
+WorkloadJitting 57: 1 op, 23187200.00 ns, 23.1872 ms/op
+WorkloadJitting 58: 1 op, 22897600.00 ns, 22.8976 ms/op
+WorkloadJitting 59: 1 op, 23436600.00 ns, 23.4366 ms/op
+WorkloadJitting 60: 1 op, 24820100.00 ns, 24.8201 ms/op
+WorkloadJitting 61: 1 op, 23397200.00 ns, 23.3972 ms/op
+WorkloadJitting 62: 1 op, 20422100.00 ns, 20.4221 ms/op
+
+WorkloadWarmup   1: 1 op, 21121800.00 ns, 21.1218 ms/op
+WorkloadWarmup   2: 1 op, 20648100.00 ns, 20.6481 ms/op
+WorkloadWarmup   3: 1 op, 20585600.00 ns, 20.5856 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 1 op, 20979800.00 ns, 20.9798 ms/op
+WorkloadActual   2: 1 op, 20195500.00 ns, 20.1955 ms/op
+WorkloadActual   3: 1 op, 20732300.00 ns, 20.7323 ms/op
+WorkloadActual   4: 1 op, 21121800.00 ns, 21.1218 ms/op
+WorkloadActual   5: 1 op, 20706000.00 ns, 20.7060 ms/op
+
+// AfterActualRun
+// BeforeExtraIteration
+// AfterExtraIteration
+WorkloadExtra    1: 1 op, 22691400.00 ns, 22.6914 ms/op
+WorkloadResult   1: 1 op, 20979800.00 ns, 20.9798 ms/op
+WorkloadResult   2: 1 op, 20195500.00 ns, 20.1955 ms/op
+WorkloadResult   3: 1 op, 20732300.00 ns, 20.7323 ms/op
+WorkloadResult   4: 1 op, 21121800.00 ns, 21.1218 ms/op
+WorkloadResult   5: 1 op, 20706000.00 ns, 20.7060 ms/op
+// GC:  0 0 0 12638304 1
+
+// AfterAll
+// Benchmark Process 40180 has exited with code 0.
+
+Mean = 20.747 ms, StdErr = 0.158 ms (0.76%), N = 5, StdDev = 0.354 ms
+Min = 20.195 ms, Q1 = 20.706 ms, Median = 20.732 ms, Q3 = 20.980 ms, Max = 21.122 ms
+IQR = 0.274 ms, LowerFence = 20.295 ms, UpperFence = 21.390 ms
+ConfidenceInterval = [19.385 ms; 22.109 ms] (CI 99.9%), Margin = 1.362 ms (6.57% of Mean)
+Skewness = -0.46, Kurtosis = 1.47, MValue = 2
+
+// ** Remained 4 (57.1%) benchmark(s) to run. Estimated finish 2026-11-23 19:03 (0h 0m from now) **
+Cannot setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c)
+// **************************
+// Benchmark: EntitiesInsertBenchmarks.ComponentsInsertHoisted: Job-MJLQTR(InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3) [Count=200000]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Gubbins.Entities.Benchmarks-gen.dll --ipcPort 51972 --benchmarkName "Gubbins.Entities.Benchmarks.EntitiesInsertBenchmarks.ComponentsInsertHoisted(Count: 200000)" --job "InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3" --diagnoserRunMode 3 --benchmarkId 3 in E:\Projects\CSharp\Gubbins\Entities\Benchmarks\.bdn\1\b
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.16.0-preview.2
+// Runtime=.NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: Job-MJLQTR(InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3)
+
+WorkloadJitting  1: 1 op, 78109700.00 ns, 78.1097 ms/op
+WorkloadJitting  2: 1 op, 22557200.00 ns, 22.5572 ms/op
+WorkloadJitting  3: 1 op, 21645400.00 ns, 21.6454 ms/op
+WorkloadJitting  4: 1 op, 19993700.00 ns, 19.9937 ms/op
+WorkloadJitting  5: 1 op, 20739100.00 ns, 20.7391 ms/op
+WorkloadJitting  6: 1 op, 21472400.00 ns, 21.4724 ms/op
+WorkloadJitting  7: 1 op, 20132000.00 ns, 20.1320 ms/op
+WorkloadJitting  8: 1 op, 20235300.00 ns, 20.2353 ms/op
+WorkloadJitting  9: 1 op, 19958900.00 ns, 19.9589 ms/op
+WorkloadJitting 10: 1 op, 19994900.00 ns, 19.9949 ms/op
+WorkloadJitting 11: 1 op, 19880100.00 ns, 19.8801 ms/op
+WorkloadJitting 12: 1 op, 19670200.00 ns, 19.6702 ms/op
+WorkloadJitting 13: 1 op, 20319900.00 ns, 20.3199 ms/op
+WorkloadJitting 14: 1 op, 21448400.00 ns, 21.4484 ms/op
+WorkloadJitting 15: 1 op, 21479100.00 ns, 21.4791 ms/op
+WorkloadJitting 16: 1 op, 20827000.00 ns, 20.8270 ms/op
+WorkloadJitting 17: 1 op, 20635400.00 ns, 20.6354 ms/op
+WorkloadJitting 18: 1 op, 19884400.00 ns, 19.8844 ms/op
+WorkloadJitting 19: 1 op, 19706100.00 ns, 19.7061 ms/op
+WorkloadJitting 20: 1 op, 21541900.00 ns, 21.5419 ms/op
+WorkloadJitting 21: 1 op, 21462500.00 ns, 21.4625 ms/op
+WorkloadJitting 22: 1 op, 20039100.00 ns, 20.0391 ms/op
+WorkloadJitting 23: 1 op, 20319200.00 ns, 20.3192 ms/op
+WorkloadJitting 24: 1 op, 19596900.00 ns, 19.5969 ms/op
+WorkloadJitting 25: 1 op, 20303200.00 ns, 20.3032 ms/op
+WorkloadJitting 26: 1 op, 19939000.00 ns, 19.9390 ms/op
+WorkloadJitting 27: 1 op, 19836300.00 ns, 19.8363 ms/op
+WorkloadJitting 28: 1 op, 22503500.00 ns, 22.5035 ms/op
+WorkloadJitting 29: 1 op, 21677700.00 ns, 21.6777 ms/op
+WorkloadJitting 30: 1 op, 21016800.00 ns, 21.0168 ms/op
+WorkloadJitting 31: 1 op, 19663500.00 ns, 19.6635 ms/op
+WorkloadJitting 32: 1 op, 19967000.00 ns, 19.9670 ms/op
+WorkloadJitting 33: 1 op, 19925300.00 ns, 19.9253 ms/op
+WorkloadJitting 34: 1 op, 20032200.00 ns, 20.0322 ms/op
+WorkloadJitting 35: 1 op, 21279600.00 ns, 21.2796 ms/op
+WorkloadJitting 36: 1 op, 20146500.00 ns, 20.1465 ms/op
+WorkloadJitting 37: 1 op, 19827800.00 ns, 19.8278 ms/op
+WorkloadJitting 38: 1 op, 20677300.00 ns, 20.6773 ms/op
+WorkloadJitting 39: 1 op, 20854800.00 ns, 20.8548 ms/op
+WorkloadJitting 40: 1 op, 19480300.00 ns, 19.4803 ms/op
+WorkloadJitting 41: 1 op, 20718300.00 ns, 20.7183 ms/op
+WorkloadJitting 42: 1 op, 20005500.00 ns, 20.0055 ms/op
+WorkloadJitting 43: 1 op, 19325200.00 ns, 19.3252 ms/op
+WorkloadJitting 44: 1 op, 19664400.00 ns, 19.6644 ms/op
+WorkloadJitting 45: 1 op, 19650000.00 ns, 19.6500 ms/op
+WorkloadJitting 46: 1 op, 20357400.00 ns, 20.3574 ms/op
+WorkloadJitting 47: 1 op, 19729800.00 ns, 19.7298 ms/op
+WorkloadJitting 48: 1 op, 19864800.00 ns, 19.8648 ms/op
+WorkloadJitting 49: 1 op, 22253200.00 ns, 22.2532 ms/op
+WorkloadJitting 50: 1 op, 22092600.00 ns, 22.0926 ms/op
+WorkloadJitting 51: 1 op, 21884800.00 ns, 21.8848 ms/op
+WorkloadJitting 52: 1 op, 20094100.00 ns, 20.0941 ms/op
+WorkloadJitting 53: 1 op, 19845500.00 ns, 19.8455 ms/op
+WorkloadJitting 54: 1 op, 19965400.00 ns, 19.9654 ms/op
+WorkloadJitting 55: 1 op, 20660100.00 ns, 20.6601 ms/op
+WorkloadJitting 56: 1 op, 21147600.00 ns, 21.1476 ms/op
+WorkloadJitting 57: 1 op, 22654400.00 ns, 22.6544 ms/op
+WorkloadJitting 58: 1 op, 21864300.00 ns, 21.8643 ms/op
+WorkloadJitting 59: 1 op, 23921100.00 ns, 23.9211 ms/op
+WorkloadJitting 60: 1 op, 23104100.00 ns, 23.1041 ms/op
+WorkloadJitting 61: 1 op, 22927900.00 ns, 22.9279 ms/op
+WorkloadJitting 62: 1 op, 18975700.00 ns, 18.9757 ms/op
+
+WorkloadWarmup   1: 1 op, 20277900.00 ns, 20.2779 ms/op
+WorkloadWarmup   2: 1 op, 19305700.00 ns, 19.3057 ms/op
+WorkloadWarmup   3: 1 op, 19697100.00 ns, 19.6971 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 1 op, 20881600.00 ns, 20.8816 ms/op
+WorkloadActual   2: 1 op, 21371100.00 ns, 21.3711 ms/op
+WorkloadActual   3: 1 op, 21008300.00 ns, 21.0083 ms/op
+WorkloadActual   4: 1 op, 20910300.00 ns, 20.9103 ms/op
+WorkloadActual   5: 1 op, 19845900.00 ns, 19.8459 ms/op
+
+// AfterActualRun
+// BeforeExtraIteration
+// AfterExtraIteration
+WorkloadExtra    1: 1 op, 22287200.00 ns, 22.2872 ms/op
+WorkloadResult   1: 1 op, 20881600.00 ns, 20.8816 ms/op
+WorkloadResult   2: 1 op, 21008300.00 ns, 21.0083 ms/op
+WorkloadResult   3: 1 op, 20910300.00 ns, 20.9103 ms/op
+WorkloadResult   4: 1 op, 19845900.00 ns, 19.8459 ms/op
+// GC:  0 0 0 12638304 1
+
+// AfterAll
+// Benchmark Process 41676 has exited with code 0.
+
+Mean = 20.662 ms, StdErr = 0.273 ms (1.32%), N = 4, StdDev = 0.546 ms
+Min = 19.846 ms, Q1 = 20.623 ms, Median = 20.896 ms, Q3 = 20.935 ms, Max = 21.008 ms
+IQR = 0.312 ms, LowerFence = 20.154 ms, UpperFence = 21.403 ms
+ConfidenceInterval = [17.130 ms; 24.193 ms] (CI 99.9%), Margin = 3.531 ms (17.09% of Mean)
+Skewness = -0.73, Kurtosis = 1.3, MValue = 2
+
+// ** Remained 3 (42.9%) benchmark(s) to run. Estimated finish 2026-11-23 19:03 (0h 0m from now) **
+Cannot setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c)
+// **************************
+// Benchmark: EntitiesInsertBenchmarks.ComponentsInsertAll: Job-MJLQTR(InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3) [Count=200000]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Gubbins.Entities.Benchmarks-gen.dll --ipcPort 50885 --benchmarkName "Gubbins.Entities.Benchmarks.EntitiesInsertBenchmarks.ComponentsInsertAll(Count: 200000)" --job "InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3" --diagnoserRunMode 3 --benchmarkId 4 in E:\Projects\CSharp\Gubbins\Entities\Benchmarks\.bdn\1\b
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.16.0-preview.2
+// Runtime=.NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: Job-MJLQTR(InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3)
+
+WorkloadJitting  1: 1 op, 65011400.00 ns, 65.0114 ms/op
+WorkloadJitting  2: 1 op, 17129900.00 ns, 17.1299 ms/op
+WorkloadJitting  3: 1 op, 16891200.00 ns, 16.8912 ms/op
+WorkloadJitting  4: 1 op, 15912900.00 ns, 15.9129 ms/op
+WorkloadJitting  5: 1 op, 15898700.00 ns, 15.8987 ms/op
+WorkloadJitting  6: 1 op, 16252300.00 ns, 16.2523 ms/op
+WorkloadJitting  7: 1 op, 15823900.00 ns, 15.8239 ms/op
+WorkloadJitting  8: 1 op, 16856200.00 ns, 16.8562 ms/op
+WorkloadJitting  9: 1 op, 16650000.00 ns, 16.6500 ms/op
+WorkloadJitting 10: 1 op, 16477300.00 ns, 16.4773 ms/op
+WorkloadJitting 11: 1 op, 16179600.00 ns, 16.1796 ms/op
+WorkloadJitting 12: 1 op, 16207500.00 ns, 16.2075 ms/op
+WorkloadJitting 13: 1 op, 16339800.00 ns, 16.3398 ms/op
+WorkloadJitting 14: 1 op, 15912400.00 ns, 15.9124 ms/op
+WorkloadJitting 15: 1 op, 16784200.00 ns, 16.7842 ms/op
+WorkloadJitting 16: 1 op, 17449100.00 ns, 17.4491 ms/op
+WorkloadJitting 17: 1 op, 17830400.00 ns, 17.8304 ms/op
+WorkloadJitting 18: 1 op, 18051100.00 ns, 18.0511 ms/op
+WorkloadJitting 19: 1 op, 17459300.00 ns, 17.4593 ms/op
+WorkloadJitting 20: 1 op, 16720400.00 ns, 16.7204 ms/op
+WorkloadJitting 21: 1 op, 16897100.00 ns, 16.8971 ms/op
+WorkloadJitting 22: 1 op, 17548900.00 ns, 17.5489 ms/op
+WorkloadJitting 23: 1 op, 17694400.00 ns, 17.6944 ms/op
+WorkloadJitting 24: 1 op, 17222000.00 ns, 17.2220 ms/op
+WorkloadJitting 25: 1 op, 17314800.00 ns, 17.3148 ms/op
+WorkloadJitting 26: 1 op, 16472600.00 ns, 16.4726 ms/op
+WorkloadJitting 27: 1 op, 16064400.00 ns, 16.0644 ms/op
+WorkloadJitting 28: 1 op, 17519300.00 ns, 17.5193 ms/op
+WorkloadJitting 29: 1 op, 17409100.00 ns, 17.4091 ms/op
+WorkloadJitting 30: 1 op, 16815400.00 ns, 16.8154 ms/op
+WorkloadJitting 31: 1 op, 17433100.00 ns, 17.4331 ms/op
+WorkloadJitting 32: 1 op, 16980100.00 ns, 16.9801 ms/op
+WorkloadJitting 33: 1 op, 16596200.00 ns, 16.5962 ms/op
+WorkloadJitting 34: 1 op, 18371100.00 ns, 18.3711 ms/op
+WorkloadJitting 35: 1 op, 17687500.00 ns, 17.6875 ms/op
+WorkloadJitting 36: 1 op, 17031000.00 ns, 17.0310 ms/op
+WorkloadJitting 37: 1 op, 15949200.00 ns, 15.9492 ms/op
+WorkloadJitting 38: 1 op, 16898700.00 ns, 16.8987 ms/op
+WorkloadJitting 39: 1 op, 16243700.00 ns, 16.2437 ms/op
+WorkloadJitting 40: 1 op, 16938800.00 ns, 16.9388 ms/op
+WorkloadJitting 41: 1 op, 16838600.00 ns, 16.8386 ms/op
+WorkloadJitting 42: 1 op, 16376900.00 ns, 16.3769 ms/op
+WorkloadJitting 43: 1 op, 17320100.00 ns, 17.3201 ms/op
+WorkloadJitting 44: 1 op, 17489300.00 ns, 17.4893 ms/op
+WorkloadJitting 45: 1 op, 18384500.00 ns, 18.3845 ms/op
+WorkloadJitting 46: 1 op, 20331400.00 ns, 20.3314 ms/op
+WorkloadJitting 47: 1 op, 19152300.00 ns, 19.1523 ms/op
+WorkloadJitting 48: 1 op, 17731800.00 ns, 17.7318 ms/op
+WorkloadJitting 49: 1 op, 17552800.00 ns, 17.5528 ms/op
+WorkloadJitting 50: 1 op, 17488800.00 ns, 17.4888 ms/op
+WorkloadJitting 51: 1 op, 17375200.00 ns, 17.3752 ms/op
+WorkloadJitting 52: 1 op, 17361500.00 ns, 17.3615 ms/op
+WorkloadJitting 53: 1 op, 17188700.00 ns, 17.1887 ms/op
+WorkloadJitting 54: 1 op, 16641900.00 ns, 16.6419 ms/op
+WorkloadJitting 55: 1 op, 17861200.00 ns, 17.8612 ms/op
+WorkloadJitting 56: 1 op, 17775500.00 ns, 17.7755 ms/op
+WorkloadJitting 57: 1 op, 17821800.00 ns, 17.8218 ms/op
+WorkloadJitting 58: 1 op, 17525800.00 ns, 17.5258 ms/op
+WorkloadJitting 59: 1 op, 16459500.00 ns, 16.4595 ms/op
+WorkloadJitting 60: 1 op, 16168500.00 ns, 16.1685 ms/op
+WorkloadJitting 61: 1 op, 16341000.00 ns, 16.3410 ms/op
+WorkloadJitting 62: 1 op, 15505200.00 ns, 15.5052 ms/op
+
+WorkloadWarmup   1: 1 op, 15843000.00 ns, 15.8430 ms/op
+WorkloadWarmup   2: 1 op, 15643800.00 ns, 15.6438 ms/op
+WorkloadWarmup   3: 1 op, 15610100.00 ns, 15.6101 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 1 op, 15722100.00 ns, 15.7221 ms/op
+WorkloadActual   2: 1 op, 15513100.00 ns, 15.5131 ms/op
+WorkloadActual   3: 1 op, 15547400.00 ns, 15.5474 ms/op
+WorkloadActual   4: 1 op, 15737700.00 ns, 15.7377 ms/op
+WorkloadActual   5: 1 op, 15511900.00 ns, 15.5119 ms/op
+
+// AfterActualRun
+// BeforeExtraIteration
+// AfterExtraIteration
+WorkloadExtra    1: 1 op, 15959000.00 ns, 15.9590 ms/op
+WorkloadResult   1: 1 op, 15722100.00 ns, 15.7221 ms/op
+WorkloadResult   2: 1 op, 15513100.00 ns, 15.5131 ms/op
+WorkloadResult   3: 1 op, 15547400.00 ns, 15.5474 ms/op
+WorkloadResult   4: 1 op, 15737700.00 ns, 15.7377 ms/op
+WorkloadResult   5: 1 op, 15511900.00 ns, 15.5119 ms/op
+// GC:  0 0 0 12638304 1
+
+// AfterAll
+// Benchmark Process 42248 has exited with code 0.
+
+Mean = 15.606 ms, StdErr = 0.051 ms (0.33%), N = 5, StdDev = 0.114 ms
+Min = 15.512 ms, Q1 = 15.513 ms, Median = 15.547 ms, Q3 = 15.722 ms, Max = 15.738 ms
+IQR = 0.209 ms, LowerFence = 15.200 ms, UpperFence = 16.036 ms
+ConfidenceInterval = [15.168 ms; 16.044 ms] (CI 99.9%), Margin = 0.438 ms (2.81% of Mean)
+Skewness = 0.26, Kurtosis = 0.77, MValue = 2
+
+// ** Remained 2 (28.6%) benchmark(s) to run. Estimated finish 2026-11-23 19:03 (0h 0m from now) **
+Cannot setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c)
+// **************************
+// Benchmark: EntitiesInsertBenchmarks.TypedInsertManyArchetypes: Job-MJLQTR(InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3) [Count=200000]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Gubbins.Entities.Benchmarks-gen.dll --ipcPort 50895 --benchmarkName "Gubbins.Entities.Benchmarks.EntitiesInsertBenchmarks.TypedInsertManyArchetypes(Count: 200000)" --job "InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3" --diagnoserRunMode 3 --benchmarkId 5 in E:\Projects\CSharp\Gubbins\Entities\Benchmarks\.bdn\1\b
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.16.0-preview.2
+// Runtime=.NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: Job-MJLQTR(InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3)
+
+WorkloadJitting  1: 1 op, 100628200.00 ns, 100.6282 ms/op
+WorkloadJitting  2: 1 op, 28907300.00 ns, 28.9073 ms/op
+WorkloadJitting  3: 1 op, 26749100.00 ns, 26.7491 ms/op
+WorkloadJitting  4: 1 op, 28717300.00 ns, 28.7173 ms/op
+WorkloadJitting  5: 1 op, 26542600.00 ns, 26.5426 ms/op
+WorkloadJitting  6: 1 op, 27762600.00 ns, 27.7626 ms/op
+WorkloadJitting  7: 1 op, 28562600.00 ns, 28.5626 ms/op
+WorkloadJitting  8: 1 op, 28579800.00 ns, 28.5798 ms/op
+WorkloadJitting  9: 1 op, 26892300.00 ns, 26.8923 ms/op
+WorkloadJitting 10: 1 op, 33168100.00 ns, 33.1681 ms/op
+WorkloadJitting 11: 1 op, 30491600.00 ns, 30.4916 ms/op
+WorkloadJitting 12: 1 op, 28709100.00 ns, 28.7091 ms/op
+WorkloadJitting 13: 1 op, 27957500.00 ns, 27.9575 ms/op
+WorkloadJitting 14: 1 op, 28780800.00 ns, 28.7808 ms/op
+WorkloadJitting 15: 1 op, 26459400.00 ns, 26.4594 ms/op
+WorkloadJitting 16: 1 op, 26600700.00 ns, 26.6007 ms/op
+WorkloadJitting 17: 1 op, 26278600.00 ns, 26.2786 ms/op
+WorkloadJitting 18: 1 op, 28409400.00 ns, 28.4094 ms/op
+WorkloadJitting 19: 1 op, 27789100.00 ns, 27.7891 ms/op
+WorkloadJitting 20: 1 op, 25937900.00 ns, 25.9379 ms/op
+WorkloadJitting 21: 1 op, 26103200.00 ns, 26.1032 ms/op
+WorkloadJitting 22: 1 op, 26784600.00 ns, 26.7846 ms/op
+WorkloadJitting 23: 1 op, 27750600.00 ns, 27.7506 ms/op
+WorkloadJitting 24: 1 op, 27581800.00 ns, 27.5818 ms/op
+WorkloadJitting 25: 1 op, 28095500.00 ns, 28.0955 ms/op
+WorkloadJitting 26: 1 op, 30375200.00 ns, 30.3752 ms/op
+WorkloadJitting 27: 1 op, 28922200.00 ns, 28.9222 ms/op
+WorkloadJitting 28: 1 op, 28306500.00 ns, 28.3065 ms/op
+WorkloadJitting 29: 1 op, 28070400.00 ns, 28.0704 ms/op
+WorkloadJitting 30: 1 op, 29060300.00 ns, 29.0603 ms/op
+WorkloadJitting 31: 1 op, 27277900.00 ns, 27.2779 ms/op
+WorkloadJitting 32: 1 op, 28665600.00 ns, 28.6656 ms/op
+WorkloadJitting 33: 1 op, 27785400.00 ns, 27.7854 ms/op
+WorkloadJitting 34: 1 op, 28593200.00 ns, 28.5932 ms/op
+WorkloadJitting 35: 1 op, 26509500.00 ns, 26.5095 ms/op
+WorkloadJitting 36: 1 op, 26571500.00 ns, 26.5715 ms/op
+WorkloadJitting 37: 1 op, 26940500.00 ns, 26.9405 ms/op
+WorkloadJitting 38: 1 op, 28023200.00 ns, 28.0232 ms/op
+WorkloadJitting 39: 1 op, 27562800.00 ns, 27.5628 ms/op
+WorkloadJitting 40: 1 op, 28978000.00 ns, 28.9780 ms/op
+WorkloadJitting 41: 1 op, 26929700.00 ns, 26.9297 ms/op
+WorkloadJitting 42: 1 op, 27022700.00 ns, 27.0227 ms/op
+WorkloadJitting 43: 1 op, 27124500.00 ns, 27.1245 ms/op
+WorkloadJitting 44: 1 op, 26324500.00 ns, 26.3245 ms/op
+WorkloadJitting 45: 1 op, 26967500.00 ns, 26.9675 ms/op
+WorkloadJitting 46: 1 op, 26625200.00 ns, 26.6252 ms/op
+WorkloadJitting 47: 1 op, 28097300.00 ns, 28.0973 ms/op
+WorkloadJitting 48: 1 op, 28698700.00 ns, 28.6987 ms/op
+WorkloadJitting 49: 1 op, 27786500.00 ns, 27.7865 ms/op
+WorkloadJitting 50: 1 op, 31048700.00 ns, 31.0487 ms/op
+WorkloadJitting 51: 1 op, 30859500.00 ns, 30.8595 ms/op
+WorkloadJitting 52: 1 op, 29201800.00 ns, 29.2018 ms/op
+WorkloadJitting 53: 1 op, 29111200.00 ns, 29.1112 ms/op
+WorkloadJitting 54: 1 op, 30897200.00 ns, 30.8972 ms/op
+WorkloadJitting 55: 1 op, 28493100.00 ns, 28.4931 ms/op
+WorkloadJitting 56: 1 op, 28095600.00 ns, 28.0956 ms/op
+WorkloadJitting 57: 1 op, 26430500.00 ns, 26.4305 ms/op
+WorkloadJitting 58: 1 op, 26614800.00 ns, 26.6148 ms/op
+WorkloadJitting 59: 1 op, 26227200.00 ns, 26.2272 ms/op
+WorkloadJitting 60: 1 op, 26376800.00 ns, 26.3768 ms/op
+WorkloadJitting 61: 1 op, 27741400.00 ns, 27.7414 ms/op
+WorkloadJitting 62: 1 op, 23324000.00 ns, 23.3240 ms/op
+
+WorkloadWarmup   1: 1 op, 25008200.00 ns, 25.0082 ms/op
+WorkloadWarmup   2: 1 op, 24283000.00 ns, 24.2830 ms/op
+WorkloadWarmup   3: 1 op, 24121700.00 ns, 24.1217 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 1 op, 24279900.00 ns, 24.2799 ms/op
+WorkloadActual   2: 1 op, 23815300.00 ns, 23.8153 ms/op
+WorkloadActual   3: 1 op, 23716700.00 ns, 23.7167 ms/op
+WorkloadActual   4: 1 op, 23804300.00 ns, 23.8043 ms/op
+WorkloadActual   5: 1 op, 24625600.00 ns, 24.6256 ms/op
+
+// AfterActualRun
+// BeforeExtraIteration
+// AfterExtraIteration
+WorkloadExtra    1: 1 op, 23661600.00 ns, 23.6616 ms/op
+WorkloadResult   1: 1 op, 24279900.00 ns, 24.2799 ms/op
+WorkloadResult   2: 1 op, 23815300.00 ns, 23.8153 ms/op
+WorkloadResult   3: 1 op, 23716700.00 ns, 23.7167 ms/op
+WorkloadResult   4: 1 op, 23804300.00 ns, 23.8043 ms/op
+WorkloadResult   5: 1 op, 24625600.00 ns, 24.6256 ms/op
+// GC:  0 0 0 12662864 1
+
+// AfterAll
+// Benchmark Process 8584 has exited with code 0.
+
+Mean = 24.048 ms, StdErr = 0.175 ms (0.73%), N = 5, StdDev = 0.391 ms
+Min = 23.717 ms, Q1 = 23.804 ms, Median = 23.815 ms, Q3 = 24.280 ms, Max = 24.626 ms
+IQR = 0.476 ms, LowerFence = 23.091 ms, UpperFence = 24.993 ms
+ConfidenceInterval = [22.544 ms; 25.553 ms] (CI 99.9%), Margin = 1.505 ms (6.26% of Mean)
+Skewness = 0.47, Kurtosis = 1.14, MValue = 2
+
+// ** Remained 1 (14.3%) benchmark(s) to run. Estimated finish 2026-11-23 19:03 (0h 0m from now) **
+Cannot setup power plan (GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c)
+// **************************
+// Benchmark: EntitiesInsertBenchmarks.ComponentsInsertManyArchetypes: Job-MJLQTR(InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3) [Count=200000]
+// *** Execute ***
+// Launch: 1 / 1
+// Execute: dotnet Gubbins.Entities.Benchmarks-gen.dll --ipcPort 50903 --benchmarkName "Gubbins.Entities.Benchmarks.EntitiesInsertBenchmarks.ComponentsInsertManyArchetypes(Count: 200000)" --job "InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3" --diagnoserRunMode 3 --benchmarkId 6 in E:\Projects\CSharp\Gubbins\Entities\Benchmarks\.bdn\1\b
+// BeforeAnythingElse
+
+// Benchmark Process Environment Information:
+// BenchmarkDotNet v0.16.0-preview.2
+// Runtime=.NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v3
+// GC=Concurrent Workstation
+// HardwareIntrinsics=AVX2+BMI1+BMI2+F16C+FMA+LZCNT+MOVBE,AVX,SSE3+SSSE3+SSE4.1+SSE4.2+POPCNT,X86Base+SSE+SSE2,AES+PCLMUL,AvxVnni,SERIALIZE VectorSize=256
+// Job: Job-MJLQTR(InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3)
+
+WorkloadJitting  1: 1 op, 99175700.00 ns, 99.1757 ms/op
+WorkloadJitting  2: 1 op, 26943200.00 ns, 26.9432 ms/op
+WorkloadJitting  3: 1 op, 26783500.00 ns, 26.7835 ms/op
+WorkloadJitting  4: 1 op, 26409200.00 ns, 26.4092 ms/op
+WorkloadJitting  5: 1 op, 26157400.00 ns, 26.1574 ms/op
+WorkloadJitting  6: 1 op, 26294200.00 ns, 26.2942 ms/op
+WorkloadJitting  7: 1 op, 24198900.00 ns, 24.1989 ms/op
+WorkloadJitting  8: 1 op, 24990800.00 ns, 24.9908 ms/op
+WorkloadJitting  9: 1 op, 25471200.00 ns, 25.4712 ms/op
+WorkloadJitting 10: 1 op, 25172700.00 ns, 25.1727 ms/op
+WorkloadJitting 11: 1 op, 25865400.00 ns, 25.8654 ms/op
+WorkloadJitting 12: 1 op, 24284600.00 ns, 24.2846 ms/op
+WorkloadJitting 13: 1 op, 25927700.00 ns, 25.9277 ms/op
+WorkloadJitting 14: 1 op, 26293900.00 ns, 26.2939 ms/op
+WorkloadJitting 15: 1 op, 27318600.00 ns, 27.3186 ms/op
+WorkloadJitting 16: 1 op, 27210100.00 ns, 27.2101 ms/op
+WorkloadJitting 17: 1 op, 25946700.00 ns, 25.9467 ms/op
+WorkloadJitting 18: 1 op, 25615200.00 ns, 25.6152 ms/op
+WorkloadJitting 19: 1 op, 29737600.00 ns, 29.7376 ms/op
+WorkloadJitting 20: 1 op, 27744900.00 ns, 27.7449 ms/op
+WorkloadJitting 21: 1 op, 25752800.00 ns, 25.7528 ms/op
+WorkloadJitting 22: 1 op, 24685800.00 ns, 24.6858 ms/op
+WorkloadJitting 23: 1 op, 25415900.00 ns, 25.4159 ms/op
+WorkloadJitting 24: 1 op, 26158700.00 ns, 26.1587 ms/op
+WorkloadJitting 25: 1 op, 25988900.00 ns, 25.9889 ms/op
+WorkloadJitting 26: 1 op, 27370000.00 ns, 27.3700 ms/op
+WorkloadJitting 27: 1 op, 27178500.00 ns, 27.1785 ms/op
+WorkloadJitting 28: 1 op, 28159000.00 ns, 28.1590 ms/op
+WorkloadJitting 29: 1 op, 26356200.00 ns, 26.3562 ms/op
+WorkloadJitting 30: 1 op, 27433800.00 ns, 27.4338 ms/op
+WorkloadJitting 31: 1 op, 33070900.00 ns, 33.0709 ms/op
+WorkloadJitting 32: 1 op, 26511300.00 ns, 26.5113 ms/op
+WorkloadJitting 33: 1 op, 26321500.00 ns, 26.3215 ms/op
+WorkloadJitting 34: 1 op, 25317100.00 ns, 25.3171 ms/op
+WorkloadJitting 35: 1 op, 25079800.00 ns, 25.0798 ms/op
+WorkloadJitting 36: 1 op, 25491800.00 ns, 25.4918 ms/op
+WorkloadJitting 37: 1 op, 26185900.00 ns, 26.1859 ms/op
+WorkloadJitting 38: 1 op, 23979800.00 ns, 23.9798 ms/op
+WorkloadJitting 39: 1 op, 24651700.00 ns, 24.6517 ms/op
+WorkloadJitting 40: 1 op, 25706000.00 ns, 25.7060 ms/op
+WorkloadJitting 41: 1 op, 25054700.00 ns, 25.0547 ms/op
+WorkloadJitting 42: 1 op, 28638600.00 ns, 28.6386 ms/op
+WorkloadJitting 43: 1 op, 26367500.00 ns, 26.3675 ms/op
+WorkloadJitting 44: 1 op, 26782400.00 ns, 26.7824 ms/op
+WorkloadJitting 45: 1 op, 26176500.00 ns, 26.1765 ms/op
+WorkloadJitting 46: 1 op, 26382000.00 ns, 26.3820 ms/op
+WorkloadJitting 47: 1 op, 24503000.00 ns, 24.5030 ms/op
+WorkloadJitting 48: 1 op, 27324700.00 ns, 27.3247 ms/op
+WorkloadJitting 49: 1 op, 26211900.00 ns, 26.2119 ms/op
+WorkloadJitting 50: 1 op, 24825000.00 ns, 24.8250 ms/op
+WorkloadJitting 51: 1 op, 24763800.00 ns, 24.7638 ms/op
+WorkloadJitting 52: 1 op, 26347100.00 ns, 26.3471 ms/op
+WorkloadJitting 53: 1 op, 26619100.00 ns, 26.6191 ms/op
+WorkloadJitting 54: 1 op, 25244500.00 ns, 25.2445 ms/op
+WorkloadJitting 55: 1 op, 24647500.00 ns, 24.6475 ms/op
+WorkloadJitting 56: 1 op, 24568500.00 ns, 24.5685 ms/op
+WorkloadJitting 57: 1 op, 24380000.00 ns, 24.3800 ms/op
+WorkloadJitting 58: 1 op, 29082700.00 ns, 29.0827 ms/op
+WorkloadJitting 59: 1 op, 26565600.00 ns, 26.5656 ms/op
+WorkloadJitting 60: 1 op, 26469100.00 ns, 26.4691 ms/op
+WorkloadJitting 61: 1 op, 26431900.00 ns, 26.4319 ms/op
+WorkloadJitting 62: 1 op, 23500100.00 ns, 23.5001 ms/op
+
+WorkloadWarmup   1: 1 op, 24141600.00 ns, 24.1416 ms/op
+WorkloadWarmup   2: 1 op, 23987200.00 ns, 23.9872 ms/op
+WorkloadWarmup   3: 1 op, 25024600.00 ns, 25.0246 ms/op
+
+// BeforeActualRun
+WorkloadActual   1: 1 op, 22346300.00 ns, 22.3463 ms/op
+WorkloadActual   2: 1 op, 22387900.00 ns, 22.3879 ms/op
+WorkloadActual   3: 1 op, 22406800.00 ns, 22.4068 ms/op
+WorkloadActual   4: 1 op, 22745600.00 ns, 22.7456 ms/op
+WorkloadActual   5: 1 op, 21790900.00 ns, 21.7909 ms/op
+
+// AfterActualRun
+// BeforeExtraIteration
+// AfterExtraIteration
+WorkloadExtra    1: 1 op, 21632000.00 ns, 21.6320 ms/op
+WorkloadResult   1: 1 op, 22346300.00 ns, 22.3463 ms/op
+WorkloadResult   2: 1 op, 22387900.00 ns, 22.3879 ms/op
+WorkloadResult   3: 1 op, 22406800.00 ns, 22.4068 ms/op
+WorkloadResult   4: 1 op, 21790900.00 ns, 21.7909 ms/op
+// GC:  0 0 0 12662072 1
+
+// AfterAll
+// Benchmark Process 19804 has exited with code 0.
+
+Mean = 22.233 ms, StdErr = 0.148 ms (0.67%), N = 4, StdDev = 0.296 ms
+Min = 21.791 ms, Q1 = 22.207 ms, Median = 22.367 ms, Q3 = 22.393 ms, Max = 22.407 ms
+IQR = 0.185 ms, LowerFence = 21.930 ms, UpperFence = 22.670 ms
+ConfidenceInterval = [20.322 ms; 24.144 ms] (CI 99.9%), Margin = 1.911 ms (8.60% of Mean)
+Skewness = -0.73, Kurtosis = 1.3, MValue = 2
+
+// ** Remained 0 (0.0%) benchmark(s) to run. Estimated finish 2026-11-23 19:03 (0h 0m from now) **
+// ***** BenchmarkRunner: Finish  *****
+
+// * Export *
+  BenchmarkDotNet.Artifacts\results\Gubbins.Entities.Benchmarks.EntitiesInsertBenchmarks-report.csv
+  BenchmarkDotNet.Artifacts\results\Gubbins.Entities.Benchmarks.EntitiesInsertBenchmarks-report-github.md
+  BenchmarkDotNet.Artifacts\results\Gubbins.Entities.Benchmarks.EntitiesInsertBenchmarks-report.html
+
+// * Detailed results *
+EntitiesInsertBenchmarks.TypedInsert: Job-MJLQTR(InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3) [Count=200000]
+Runtime = .NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 22.458 ms, StdErr = 0.082 ms (0.37%), N = 5, StdDev = 0.184 ms
+Min = 22.267 ms, Q1 = 22.276 ms, Median = 22.473 ms, Q3 = 22.613 ms, Max = 22.663 ms
+IQR = 0.337 ms, LowerFence = 21.771 ms, UpperFence = 23.118 ms
+ConfidenceInterval = [21.749 ms; 23.167 ms] (CI 99.9%), Margin = 0.709 ms (3.16% of Mean)
+Skewness = -0.03, Kurtosis = 0.83, MValue = 2
+-------------------- Histogram --------------------
+[22.126 ms ; 22.804 ms) | @@@@@
+---------------------------------------------------
+
+EntitiesInsertBenchmarks.TypedInsertAll: Job-MJLQTR(InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3) [Count=200000]
+Runtime = .NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 15.686 ms, StdErr = 0.168 ms (1.07%), N = 5, StdDev = 0.376 ms
+Min = 15.289 ms, Q1 = 15.500 ms, Median = 15.541 ms, Q3 = 15.839 ms, Max = 16.260 ms
+IQR = 0.338 ms, LowerFence = 14.993 ms, UpperFence = 16.346 ms
+ConfidenceInterval = [14.238 ms; 17.134 ms] (CI 99.9%), Margin = 1.448 ms (9.23% of Mean)
+Skewness = 0.45, Kurtosis = 1.36, MValue = 2
+-------------------- Histogram --------------------
+[15.275 ms ; 15.971 ms) | @@@@
+[15.971 ms ; 16.548 ms) | @
+---------------------------------------------------
+
+EntitiesInsertBenchmarks.ComponentsInsertPerCall: Job-MJLQTR(InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3) [Count=200000]
+Runtime = .NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 20.747 ms, StdErr = 0.158 ms (0.76%), N = 5, StdDev = 0.354 ms
+Min = 20.195 ms, Q1 = 20.706 ms, Median = 20.732 ms, Q3 = 20.980 ms, Max = 21.122 ms
+IQR = 0.274 ms, LowerFence = 20.295 ms, UpperFence = 21.390 ms
+ConfidenceInterval = [19.385 ms; 22.109 ms] (CI 99.9%), Margin = 1.362 ms (6.57% of Mean)
+Skewness = -0.46, Kurtosis = 1.47, MValue = 2
+-------------------- Histogram --------------------
+[19.924 ms ; 20.467 ms) | @
+[20.467 ms ; 21.185 ms) | @@@@
+---------------------------------------------------
+
+EntitiesInsertBenchmarks.ComponentsInsertHoisted: Job-MJLQTR(InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3) [Count=200000]
+Runtime = .NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 20.662 ms, StdErr = 0.273 ms (1.32%), N = 4, StdDev = 0.546 ms
+Min = 19.846 ms, Q1 = 20.623 ms, Median = 20.896 ms, Q3 = 20.935 ms, Max = 21.008 ms
+IQR = 0.312 ms, LowerFence = 20.154 ms, UpperFence = 21.403 ms
+ConfidenceInterval = [17.130 ms; 24.193 ms] (CI 99.9%), Margin = 3.531 ms (17.09% of Mean)
+Skewness = -0.73, Kurtosis = 1.3, MValue = 2
+-------------------- Histogram --------------------
+[19.394 ms ; 20.493 ms) | @
+[20.493 ms ; 21.460 ms) | @@@
+---------------------------------------------------
+
+EntitiesInsertBenchmarks.ComponentsInsertAll: Job-MJLQTR(InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3) [Count=200000]
+Runtime = .NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 15.606 ms, StdErr = 0.051 ms (0.33%), N = 5, StdDev = 0.114 ms
+Min = 15.512 ms, Q1 = 15.513 ms, Median = 15.547 ms, Q3 = 15.722 ms, Max = 15.738 ms
+IQR = 0.209 ms, LowerFence = 15.200 ms, UpperFence = 16.036 ms
+ConfidenceInterval = [15.168 ms; 16.044 ms] (CI 99.9%), Margin = 0.438 ms (2.81% of Mean)
+Skewness = 0.26, Kurtosis = 0.77, MValue = 2
+-------------------- Histogram --------------------
+[15.425 ms ; 15.825 ms) | @@@@@
+---------------------------------------------------
+
+EntitiesInsertBenchmarks.TypedInsertManyArchetypes: Job-MJLQTR(InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3) [Count=200000]
+Runtime = .NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 24.048 ms, StdErr = 0.175 ms (0.73%), N = 5, StdDev = 0.391 ms
+Min = 23.717 ms, Q1 = 23.804 ms, Median = 23.815 ms, Q3 = 24.280 ms, Max = 24.626 ms
+IQR = 0.476 ms, LowerFence = 23.091 ms, UpperFence = 24.993 ms
+ConfidenceInterval = [22.544 ms; 25.553 ms] (CI 99.9%), Margin = 1.505 ms (6.26% of Mean)
+Skewness = 0.47, Kurtosis = 1.14, MValue = 2
+-------------------- Histogram --------------------
+[23.698 ms ; 24.298 ms) | @@@@
+[24.298 ms ; 24.926 ms) | @
+---------------------------------------------------
+
+EntitiesInsertBenchmarks.ComponentsInsertManyArchetypes: Job-MJLQTR(InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3) [Count=200000]
+Runtime = .NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v3; GC = Concurrent Workstation
+Mean = 22.233 ms, StdErr = 0.148 ms (0.67%), N = 4, StdDev = 0.296 ms
+Min = 21.791 ms, Q1 = 22.207 ms, Median = 22.367 ms, Q3 = 22.393 ms, Max = 22.407 ms
+IQR = 0.185 ms, LowerFence = 21.930 ms, UpperFence = 22.670 ms
+ConfidenceInterval = [20.322 ms; 24.144 ms] (CI 99.9%), Margin = 1.911 ms (8.60% of Mean)
+Skewness = -0.73, Kurtosis = 1.3, MValue = 2
+-------------------- Histogram --------------------
+[21.546 ms ; 22.132 ms) | @
+[22.132 ms ; 22.651 ms) | @@@
+---------------------------------------------------
+
+// * Summary *
+
+BenchmarkDotNet v0.16.0-preview.2, Windows 11 (10.0.26300.9974)
+12th Gen Intel Core i5-12490F 3.00GHz, 1 CPU, 12 logical and 6 physical cores
+Memory: 63.81 GB Total, 29.77 GB Available
+.NET SDK 11.0.100
+  [Host]     : .NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v3
+  Job-MJLQTR : .NET 10.0.15 (10.0.15, 10.0.1526.53008), X64 RyuJIT x86-64-v3
+
+InvocationCount=1  IterationCount=5  UnrollFactor=1  
+WarmupCount=3  
+
+| Method                         | Count  | Mean     | Error    | StdDev   | Ratio | RatioSD | Allocated | Alloc Ratio |
+|------------------------------- |------- |---------:|---------:|---------:|------:|--------:|----------:|------------:|
+| TypedInsert                    | 200000 | 22.46 ms | 0.709 ms | 0.184 ms |  1.00 |    0.00 |  12.05 MB |        1.00 |
+| TypedInsertAll                 | 200000 | 15.69 ms | 1.448 ms | 0.376 ms |  0.70 |    0.02 |  12.05 MB |        1.00 |
+| ComponentsInsertPerCall        | 200000 | 20.75 ms | 1.362 ms | 0.354 ms |  0.92 |    0.02 |  12.05 MB |        1.00 |
+| ComponentsInsertHoisted        | 200000 | 20.66 ms | 3.531 ms | 0.546 ms |  0.92 |    0.02 |  12.05 MB |        1.00 |
+| ComponentsInsertAll            | 200000 | 15.61 ms | 0.438 ms | 0.114 ms |  0.69 |    0.01 |  12.05 MB |        1.00 |
+| TypedInsertManyArchetypes      | 200000 | 24.05 ms | 1.505 ms | 0.391 ms |  1.07 |    0.02 |  12.08 MB |        1.00 |
+| ComponentsInsertManyArchetypes | 200000 | 22.23 ms | 1.911 ms | 0.296 ms |  0.99 |    0.01 |  12.08 MB |        1.00 |
+
+// * Warnings *
+MinIterationTime
+  EntitiesInsertBenchmarks.TypedInsert: InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3                    -> The minimum observed iteration time is 22.267ms which is very small. It's recommended to increase it to at least 100ms using more operations.
+  EntitiesInsertBenchmarks.TypedInsertAll: InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3                 -> The minimum observed iteration time is 15.289ms which is very small. It's recommended to increase it to at least 100ms using more operations.
+  EntitiesInsertBenchmarks.ComponentsInsertPerCall: InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3        -> The minimum observed iteration time is 20.196ms which is very small. It's recommended to increase it to at least 100ms using more operations.
+  EntitiesInsertBenchmarks.ComponentsInsertHoisted: InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3        -> The minimum observed iteration time is 19.846ms which is very small. It's recommended to increase it to at least 100ms using more operations.
+  EntitiesInsertBenchmarks.ComponentsInsertAll: InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3            -> The minimum observed iteration time is 15.512ms which is very small. It's recommended to increase it to at least 100ms using more operations.
+  EntitiesInsertBenchmarks.TypedInsertManyArchetypes: InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3      -> The minimum observed iteration time is 23.717ms which is very small. It's recommended to increase it to at least 100ms using more operations.
+  EntitiesInsertBenchmarks.ComponentsInsertManyArchetypes: InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3 -> The minimum observed iteration time is 21.791ms which is very small. It's recommended to increase it to at least 100ms using more operations.
+
+// * Hints *
+Outliers
+  EntitiesInsertBenchmarks.ComponentsInsertPerCall: InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3        -> 1 outlier  was  detected (20.20 ms)
+  EntitiesInsertBenchmarks.ComponentsInsertHoisted: InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3        -> 1 outlier  was  removed, 2 outliers were detected (19.85 ms, 21.37 ms)
+  EntitiesInsertBenchmarks.ComponentsInsertManyArchetypes: InvocationCount=1, IterationCount=5, UnrollFactor=1, WarmupCount=3 -> 1 outlier  was  removed, 2 outliers were detected (21.79 ms, 22.75 ms)
+
+// * Legends *
+  Count       : Value of the 'Count' parameter
+  Mean        : Arithmetic mean of all measurements
+  Error       : Half of 99.9% confidence interval
+  StdDev      : Standard deviation of all measurements
+  Ratio       : Mean of the ratio distribution ([Current]/[Baseline])
+  RatioSD     : Standard deviation of the ratio distribution ([Current]/[Baseline])
+  Allocated   : Allocated memory per single operation (managed only, inclusive, 1KB = 1024B)
+  Alloc Ratio : Allocated memory ratio distribution ([Current]/[Baseline])
+  1 ms        : 1 Millisecond (0.001 sec)
+
+// * Diagnostic Output - MemoryDiagnoser *
+
+
+// ***** BenchmarkRunner: End *****
+Run time: 00:00:19 (19.35 sec), executed benchmarks: 7
+
+Global total time: 00:00:47 (47.46 sec), executed benchmarks: 7
+// * Artifacts cleanup *
+Artifacts cleanup is finished

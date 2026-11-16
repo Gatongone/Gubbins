@@ -1,0 +1,22 @@
+{
+  "name": "com.gatongone.gubbins.pipeline",
+  "version": "0.0.1",
+  "license": "MIT",
+  "displayName": "Gubbins Pipeline",
+  "description": "Pipeline and event-listener integration for Unity.",
+  "author": {
+    "name": "Gatongone",
+    "email": "gatongone@gmail.com",
+    "url": "https://www.github.com/gatongone"
+  },
+  "unity": "2021.3",
+  "type": "tools",
+  "keywords": [
+    "Utils"
+  ],
+  "dependencies": {
+    "com.gatongone.gubbins.context": "0.0.1",
+    "com.gatongone.gubbins.enhance": "0.0.1",
+    "com.gatongone.gubbins.events": "0.0.1"
+  }
+}

@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\Enhance\Core\Gubbins.Enhance.csproj" />
+      <ProjectReference Include="..\..\Spawner\Core\Gubbins.Spawner.csproj" />
+      <ProjectReference Include="..\..\Unsafe\Core\Gubbins.Unsafe.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+    </ItemGroup>
+
+</Project>

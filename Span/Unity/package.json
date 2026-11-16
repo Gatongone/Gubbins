@@ -1,0 +1,22 @@
+{
+  "name": "com.gatongone.gubbins.span",
+  "version": "0.0.1",
+  "license": "MIT",
+  "displayName": "Gubbins Span",
+  "description": "SIMD span operations for Unity.",
+  "author": {
+    "name": "Gatongone",
+    "email": "gatongone@gmail.com",
+    "url": "https://www.github.com/gatongone"
+  },
+  "unity": "2021.3",
+  "type": "tools",
+  "keywords": [
+    "Utils"
+  ],
+  "dependencies": {
+    "com.gatongone.gubbins.unsafe": "0.0.1",
+    "com.unity.burst": "1.8.26",
+    "com.unity.collections": "1.5.2"
+  }
+}

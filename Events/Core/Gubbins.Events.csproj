@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <None Update="Extensions\EventSubscribeExtensions.tt">
+        <Generator>TextTemplatingFileGenerator</Generator>
+        <LastGenOutput>EventSubscribeExtensions.cs</LastGenOutput>
+      </None>
+      <None Update="Extensions\EventBroadcastExtensions.tt">
+        <Generator>TextTemplatingFileGenerator</Generator>
+        <LastGenOutput>EventBroadcastExtensions.cs</LastGenOutput>
+      </None>
+      <None Update="Handlers\ActionEventHandler.tt">
+        <Generator>TextTemplatingFileGenerator</Generator>
+        <LastGenOutput>ActionEventHandler.cs</LastGenOutput>
+      </None>
+    </ItemGroup>
+
+    <ItemGroup>
+      <Compile Update="Extensions\EventSubscribeExtensions.cs">
+        <DependentUpon>EventSubscribeExtensions.tt</DependentUpon>
+      </Compile>
+      <Compile Update="Extensions\EventBroadcastExtensions.cs">
+        <DependentUpon>EventBroadcastExtensions.tt</DependentUpon>
+      </Compile>
+      <Compile Update="Handlers\ActionEventHandler.cs">
+        <DependentUpon>ActionEventHandler.tt</DependentUpon>
+      </Compile>
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\Enhance\Core\Gubbins.Enhance.csproj" />
+    </ItemGroup>
+
+</Project>

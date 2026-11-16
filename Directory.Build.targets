@@ -1,0 +1,47 @@
+<Project>
+    <PropertyGroup Condition="'$(NativeAOT)' == 'true'">
+        <DefineConstants>$(DefineConstants);NATIVEAOT;</DefineConstants>
+    </PropertyGroup>
+
+    <Target Name="PostBuild" BeforeTargets="PostBuildEvent" Condition="'$(IsTestProject)' != 'true' And '$(SkipDefaultPostBuild)' != 'true'">
+        <PropertyGroup>
+            <DotNetVer>$(TargetFramework)</DotNetVer>
+            <UnitySupportVer>netstandard2.1</UnitySupportVer>
+            <GodotSupportVer>net8.0</GodotSupportVer>
+            <UnityOutDir>$(ProjectDir)..\Unity\Plugins</UnityOutDir>
+            <GodotOutDir>$(ProjectDir)..\Godot\Plugins</GodotOutDir>
+        </PropertyGroup>
+        <ItemGroup>
+            <OutputFiles Include="$(OutputPath)$(ProjectName).dll"/>
+            <OutputFiles Include="$(OutputPath)$(ProjectName).pdb" Condition="Exists('$(OutputPath)$(ProjectName).pdb')"/>
+            <OutputFiles Include="$(OutputPath)$(ProjectName).mdb" Condition="Exists('$(OutputPath)$(ProjectName).mdb')"/>
+        </ItemGroup>
+        <Copy SourceFiles="@(OutputFiles)" DestinationFolder="$(UnityOutDir)" SkipUnchangedFiles="true" Condition=" '$(UnityOutDir)' != '' and '$(DotNetVer)' == '$(UnitySupportVer)' "/>
+        <Copy SourceFiles="@(OutputFiles)" DestinationFolder="$(GodotOutDir)" SkipUnchangedFiles="true" Condition=" '$(GodotOutDir)' != '' and '$(DotNetVer)' == '$(GodotSupportVer)' "/>
+    </Target>
+
+    <PropertyGroup>
+        <GubbinsKernelTool>$(MSBuildThisFileDirectory)Graphic\KernelTool\Gubbins.Graphic.Kernels.Tool.csproj</GubbinsKernelTool>
+        <GubbinsKernelOutput Condition="'$(GubbinsKernelOutput)' == ''">$(IntermediateOutputPath)kernels</GubbinsKernelOutput>
+    </PropertyGroup>
+
+    <!-- A project that declares kernels with <GubbinsKernel Include="..." /> gets them compiled before it builds: a kernel
+         file is named <Name>.Kernel.cs, and the artifacts every backend can load are written under its name and copied
+         beside the program, where GpuKernel.LoadFromDirectory reads them from its "Kernels" directory. -->
+    <Target Name="CompileGubbinsKernels" BeforeTargets="BeforeBuild" Condition="'@(GubbinsKernel)' != ''" Inputs="@(GubbinsKernel)" Outputs="@(GubbinsKernel->'$(GubbinsKernelOutput)\$([System.String]::Copy('%(Filename)').Replace('.Kernel','')).ptx')">
+        <Exec Command="dotnet run --project &quot;$(GubbinsKernelTool)&quot; -c $(Configuration) -- --output &quot;$(GubbinsKernelOutput)&quot; @(GubbinsKernel->'&quot;%(FullPath)&quot;', ' ')" />
+    </Target>
+
+    <Target Name="CopyGubbinsKernels" AfterTargets="Build" Condition="'@(GubbinsKernel)' != ''">
+        <ItemGroup>
+            <_GubbinsKernelArtifact Include="$(GubbinsKernelOutput)\*.dxil" />
+            <_GubbinsKernelArtifact Include="$(GubbinsKernelOutput)\*.spv" />
+            <_GubbinsKernelArtifact Include="$(GubbinsKernelOutput)\*.comp" />
+            <_GubbinsKernelArtifact Include="$(GubbinsKernelOutput)\*.metal" />
+            <_GubbinsKernelArtifact Include="$(GubbinsKernelOutput)\*.ptx" />
+        </ItemGroup>
+
+        <Copy SourceFiles="@(_GubbinsKernelArtifact)" DestinationFolder="$(OutDir)Kernels" SkipUnchangedFiles="true" />
+    </Target>
+
+</Project>

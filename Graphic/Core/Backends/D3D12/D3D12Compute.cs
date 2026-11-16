@@ -1,0 +1,271 @@
+
+namespace Gubbins.Graphic.D3D12;
+
+/// <summary>
+/// Runs one compute pipeline on a D3D12 device: a root signature with three root descriptors, a pipeline state loaded from
+/// DXIL, and a compute queue the bridge does not own.
+/// </summary>
+/// <remarks>
+/// The three root descriptors are the shape this layer binds: an unordered access view over the input block, one over the
+/// output block and one over the block that carries the lengths. All three are ordered access because the shader declares
+/// them that way, so that one translation of a kernel can bind the same way on a backend that has a single address space
+/// for resources. Resources are created in the common state and copied from the common state, so every dispatch starts and
+/// ends by putting them back there.
+/// </remarks>
+internal sealed unsafe class D3D12Compute : IDisposable
+{
+    private readonly nint m_Device;
+    private readonly nint m_Queue;
+    private readonly nint m_Allocator;
+    private readonly nint m_List;
+    private readonly nint m_Fence;
+    private nint m_RootSignature;
+    private nint m_Pipeline;
+    private ulong m_FenceValue;
+    private bool m_Disposed;
+
+    /// <param name="device">The <c>ID3D12Device</c> to run on.</param>
+    /// <exception cref="D3D12Exception">Thrown when the queue, the allocator, the list or the fence cannot be created.</exception>
+    internal D3D12Compute(nint device)
+    {
+        m_Device = device;
+
+        var queueDescription = new D3D12CommandQueueDesc { Type = D3D12Api.COMMAND_LIST_TYPE_COMPUTE, NodeMask = 1 };
+        if (D3D12Api.CreateCommandQueue(device, &queueDescription, out m_Queue) < 0 || m_Queue == 0)
+        {
+            throw new D3D12Exception("CreateCommandQueue failed for the compute queue.");
+        }
+
+        if (D3D12Api.CreateCommandAllocator(device, D3D12Api.COMMAND_LIST_TYPE_COMPUTE, out m_Allocator) < 0 || m_Allocator == 0)
+        {
+            throw new D3D12Exception("CreateCommandAllocator failed for the compute allocator.");
+        }
+
+        if (D3D12Api.CreateCommandList(device, m_Allocator, D3D12Api.COMMAND_LIST_TYPE_COMPUTE, out m_List) < 0 || m_List == 0)
+        {
+            throw new D3D12Exception("CreateCommandList failed for the compute list.");
+        }
+
+        // CreateCommandList hands back a recording list, and an allocator cannot be reset while a list recorded into it is
+        // still open, so the initial session is closed here.
+        if (D3D12Api.CloseCommandList(m_List) < 0)
+        {
+            throw new D3D12Exception("Closing the initial compute list failed.");
+        }
+
+        if (D3D12Api.CreateFence(device, out m_Fence) < 0 || m_Fence == 0)
+        {
+            throw new D3D12Exception("CreateFence failed for the compute fence.");
+        }
+    }
+
+    /// <summary>
+    /// Loads a pipeline state from DXIL, replacing the one that is already loaded.
+    /// </summary>
+    /// <param name="bytecode">The compiled shader.</param>
+    /// <returns><see langword="true"/> if the pipeline state was created.</returns>
+    internal bool SetPipeline(scoped ReadOnlySpan<byte> bytecode)
+    {
+        if (m_Disposed || bytecode.Length == 0)
+        {
+            return false;
+        }
+
+        if (m_Pipeline != 0)
+        {
+            D3D12Api.Release(m_Pipeline);
+            m_Pipeline = 0;
+        }
+
+        if (m_RootSignature == 0 && !CreateRootSignature())
+        {
+            return false;
+        }
+
+        fixed (byte* code = bytecode)
+        {
+            var description = new D3D12ComputePipelineStateDesc
+            {
+                RootSignature = m_RootSignature,
+                Shader = new D3D12ShaderBytecode { Data = code, Size = (nuint)bytecode.Length },
+                NodeMask = 1,
+                Flags = D3D12Api.PIPELINE_STATE_FLAG_NONE
+            };
+
+            var hr = D3D12Api.CreateComputePipelineState(m_Device, &description, out m_Pipeline);
+            if (hr < 0 || m_Pipeline == 0)
+            {
+                m_Pipeline = 0;
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Runs the loaded pipeline over two buffers.
+    /// </summary>
+    /// <param name="sourceResource">The <c>ID3D12Resource</c> the input lives in, for the transition barriers.</param>
+    /// <param name="sourceAddress">The GPU address of the input, bound as an unordered access view.</param>
+    /// <param name="destinationResource">The <c>ID3D12Resource</c> the output lives in.</param>
+    /// <param name="destinationAddress">The GPU address of the output, bound as an unordered access view.</param>
+    /// <param name="lengthsAddress">The GPU address of the lengths, or <see langword="0"/> when the kernel takes none.</param>
+    /// <param name="groups">The number of thread groups to dispatch on the x axis.</param>
+    /// <returns><see langword="true"/> if the dispatch ran to completion.</returns>
+    internal bool Dispatch(nint sourceResource, ulong sourceAddress, nint destinationResource, ulong destinationAddress, ulong lengthsAddress, uint groups)
+    {
+        if (m_Disposed || m_Pipeline == 0 || sourceResource == 0 || destinationResource == 0 || groups == 0)
+        {
+            return false;
+        }
+
+        if (D3D12Api.ResetCommandAllocator(m_Allocator) < 0 || D3D12Api.ResetCommandList(m_List, m_Allocator) < 0)
+        {
+            return false;
+        }
+
+        var source = new D3D12ResourceBarrier
+        {
+            Type = D3D12Api.RESOURCE_BARRIER_TYPE_TRANSITION,
+            Subresource = unchecked((uint)D3D12Api.RESOURCE_BARRIER_ALL_SUBRESOURCES),
+            StateBefore = D3D12Api.RESOURCE_STATE_COMMON,
+            StateAfter = D3D12Api.RESOURCE_STATE_UNORDERED_ACCESS
+        };
+
+        var destination = new D3D12ResourceBarrier
+        {
+            Type = D3D12Api.RESOURCE_BARRIER_TYPE_TRANSITION,
+            Subresource = unchecked((uint)D3D12Api.RESOURCE_BARRIER_ALL_SUBRESOURCES),
+            StateBefore = D3D12Api.RESOURCE_STATE_COMMON,
+            StateAfter = D3D12Api.RESOURCE_STATE_UNORDERED_ACCESS
+        };
+
+        source.Resource = sourceResource;
+        destination.Resource = destinationResource;
+
+        D3D12Api.ResourceBarrier(m_List, &source);
+        D3D12Api.SetComputeRootSignature(m_List, m_RootSignature);
+        D3D12Api.SetPipelineState(m_List, m_Pipeline);
+        D3D12Api.SetComputeRootUnorderedAccessView(m_List, 0, sourceAddress);
+        D3D12Api.SetComputeRootUnorderedAccessView(m_List, 1, destinationAddress);
+
+        if (lengthsAddress != 0)
+        {
+            D3D12Api.SetComputeRootUnorderedAccessView(m_List, 2, lengthsAddress);
+        }
+        D3D12Api.ResourceBarrier(m_List, &destination);
+        D3D12Api.Dispatch(m_List, groups, 1, 1);
+
+        // Both resources go back to the common state, which is where the bridge's copies expect to find them.
+        var restoreSource = new D3D12ResourceBarrier
+        {
+            Type = D3D12Api.RESOURCE_BARRIER_TYPE_TRANSITION,
+            Subresource = unchecked((uint)D3D12Api.RESOURCE_BARRIER_ALL_SUBRESOURCES),
+            StateBefore = D3D12Api.RESOURCE_STATE_UNORDERED_ACCESS,
+            StateAfter = D3D12Api.RESOURCE_STATE_COMMON
+        };
+
+        var restoreDestination = new D3D12ResourceBarrier
+        {
+            Type = D3D12Api.RESOURCE_BARRIER_TYPE_TRANSITION,
+            Subresource = unchecked((uint)D3D12Api.RESOURCE_BARRIER_ALL_SUBRESOURCES),
+            StateBefore = D3D12Api.RESOURCE_STATE_UNORDERED_ACCESS,
+            StateAfter = D3D12Api.RESOURCE_STATE_COMMON
+        };
+
+        restoreSource.Resource = sourceResource;
+        restoreDestination.Resource = destinationResource;
+
+        D3D12Api.ResourceBarrier(m_List, &restoreSource);
+        D3D12Api.ResourceBarrier(m_List, &restoreDestination);
+
+        if (D3D12Api.CloseCommandList(m_List) < 0)
+        {
+            return false;
+        }
+
+        D3D12Api.ExecuteCommandLists(m_Queue, m_List);
+
+        m_FenceValue++;
+        return D3D12Api.Signal(m_Queue, m_Fence, m_FenceValue) >= 0 && D3D12Api.WaitForFence(m_Fence, m_FenceValue);
+    }
+
+    /// <summary>
+    /// Builds the root signature the pipeline state needs.
+    /// </summary>
+    /// <returns><see langword="true"/> if the signature was created.</returns>
+    private bool CreateRootSignature()
+    {
+        // The third root descriptor carries the buffer lengths, because a root descriptor on its own reports no size.
+        var parameters = stackalloc D3D12RootParameter[3];
+
+        for (var index = 0; index < 3; index++)
+        {
+            parameters[index] = new D3D12RootParameter
+            {
+                Type = D3D12Api.ROOT_PARAMETER_TYPE_UAV,
+                ShaderRegister = (uint)index,
+                RegisterSpace = 0,
+                ShaderVisibility = D3D12Api.SHADER_VISIBILITY_ALL
+            };
+        }
+
+        var description = new D3D12RootSignatureDesc
+        {
+            ParameterCount = 3,
+            Parameters = parameters,
+            Flags = D3D12Api.ROOT_SIGNATURE_FLAGS_NONE
+        };
+
+        var serialize = D3D12Api.SerializeRootSignature(&description, out var blob, out var error);
+        if (serialize < 0 || blob == 0)
+        {
+            if (error != 0)
+            {
+                D3D12Api.Release(error);
+            }
+
+            return false;
+        }
+
+        var result = D3D12Api.CreateRootSignature(m_Device, D3D12Api.BlobData(blob), D3D12Api.BlobSize(blob), out m_RootSignature);
+        D3D12Api.Release(blob);
+
+        if (error != 0)
+        {
+            D3D12Api.Release(error);
+        }
+
+        return result >= 0 && m_RootSignature != 0;
+    }
+
+    /// <summary>
+    /// Releases the fence, the queue, the allocator, the list, the pipeline and the root signature.
+    /// </summary>
+    public void Dispose()
+    {
+        if (m_Disposed)
+        {
+            return;
+        }
+
+        m_Disposed = true;
+
+        if (m_Pipeline != 0)
+        {
+            D3D12Api.Release(m_Pipeline);
+        }
+
+        if (m_RootSignature != 0)
+        {
+            D3D12Api.Release(m_RootSignature);
+        }
+
+        D3D12Api.Release(m_Fence);
+        D3D12Api.Release(m_List);
+        D3D12Api.Release(m_Allocator);
+        D3D12Api.Release(m_Queue);
+    }
+}
+
