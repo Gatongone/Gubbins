@@ -15,9 +15,9 @@
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.11.0" />
     </ItemGroup>
 
-    <!-- The compiler that runs slangc starts a process, which is not a part of .NET Standard 2.0. The generator that
-         reads a kernel needs the translation and nothing that runs a tool, so the target the generator is built for
-         leaves the compiler out. -->
+    <!-- The step that writes the artifacts of a kernel is a tool for the build, which the generator that reads a kernel
+         has no use for: what it compiles into an analyzer is the translation and the emitters, and nothing that writes a
+         file. -->
     <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
         <Compile Remove="KernelCompiler.cs" />
     </ItemGroup>

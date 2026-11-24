@@ -23,8 +23,9 @@ namespace Gubbins.Graphic.Generator;
 /// shading language compiler.
 /// </para>
 /// <para>
-/// A kernel is declared in a partial type, because the entry point is a member of that type: <c>Motion.Run(gpu, source,
-/// target)</c> sits beside <c>Motion.Integrate</c>, which is the method it dispatches.
+/// A kernel is declared in a partial type, because the entry point is a member of that type: <c>Motion.RunIntegrate(gpu,
+/// source, target)</c> sits beside <c>Motion.Integrate</c>, which is the method it dispatches. Each kernel gets its own
+/// entry point, named after it, so a type may declare several kernels over the same buffers.
 /// </para>
 /// </remarks>
 [Generator(LanguageNames.CSharp)]
@@ -121,7 +122,7 @@ public sealed class KernelGenerator : IIncrementalGenerator
                 continue;
             }
 
-            if (!TryTranslate(context, compilation, kernel, out var slang, out var threads))
+            if (!TryTranslate(context, compilation, kernel, out var program, out var threads))
             {
                 continue;
             }
@@ -129,7 +130,7 @@ public sealed class KernelGenerator : IIncrementalGenerator
             var name = NameOf(kernel);
 
             WriteEntryPoint(source, kernel, name, threads);
-            WriteRegistry(registry, index++, name, slang, threads);
+            WriteRegistry(registry, index++, name, program, threads);
         }
 
         registry.AppendLine("    }");
@@ -182,6 +183,23 @@ public sealed class KernelGenerator : IIncrementalGenerator
             return false;
         }
 
+        // A kernel may also take one structure as a value, which the caller fills in and the entry point uploads for it.
+        var values = kernel.Parameters.Where(parameter => !buffers.Contains(parameter) && parameter.Type.SpecialType != SpecialType.System_Int32).ToList();
+
+        if (values.Count > 1 ||
+            (values.Count == 1 &&
+             (values[0].Type is not INamedTypeSymbol { TypeKind: TypeKind.Struct } ||
+              values[0].RefKind is not (RefKind.None or RefKind.In) ||
+              !SymbolEqualityComparer.Default.Equals(values[0], kernel.Parameters[kernel.Parameters.Length - 1]))))
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                UnsupportedShape,
+                location,
+                kernel.ToDisplayString(),
+                "the structure a kernel takes as one value is the last parameter, declared as [GpuStruct] and passed by value or in."));
+            return false;
+        }
+
         return true;
     }
 
@@ -191,17 +209,17 @@ public sealed class KernelGenerator : IIncrementalGenerator
     /// <param name="context">The production context.</param>
     /// <param name="compilation">The compilation the kernel was resolved in.</param>
     /// <param name="kernel">The kernel.</param>
-    /// <param name="slang">When the method returns, the Slang program.</param>
+    /// <param name="program">When the method returns, the kernel as every backend reads it.</param>
     /// <param name="threads">When the method returns, the threads in a group.</param>
     /// <returns><see langword="true"/> when the kernel was translated.</returns>
-    private static bool TryTranslate(SourceProductionContext context, Compilation compilation, IMethodSymbol kernel, out string slang, out int threads)
+    private static bool TryTranslate(SourceProductionContext context, Compilation compilation, IMethodSymbol kernel, out KernelProgram program, out int threads)
     {
-        slang = string.Empty;
+        program = null!;
         threads = 64;
 
         try
         {
-            slang = KernelTranspiler.Transpile(compilation, kernel);
+            program = KernelTranspiler.Transpile(compilation, kernel);
             threads = KernelTranspiler.ThreadsPerGroup(kernel);
             return true;
         }
@@ -246,6 +264,8 @@ public sealed class KernelGenerator : IIncrementalGenerator
         }
 
         var padding = new string(' ', indent);
+        var entry = kernel.Name;
+
         var sourceParameter = kernel.Parameters.First(parameter => parameter.Type is INamedTypeSymbol { Name: "ReadOnlySpan" });
         var targetParameter = kernel.Parameters.First(parameter => parameter.Type is INamedTypeSymbol { Name: "Span" });
         var element = ((INamedTypeSymbol) sourceParameter.Type).TypeArguments[0].ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
@@ -258,7 +278,7 @@ public sealed class KernelGenerator : IIncrementalGenerator
         source.AppendLine($"{padding}/// <param name=\"gpu\">The layer the kernel runs on.</param>");
         source.AppendLine($"{padding}/// <param name=\"{sourceParameter.Name}\">The buffer the kernel reads.</param>");
         source.AppendLine($"{padding}/// <param name=\"{targetParameter.Name}\">The buffer the kernel writes.</param>");
-        source.AppendLine($"{padding}public static void Run(global::Gubbins.Graphic.Gpu gpu, global::Gubbins.Graphic.GpuBuffer<{element}> {sourceParameter.Name}, global::Gubbins.Graphic.GpuBuffer<{element}> {targetParameter.Name})");
+        source.AppendLine($"{padding}public static void Run{entry}(global::Gubbins.Graphic.Gpu gpu, global::Gubbins.Graphic.GpuBuffer<{element}> {sourceParameter.Name}, global::Gubbins.Graphic.GpuBuffer<{element}> {targetParameter.Name})");
         source.AppendLine($"{padding}{{");
         source.AppendLine($"{padding}    if (gpu is null)");
         source.AppendLine($"{padding}    {{");
@@ -274,7 +294,7 @@ public sealed class KernelGenerator : IIncrementalGenerator
         source.AppendLine($"{padding}/// <param name=\"gpu\">The layer the kernel runs on.</param>");
         source.AppendLine($"{padding}/// <param name=\"{sourceParameter.Name}\">The values the kernel reads.</param>");
         source.AppendLine($"{padding}/// <param name=\"{targetParameter.Name}\">The span the kernel writes.</param>");
-        source.AppendLine($"{padding}public static void Run(global::Gubbins.Graphic.Gpu gpu, global::System.ReadOnlySpan<{element}> {sourceParameter.Name}, global::System.Span<{element}> {targetParameter.Name})");
+        source.AppendLine($"{padding}public static void Run{entry}(global::Gubbins.Graphic.Gpu gpu, global::System.ReadOnlySpan<{element}> {sourceParameter.Name}, global::System.Span<{element}> {targetParameter.Name})");
         source.AppendLine($"{padding}{{");
         source.AppendLine($"{padding}    if (gpu is null)");
         source.AppendLine($"{padding}    {{");
@@ -289,6 +309,13 @@ public sealed class KernelGenerator : IIncrementalGenerator
         source.AppendLine($"{padding}    }}");
         source.AppendLine($"{padding}}}");
 
+        var value = kernel.Parameters.FirstOrDefault(parameter => !IsBuffer(parameter) && parameter.Type.SpecialType != SpecialType.System_Int32);
+
+        if (value is not null)
+        {
+            WriteValueEntryPoints(source, kernel, value, sourceParameter, targetParameter, element, literal, threads, padding, entry);
+        }
+
         for (var current = declared.Count - 1; current >= 0; current--)
         {
             indent -= 4;
@@ -302,20 +329,95 @@ public sealed class KernelGenerator : IIncrementalGenerator
     }
 
     /// <summary>
+    /// Writes the entry points of a kernel that also takes a structure as one value.
+    /// </summary>
+    /// <param name="source">The source being built.</param>
+    /// <param name="kernel">The kernel.</param>
+    /// <param name="value">The structure it takes.</param>
+    /// <param name="sourceParameter">The parameter the kernel reads.</param>
+    /// <param name="targetParameter">The parameter the kernel writes.</param>
+    /// <param name="element">The type of one element of the buffers.</param>
+    /// <param name="literal">The kernel name, as a literal.</param>
+    /// <param name="threads">The threads in a group.</param>
+    /// <param name="padding">The indentation of the type the entry point is written into.</param>
+    /// <param name="entry">The name of the kernel, which the entry point is named after.</param>
+    private static void WriteValueEntryPoints(StringBuilder source, IMethodSymbol kernel, IParameterSymbol value, IParameterSymbol sourceParameter, IParameterSymbol targetParameter, string element, string literal, int threads, string padding, string entry)
+    {
+        var type = value.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        var name = value.Name;
+
+        source.AppendLine();
+        source.AppendLine($"{padding}/// <summary>");
+        source.AppendLine($"{padding}/// Runs the kernel over the buffers this layer owns and the structure it takes, and waits for it to finish.");
+        source.AppendLine($"{padding}/// </summary>");
+        source.AppendLine($"{padding}/// <param name=\"gpu\">The layer the kernel runs on.</param>");
+        source.AppendLine($"{padding}/// <param name=\"{sourceParameter.Name}\">The buffer the kernel reads.</param>");
+        source.AppendLine($"{padding}/// <param name=\"{targetParameter.Name}\">The buffer the kernel writes.</param>");
+        source.AppendLine($"{padding}/// <param name=\"{name}\">The structure the kernel takes as one value.</param>");
+        source.AppendLine($"{padding}public static void Run{entry}(global::Gubbins.Graphic.Gpu gpu, global::Gubbins.Graphic.GpuBuffer<{element}> {sourceParameter.Name}, global::Gubbins.Graphic.GpuBuffer<{element}> {targetParameter.Name}, in {type} {name})");
+        source.AppendLine($"{padding}{{");
+        source.AppendLine($"{padding}    if (gpu is null)");
+        source.AppendLine($"{padding}    {{");
+        source.AppendLine($"{padding}        throw new global::System.ArgumentNullException(nameof(gpu));");
+        source.AppendLine($"{padding}    }}");
+        source.AppendLine();
+        source.AppendLine($"{padding}    using (var __parameters = gpu.Upload(new[] {{ {name} }}))");
+        source.AppendLine($"{padding}    {{");
+        source.AppendLine($"{padding}        gpu.LoadKernel({literal}, {threads}).Run({sourceParameter.Name}, {targetParameter.Name}, __parameters);");
+        source.AppendLine($"{padding}    }}");
+        source.AppendLine($"{padding}}}");
+        source.AppendLine();
+        source.AppendLine($"{padding}/// <summary>");
+        source.AppendLine($"{padding}/// Runs the kernel over spans and the structure it takes, staging the buffers through this layer, and waits.");
+        source.AppendLine($"{padding}/// </summary>");
+        source.AppendLine($"{padding}/// <param name=\"gpu\">The layer the kernel runs on.</param>");
+        source.AppendLine($"{padding}/// <param name=\"{sourceParameter.Name}\">The values the kernel reads.</param>");
+        source.AppendLine($"{padding}/// <param name=\"{targetParameter.Name}\">The span the kernel writes.</param>");
+        source.AppendLine($"{padding}/// <param name=\"{name}\">The structure the kernel takes as one value.</param>");
+        source.AppendLine($"{padding}public static void Run{entry}(global::Gubbins.Graphic.Gpu gpu, global::System.ReadOnlySpan<{element}> {sourceParameter.Name}, global::System.Span<{element}> {targetParameter.Name}, in {type} {name})");
+        source.AppendLine($"{padding}{{");
+        source.AppendLine($"{padding}    if (gpu is null)");
+        source.AppendLine($"{padding}    {{");
+        source.AppendLine($"{padding}        throw new global::System.ArgumentNullException(nameof(gpu));");
+        source.AppendLine($"{padding}    }}");
+        source.AppendLine();
+        source.AppendLine($"{padding}    using (var __source = gpu.Upload({sourceParameter.Name}))");
+        source.AppendLine($"{padding}    using (var __target = gpu.Allocate<{element}>({targetParameter.Name}.Length))");
+        source.AppendLine($"{padding}    using (var __parameters = gpu.Upload(new[] {{ {name} }}))");
+        source.AppendLine($"{padding}    {{");
+        source.AppendLine($"{padding}        gpu.LoadKernel({literal}, {threads}).Run(__source, __target, __parameters);");
+        source.AppendLine($"{padding}        __target.CpuSpan.CopyTo({targetParameter.Name});");
+        source.AppendLine($"{padding}    }}");
+        source.AppendLine($"{padding}}}");
+    }
+
+    /// <summary>
+    /// Reports whether a parameter of a kernel is one of its buffers.
+    /// </summary>
+    /// <param name="parameter">The parameter.</param>
+    /// <returns><see langword="true"/> when it is a span.</returns>
+    private static bool IsBuffer(IParameterSymbol parameter)
+        => parameter.Type is INamedTypeSymbol { Arity: 1 } named && (named.Name == "ReadOnlySpan" || named.Name == "Span");
+
+    /// <summary>
     /// Writes the constants of one kernel into the registry the artifact build reads.
     /// </summary>
     /// <param name="registry">The registry being built.</param>
     /// <param name="index">The position of the kernel, which makes the type name unique.</param>
     /// <param name="name">The name the artifact is built under.</param>
-    /// <param name="slang">The Slang program.</param>
+    /// <param name="program">The kernel as every backend reads it.</param>
     /// <param name="threads">The threads in a group.</param>
-    private static void WriteRegistry(StringBuilder registry, int index, string name, string slang, int threads)
+    private static void WriteRegistry(StringBuilder registry, int index, string name, KernelProgram program, int threads)
     {
         registry.AppendLine($"        internal static class Kernel{index}");
         registry.AppendLine("        {");
         registry.AppendLine($"            internal const string Name = {SymbolDisplay.FormatLiteral(name, true)};");
         registry.AppendLine($"            internal const int Threads = {threads};");
-        registry.AppendLine($"            internal const string Slang = {SymbolDisplay.FormatLiteral(slang, true)};");
+        registry.AppendLine($"            internal const string Hlsl = {SymbolDisplay.FormatLiteral(new KernelHlsl().Emit(program), true)};");
+        registry.AppendLine($"            internal const string Glsl = {SymbolDisplay.FormatLiteral(new KernelGlsl().Emit(program), true)};");
+        registry.AppendLine($"            internal const string Metal = {SymbolDisplay.FormatLiteral(new KernelMetal().Emit(program), true)};");
+        registry.AppendLine($"            internal const string Ptx = {SymbolDisplay.FormatLiteral(new KernelPtx().Emit(program), true)};");
+        registry.AppendLine($"            internal const string SpirV = {SymbolDisplay.FormatLiteral(Convert.ToBase64String(new KernelSpirV().Emit(program)), true)};");
         registry.AppendLine("        }");
         registry.AppendLine();
     }

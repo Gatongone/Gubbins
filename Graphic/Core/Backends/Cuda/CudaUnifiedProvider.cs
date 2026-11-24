@@ -331,19 +331,21 @@ internal sealed unsafe class CudaCompute : IDisposable
     /// <param name="sourceSize">The size of that block, in bytes.</param>
     /// <param name="destination">The device pointer the kernel writes.</param>
     /// <param name="destinationSize">The size of that block, in bytes.</param>
+    /// <param name="parameters">The device pointer the structure the kernel takes is read from, or zero when it takes none.</param>
     /// <param name="lengths">The device pointer the lengths are read from the block that carries them.</param>
     /// <param name="lengthsSize">The size of that block, in bytes.</param>
     /// <param name="groups">The number of thread blocks on the x axis.</param>
     /// <param name="threadsPerGroup">The threads in a block.</param>
     /// <returns><see langword="true"/> if the launch completed.</returns>
-    internal bool Dispatch(ulong source, ulong sourceSize, ulong destination, ulong destinationSize, ulong lengths, ulong lengthsSize, uint groups, uint threadsPerGroup)
+    internal bool Dispatch(ulong source, ulong sourceSize, ulong destination, ulong destinationSize, ulong parametersAddress, ulong lengths, ulong lengthsSize, uint groups, uint threadsPerGroup)
     {
         if (m_Disposed || m_Function == 0 || groups == 0 || threadsPerGroup == 0)
         {
             return false;
         }
 
-        void** parameters = null;
+        // The list of arguments a kernel that takes its blocks as arguments is launched with, when it has no constant.
+        void** arguments = null;
 
         if (m_Parameters != 0)
         {
@@ -366,14 +368,15 @@ internal sealed unsafe class CudaCompute : IDisposable
         else
         {
             // A kernel whose PTX takes its buffers as arguments has no constant to fill, so they are passed instead.
-            var arguments = stackalloc void*[3];
-            arguments[0] = &source;
-            arguments[1] = &destination;
-            arguments[2] = &lengths;
-            parameters = arguments;
+            var list = stackalloc void*[4];
+            list[0] = &source;
+            list[1] = &destination;
+            list[2] = &parametersAddress;
+            list[3] = &lengths;
+            arguments = list;
         }
 
-        if (CudaApi.cuLaunchKernel(m_Function, groups, 1, 1, threadsPerGroup, 1, 1, 0, 0, parameters, null) != 0)
+        if (CudaApi.cuLaunchKernel(m_Function, groups, 1, 1, threadsPerGroup, 1, 1, 0, 0, arguments, null) != 0)
         {
             return false;
         }

@@ -2,12 +2,13 @@
 namespace Gubbins.Graphic.D3D12;
 
 /// <summary>
-/// Runs one compute pipeline on a D3D12 device: a root signature with three root descriptors, a pipeline state loaded from
-/// DXIL, and a compute queue the bridge does not own.
+/// Runs one compute pipeline on a D3D12 device: a root signature with four root descriptors, a pipeline state loaded from
+/// the HLSL the system compiles, and a compute queue the bridge does not own.
 /// </summary>
 /// <remarks>
-/// The three root descriptors are the shape this layer binds: an unordered access view over the input block, one over the
-/// output block and one over the block that carries the lengths. All three are ordered access because the shader declares
+/// The root descriptors are the shape this layer binds: an unordered access view over the input block, one over the
+/// output block, one over the block that carries the structure a kernel takes, and one over the block that carries the
+/// lengths. All three are ordered access because the shader declares
 /// them that way, so that one translation of a kernel can bind the same way on a backend that has a single address space
 /// for resources. Resources are created in the common state and copied from the common state, so every dispatch starts and
 /// ends by putting them back there.
@@ -60,7 +61,7 @@ internal sealed unsafe class D3D12Compute : IDisposable
     }
 
     /// <summary>
-    /// Loads a pipeline state from DXIL, replacing the one that is already loaded.
+    /// Loads a pipeline state from bytecode, replacing the one that is already loaded.
     /// </summary>
     /// <param name="bytecode">The compiled shader.</param>
     /// <returns><see langword="true"/> if the pipeline state was created.</returns>
@@ -104,6 +105,23 @@ internal sealed unsafe class D3D12Compute : IDisposable
     }
 
     /// <summary>
+    /// Loads a pipeline state from the HLSL a kernel was translated to, which the system compiles here.
+    /// </summary>
+    /// <param name="source">The HLSL of the kernel.</param>
+    /// <param name="function">The function to compile.</param>
+    /// <returns><see langword="true"/> if the pipeline state was created.</returns>
+    /// <exception cref="D3D12Exception">Thrown when the system has no compiler or it refuses the program.</exception>
+    internal bool SetPipelineFromSource(string source, string function)
+    {
+        if (m_Disposed || string.IsNullOrEmpty(source))
+        {
+            return false;
+        }
+
+        return SetPipeline(D3D12Api.CompileShader(source, function));
+    }
+
+    /// <summary>
     /// Runs the loaded pipeline over two buffers.
     /// </summary>
     /// <param name="sourceResource">The <c>ID3D12Resource</c> the input lives in, for the transition barriers.</param>
@@ -113,7 +131,7 @@ internal sealed unsafe class D3D12Compute : IDisposable
     /// <param name="lengthsAddress">The GPU address of the lengths, or <see langword="0"/> when the kernel takes none.</param>
     /// <param name="groups">The number of thread groups to dispatch on the x axis.</param>
     /// <returns><see langword="true"/> if the dispatch ran to completion.</returns>
-    internal bool Dispatch(nint sourceResource, ulong sourceAddress, nint destinationResource, ulong destinationAddress, ulong lengthsAddress, uint groups)
+    internal bool Dispatch(nint sourceResource, ulong sourceAddress, nint destinationResource, ulong destinationAddress, ulong parametersAddress, ulong lengthsAddress, uint groups)
     {
         if (m_Disposed || m_Pipeline == 0 || sourceResource == 0 || destinationResource == 0 || groups == 0)
         {
@@ -150,7 +168,18 @@ internal sealed unsafe class D3D12Compute : IDisposable
         D3D12Api.SetComputeRootUnorderedAccessView(m_List, 0, sourceAddress);
         D3D12Api.SetComputeRootUnorderedAccessView(m_List, 1, destinationAddress);
 
-        if (lengthsAddress != 0)
+        // The block of the structure a kernel takes comes after the buffers, which is where the translation binds it, and
+        // the counts are bound after it when it is there.
+        if (parametersAddress != 0)
+        {
+            D3D12Api.SetComputeRootUnorderedAccessView(m_List, 2, parametersAddress);
+
+            if (lengthsAddress != 0)
+            {
+                D3D12Api.SetComputeRootUnorderedAccessView(m_List, 3, lengthsAddress);
+            }
+        }
+        else if (lengthsAddress != 0)
         {
             D3D12Api.SetComputeRootUnorderedAccessView(m_List, 2, lengthsAddress);
         }
@@ -197,10 +226,11 @@ internal sealed unsafe class D3D12Compute : IDisposable
     /// <returns><see langword="true"/> if the signature was created.</returns>
     private bool CreateRootSignature()
     {
-        // The third root descriptor carries the buffer lengths, because a root descriptor on its own reports no size.
-        var parameters = stackalloc D3D12RootParameter[3];
+        // A root descriptor on its own reports no size, which is why the block that carries the lengths is bound beside
+        // the buffers rather than read from one of them.
+        var parameters = stackalloc D3D12RootParameter[4];
 
-        for (var index = 0; index < 3; index++)
+        for (var index = 0; index < 4; index++)
         {
             parameters[index] = new D3D12RootParameter
             {
@@ -213,7 +243,7 @@ internal sealed unsafe class D3D12Compute : IDisposable
 
         var description = new D3D12RootSignatureDesc
         {
-            ParameterCount = 3,
+            ParameterCount = 4,
             Parameters = parameters,
             Flags = D3D12Api.ROOT_SIGNATURE_FLAGS_NONE
         };

@@ -57,7 +57,7 @@ public sealed class GpuKernel : IDisposable
     /// Loads a kernel from bytecode.
     /// </summary>
     /// <param name="device">The device to load it on.</param>
-    /// <param name="bytecode">The compiled shader for that device's backend: DXIL on D3D12, SPIR-V on Vulkan.</param>
+    /// <param name="bytecode">The compiled shader for that device's backend: SPIR-V on Vulkan.</param>
     /// <returns>The kernel, or <see langword="null"/> when the backend has no compute path yet or refused the pipeline.</returns>
     public static GpuKernel? Load(GpuDevice device, ReadOnlySpan<byte> bytecode)
     {
@@ -104,10 +104,10 @@ public sealed class GpuKernel : IDisposable
     /// <param name="entryPoint">The function to run, for the backends that resolve one by name.</param>
     /// <returns>The kernel, or <see langword="null"/> when the artifact for this backend is missing or refused.</returns>
     /// <remarks>
-    /// The artifact that is loaded is chosen from the backend the device selected: <c>dxil</c> for D3D12, <c>spv</c> for
-    /// Vulkan, <c>comp</c> for OpenGL, <c>metallib</c> or the <c>metal</c> source it was built from for Metal, and
-    /// <c>ptx</c> for CUDA. A caller that ships them all has one kernel to maintain and no branch of its own.
-    /// </remarks>
+    /// The artifact that is loaded is chosen from the backend the device selected: <c>hlsl</c> for D3D12, which the
+    /// system's own compiler turns into bytecode here, <c>spv</c> for Vulkan, <c>comp</c> for OpenGL, <c>metallib</c> or
+    /// the <c>metal</c> source it was built from for Metal, and <c>ptx</c> for CUDA. A caller that ships them all has one
+    /// kernel to maintain and no branch of its own.
     public static GpuKernel? LoadFromDirectory(GpuDevice device, string directory, string name, string entryPoint = KernelEntryPoint)
     {
         if (device is null)
@@ -117,7 +117,7 @@ public sealed class GpuKernel : IDisposable
 
         string extension = device.Backend switch
         {
-            D3D12Device => ".dxil",
+            D3D12Device => ".hlsl",
             VulkanDevice => ".spv",
             GlDevice => ".comp",
             MetalDevice => ".metallib",
@@ -146,7 +146,7 @@ public sealed class GpuKernel : IDisposable
     /// Loads a kernel from a file, which is the only way Metal takes a shader.
     /// </summary>
     /// <param name="device">The device to load it on.</param>
-    /// <param name="path">The compiled shader on disk: a metallib on Metal, DXIL or SPIR-V elsewhere.</param>
+    /// <param name="path">The shader on disk: a metallib or the source Metal compiles, HLSL for D3D12, and SPIR-V for Vulkan.</param>
     /// <param name="function">The kernel function to run; Metal resolves it by name.</param>
     /// <returns>The kernel, or <see langword="null"/> when the backend refused it.</returns>
     public static GpuKernel? LoadFromFile(GpuDevice device, string path, string function)
@@ -199,6 +199,19 @@ public sealed class GpuKernel : IDisposable
             return new GpuKernel(device, null, null, compute, null, null);
         }
 
+        if (device.Backend is D3D12Device d3d12 && path.EndsWith(".hlsl", StringComparison.OrdinalIgnoreCase))
+        {
+            var compute = new D3D12Compute(d3d12.Handle);
+
+            if (!compute.SetPipelineFromSource(File.ReadAllText(path), function))
+            {
+                compute.Dispose();
+                return null;
+            }
+
+            return new GpuKernel(device, compute, null, null, null, null);
+        }
+
         return Load(device, File.ReadAllBytes(path));
     }
 
@@ -212,8 +225,11 @@ public sealed class GpuKernel : IDisposable
     /// The block that holds one element count per buffer, for a kernel that reads <c>Span.Length</c>; <see langword="null"/>
     /// when the kernel does not.
     /// </param>
+    /// <param name="parameters">
+    /// The block that holds the structure the kernel takes as one value; <see langword="null"/> when the kernel takes none.
+    /// </param>
     /// <returns><see langword="true"/> if the dispatch ran to completion.</returns>
-    public bool TryDispatch(GpuBlock source, GpuBlock destination, uint groups, GpuBlock? lengths = null)
+    public bool TryDispatch(GpuBlock source, GpuBlock destination, uint groups, GpuBlock? lengths = null, GpuBlock? parameters = null)
     {
         if (m_Disposed)
         {
@@ -242,7 +258,14 @@ public sealed class GpuKernel : IDisposable
                 lengthsLength = (ulong)lengths.Storage.Length;
             }
 
-            return m_Cuda.Dispatch(sourcePointer, (ulong)source.Storage.Length, destinationPointer, (ulong)destination.Storage.Length, lengthsPointer, lengthsLength, groups, 64);
+            var parametersPointer = 0ul;
+
+            if (parameters is not null && cuda.Provider.TryGetPointer(parameters.Storage, out var availableParameters))
+            {
+                parametersPointer = availableParameters;
+            }
+
+            return m_Cuda.Dispatch(sourcePointer, (ulong)source.Storage.Length, destinationPointer, (ulong)destination.Storage.Length, parametersPointer, lengthsPointer, lengthsLength, groups, 64);
         }
 
         if (m_OpenGL is not null && m_Device.Backend is GlDevice openGL)
@@ -262,7 +285,18 @@ public sealed class GpuKernel : IDisposable
                 lengthsOffset = availableLengthsOffset;
             }
 
-            return m_OpenGL.Dispatch(sourceBuffer, sourceOffset, (ulong)source.Length, destinationBuffer, destinationOffset, (ulong)destination.Length, lengthsBuffer, lengthsOffset, LengthsSize, groups);
+            var parametersBuffer = 0u;
+            var parametersOffset = 0ul;
+            var parametersSize = 0ul;
+
+            if (parameters is not null && openGL.Provider.TryGetBuffer(parameters.Storage, out var availableParameters, out var availableParametersOffset))
+            {
+                parametersBuffer = availableParameters;
+                parametersOffset = availableParametersOffset;
+                parametersSize = (ulong)parameters.Storage.Length;
+            }
+
+            return m_OpenGL.Dispatch(sourceBuffer, sourceOffset, (ulong)source.Length, destinationBuffer, destinationOffset, (ulong)destination.Length, parametersBuffer, parametersOffset, parametersSize, lengthsBuffer, lengthsOffset, LengthsSize, groups);
         }
 
         if (m_Metal is not null && m_Device.Backend is MetalDevice metal)
@@ -284,7 +318,16 @@ public sealed class GpuKernel : IDisposable
                 lengthsOffset = availableLengthsOffset;
             }
 
-            return m_Metal.Dispatch(sourceBuffer, (nuint)sourceOffset, destinationBuffer, (nuint)destinationOffset, lengthsBuffer, (nuint)lengthsOffset, groups, 64);
+            nint parametersBuffer = 0;
+            var parametersOffset = 0ul;
+
+            if (parameters is not null && metalProvider.TryGetBuffer(parameters.Storage, out var availableParameters, out var availableParametersOffset))
+            {
+                parametersBuffer = availableParameters;
+                parametersOffset = availableParametersOffset;
+            }
+
+            return m_Metal.Dispatch(sourceBuffer, (nuint)sourceOffset, destinationBuffer, (nuint)destinationOffset, parametersBuffer, (nuint)parametersOffset, lengthsBuffer, (nuint)lengthsOffset, groups, 64);
         }
 
         if (m_Vulkan is not null && m_Device.Backend is VulkanDevice vulkan)
@@ -306,7 +349,18 @@ public sealed class GpuKernel : IDisposable
                 lengthsOffset = availableLengthsOffset;
             }
 
-            return m_Vulkan.Dispatch(sourceBuffer, sourceOffset, (ulong)source.Length, destinationBuffer, destinationOffset, (ulong)destination.Length, lengthsBuffer, lengthsOffset, groups);
+            nint parametersBuffer = 0;
+            var parametersOffset = 0ul;
+            var parametersSize = 0ul;
+
+            if (parameters is not null && provider.TryGetVulkanBuffer(parameters.Storage, out var availableParameters, out var availableParametersOffset))
+            {
+                parametersBuffer = availableParameters;
+                parametersOffset = availableParametersOffset;
+                parametersSize = (ulong)parameters.Storage.Length;
+            }
+
+            return m_Vulkan.Dispatch(sourceBuffer, sourceOffset, (ulong)source.Length, destinationBuffer, destinationOffset, (ulong)destination.Length, parametersBuffer, parametersOffset, parametersSize, lengthsBuffer, lengthsOffset, groups);
         }
 
         if (m_D3D12 is null || m_Device.Backend is not D3D12Device d3d12)
@@ -332,7 +386,14 @@ public sealed class GpuKernel : IDisposable
             lengthsAddress = D3D12Api.GetVirtualAddress(lengthsResource) + (ulong)lengths.Storage.Offset;
         }
 
-        return m_D3D12.Dispatch(sourceResource, sourceAddress, destinationResource, destinationAddress, lengthsAddress, groups);
+        var parametersAddress = 0ul;
+
+        if (parameters is not null && d3d12Provider.TryGetResource(parameters.Storage, out var parametersResource, out _))
+        {
+            parametersAddress = D3D12Api.GetVirtualAddress(parametersResource) + (ulong)parameters.Storage.Offset;
+        }
+
+        return m_D3D12.Dispatch(sourceResource, sourceAddress, destinationResource, destinationAddress, parametersAddress, lengthsAddress, groups);
     }
 
     /// <summary>

@@ -8,9 +8,8 @@ namespace Gubbins.Graphic.Tests;
 /// device this machine has.
 /// </summary>
 /// <remarks>
-/// The tests that only read the translation need nothing but the translator. The ones that compile and run need
-/// <c>slangc</c> and a device, and are ignored on a machine that has neither rather than reporting a failure that is not
-/// the pipeline's.
+/// The tests that only read the translation need nothing but the translator. The ones that compile and run need a device,
+/// and are ignored on a machine that has none rather than reporting a failure that is not the pipeline's.
 /// </remarks>
 public sealed class KernelTests
 {
@@ -70,15 +69,15 @@ public static unsafe class Scale
     [Test]
     public void Kernel_TranslatesIntoTheShapeEveryBackendBinds()
     {
-        var slang = KernelTranspiler.Transpile(Kernel);
+        var hlsl = Hlsl(Kernel);
 
-        Assert.That(slang, Does.Contain($"#define index (__gubbinsThreadId.x)"), "the thread index is the name the body uses");
-        Assert.That(slang, Does.Contain($"void {KernelTranspiler.ENTRY_POINT}("), "every backend looks the kernel up by one name");
-        Assert.That(slang, Does.Contain("[[vk::binding(0, 0)]] RWStructuredBuffer<uint> source : register(u0);"));
-        Assert.That(slang, Does.Contain("[[vk::binding(1, 0)]] RWStructuredBuffer<uint> destination : register(u1);"));
-        Assert.That(slang, Does.Contain("[[vk::binding(2, 0)]] RWStructuredBuffer<uint> __gubbinsLengths : register(u2);"));
-        Assert.That(slang, Does.Contain("int __length_source = int(__gubbinsLengths[0]);"), "a span's Length comes from the lengths block");
-        Assert.That(slang, Does.Contain("min(__length_source, 4096)"), "the maths calls the subset maps become intrinsics");
+        Assert.That(hlsl, Does.Contain("int __gubbinsIndex = int(__gubbinsThreadId.x);"), "the thread index is the name the body uses");
+        Assert.That(hlsl, Does.Contain($"void {KernelTranspiler.ENTRY_POINT}("), "every backend looks the kernel up by one name");
+        Assert.That(hlsl, Does.Contain("RWStructuredBuffer<uint> source : register(u0);"));
+        Assert.That(hlsl, Does.Contain("RWStructuredBuffer<uint> destination : register(u1);"));
+        Assert.That(hlsl, Does.Contain("RWStructuredBuffer<uint> __gubbinsLengths : register(u2);"));
+        Assert.That(hlsl, Does.Contain("int __length_source = int(__gubbinsLengths[0]);"), "a span's Length comes from the lengths block");
+        Assert.That(hlsl, Does.Contain("min(__length_source, 4096)"), "the maths calls the subset maps become intrinsics");
     }
 
     [Test]
@@ -120,11 +119,11 @@ public static unsafe class Tiled
 }
 ";
 
-        var slang = KernelTranspiler.Transpile(Source);
+        var hlsl = Hlsl(Source);
 
-        Assert.That(slang, Does.Contain("source[index]"), "a read through a slice that starts at zero is the buffer itself");
-        Assert.That(slang, Does.Contain("destination[(index) + (half)]"), "a write through a slice is a write of the buffer it came from");
-        Assert.That(slang, Does.Not.Contain(".Slice("), "the slice itself has no representation on the device");
+        Assert.That(hlsl, Does.Contain("source[__gubbinsIndex]"), "a read through a slice that starts at zero is the buffer itself");
+        Assert.That(hlsl, Does.Contain("destination[__gubbinsIndex + half]"), "a write through a slice is a write of the buffer it came from");
+        Assert.That(hlsl, Does.Not.Contain(".Slice("), "the slice itself has no representation on the device");
     }
 
     [Test]
@@ -143,9 +142,9 @@ public static unsafe class Tailed
 }
 ";
 
-        var slang = KernelTranspiler.Transpile(Source);
+        var hlsl = Hlsl(Source);
 
-        Assert.That(slang, Does.Contain("(__length_source - (1))"), "a slice with no count runs to the end of the buffer");
+        Assert.That(hlsl, Does.Contain("(__length_source - 1)"), "a slice with no count runs to the end of the buffer");
     }
 
     [Test]
@@ -163,10 +162,10 @@ public static unsafe class Inline
 }
 ";
 
-        var slang = KernelTranspiler.Transpile(Source);
+        var hlsl = Hlsl(Source);
 
-        Assert.That(slang, Does.Contain("source[0]"), "a slice of one element is the element itself");
-        Assert.That(slang, Does.Not.Contain(".Slice("), "the slice itself has no representation on the device");
+        Assert.That(hlsl, Does.Contain("source[0]"), "a slice of one element is the element itself");
+        Assert.That(hlsl, Does.Not.Contain(".Slice("), "the slice itself has no representation on the device");
     }
 
     [Test]
@@ -185,10 +184,10 @@ public static unsafe class Nested
 }
 ";
 
-        var slang = KernelTranspiler.Transpile(Source);
+        var hlsl = Hlsl(Source);
 
-        Assert.That(slang, Does.Contain("source[(0) + ((1) + (2))]"), "the offsets of a chain of slices add up");
-        Assert.That(slang, Does.Contain("(__length_source - (1))"), "the length of a slice runs from its offset to the end of the buffer");
+        Assert.That(hlsl, Does.Contain("source[0 + (1 + 2)]"), "the offsets of a chain of slices add up");
+        Assert.That(hlsl, Does.Contain("(__length_source - 1)"), "the length of a slice runs from its offset to the end of the buffer");
     }
 
     [Test]
@@ -208,9 +207,9 @@ public static unsafe class Grouped
 }
 ";
 
-        var slang = KernelTranspiler.Transpile(Source);
+        var hlsl = Hlsl(Source);
 
-        Assert.That(slang, Does.Contain("[numthreads(128, 1, 1)]"), "the kernel says how many threads a group of it has");
+        Assert.That(hlsl, Does.Contain("[numthreads(128, 1, 1)]"), "the kernel says how many threads a group of it has");
         Assert.That(KernelTranspiler.ThreadsPerGroup(Source), Is.EqualTo(128), "a caller divides its element count by the same number");
         Assert.That(KernelTranspiler.ThreadsPerGroup(Kernel), Is.EqualTo(KernelTranspiler.THREADS_PER_GROUP), "a kernel that says nothing gets the default");
     }
@@ -263,7 +262,7 @@ public static unsafe class Narrow
 }
 ";
 
-        Assert.That(() => KernelTranspiler.Transpile(Unknown), Throws.TypeOf<KernelTranslationException>().With.Message.Contains("not a struct the kernel declares"));
+        Assert.That(() => KernelTranspiler.Transpile(Unknown), Throws.TypeOf<KernelTranslationException>().With.Message.Contains("structure the kernel declares"));
         Assert.That(() => KernelTranspiler.Transpile(Narrow), Throws.TypeOf<KernelTranslationException>().With.Message.Contains("element type every backend has"));
     }
     [Test]
@@ -318,12 +317,12 @@ public static unsafe class Windows
 }
 ";
 
-        var slang = KernelTranspiler.Transpile(Source);
+        var hlsl = Hlsl(Source);
 
-        Assert.That(slang, Does.Contain("(__length_source) - (1)"), "an index from the end is the length less the index");
-        Assert.That(slang, Does.Contain("((4) - (2))"), "a range runs from its start to its end");
-        Assert.That(slang, Does.Contain("(__length_source - (1))"), "a range with no end runs to the end of the buffer");
-        Assert.That(slang, Does.Not.Contain(".."), "the ranges themselves have no representation on the device");
+        Assert.That(hlsl, Does.Contain("__length_source - 1"), "an index from the end is the length less the index");
+        Assert.That(hlsl, Does.Contain("(4 - 2)"), "a range runs from its start to its end");
+        Assert.That(hlsl, Does.Contain("(__length_source - 1)"), "a range with no end runs to the end of the buffer");
+        Assert.That(hlsl, Does.Not.Contain(".."), "the ranges themselves have no representation on the device");
     }
     [Test]
     public void Kernel_DeclaresAStructAsAValueTypeOfTheDevice()
@@ -367,13 +366,13 @@ public static unsafe class Vectors
 }
 ";
 
-        var slang = KernelTranspiler.Transpile(Source);
+        var hlsl = Hlsl(Source);
 
-        Assert.That(slang, Does.Contain("struct Vec2"), "the struct is a type of the device");
-        Assert.That(slang, Does.Contain("__init(uint x, uint y)"), "a constructor is the way a value is built");
-        Assert.That(slang, Does.Contain("operator+(Vec2 left, Vec2 right)"), "an operator is a function of the module");
-        Assert.That(slang, Does.Contain("[mutating] void Shift"), "a method that writes a field mutates the value");
-        Assert.That(slang, Does.Contain("Vec2(source[index], 1)"), "a value is built without an allocation");
+        Assert.That(hlsl, Does.Contain("struct Vec2"), "the struct is a type of the device");
+        Assert.That(hlsl, Does.Contain("Vec2_ctor(uint x, uint y)"), "a constructor is the way a value is built");
+        Assert.That(hlsl, Does.Contain("Vec2_op_Addition(Vec2 left, Vec2 right)"), "an operator is a function of the module");
+        Assert.That(hlsl, Does.Contain("void Vec2_Shift(inout Vec2 self"), "a method that writes a field mutates the value");
+        Assert.That(hlsl, Does.Contain("Vec2_ctor(source[__gubbinsIndex], 1)"), "a value is built without an allocation");
     }
 
     [Test]
@@ -437,15 +436,199 @@ public static unsafe class Values
 }
 ";
 
-        var slang = KernelTranspiler.Transpile(Source);
+        var hlsl = Hlsl(Source);
 
-        Assert.That(slang, Does.Contain("struct Inner"), "a struct that a struct holds is declared before it");
-        Assert.That(slang.IndexOf("struct Inner", StringComparison.Ordinal), Is.LessThan(slang.IndexOf("struct Outer", StringComparison.Ordinal)), "the order follows what holds what");
-        Assert.That(slang, Does.Contain("property uint Total { get { return Item.Value * Scale; } }"), "a read only property is a property of the type");
-        Assert.That(slang, Does.Contain("static uint Twice(uint value)"), "a static method stays static");
-        Assert.That(slang, Does.Contain("struct Holder<T>"), "a generic struct keeps its parameters");
-        Assert.That(slang, Does.Contain("uint Helper(uint value)"), "a helper method of the kernel's class is a function of the module");
-        Assert.That(slang, Does.Contain("Holder<uint> holder = {};"), "a value with no arguments is declared, which is what a generic one needs");
+        Assert.That(hlsl, Does.Contain("struct Inner"), "a struct that a struct holds is declared before it");
+        Assert.That(hlsl.IndexOf("struct Inner", StringComparison.Ordinal), Is.LessThan(hlsl.IndexOf("struct Outer", StringComparison.Ordinal)), "the order follows what holds what");
+        Assert.That(hlsl, Does.Contain("uint Outer_Total(Outer self)"), "a read only property is a function that reads the value it is called on");
+        Assert.That(hlsl, Does.Contain("self.Item.Value * self.Scale"), "the body of the property reads the fields of the value");
+        Assert.That(hlsl, Does.Contain("uint Outer_Twice(uint value)"), "a static method stays static");
+        Assert.That(hlsl, Does.Contain("struct Holder_uint"), "a generic struct is instantiated with the arguments the kernel uses it with");
+        Assert.That(hlsl, Does.Contain("uint Helper(uint value)"), "a helper method of the kernel's class is a function of the module");
+        Assert.That(hlsl, Does.Contain("Holder_uint holder;"), "a value with no arguments is declared, which is what a generic one needs");
+    }
+
+    [Test]
+    public void Kernel_TakesAStructureAsOneValue()
+    {
+        const string Source = @"
+using System;
+using Gubbins.Graphic;
+
+[GpuStruct]
+public struct Step
+{
+    public float Damping;
+    public float Offset;
+}
+
+public static partial class Motion
+{
+    [GpuKernel]
+    public static void Scale(int index, ReadOnlySpan<float> source, Span<float> destination, in Step step)
+    {
+        destination[index] = source[index] * step.Damping + step.Offset;
+    }
+}
+";
+
+        var hlsl = Hlsl(Source);
+
+        Assert.That(hlsl, Does.Contain("RWStructuredBuffer<Step> __gubbinsParams : register(u2);"), "the structure is a block of one element, bound after the buffers");
+        Assert.That(hlsl, Does.Contain("RWStructuredBuffer<uint> __gubbinsLengths : register(u3);"), "the counts are bound after it, because the binding is taken");
+        Assert.That(hlsl, Does.Contain("Step step = __gubbinsParams[0];"), "the entry point copies it into a local");
+        Assert.That(hlsl, Does.Contain("source[__gubbinsIndex] * step.Damping + step.Offset"), "the body reads the structure like any value");
+    }
+
+    [Test]
+    public void Kernel_RunsWithTheStructureItTakesOnTheDeviceTheMachineHas()
+    {
+        const int Count = 256;
+        const string Source = @"
+using System;
+using Gubbins.Graphic;
+
+[GpuStruct]
+public struct Step
+{
+    public float Damping;
+    public float Offset;
+}
+
+public static partial class Motion
+{
+    [GpuKernel]
+    public static void Scale(int index, ReadOnlySpan<float> source, Span<float> destination, in Step step)
+    {
+        destination[index] = source[index] * step.Damping + step.Offset;
+    }
+}
+";
+
+        if (!TryUseDevice(out var device, out var directory, Source, "Scaled"))
+        {
+            return;
+        }
+
+        try
+        {
+            using (device)
+            using (var memory = device.CreateMemory())
+            using (var kernel = GpuKernel.LoadFromDirectory(device, directory, "Scaled"))
+            {
+                Assert.That(kernel, Is.Not.Null, "the artifact the backend needs was loaded");
+
+                var values = new float[Count];
+
+                for (var index = 0; index < Count; index++)
+                {
+                    values[index] = index;
+                }
+
+                var input = memory.Allocate((nuint)(Count * sizeof(float)), GpuAccess.Shared);
+                var output = memory.Allocate((nuint)(Count * sizeof(float)), GpuAccess.Shared);
+                var lengths = memory.Allocate(16, GpuAccess.Shared);
+                var parameters = memory.Allocate((nuint)(2 * sizeof(float)), GpuAccess.Shared);
+
+                memory.Upload(input, MemoryMarshal.AsBytes(values.AsSpan()));
+                memory.Upload(lengths, MemoryMarshal.AsBytes(new uint[] { Count, Count, 0, 0 }.AsSpan()));
+
+                foreach (var (damping, offset) in new[] { (2f, 1f), (5f, -3f) })
+                {
+                    memory.Upload(parameters, MemoryMarshal.AsBytes(new[] { damping, offset }.AsSpan()));
+
+                    Assert.That(kernel!.TryDispatch(input, output, (uint)(Count / KernelTranspiler.THREADS_PER_GROUP), lengths, parameters), Is.True, $"the dispatch with damping {damping} ran");
+                    memory.MarkWrittenByGpu(output);
+                    memory.Synchronize();
+
+                    var result = MemoryMarshal.Cast<byte, float>(output.CpuView());
+
+                    for (var index = 0; index < Count; index++)
+                    {
+                        Assert.That(result[index], Is.EqualTo(values[index] * damping + offset).Within(0.001f), $"element {index} with damping {damping} and offset {offset}");
+                    }
+                }
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Test]
+    public void Kernel_ResolvesAHelperDeclaredInAnotherClass()
+    {
+        const string Source = @"
+using System;
+using Gubbins.Graphic;
+
+public static class Maths
+{
+    [GpuCompatible]
+    public static uint Twice(uint value) => Scale(value * 3);
+}
+
+public static class Scale
+{
+    [GpuCompatible]
+    public static uint Scale(uint value) => value * 2;
+}
+
+public static partial class Kernels
+{
+    [GpuKernel]
+    public static void Add(int index, ReadOnlySpan<uint> source, Span<uint> destination)
+    {
+        destination[index] = Maths.Twice(source[index]);
+    }
+}
+";
+
+        var hlsl = Hlsl(Source);
+
+        Assert.That(hlsl, Does.Contain("uint Twice(uint value)"), "the helper of another class is a function of the program");
+        Assert.That(hlsl, Does.Contain("uint Scale(uint value)"), "the helper that helper calls is one too");
+        Assert.That(hlsl, Does.Contain("return Scale(value * 3u);"), "a qualified call is emitted as the free function it becomes");
+        Assert.That(hlsl, Does.Not.Contain("Maths.Twice"), "the name the call was qualified with has no meaning on the device");
+    }
+
+    [Test]
+    public void Kernel_TellsApartTwoHelpersOfTheSameNameInDifferentClasses()
+    {
+        const string Source = @"
+using System;
+using Gubbins.Graphic;
+
+public static class First
+{
+    [GpuCompatible]
+    public static uint Bump(uint value) => value + 1;
+}
+
+public static class Second
+{
+    [GpuCompatible]
+    public static uint Bump(uint value) => value + 100;
+}
+
+public static partial class Kernels
+{
+    [GpuKernel]
+    public static void Add(int index, ReadOnlySpan<uint> source, Span<uint> destination)
+    {
+        destination[index] = First.Bump(source[index]) + Second.Bump(source[index]);
+    }
+}
+";
+
+        var hlsl = Hlsl(Source);
+
+        Assert.That(hlsl, Does.Contain("uint First_Bump(uint value)"), "a name two classes share is qualified by the class that declares it");
+        Assert.That(hlsl, Does.Contain("uint Second_Bump(uint value)"), "the other class keeps the same rule");
+        Assert.That(hlsl, Does.Contain("return value + 1u;"), "the first helper is the body of the first class");
+        Assert.That(hlsl, Does.Contain("return value + 100u;"), "the second helper is the body of the second class");
+        Assert.That(hlsl, Does.Contain("First_Bump(source[__gubbinsIndex]) + Second_Bump(source[__gubbinsIndex])"), "each call reaches the helper of the class it names");
     }
 
     [Test]
@@ -475,12 +658,12 @@ public static unsafe class Walks
 }
 ";
 
-        var slang = KernelTranspiler.Transpile(Source);
+        var hlsl = Hlsl(Source);
 
-        Assert.That(slang, Does.Contain("for (int __gubbinsLoop0 = 0; __gubbinsLoop0 < 2; __gubbinsLoop0++)"), "a loop over a slice counts the elements of the slice");
-        Assert.That(slang, Does.Contain("uint value = source[(__gubbinsLoop0) + (1)];"), "the element of a slice is the buffer at the offset");
-        Assert.That(slang, Does.Contain("for (int __gubbinsLoop1 = 0; __gubbinsLoop1 < __length_source; __gubbinsLoop1++)"), "a loop over a buffer counts its elements");
-        Assert.That(slang, Does.Contain("uint other = source[__gubbinsLoop1];"), "the element of a buffer is its element");
+        Assert.That(hlsl, Does.Contain("for (int __gubbinsLoop0 = 0; __gubbinsLoop0 < 2; __gubbinsLoop0 = __gubbinsLoop0 + 1)"), "a loop over a slice counts the elements of the slice");
+        Assert.That(hlsl, Does.Contain("uint value = source[__gubbinsLoop0 + 1];"), "the element of a slice is the buffer at the offset");
+        Assert.That(hlsl, Does.Contain("for (int __gubbinsLoop1 = 0; __gubbinsLoop1 < __length_source; __gubbinsLoop1 = __gubbinsLoop1 + 1)"), "a loop over a buffer counts its elements");
+        Assert.That(hlsl, Does.Contain("uint other = source[__gubbinsLoop1];"), "the element of a buffer is its element");
     }
 
     [Test]
@@ -583,12 +766,12 @@ public static unsafe class Writes
 }
 ";
 
-        var slang = KernelTranspiler.Transpile(Source);
+        var hlsl = Hlsl(Source);
 
-        Assert.That(slang, Does.Contain("void Bump(inout uint value)"), "a parameter a helper writes back to is inout");
-        Assert.That(slang, Does.Contain("void Split(uint value, out uint high, out uint low)"), "a parameter a helper only writes is out");
-        Assert.That(slang, Does.Contain("Bump(value);"), "the caller passes the variable itself");
-        Assert.That(slang, Does.Contain("Split(value, high, low);"), "the caller passes the variables the call writes back to");
+        Assert.That(hlsl, Does.Contain("void Bump(inout uint value)"), "a parameter a helper writes back to is inout");
+        Assert.That(hlsl, Does.Contain("void Split(uint value, out uint high, out uint low)"), "a parameter a helper only writes is out");
+        Assert.That(hlsl, Does.Contain("Bump(value);"), "the caller passes the variable itself");
+        Assert.That(hlsl, Does.Contain("Split(value, high, low);"), "the caller passes the variables the call writes back to");
     }
 
     [Test]
@@ -613,10 +796,10 @@ public static unsafe class Writes
 }
 ";
 
-        var slang = KernelTranspiler.Transpile(Source);
+        var hlsl = Hlsl(Source);
 
-        Assert.That(slang, Does.Contain("uint high;"), "the variable the call writes back to is declared with the type the call takes");
-        Assert.That(slang, Does.Contain("Split(source[index], high, low);"), "the call passes the variables themselves");
+        Assert.That(hlsl, Does.Contain("uint high;"), "the variable the call writes back to is declared with the type the call takes");
+        Assert.That(hlsl, Does.Contain("Split(source[__gubbinsIndex], high, low);"), "the call passes the variables themselves");
     }
 
     [Test]
@@ -646,11 +829,11 @@ public static unsafe class Grades
 }
 ";
 
-        var slang = KernelTranspiler.Transpile(Source);
+        var hlsl = Hlsl(Source);
 
-        Assert.That(slang, Does.Contain("== (0) ? (100u)"), "a switch expression is a chain of comparisons");
-        Assert.That(slang, Does.Contain("== (2)"), "a constant pattern is an equality");
-        Assert.That(slang, Does.Not.Contain("switch"), "the device branches with the comparisons");
+        Assert.That(hlsl, Does.Contain("== 0u ? 100u"), "a switch expression is a chain of comparisons");
+        Assert.That(hlsl, Does.Contain("== 2u"), "a constant pattern is an equality");
+        Assert.That(hlsl, Does.Not.Contain("switch"), "the device branches with the comparisons");
     }
 
     [Test]
@@ -731,9 +914,10 @@ public static unsafe class Scratch
 }
 ";
 
-        var slang = KernelTranspiler.Transpile(Source);
+        var hlsl = Hlsl(Source);
 
-        Assert.That(slang, Does.Contain("uint values[4] = { 1, 2, 3, 4 };"), "the array is sized where it is declared");
+        Assert.That(hlsl, Does.Contain("uint values[4];"), "the array is sized where it is declared");
+        Assert.That(hlsl, Does.Contain("values[2] = 3u;"), "the values it starts with are written into it one element at a time");
     }
 
     [Test]
@@ -751,10 +935,10 @@ public static unsafe class Waves
 }
 ";
 
-        var slang = KernelTranspiler.Transpile(Source);
+        var hlsl = Hlsl(Source);
 
-        Assert.That(slang, Does.Contain("WaveActiveSum("), "a wave sum is the intrinsic every backend has");
-        Assert.That(slang, Does.Contain("WaveActiveMax("));
+        Assert.That(hlsl, Does.Contain("WaveActiveSum("), "a wave sum is the intrinsic every backend has");
+        Assert.That(hlsl, Does.Contain("WaveActiveMax("));
     }
 
     [Test]
@@ -864,6 +1048,16 @@ public static unsafe class Waves
             return;
         }
 
+        // D3D12 compiles the artifact with the system compiler's cs_5_1 profile, which has no wave intrinsics: the kernel
+        // loads on every backend that has the operation in its language, so a D3D12 machine skips rather than fails.
+        if (device.Backend is D3D12Device)
+        {
+            device.Dispose();
+            Directory.Delete(directory, true);
+            Assert.Ignore("D3D12 compiles kernels with cs_5_1, which has no wave intrinsics.");
+            return;
+        }
+
         using (device)
         using (var memory = device.CreateMemory())
         using (var kernel = GpuKernel.LoadFromDirectory(device, directory, "Waves"))
@@ -925,26 +1119,18 @@ public static unsafe class Callback
             var artifacts = Compile(directory);
             var names = artifacts.Select(Path.GetFileName).ToList();
 
-            // The targets every machine with the compiler can produce: the translation itself, the two cross platform
-            // shader artifacts, and the source Metal compiles itself.
-            foreach (var extension in new[] { ".slang", ".spv", ".comp", ".metal" })
+            // The artifacts every machine produces: the HLSL D3D12 compiles where it loads, the SPIR-V Vulkan loads, and
+            // the sources OpenGL and Metal compile themselves.
+            foreach (var extension in new[] { ".hlsl", ".spv", ".comp", ".metal" })
             {
                 Assert.That(names, Does.Contain("Scale" + extension), $"the {extension} artifact is one of the targets");
             }
 
-            // The remaining three come from a downstream compiler, which is a Windows driver kit, a CUDA runtime or the
-            // platform toolchain. A machine without one produces the rest rather than failing the build.
+            // The text CUDA compiles is written by this layer, so a machine that has it produces it. The test checks the
+            // artifact when it is there.
             if (names.Contains("Scale.ptx"))
             {
-                Assert.That(File.ReadAllText(Path.Combine(directory, "Scale.ptx")), Does.Contain("SLANG_globalParams"), "CUDA reads its buffers from the constant the runtime fills");
-            }
-
-            // The D3D12 and CUDA artifacts come from downstream compilers that are separate installs: the Windows driver
-            // kit provides the first and a CUDA toolkit the second, so a machine without one produces the rest rather
-            // than failing the build. The test checks the artifact when it is there.
-            if (names.Contains("Scale.dxil"))
-            {
-                Assert.That(new FileInfo(Path.Combine(directory, "Scale.dxil")).Length, Is.GreaterThan(0), "the D3D12 artifact is a compiled shader");
+                Assert.That(new FileInfo(Path.Combine(directory, "Scale.ptx")).Length, Is.GreaterThan(0), "the CUDA artifact is the PTX text the driver compiles");
             }
 
             if (OperatingSystem.IsMacOS())
@@ -1041,15 +1227,7 @@ public static unsafe class Tiled
 
         try
         {
-            try
-            {
-                KernelCompiler.Compile(Tiled, directory, "Tiled");
-            }
-            catch (InvalidOperationException exception) when (exception.Message.Contains("slangc was not found"))
-            {
-                Assert.Ignore("This machine has no slangc.");
-                return;
-            }
+            KernelCompiler.Compile(Tiled, directory, "Tiled");
 
             using var memory = device.CreateMemory();
             using var kernel = GpuKernel.LoadFromDirectory(device, directory, "Tiled");
@@ -1112,12 +1290,12 @@ public static unsafe class Reduce
 }
 ";
 
-        var slang = KernelTranspiler.Transpile(Source);
+        var hlsl = Hlsl(Source);
 
-        Assert.That(slang, Does.Contain("groupshared uint tile[64];"), "the array every thread of the group addresses is a module declaration");
-        Assert.That(slang, Does.Contain("GroupMemoryBarrierWithGroupSync();"), "the barrier becomes the one call every backend has");
-        Assert.That(slang, Does.Contain("tile[0] + 64"), "the length of a shared array is the number it was declared with");
-        Assert.That(slang, Does.Not.Contain("Shared<"), "the declaration has no representation on the device");
+        Assert.That(hlsl, Does.Contain("groupshared uint tile[64];"), "the array every thread of the group addresses is a module declaration");
+        Assert.That(hlsl, Does.Contain("GroupMemoryBarrierWithGroupSync();"), "the barrier becomes the one call every backend has");
+        Assert.That(hlsl, Does.Contain("tile[0] + 64u"), "the length of a shared array is the number it was declared with");
+        Assert.That(hlsl, Does.Not.Contain("Shared<"), "the declaration has no representation on the device");
     }
 
     [Test]
@@ -1191,15 +1369,7 @@ public static unsafe class Reduce
 
         try
         {
-            try
-            {
-                KernelCompiler.Compile(Reduction, directory, "Reduce");
-            }
-            catch (InvalidOperationException exception) when (exception.Message.Contains("slangc was not found"))
-            {
-                Assert.Ignore("This machine has no slangc.");
-                return;
-            }
+            KernelCompiler.Compile(Reduction, directory, "Reduce");
 
             using var memory = device.CreateMemory();
             using var kernel = GpuKernel.LoadFromDirectory(device, directory, "Reduce");
@@ -1261,10 +1431,10 @@ public static unsafe class Square
 }
 ";
 
-        var slang = KernelTranspiler.Transpile(Source);
+        var hlsl = Hlsl(Source);
 
-        Assert.That(slang, Does.Contain("RWStructuredBuffer<float4> source"), "an element is whatever type the language knows");
-        Assert.That(slang, Does.Contain("value * value"), "the arithmetic on a vector is the language's own");
+        Assert.That(hlsl, Does.Contain("RWStructuredBuffer<float4> source"), "an element is whatever type the language knows");
+        Assert.That(hlsl, Does.Contain("value * value"), "the arithmetic on a vector is the language's own");
     }
 
     [Test]
@@ -1414,16 +1584,8 @@ public static unsafe class Histogram
 
         try
         {
-            try
-            {
-                KernelCompiler.Compile(Kernel, directory, "Scale");
-                KernelCompiler.Compile(Reduction, directory, "Reduce");
-            }
-            catch (InvalidOperationException exception) when (exception.Message.Contains("slangc was not found"))
-            {
-                Assert.Ignore("This machine has no slangc.");
-                return;
-            }
+            KernelCompiler.Compile(Kernel, directory, "Scale");
+            KernelCompiler.Compile(Reduction, directory, "Reduce");
 
             var ran = 0;
 
@@ -1578,6 +1740,13 @@ public static unsafe class Histogram
     }
 
     /// <summary>
+    /// Emits the HLSL of the kernel a source declares, which is the artifact D3D12 compiles when it loads it.
+    /// </summary>
+    /// <param name="source">The C# source that declares the kernel.</param>
+    /// <returns>The HLSL the program is written as.</returns>
+    private static string Hlsl(string source) => new KernelHlsl().Emit(KernelTranspiler.Transpile(source));
+
+    /// <summary>
     /// Compiles a kernel for the device this machine has, skipping the test when either is missing.
     /// </summary>
     /// <param name="device">When the method returns, the device to run on.</param>
@@ -1599,35 +1768,16 @@ public static unsafe class Histogram
         device = created;
         directory = Directory.CreateTempSubdirectory("gubbins-kernel-").FullName;
 
-        try
-        {
-            KernelCompiler.Compile(source, directory, name);
-        }
-        catch (InvalidOperationException exception) when (exception.Message.Contains("slangc was not found"))
-        {
-            Assert.Ignore("This machine has no slangc.");
-            Directory.Delete(directory, true);
-            return false;
-        }
+        KernelCompiler.Compile(source, directory, name);
 
         return true;
     }
 
     /// <summary>
-    /// Compiles the kernel the tests share, skipping the test when the compiler is not installed.
+    /// Compiles the kernel the tests share.
     /// </summary>
     /// <param name="directory">The directory the artifacts are written to.</param>
     /// <returns>The artifacts that were written.</returns>
     private static IReadOnlyList<string> Compile(string directory)
-    {
-        try
-        {
-            return KernelCompiler.Compile(Kernel, directory, "Scale");
-        }
-        catch (InvalidOperationException exception) when (exception.Message.Contains("slangc was not found"))
-        {
-            Assert.Ignore("This machine has no slangc.");
-            return Array.Empty<string>();
-        }
-    }
+        => KernelCompiler.Compile(Kernel, directory, "Scale");
 }

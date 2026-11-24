@@ -119,12 +119,14 @@ internal sealed unsafe class MetalCompute : IDisposable
     /// <param name="sourceOffset">The offset of the input inside it.</param>
     /// <param name="destinationBuffer">The <c>MTLBuffer</c> the shader writes.</param>
     /// <param name="destinationOffset">The offset of the output inside it.</param>
+    /// <param name="parametersBuffer">The <c>MTLBuffer</c> that carries the structure the kernel takes, or zero when it takes none.</param>
+    /// <param name="parametersOffset">The offset of that structure inside it.</param>
     /// <param name="lengthsBuffer">The <c>MTLBuffer</c> the lengths are read from, or zero to bind the input again.</param>
     /// <param name="lengthsOffset">The offset of the lengths inside it.</param>
     /// <param name="groups">The number of thread groups on the x axis.</param>
     /// <param name="threadsPerGroup">The threads in a group.</param>
     /// <returns><see langword="true"/> if the dispatch ran to completion.</returns>
-    internal bool Dispatch(nint sourceBuffer, nuint sourceOffset, nint destinationBuffer, nuint destinationOffset, nint lengthsBuffer, nuint lengthsOffset, uint groups, uint threadsPerGroup)
+    internal bool Dispatch(nint sourceBuffer, nuint sourceOffset, nint destinationBuffer, nuint destinationOffset, nint parametersBuffer, nuint parametersOffset, nint lengthsBuffer, nuint lengthsOffset, uint groups, uint threadsPerGroup)
     {
         if (m_Disposed || m_Pipeline == 0 || sourceBuffer == 0 || destinationBuffer == 0 || groups == 0 || threadsPerGroup == 0)
         {
@@ -149,7 +151,17 @@ internal sealed unsafe class MetalCompute : IDisposable
         MetalApi.SetBuffer(encoder, sourceBuffer, sourceOffset, 0);
         MetalApi.SetBuffer(encoder, destinationBuffer, destinationOffset, 1);
 
-        if (lengthsBuffer != 0)
+        // The block of the structure a kernel takes is bound after the buffers, and the counts after it when it is there.
+        if (parametersBuffer != 0)
+        {
+            MetalApi.SetBuffer(encoder, parametersBuffer, parametersOffset, 2);
+
+            if (lengthsBuffer != 0)
+            {
+                MetalApi.SetBuffer(encoder, lengthsBuffer, lengthsOffset, 3);
+            }
+        }
+        else if (lengthsBuffer != 0)
         {
             MetalApi.SetBuffer(encoder, lengthsBuffer, lengthsOffset, 2);
         }

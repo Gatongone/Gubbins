@@ -81,7 +81,10 @@ internal sealed unsafe class GlCompute : IDisposable
     /// <param name="destinationBuffer">The buffer bound to binding 1.</param>
     /// <param name="destinationOffset">The offset of the output inside it.</param>
     /// <param name="destinationSize">The size of the output.</param>
-    /// <param name="lengthsBuffer">The buffer bound to binding 2, or zero to reuse the input.</param>
+    /// <param name="parametersBuffer">The buffer bound after the buffers, which carries the structure a kernel takes, or zero when it takes none.</param>
+    /// <param name="parametersOffset">The offset of that structure inside it.</param>
+    /// <param name="parametersSize">The size of that structure.</param>
+    /// <param name="lengthsBuffer">The buffer bound after the buffers, or zero to reuse the input.</param>
     /// <param name="lengthsOffset">The offset of the lengths inside it.</param>
     /// <param name="lengthsSize">The size of the lengths.</param>
     /// <param name="groups">The number of thread groups on the x axis.</param>
@@ -90,7 +93,7 @@ internal sealed unsafe class GlCompute : IDisposable
     /// The blocks of one segment share a buffer, so every binding is a range and never the whole buffer: binding the
     /// whole buffer would make every block read and write the words at the start of the segment instead of its own.
     /// </remarks>
-    internal bool Dispatch(uint sourceBuffer, ulong sourceOffset, ulong sourceSize, uint destinationBuffer, ulong destinationOffset, ulong destinationSize, uint lengthsBuffer, ulong lengthsOffset, ulong lengthsSize, uint groups)
+    internal bool Dispatch(uint sourceBuffer, ulong sourceOffset, ulong sourceSize, uint destinationBuffer, ulong destinationOffset, ulong destinationSize, uint parametersBuffer, ulong parametersOffset, ulong parametersSize, uint lengthsBuffer, ulong lengthsOffset, ulong lengthsSize, uint groups)
     {
         if (m_Disposed || m_Program == 0 || sourceBuffer == 0 || destinationBuffer == 0 || groups == 0)
         {
@@ -101,7 +104,21 @@ internal sealed unsafe class GlCompute : IDisposable
         m_Api.BindBufferRange(ShaderStorageBuffer, 0, sourceBuffer, (nint)sourceOffset, (nint)sourceSize);
         m_Api.BindBufferRange(ShaderStorageBuffer, 1, destinationBuffer, (nint)destinationOffset, (nint)destinationSize);
 
-        if (lengthsBuffer == 0)
+        // The block of the structure a kernel takes is bound after the buffers, and the counts after it when it is there.
+        if (parametersBuffer != 0)
+        {
+            m_Api.BindBufferRange(ShaderStorageBuffer, 2, parametersBuffer, (nint)parametersOffset, (nint)parametersSize);
+
+            if (lengthsBuffer != 0)
+            {
+                m_Api.BindBufferRange(ShaderStorageBuffer, 3, lengthsBuffer, (nint)lengthsOffset, (nint)lengthsSize);
+            }
+            else
+            {
+                m_Api.BindBufferRange(ShaderStorageBuffer, 3, sourceBuffer, (nint)sourceOffset, (nint)sourceSize);
+            }
+        }
+        else if (lengthsBuffer == 0)
         {
             m_Api.BindBufferRange(ShaderStorageBuffer, 2, sourceBuffer, (nint)sourceOffset, (nint)sourceSize);
         }

@@ -9,8 +9,9 @@ namespace Gubbins.Graphic;
 /// The method is ordinary C#: it compiles, it can be called from any other method, and it runs as it is written when the
 /// central processor calls it. What the attribute adds is that the translator will also accept it as the body of a
 /// device kernel, which is why it is restricted to the subset the shading language can express: the first parameter is
-/// the thread index, the buffers are declared as <see cref="ReadOnlySpan{T}"/> or <see cref="Span{T}"/>, and everything
-/// the body calls is either an intrinsic of <see cref="GpuIntrinsics"/> or a method marked with
+/// the thread index, the buffers are declared as <see cref="ReadOnlySpan{T}"/> or <see cref="Span{T}"/>, an optional last
+/// parameter is a structure marked with <see cref="GpuStructAttribute"/> that the caller fills in for every dispatch, and
+/// everything the body calls is either an intrinsic of <see cref="GpuIntrinsics"/> or a method marked with
 /// <see cref="GpuCompatibleAttribute"/>.
 /// </para>
 /// <para>
@@ -29,6 +30,29 @@ namespace Gubbins.Graphic;
 ///         target[index] = source[index] + 1;
 ///     }
 /// }
+/// </code>
+/// <para>
+/// A kernel that takes a structure as one value reads it like any other value, and the caller fills it in for every
+/// dispatch, so the same artifact runs with different settings without being translated again:
+/// </para>
+/// <code>
+/// [GpuStruct]
+/// public struct Step
+/// {
+///     public float Damping;
+///     public float Offset;
+/// }
+///
+/// public static partial class Motion
+/// {
+///     [GpuKernel]
+///     public static void Integrate(int index, ReadOnlySpan&lt;float&gt; source, Span&lt;float&gt; target, in Step step)
+///     {
+///         target[index] = source[index] * step.Damping + step.Offset;
+///     }
+/// }
+///
+/// // Motion.RunIntegrate(gpu, source, target, new Step { Damping = 0.5f, Offset = 1f });
 /// </code>
 /// </example>
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = false)]
@@ -120,6 +144,12 @@ public sealed class GpuStructAttribute : Attribute
 /// call from the kernel and emits the body beside the kernel for the device. The method has to be expressible in the
 /// subset the kernel is, which is why the mark is explicit: everything the kernel reaches has to be checked before it is
 /// translated, and an unmarked method is one the translator will not follow.
+/// </para>
+/// <para>
+/// The method may be declared in any class of that compilation: the translator follows the call by what the compiler
+/// resolved, so a helper of another class, or one that calls a helper of a third, is part of the kernel. Two classes may
+/// even declare a method of the same name, in which case the name the program emits is qualified by the class that
+/// declares it, and a call written without a class still reaches the one in the kernel's own class.
 /// </para>
 /// <para>
 /// The method has to be declared in the same compilation as the kernel, or in a source file both projects compile. The

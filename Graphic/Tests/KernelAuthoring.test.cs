@@ -37,6 +37,27 @@ public struct Position
     }
 
 /// <summary>
+/// The gain a shift applies, which the caller fills in for every dispatch.
+/// </summary>
+[GpuStruct]
+public struct Gain
+{
+    /// <summary>The factor every component is multiplied by.</summary>
+    public float Scale;
+
+    /// <summary>The value added after the factor.</summary>
+    public float Bias;
+
+    /// <param name="scale">The factor every component is multiplied by.</param>
+    /// <param name="bias">The value added after the factor.</param>
+    public Gain(float scale, float bias)
+    {
+        Scale = scale;
+        Bias = bias;
+    }
+}
+
+/// <summary>
 /// The kernel and the helper it calls, which are ordinary C# methods.
 /// </summary>
 public sealed partial class KernelAuthoringTests
@@ -69,16 +90,32 @@ public sealed partial class KernelAuthoringTests
             var position = source[index];
             target[index] = new Position(Damping(position.X), Damping(position.Y), Damping(position.Z));
         }
+        /// <summary>
+        /// Shifts one position by the gain the caller fills in, which changes between two dispatches.
+        /// </summary>
+        /// <param name="index">The position to shift.</param>
+        /// <param name="source">The positions to read.</param>
+        /// <param name="target">The positions to write.</param>
+        /// <param name="gain">The factor and the value added after it.</param>
+        [GpuKernel]
+        public static void Shift(int index, ReadOnlySpan<Position> source, Span<Position> target, in Gain gain)
+        {
+            var position = source[index];
+            target[index] = new Position(
+                position.X * gain.Scale + gain.Bias,
+                position.Y * gain.Scale + gain.Bias,
+                position.Z * gain.Scale + gain.Bias);
+        }
     }
 
     [Test]
     public void Kernel_GeneratesATypedEntryPointBesideTheMethod()
     {
         var methods = typeof(Motion).GetMethods(BindingFlags.Public | BindingFlags.Static)
-            .Where(method => method.Name == "Run")
+            .Where(method => method.Name == "RunIntegrate")
             .ToList();
 
-        Assert.That(methods, Is.Not.Empty, "the generator adds Run to the type that declares the kernel");
+        Assert.That(methods, Is.Not.Empty, "the generator adds RunIntegrate to the type that declares the kernel, named after it");
         Assert.That(
             methods.Any(method => method.GetParameters()[1].ParameterType.IsGenericType &&
                                   method.GetParameters()[1].ParameterType.GetGenericTypeDefinition() == typeof(GpuBuffer<>)),
@@ -101,7 +138,7 @@ public sealed partial class KernelAuthoringTests
         var entry = registry.GetNestedType("Kernel0", BindingFlags.NonPublic)!;
 
         Assert.That((string) entry.GetField("Name", BindingFlags.NonPublic | BindingFlags.Static)!.GetRawConstantValue()!, Does.EndWith(".Integrate"), "the artifact is named after the kernel");
-        Assert.That((string) entry.GetField("Slang", BindingFlags.NonPublic | BindingFlags.Static)!.GetRawConstantValue()!, Does.Contain("void gubbins_main"), "the translated program is a constant, so a tool reads it without running the program");
+        Assert.That((string) entry.GetField("Hlsl", BindingFlags.NonPublic | BindingFlags.Static)!.GetRawConstantValue()!, Does.Contain("void gubbins_main"), "the HLSL entry point is a constant, so a tool reads it without running the program");
         Assert.That((int) entry.GetField("Threads", BindingFlags.NonPublic | BindingFlags.Static)!.GetRawConstantValue()!, Is.EqualTo(64), "the group size travels with the program");
     }
 
@@ -121,7 +158,7 @@ public sealed partial class KernelAuthoringTests
 
             try
             {
-                Motion.Run(gpu, source, target);
+                Motion.RunIntegrate(gpu, source, target);
             }
             catch (GpuExecutionException)
             {
@@ -131,6 +168,38 @@ public sealed partial class KernelAuthoringTests
 
             Assert.That(target[0].X, Is.EqualTo(98f).Within(0.001f), "the generated entry point dispatched the kernel and the result came back");
             Assert.That(target[1].Z, Is.EqualTo(2.94f).Within(0.001f), "every element went through the helper the two processors share");
+        }
+    }
+
+    [Test]
+    public void Kernel_RunsWithTheStructureItTakesThroughTheGeneratedEntryPoint()
+    {
+        if (!Gpu.TryCreate(out var gpu) || gpu is null)
+        {
+            Assert.Ignore("This machine has no device the layer can use.");
+            return;
+        }
+
+        using (gpu)
+        {
+            var source = new[] { new Position(1f, 2f, 3f), new Position(4f, 5f, 6f) };
+            var target = new Position[source.Length];
+
+            try
+            {
+                Motion.RunShift(gpu, source, target, new Gain(2f, 1f));
+
+                Assert.That(target[0].X, Is.EqualTo(3f).Within(0.001f), "the generated entry point dispatched the kernel with the structure it was given");
+                Assert.That(target[1].Z, Is.EqualTo(13f).Within(0.001f), "every component of every element went through it");
+
+                Motion.RunShift(gpu, source, target, new Gain(10f, -1f));
+
+                Assert.That(target[0].Y, Is.EqualTo(19f).Within(0.001f), "the second dispatch used the second structure, without translating anything again");
+            }
+            catch (GpuExecutionException)
+            {
+                Assert.Ignore("The kernel artifact was not built beside this test.");
+            }
         }
     }
 

@@ -81,6 +81,33 @@ public sealed class Kernel
     }
 
     /// <summary>
+    /// Runs a kernel that takes a structure as one value, and waits for it to finish.
+    /// </summary>
+    /// <param name="source">The buffer the kernel reads.</param>
+    /// <param name="target">The buffer the kernel writes.</param>
+    /// <param name="parameters">The block that holds the structure, which is one element of the type the kernel declares.</param>
+    /// <exception cref="GpuExecutionException">Thrown when the dispatch did not run.</exception>
+    public void Run(GpuBuffer source, GpuBuffer target, GpuBuffer parameters)
+    {
+        Dispatch(source, target, parameters);
+        m_Gpu.Synchronize();
+    }
+
+    /// <summary>
+    /// Runs a kernel that takes a structure as one value, over a number of groups the caller chooses, and waits.
+    /// </summary>
+    /// <param name="source">The buffer the kernel reads.</param>
+    /// <param name="target">The buffer the kernel writes.</param>
+    /// <param name="parameters">The block that holds the structure, which is one element of the type the kernel declares.</param>
+    /// <param name="groups">The number of groups on the x axis.</param>
+    /// <exception cref="GpuExecutionException">Thrown when the dispatch did not run.</exception>
+    public void Run(GpuBuffer source, GpuBuffer target, GpuBuffer parameters, uint groups)
+    {
+        Dispatch(source, target, parameters, groups);
+        m_Gpu.Synchronize();
+    }
+
+    /// <summary>
     /// Records the kernel over two buffers without waiting, for a caller that synchronizes once per frame.
     /// </summary>
     /// <param name="source">The buffer the kernel reads.</param>
@@ -89,13 +116,50 @@ public sealed class Kernel
     public void Dispatch(GpuBuffer source, GpuBuffer target) => Dispatch(source, target, Groups(source));
 
     /// <summary>
+    /// Records a kernel that takes a structure as one value, without waiting.
+    /// </summary>
+    /// <param name="source">The buffer the kernel reads.</param>
+    /// <param name="target">The buffer the kernel writes.</param>
+    /// <param name="parameters">The block that holds the structure, which is one element of the type the kernel declares.</param>
+    /// <exception cref="GpuExecutionException">Thrown when the dispatch did not run.</exception>
+    public void Dispatch(GpuBuffer source, GpuBuffer target, GpuBuffer parameters) => Dispatch(source, target, parameters, Groups(source));
+
+    /// <summary>
     /// Records the kernel over two buffers, over a number of groups the caller chooses, without waiting.
     /// </summary>
     /// <param name="source">The buffer the kernel reads.</param>
     /// <param name="target">The buffer the kernel writes.</param>
     /// <param name="groups">The number of groups on the x axis.</param>
     /// <exception cref="GpuExecutionException">Thrown when the dispatch did not run.</exception>
-    public void Dispatch(GpuBuffer source, GpuBuffer target, uint groups)
+    public void Dispatch(GpuBuffer source, GpuBuffer target, uint groups) => Dispatch(source, target, (GpuBlock?)null, groups);
+
+    /// <summary>
+    /// Records a kernel that takes a structure as one value, over a number of groups the caller chooses, without waiting.
+    /// </summary>
+    /// <param name="source">The buffer the kernel reads.</param>
+    /// <param name="target">The buffer the kernel writes.</param>
+    /// <param name="parameters">The block that holds the structure, which is one element of the type the kernel declares.</param>
+    /// <param name="groups">The number of groups on the x axis.</param>
+    /// <exception cref="GpuExecutionException">Thrown when the dispatch did not run.</exception>
+    public void Dispatch(GpuBuffer source, GpuBuffer target, GpuBuffer parameters, uint groups)
+    {
+        if (parameters is null)
+        {
+            throw new ArgumentNullException(nameof(parameters));
+        }
+
+        Dispatch(source, target, parameters.Block, groups);
+    }
+
+    /// <summary>
+    /// Records the kernel over two buffers and the block of a structure, without waiting.
+    /// </summary>
+    /// <param name="source">The buffer the kernel reads.</param>
+    /// <param name="target">The buffer the kernel writes.</param>
+    /// <param name="parameters">The block that holds the structure, or <see langword="null"/> when the kernel takes none.</param>
+    /// <param name="groups">The number of groups on the x axis.</param>
+    /// <exception cref="GpuExecutionException">Thrown when the dispatch did not run.</exception>
+    private void Dispatch(GpuBuffer source, GpuBuffer target, GpuBlock? parameters, uint groups)
     {
         if (m_Disposed)
         {
@@ -120,7 +184,7 @@ public sealed class Kernel
             var counts = new uint[] { (uint) source.Length, (uint) target.Length, 0, 0 };
             memory.Upload(lengths, MemoryMarshal.AsBytes(counts.AsSpan()));
 
-            if (!m_Program.TryDispatch(source.Block, target.Block, groups, lengths))
+            if (!m_Program.TryDispatch(source.Block, target.Block, groups, lengths, parameters))
             {
                 throw new GpuExecutionException($"The kernel '{Name}' did not run.");
             }

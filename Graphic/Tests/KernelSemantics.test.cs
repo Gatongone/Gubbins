@@ -59,15 +59,15 @@ public sealed class KernelSemanticsTests
     public void Kernel_TranslatesTheHelperAndStructureTheCodeBaseDeclares()
     {
         var (compilation, kernel) = CompileSource(Source);
-        var slang = KernelTranspiler.Transpile(compilation, kernel);
+        var hlsl = new KernelHlsl().Emit(KernelTranspiler.Transpile(compilation, kernel));
 
-        Assert.That(slang, Does.Contain("struct Position"), "the structure is the one the source declares");
-        Assert.That(slang, Does.Contain("float Damping(float value)"), "the helper is a function of the program");
-        Assert.That(slang, Does.Contain("0.98"), "the constant the helper reads is folded to its value");
-        Assert.That(slang, Does.Not.Contain("Retention"), "the name of the constant has no meaning on the device");
-        Assert.That(slang, Does.Contain("RWStructuredBuffer<Position> source"), "the buffer holds the structure itself");
-        Assert.That(slang, Does.Contain("target[index]= Position(Damping(position.X)"), "the body calls the helper and builds the structure");
-        Assert.That(slang, Does.Contain("[numthreads(64, 1, 1)]"), "the group size is the one the attribute declares");
+        Assert.That(hlsl, Does.Contain("struct Position"), "the structure is the one the source declares");
+        Assert.That(hlsl, Does.Contain("float Damping(float value)"), "the helper is a function of the program");
+        Assert.That(hlsl, Does.Contain("0.98"), "the constant the helper reads is folded to its value");
+        Assert.That(hlsl, Does.Not.Contain("Retention"), "the name of the constant has no meaning on the device");
+        Assert.That(hlsl, Does.Contain("RWStructuredBuffer<Position> source"), "the buffer holds the structure itself");
+        Assert.That(hlsl, Does.Contain("target[__gubbinsIndex] = Position_ctor(Damping(position.X)"), "the body calls the helper and builds the structure");
+        Assert.That(hlsl, Does.Contain("[numthreads(64, 1, 1)]"), "the group size is the one the attribute declares");
     }
 
     [Test]
@@ -157,12 +157,12 @@ public sealed class KernelSemanticsTests
             """;
 
         var (compilation, kernel) = CompileProject("Integrate", Kernel, Shared);
-        var slang = KernelTranspiler.Transpile(compilation, kernel);
+        var hlsl = new KernelHlsl().Emit(KernelTranspiler.Transpile(compilation, kernel));
 
-        Assert.That(slang, Does.Contain("struct Position"), "the structure comes from the file that declares it");
-        Assert.That(slang, Does.Contain("float Apply(float value)"), "the helper comes from the file that declares it");
-        Assert.That(slang, Does.Contain("Apply(position.X)"), "a qualified call is emitted as the free function it becomes");
-        Assert.That(slang, Does.Contain("0.98"), "the constant of that file is folded too");
+        Assert.That(hlsl, Does.Contain("struct Position"), "the structure comes from the file that declares it");
+        Assert.That(hlsl, Does.Contain("float Apply(float value)"), "the helper comes from the file that declares it");
+        Assert.That(hlsl, Does.Contain("Apply(position.X)"), "a qualified call is emitted as the free function it becomes");
+        Assert.That(hlsl, Does.Contain("0.98"), "the constant of that file is folded too");
     }
 
     [Test]
@@ -188,13 +188,13 @@ public sealed class KernelSemanticsTests
             """;
 
         var (compilation, kernel) = CompileSource(Grouped, "Touch");
-        var slang = KernelTranspiler.Transpile(compilation, kernel);
+        var hlsl = new KernelHlsl().Emit(KernelTranspiler.Transpile(compilation, kernel));
 
-        Assert.That(slang, Does.Contain("groupshared uint tile[64];"), "the shared array is the memory of the group");
-        Assert.That(slang, Does.Contain("GroupMemoryBarrierWithGroupSync()"), "the barrier becomes the one every backend has");
-        Assert.That(slang, Does.Contain("WaveActiveSum(tile[lane])"), "the wave call becomes the wave intrinsic");
-        Assert.That(slang, Does.Contain("abs("), "the maths call becomes the intrinsic with that meaning");
-        Assert.That(slang, Does.Contain("__length_source"), "a length read is the block the caller passes");
+        Assert.That(hlsl, Does.Contain("groupshared uint tile[64];"), "the shared array is the memory of the group");
+        Assert.That(hlsl, Does.Contain("GroupMemoryBarrierWithGroupSync()"), "the barrier becomes the one every backend has");
+        Assert.That(hlsl, Does.Contain("WaveActiveSum(tile[lane])"), "the wave call becomes the wave intrinsic");
+        Assert.That(hlsl, Does.Contain("abs("), "the maths call becomes the intrinsic with that meaning");
+        Assert.That(hlsl, Does.Contain("__length_source"), "a length read is the block the caller passes");
     }
 
     [Test]
@@ -219,12 +219,12 @@ public sealed class KernelSemanticsTests
             """;
 
         var (compilation, kernel) = CompileSource(Window, "Sum");
-        var slang = KernelTranspiler.Transpile(compilation, kernel);
+        var hlsl = new KernelHlsl().Emit(KernelTranspiler.Transpile(compilation, kernel));
 
-        Assert.That(slang, Does.Contain("source[(0) + (1)]"), "a slice is the buffer and the offset it starts at");
-        Assert.That(slang, Does.Contain("(__length_source - (1))"), "the length of a slice runs from its offset to the end");
-        Assert.That(slang, Does.Not.Contain(".Slice"), "no span is left in the program");
-        Assert.That(slang, Does.Contain("InterlockedAdd(target[index], 1)"), "the atomic add is the one the device has");
+        Assert.That(hlsl, Does.Contain("source[0 + 1]"), "a slice is the buffer and the offset it starts at");
+        Assert.That(hlsl, Does.Contain("(__length_source - 1)"), "the length of a slice runs from its offset to the end");
+        Assert.That(hlsl, Does.Not.Contain(".Slice"), "no span is left in the program");
+        Assert.That(hlsl, Does.Contain("InterlockedAdd(target[__gubbinsIndex], 1u)"), "the atomic add is the one the device has");
     }
 
     /// <summary>

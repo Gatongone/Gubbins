@@ -163,18 +163,21 @@ internal sealed unsafe class VulkanCompute : IDisposable
     /// <param name="destinationBuffer">The <c>VkBuffer</c> the shader writes.</param>
     /// <param name="destinationOffset">The offset of the output inside it.</param>
     /// <param name="destinationSize">The size of the output.</param>
+    /// <param name="parametersBuffer">The <c>VkBuffer</c> that carries the structure the kernel takes, or zero when it takes none.</param>
+    /// <param name="parametersOffset">The offset of that structure inside it.</param>
+    /// <param name="parametersSize">The size of that structure.</param>
     /// <param name="lengthsBuffer">The <c>VkBuffer</c> that carries the lengths, or zero to reuse the input.</param>
     /// <param name="lengthsOffset">The offset of the lengths inside it.</param>
     /// <param name="groups">The number of thread groups on the x axis.</param>
     /// <returns><see langword="true"/> if the dispatch ran to completion.</returns>
-    internal bool Dispatch(nint sourceBuffer, ulong sourceOffset, ulong sourceSize, nint destinationBuffer, ulong destinationOffset, ulong destinationSize, nint lengthsBuffer, ulong lengthsOffset, uint groups)
+    internal bool Dispatch(nint sourceBuffer, ulong sourceOffset, ulong sourceSize, nint destinationBuffer, ulong destinationOffset, ulong destinationSize, nint parametersBuffer, ulong parametersOffset, ulong parametersSize, nint lengthsBuffer, ulong lengthsOffset, uint groups)
     {
         if (m_Disposed || m_Pipeline == 0 || sourceBuffer == 0 || destinationBuffer == 0 || groups == 0)
         {
             return false;
         }
 
-        if (!Bind(sourceBuffer, sourceOffset, sourceSize, destinationBuffer, destinationOffset, destinationSize, lengthsBuffer, lengthsOffset))
+        if (!Bind(sourceBuffer, sourceOffset, sourceSize, destinationBuffer, destinationOffset, destinationSize, parametersBuffer, parametersOffset, parametersSize, lengthsBuffer, lengthsOffset))
         {
             return false;
         }
@@ -232,9 +235,9 @@ internal sealed unsafe class VulkanCompute : IDisposable
             return true;
         }
 
-        var bindings = stackalloc VkDescriptorSetLayoutBinding[3];
+        var bindings = stackalloc VkDescriptorSetLayoutBinding[4];
 
-        for (var index = 0; index < 3; index++)
+        for (var index = 0; index < 4; index++)
         {
             bindings[index] = new VkDescriptorSetLayoutBinding
             {
@@ -248,7 +251,7 @@ internal sealed unsafe class VulkanCompute : IDisposable
         var setLayoutInfo = new VkDescriptorSetLayoutCreateInfo
         {
             StructureType = VulkanApi.DESCRIPTOR_SET_LAYOUT_CREATE_INFO_TYPE,
-            BindingCount = 3,
+            BindingCount = 4,
             Bindings = (nint)bindings
         };
 
@@ -280,7 +283,7 @@ internal sealed unsafe class VulkanCompute : IDisposable
         var poolSize = new VkDescriptorPoolSize
         {
             Type = VulkanApi.DESCRIPTOR_TYPE_STORAGE_BUFFER,
-            DescriptorCount = 3
+            DescriptorCount = 4
         };
 
         var poolInfo = new VkDescriptorPoolCreateInfo
@@ -320,26 +323,36 @@ internal sealed unsafe class VulkanCompute : IDisposable
     }
 
     /// <summary>
-    /// Points the three storage buffer bindings at the buffers of a dispatch.
+    /// Points the storage buffer bindings at the blocks of a dispatch.
     /// </summary>
     /// <returns><see langword="true"/> if the set was written.</returns>
-    private bool Bind(nint sourceBuffer, ulong sourceOffset, ulong sourceSize, nint destinationBuffer, ulong destinationOffset, ulong destinationSize, nint lengthsBuffer, ulong lengthsOffset)
+    private bool Bind(nint sourceBuffer, ulong sourceOffset, ulong sourceSize, nint destinationBuffer, ulong destinationOffset, ulong destinationSize, nint parametersBuffer, ulong parametersOffset, ulong parametersSize, nint lengthsBuffer, ulong lengthsOffset)
     {
         if (!CreateLayouts())
         {
             return false;
         }
 
-        var buffers = stackalloc VkDescriptorBufferInfo[3];
+        var buffers = stackalloc VkDescriptorBufferInfo[4];
         buffers[0] = new VkDescriptorBufferInfo { Buffer = sourceBuffer, Offset = sourceOffset, Range = sourceSize };
         buffers[1] = new VkDescriptorBufferInfo { Buffer = destinationBuffer, Offset = destinationOffset, Range = destinationSize };
-        buffers[2] = lengthsBuffer == 0
-            ? new VkDescriptorBufferInfo { Buffer = sourceBuffer, Offset = sourceOffset, Range = sourceSize }
-            : new VkDescriptorBufferInfo { Buffer = lengthsBuffer, Offset = lengthsOffset, Range = LengthsSize };
 
-        var writes = stackalloc VkWriteDescriptorSet[3];
+        // The block of the structure a kernel takes comes after the buffers, which is where the translation binds it, and
+        // the counts are bound after it when it is there. A binding the kernel does not use is still written, so that the
+        // set is complete.
+        buffers[2] = parametersBuffer != 0
+            ? new VkDescriptorBufferInfo { Buffer = parametersBuffer, Offset = parametersOffset, Range = parametersSize }
+            : lengthsBuffer == 0
+                ? new VkDescriptorBufferInfo { Buffer = sourceBuffer, Offset = sourceOffset, Range = sourceSize }
+                : new VkDescriptorBufferInfo { Buffer = lengthsBuffer, Offset = lengthsOffset, Range = LengthsSize };
 
-        for (var index = 0; index < 3; index++)
+        buffers[3] = parametersBuffer != 0 && lengthsBuffer != 0
+            ? new VkDescriptorBufferInfo { Buffer = lengthsBuffer, Offset = lengthsOffset, Range = LengthsSize }
+            : new VkDescriptorBufferInfo { Buffer = sourceBuffer, Offset = sourceOffset, Range = sourceSize };
+
+        var writes = stackalloc VkWriteDescriptorSet[4];
+
+        for (var index = 0; index < 4; index++)
         {
             writes[index] = new VkWriteDescriptorSet
             {
@@ -352,7 +365,7 @@ internal sealed unsafe class VulkanCompute : IDisposable
             };
         }
 
-        VulkanApi.UpdateDescriptorSets(m_Device, 3, writes, 0, 0);
+        VulkanApi.UpdateDescriptorSets(m_Device, 4, writes, 0, 0);
         return true;
     }
 

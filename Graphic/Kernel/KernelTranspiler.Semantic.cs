@@ -1,5 +1,3 @@
-using System.Globalization;
-using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -27,13 +25,13 @@ namespace Gubbins.Graphic.Kernels;
 public static partial class KernelTranspiler
 {
     /// <summary>
-    /// Translates one kernel the compiler resolved into Slang.
+    /// Translates one kernel the compiler resolved.
     /// </summary>
     /// <param name="compilation">The compilation the kernel was resolved in, which is what the helper calls are read from.</param>
     /// <param name="kernel">The method marked <c>[GpuKernel]</c>.</param>
-    /// <returns>The Slang program, with the bindings the backends expect.</returns>
+    /// <returns>The kernel, with the bindings the backends expect.</returns>
     /// <exception cref="KernelTranslationException">Thrown when the kernel, a helper or a structure is outside the subset.</exception>
-    public static string Transpile(Compilation compilation, IMethodSymbol kernel)
+    public static KernelProgram Transpile(Compilation compilation, IMethodSymbol kernel)
     {
         if (compilation is null)
         {
@@ -45,7 +43,9 @@ public static partial class KernelTranspiler
             throw new ArgumentNullException(nameof(kernel));
         }
 
-        return Emit(KernelSemantics.Create(compilation, kernel));
+        var semantics = KernelSemantics.Create(compilation, kernel);
+
+        return KernelLowering.Build(semantics.Declaration, semantics.Declaration.SyntaxTree, semantics.Threads, semantics);
     }
 
     /// <summary>
@@ -82,129 +82,6 @@ public static partial class KernelTranspiler
     }
 
     /// <summary>
-    /// Translates the program of a kernel whose symbols have been resolved.
-    /// </summary>
-    /// <param name="semantics">The kernel and everything it reaches.</param>
-    /// <returns>The Slang program.</returns>
-    private static string Emit(KernelSemantics semantics)
-    {
-        var parameters = semantics.Parameters;
-        var shared = new StringBuilder();
-        var body = RewriteBody(semantics.Declaration, parameters, shared, semantics.StructNames, semantics);
-        var count = parameters.Count(parameter => parameter.Kind != KernelParameterKind.Index);
-        var text = new StringBuilder();
-
-        text.Append(StructureText(semantics));
-        text.Append(FunctionText(semantics));
-
-        // Every buffer is writable here because a backend that binds one address space for all resources cannot tell a
-        // readable buffer from a writable one: Metal would place the two at the same index. The kernel the subset
-        // accepts writes only the buffer it declares writable, so nothing is lost but the read-only cache hint.
-        foreach (var parameter in parameters)
-        {
-            if (parameter.Kind == KernelParameterKind.Index)
-            {
-                continue;
-            }
-
-            text.AppendLine($"[[vk::binding({parameter.Binding}, 0)]] RWStructuredBuffer<{parameter.ElementType}> {parameter.Name} : register(u{parameter.Binding});");
-        }
-
-        if (count > 0)
-        {
-            text.AppendLine($"[[vk::binding({count}, 0)]] RWStructuredBuffer<uint> {LENGTHS_BUFFER} : register(u{count});");
-        }
-
-        text.Append(shared.ToString());
-
-        var index = parameters.First(parameter => parameter.Kind == KernelParameterKind.Index);
-
-        text.AppendLine();
-        text.AppendLine($"#define {index.Name} (__gubbinsThreadId.x)");
-        text.AppendLine();
-        text.AppendLine("[shader(\"compute\")]");
-        text.AppendLine($"[numthreads({semantics.Threads}, 1, 1)]");
-        text.AppendLine($"void {ENTRY_POINT}(uint3 __gubbinsThreadId : SV_DispatchThreadID)");
-        text.AppendLine("{");
-        text.Append(Prologue(parameters));
-        text.AppendLine();
-        text.AppendLine(body);
-        text.AppendLine("}");
-
-        return text.ToString();
-    }
-
-    /// <summary>
-    /// Translates the structures the kernel works with, in an order where a structure comes before the one that holds it.
-    /// </summary>
-    /// <param name="semantics">The kernel and everything it reaches.</param>
-    /// <returns>The declarations.</returns>
-    private static string StructureText(KernelSemantics semantics)
-    {
-        var text = new StringBuilder();
-
-        foreach (var declaration in semantics.Structs)
-        {
-            var rewriter = new SliceRewriter(
-                Array.Empty<KernelParameter>(),
-                semantics.StructNames,
-                semantics.CallableNames,
-                semantics.Signatures,
-                semantics);
-
-            var structure = (StructDeclarationSyntax) rewriter.Visit(declaration.Syntax)!;
-
-            text.AppendLine($"struct {declaration.Symbol.Name}");
-            text.AppendLine("{");
-
-            var operators = new StringBuilder();
-
-            foreach (var member in structure.Members)
-            {
-                if (member is OperatorDeclarationSyntax operation)
-                {
-                    operators.AppendLine($"{operation.ReturnType} operator{operation.OperatorToken.Text}({Parameters(operation.ParameterList)}){Body(operation.Body, operation.ExpressionBody, 0)}");
-                    continue;
-                }
-
-                text.Append(StructureMember(declaration.Symbol.Name, member));
-            }
-
-            text.AppendLine("}");
-            text.Append(operators.ToString());
-            text.AppendLine();
-        }
-
-        return text.ToString();
-    }
-
-    /// <summary>
-    /// Translates the methods the kernel calls and that carry <c>[GpuCompatible]</c>.
-    /// </summary>
-    /// <param name="semantics">The kernel and everything it reaches.</param>
-    /// <returns>The helpers, as the shading language writes them.</returns>
-    private static string FunctionText(KernelSemantics semantics)
-    {
-        var text = new StringBuilder();
-
-        foreach (var helper in semantics.Helpers)
-        {
-            var rewriter = new SliceRewriter(
-                Array.Empty<KernelParameter>(),
-                semantics.StructNames,
-                semantics.CallableNames,
-                semantics.Signatures,
-                semantics);
-
-            var method = (MethodDeclarationSyntax) rewriter.Visit(helper.Syntax)!;
-
-            text.AppendLine($"{method.ReturnType} {method.Identifier.ValueText}({Parameters(method.ParameterList)}){Body(method.Body, method.ExpressionBody, 0)}");
-        }
-
-        return text.ToString();
-    }
-
-    /// <summary>
     /// Everything a kernel the compiler resolved reaches: its parameters, the helpers marked for the device, and the
     /// structures both processors use.
     /// </summary>
@@ -216,16 +93,6 @@ public static partial class KernelTranspiler
     /// </remarks>
     internal sealed class KernelSemantics
     {
-        /// <summary>
-        /// How a call may be made: the names the body can use for a function.
-        /// </summary>
-        private readonly HashSet<string> m_Callables = new(StringComparer.Ordinal);
-
-        /// <summary>
-        /// The parameter lists of those calls, by name.
-        /// </summary>
-        private readonly Dictionary<string, IReadOnlyList<ParameterSyntax>> m_Signatures = new(StringComparer.Ordinal);
-
         /// <summary>
         /// The structures reached so far, by symbol.
         /// </summary>
@@ -275,11 +142,6 @@ public static partial class KernelTranspiler
         internal int Threads { get; }
 
         /// <summary>
-        /// Gets the parameters of the kernel.
-        /// </summary>
-        internal IReadOnlyList<KernelParameter> Parameters { get; private set; } = Array.Empty<KernelParameter>();
-
-        /// <summary>
         /// Gets the helpers the kernel reaches, in the order they were reached.
         /// </summary>
         internal IReadOnlyList<HelperMethod> Helpers { get; private set; } = Array.Empty<HelperMethod>();
@@ -288,21 +150,6 @@ public static partial class KernelTranspiler
         /// Gets the structures the kernel works with, in an order where a structure comes before the one that holds it.
         /// </summary>
         internal IReadOnlyList<StructDeclaration> Structs { get; private set; } = Array.Empty<StructDeclaration>();
-
-        /// <summary>
-        /// Gets the names of those structures, which are the types a value can be built from.
-        /// </summary>
-        internal IReadOnlyCollection<string> StructNames => m_Structs.Values.Select(structure => structure.Symbol.Name).ToList();
-
-        /// <summary>
-        /// Gets the names a kernel body may call.
-        /// </summary>
-        internal IReadOnlyCollection<string> CallableNames => m_Callables;
-
-        /// <summary>
-        /// Gets the parameter lists of those calls, by name.
-        /// </summary>
-        internal IReadOnlyDictionary<string, IReadOnlyList<ParameterSyntax>> Signatures => m_Signatures;
 
         /// <summary>
         /// Resolves a kernel and everything it reaches.
@@ -360,6 +207,7 @@ public static partial class KernelTranspiler
 
                 throw new KernelTranslationException($"The attribute '{attribute.AttributeClass?.Name}' means nothing to the device. A kernel declares at most [{KERNEL_ATTRIBUTE}] and [{THREADS_ATTRIBUTE}(count)].");
             }
+
             var reference = kernel.DeclaringSyntaxReferences.FirstOrDefault()
                 ?? throw new KernelTranslationException($"'{kernel.ToDisplayString()}' was not declared in source, so its body cannot be read.");
 
@@ -378,7 +226,13 @@ public static partial class KernelTranspiler
         private void Discover()
         {
             RejectUnsupported(Declaration, Declaration.SyntaxTree, semantic: true);
-            ReadParameters();
+
+            // The parameter a kernel takes as one value is a structure the device holds, and it is walked first so that it
+            // is declared before the body that reads it.
+            foreach (var parameter in Kernel.Parameters)
+            {
+                RequireStruct(parameter.Type, $"parameter '{parameter.Name}'");
+            }
 
             var pending = new Queue<IMethodSymbol>();
             var seen = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default) { Kernel };
@@ -433,20 +287,6 @@ public static partial class KernelTranspiler
             }
 
             OrderStructures();
-
-            foreach (var helper in Helpers)
-            {
-                m_Callables.Add(helper.Symbol.Name);
-                m_Signatures[helper.Symbol.Name] = helper.Syntax.ParameterList.Parameters;
-            }
-
-            foreach (var structure in m_Structs.Keys)
-            {
-                foreach (var method in structure.GetMembers().OfType<IMethodSymbol>())
-                {
-                    m_Callables.Add(method.Name);
-                }
-            }
         }
 
         /// <summary>
@@ -521,53 +361,6 @@ public static partial class KernelTranspiler
         }
 
         /// <summary>
-        /// Reads the parameters of the kernel from the symbols the compiler resolved.
-        /// </summary>
-        /// <exception cref="KernelTranslationException">Thrown when a parameter is not one the device has.</exception>
-        private void ReadParameters()
-        {
-            var parameters = new List<KernelParameter>();
-
-            foreach (var parameter in Kernel.Parameters)
-            {
-                if (parameter.RefKind != RefKind.None)
-                {
-                    throw new KernelTranslationException($"Parameter '{parameter.Name}' is passed by reference: a kernel reads and writes the buffers it is given.");
-                }
-
-                if (parameter.Type.SpecialType == SpecialType.System_Int32)
-                {
-                    parameters.Add(new KernelParameter(parameter.Name, KernelParameterKind.Index, string.Empty, -1));
-                    continue;
-                }
-
-                if (parameter.Type is INamedTypeSymbol span && IsSpan(span))
-                {
-                    var element = span.TypeArguments[0];
-                    RequireStruct(element, $"parameter '{parameter.Name}'");
-
-                    var kind = span.Name == "ReadOnlySpan" ? KernelParameterKind.ReadOnlyBuffer : KernelParameterKind.WritableBuffer;
-                    parameters.Add(new KernelParameter(parameter.Name, kind, ElementName(element), parameters.Count(candidate => candidate.Kind != KernelParameterKind.Index)));
-                    continue;
-                }
-
-                throw new KernelTranslationException($"Parameter '{parameter.Name}': only an int index, ReadOnlySpan<T> or Span<T> are supported, and the element type is int, uint or float.");
-            }
-
-            if (!parameters.Any(parameter => parameter.Kind == KernelParameterKind.Index))
-            {
-                throw new KernelTranslationException("The kernel has no thread index parameter.");
-            }
-
-            if (!parameters.Any(parameter => parameter.Kind == KernelParameterKind.WritableBuffer))
-            {
-                throw new KernelTranslationException("The kernel writes nothing: a writable buffer parameter is required.");
-            }
-
-            Parameters = parameters;
-        }
-
-        /// <summary>
         /// Requires a type to be one the device has, and records the structure when it is one of the kernel's.
         /// </summary>
         /// <param name="type">The type a kernel value has.</param>
@@ -597,9 +390,14 @@ public static partial class KernelTranspiler
                 return;
             }
 
-            if (named.OriginalDefinition.SpecialType != SpecialType.None)
+            if (IsSupportedScalar(named) || IsVector(named))
             {
                 return;
+            }
+
+            if (named.OriginalDefinition.SpecialType != SpecialType.None)
+            {
+                throw new KernelTranslationException($"'{named.ToDisplayString()}' is used by {use} and has no representation on the device: the device holds int, uint, float and the structures declared for both processors.");
             }
 
             if (named.TypeKind != TypeKind.Struct)
@@ -687,12 +485,20 @@ public static partial class KernelTranspiler
         }
 
         /// <summary>
-        /// Resolves the type name a buffer of the device holds.
+        /// Reports whether a type is one of the numbers the device computes with.
         /// </summary>
-        /// <param name="element">The element type of the buffer.</param>
-        /// <returns>The name the shading language declares it with.</returns>
-        private static string ElementName(ITypeSymbol element)
-            => element is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.None } named ? named.Name : element.ToDisplayString();
+        /// <param name="type">The type to test.</param>
+        /// <returns><see langword="true"/> when it is.</returns>
+        private static bool IsSupportedScalar(INamedTypeSymbol type)
+            => type.SpecialType is SpecialType.System_Int32 or SpecialType.System_UInt32 or SpecialType.System_Single or SpecialType.System_Boolean;
+
+        /// <summary>
+        /// Reports whether a type is one of the vectors a shading language spells out.
+        /// </summary>
+        /// <param name="type">The type to test.</param>
+        /// <returns><see langword="true"/> when it is.</returns>
+        private static bool IsVector(INamedTypeSymbol type)
+            => type.Name is "int2" or "int3" or "int4" or "uint2" or "uint3" or "uint4" or "float2" or "float3" or "float4";
 
         /// <summary>
         /// Reports whether a type is a span, which is how a kernel declares a buffer.
@@ -711,7 +517,7 @@ public static partial class KernelTranspiler
         /// <returns><see langword="true"/> when it maps to an intrinsic.</returns>
         private static bool IsIntrinsic(IMethodSymbol method)
             => (method.ContainingType?.ToDisplayString() == "System.Threading.Interlocked" && method.Name == "Add") ||
-               (method.ContainingType?.Name is { } owner && INTRINSICS.ContainsKey($"{owner}.{method.Name}"));
+               (method.ContainingType?.Name is { } owner && INTRINSIC_NAMES.Contains($"{owner}.{method.Name}"));
 
         /// <summary>
         /// Reports whether a method is the call that declares a group shared array.
@@ -764,164 +570,22 @@ public static partial class KernelTranspiler
         }
 
         /// <summary>
-        /// Rewrites a call the way the device reads it: an intrinsic under the name the shading language gives it, a
-        /// helper under its own name, and a call to anything else refused.
-        /// </summary>
-        /// <param name="original">The call the kernel wrote.</param>
-        /// <param name="visited">The same call, with its arguments already rewritten.</param>
-        /// <returns>The expression to emit.</returns>
-        /// <exception cref="KernelTranslationException">Thrown when the call is not one the device can run.</exception>
-        internal ExpressionSyntax RewriteInvocation(InvocationExpressionSyntax original, InvocationExpressionSyntax visited)
-        {
-            var symbol = ModelFor(original.SyntaxTree).GetSymbolInfo(original).Symbol as IMethodSymbol
-                ?? throw new KernelTranslationException($"'{original}' is not a call the compiler could resolve, so the device has nothing to run.");
-
-            if (IsShared(symbol))
-            {
-                throw new KernelTranslationException($"'{SHARED}<T>(count)' declares an array and is not an expression.");
-            }
-
-            if (IsBarrier(symbol))
-            {
-                return SyntaxFactory.ParseExpression("GroupMemoryBarrierWithGroupSync()");
-            }
-
-            if (symbol.ContainingType?.ToDisplayString() == "System.Threading.Interlocked" && symbol.Name == "Add")
-            {
-                if (original.Parent is not ExpressionStatementSyntax)
-                {
-                    throw new KernelTranslationException($"'{INTERLOCKED}' is called as a statement: the value an atomic add returns is not part of the subset.");
-                }
-
-                return SyntaxFactory.ParseExpression($"InterlockedAdd({Arguments(visited)})");
-            }
-
-            if (IsIntrinsic(symbol))
-            {
-                var intrinsic = INTRINSICS[$"{symbol.ContainingType!.Name}.{symbol.Name}"];
-
-                return SyntaxFactory.ParseExpression($"{intrinsic}({Arguments(visited)})");
-            }
-
-            if (symbol.Name == SLICE && symbol.ContainingType is { } sliceOwner && IsSpan(sliceOwner))
-            {
-                return visited;
-            }
-
-            if (symbol.ContainingType is { TypeKind: TypeKind.Struct } owner && HasAttribute(owner, m_GpuStruct))
-            {
-                return SyntaxFactory.ParseExpression($"{visited.Expression}({Arguments(visited)})");
-            }
-
-            if (!HasAttribute(symbol, m_GpuCompatible))
-            {
-                throw new KernelTranslationException($"'{symbol.ToDisplayString()}' is called from the kernel but is not marked [{m_GpuCompatible.Name}]: a helper the device runs is declared for both processors.");
-            }
-
-            // A helper is a free function in the program, so the name the call was qualified with is not written.
-            return SyntaxFactory.ParseExpression($"{symbol.Name}({Arguments(visited)})");
-        }
-
-        /// <summary>
-        /// Reads the constant a name stands for, when it stands for one.
+        /// Reads the constant a name stands for, when the compiler resolved it.
         /// </summary>
         /// <param name="node">The name or member access.</param>
-        /// <param name="literal">When the method returns, the literal the device reads.</param>
+        /// <param name="value">When the method returns, the value the name stands for.</param>
         /// <returns><see langword="true"/> when the name is a constant.</returns>
-        internal bool TryConstant(SyntaxNode node, out string literal)
+        internal bool TryConstantValue(SyntaxNode node, out object value)
         {
-            literal = string.Empty;
+            value = null!;
 
             if (ModelFor(node.SyntaxTree).GetSymbolInfo(node).Symbol is not IFieldSymbol { IsConst: true, HasConstantValue: true } field)
             {
                 return false;
             }
 
-            literal = Literal(field.ConstantValue!);
+            value = field.ConstantValue!;
             return true;
-        }
-
-        /// <summary>
-        /// Reads a shared array declaration.
-        /// </summary>
-        /// <param name="invocation">The call.</param>
-        /// <param name="element">When the method returns, the type of the elements.</param>
-        /// <param name="count">When the method returns, the number of elements.</param>
-        /// <returns><see langword="true"/> when the call declares one.</returns>
-        /// <exception cref="KernelTranslationException">Thrown when the count is not a literal.</exception>
-        internal bool TryShared(InvocationExpressionSyntax invocation, out string element, out string count)
-        {
-            element = string.Empty;
-            count = string.Empty;
-
-            if (ModelFor(invocation.SyntaxTree).GetSymbolInfo(invocation).Symbol is not IMethodSymbol symbol || !IsShared(symbol))
-            {
-                return false;
-            }
-
-            count = invocation.ArgumentList.Arguments[0].Expression.ToString();
-
-            if (!int.TryParse(count, out _))
-            {
-                throw new KernelTranslationException($"'{SHARED}<{symbol.TypeArguments[0].ToDisplayString()}>' takes the number of elements as a literal, which is what the device sizes the array with.");
-            }
-
-            element = symbol.TypeArguments[0].ToDisplayString();
-            return true;
-        }
-
-        /// <summary>
-        /// Reports whether a value is built from a structure the kernel declares.
-        /// </summary>
-        /// <param name="node">The construction.</param>
-        /// <param name="name">When the method returns, the name of the structure.</param>
-        /// <returns><see langword="true"/> when it is one.</returns>
-        internal bool IsStructType(ObjectCreationExpressionSyntax node, out string name)
-        {
-            name = string.Empty;
-
-            if (ModelFor(node.SyntaxTree).GetSymbolInfo(node).Symbol is not IMethodSymbol { ContainingType: { } type } || !m_Structs.ContainsKey(type))
-            {
-                return false;
-            }
-
-            name = type.Name;
-            return true;
-        }
-
-        /// <summary>
-        /// Writes the arguments of a call without the keyword they were passed with.
-        /// </summary>
-        /// <param name="invocation">The call.</param>
-        /// <returns>The arguments, separated by commas.</returns>
-        private static string Arguments(InvocationExpressionSyntax invocation)
-            => string.Join(", ", invocation.ArgumentList.Arguments.Select(argument => argument.Expression.ToString()));
-
-        /// <summary>
-        /// Writes a constant as the literal the shading language reads.
-        /// </summary>
-        /// <param name="value">The value of the constant.</param>
-        /// <returns>The literal.</returns>
-        /// <exception cref="KernelTranslationException">Thrown when the value has no literal on the device.</exception>
-        private static string Literal(object value) => value switch
-        {
-            float number => Float(number),
-            int number => number.ToString(CultureInfo.InvariantCulture),
-            uint number => number.ToString(CultureInfo.InvariantCulture) + "u",
-            bool number => number ? "true" : "false",
-            _ => throw new KernelTranslationException($"A constant of type '{value.GetType().Name}' has no literal on the device."),
-        };
-
-        /// <summary>
-        /// Writes a single precision number so that the shading language reads it as one.
-        /// </summary>
-        /// <param name="value">The number.</param>
-        /// <returns>The literal.</returns>
-        private static string Float(float value)
-        {
-            var text = value.ToString("R", CultureInfo.InvariantCulture);
-
-            return text.Contains('.') || text.Contains('E') || text.Contains('e') ? text : text + ".0";
         }
 
         /// <summary>
@@ -932,10 +596,21 @@ public static partial class KernelTranspiler
         internal readonly record struct HelperMethod(IMethodSymbol Symbol, MethodDeclarationSyntax Syntax);
 
         /// <summary>
-        /// One structure the kernel holds, with the declaration it is emitted from.
+        /// One structure the kernel holds, with the declaration it is read from.
         /// </summary>
         /// <param name="Symbol">The structure.</param>
         /// <param name="Syntax">Its declaration.</param>
         internal readonly record struct StructDeclaration(INamedTypeSymbol Symbol, StructDeclarationSyntax Syntax);
     }
+
+    /// <summary>
+    /// The names of the methods the intrinsics table maps, as the compiler resolves them.
+    /// </summary>
+    private static readonly HashSet<string> INTRINSIC_NAMES = new(StringComparer.Ordinal)
+    {
+        "Math.Abs", "MathF.Abs", "Math.Min", "MathF.Min", "Math.Max", "MathF.Max", "Math.Sqrt", "MathF.Sqrt",
+        "Math.Floor", "MathF.Floor", "Math.Ceiling", "MathF.Ceiling", "Math.Pow", "MathF.Pow", "Math.Clamp",
+        "MathF.Clamp", "Math.Sin", "MathF.Sin", "Math.Cos", "MathF.Cos", "GpuWave.Sum", "GpuWave.Min",
+        "GpuWave.Max", "GpuWave.Product", "GpuWave.PrefixSum", "GpuWave.Any", "GpuWave.All"
+    };
 }
