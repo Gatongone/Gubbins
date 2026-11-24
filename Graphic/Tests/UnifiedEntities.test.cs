@@ -1,4 +1,4 @@
-﻿using Gubbins.Entities;
+using Gubbins.Entities;
 
 namespace Gubbins.Graphic.Tests;
 
@@ -32,8 +32,8 @@ public sealed unsafe partial class UnifiedAllocatorTests
             repository.Insert(i + 1);
         }
 
-        var chunks = repository.Search(new ComponentFilter().Include<int>());
-        using var components = chunks.GetComponents<int>();
+        var chunks = repository.Command(new ComponentFilter().Include<int>());
+        using var components = chunks.GetLayout<int>();
 
         Assert.That(components.Segments.Count, Is.GreaterThan(0), "the query must expose at least one chunk segment");
 
@@ -86,8 +86,8 @@ public sealed unsafe partial class UnifiedAllocatorTests
             repository.Insert(i * 3);
         }
 
-        var chunks = repository.Search(new ComponentFilter().Include<int>());
-        using var components = chunks.GetComponents<int>();
+        var chunks = repository.Command(new ComponentFilter().Include<int>());
+        using var components = chunks.GetLayout<int>();
 
         var span = components.Segments[0];
         fixed (int* data = span)

@@ -238,16 +238,15 @@ public static unsafe class Marked
     [Test]
     public void Kernel_RefusesWhatTheDeviceCannotExpress()
     {
-        const string Array = @"
+        const string Unknown = @"
 using System;
 
-public static unsafe class Scratch
+public static unsafe class Builds
 {
     public static void Kernel(int index, ReadOnlySpan<uint> source, Span<uint> destination)
     {
-        var values = new uint[4];
-        values[0] = source[index];
-        destination[index] = values[0];
+        var point = new Vec2(1, 2);
+        destination[index] = point.X;
     }
 }
 ";
@@ -264,33 +263,20 @@ public static unsafe class Narrow
 }
 ";
 
-        Assert.That(() => KernelTranspiler.Transpile(Array), Throws.TypeOf<KernelTranslationException>().With.Message.Contains("cannot create an array"));
+        Assert.That(() => KernelTranspiler.Transpile(Unknown), Throws.TypeOf<KernelTranslationException>().With.Message.Contains("not a struct the kernel declares"));
         Assert.That(() => KernelTranspiler.Transpile(Narrow), Throws.TypeOf<KernelTranslationException>().With.Message.Contains("element type every backend has"));
     }
-
     [Test]
     public void Kernel_RefusesTheSyntaxThatOnlyMeansSomethingOnTheHost()
     {
-        const string Index = @"
+        const string Relational = @"
 using System;
 
-public static unsafe class FromTheEnd
+public static unsafe class Relational
 {
     public static void Kernel(int index, ReadOnlySpan<uint> source, Span<uint> destination)
     {
-        destination[index] = source[^1];
-    }
-}
-";
-
-        const string Pattern = @"
-using System;
-
-public static unsafe class Pattern
-{
-    public static void Kernel(int index, ReadOnlySpan<uint> source, Span<uint> destination)
-    {
-        if (source[index] is 0)
+        if (source[index] is > 4)
         {
             destination[index] = 1;
         }
@@ -310,11 +296,606 @@ public static unsafe class Wide
 }
 ";
 
-        Assert.That(() => KernelTranspiler.Transpile(Index), Throws.TypeOf<KernelTranslationException>().With.Message.Contains("counts forwards"));
-        Assert.That(() => KernelTranspiler.Transpile(Pattern), Throws.TypeOf<KernelTranslationException>().With.Message.Contains("pattern"));
+        Assert.That(() => KernelTranspiler.Transpile(Relational), Throws.TypeOf<KernelTranslationException>().With.Message.Contains("switch over constants"));
         Assert.That(() => KernelTranspiler.Transpile(Wide), Throws.TypeOf<KernelTranslationException>().With.Message.Contains("cast to 'double'"));
     }
+    [Test]
+    public void Kernel_ReadsFromTheEndAndThroughRanges()
+    {
+        const string Source = @"
+using System;
 
+public static unsafe class Windows
+{
+    public static void Kernel(int index, ReadOnlySpan<uint> source, Span<uint> destination)
+    {
+        var tail = source[2..4];
+        var rest = source[1..];
+        var all = source[..];
+
+        destination[index] = source[^1] + tail[0] + (uint)tail.Length + (uint)rest.Length + (uint)all.Length;
+    }
+}
+";
+
+        var slang = KernelTranspiler.Transpile(Source);
+
+        Assert.That(slang, Does.Contain("(__length_source) - (1)"), "an index from the end is the length less the index");
+        Assert.That(slang, Does.Contain("((4) - (2))"), "a range runs from its start to its end");
+        Assert.That(slang, Does.Contain("(__length_source - (1))"), "a range with no end runs to the end of the buffer");
+        Assert.That(slang, Does.Not.Contain(".."), "the ranges themselves have no representation on the device");
+    }
+    [Test]
+    public void Kernel_DeclaresAStructAsAValueTypeOfTheDevice()
+    {
+        const string Source = @"
+using System;
+
+public struct Vec2
+{
+    public uint X;
+    public uint Y;
+
+    public Vec2(uint x, uint y)
+    {
+        X = x;
+        Y = y;
+    }
+
+    public static Vec2 operator +(Vec2 left, Vec2 right) => new Vec2(left.X + right.X, left.Y + right.Y);
+
+    public uint Sum()
+    {
+        return X + Y;
+    }
+
+    public void Shift(uint amount)
+    {
+        X += amount;
+    }
+}
+
+public static unsafe class Vectors
+{
+    public static void Kernel(int index, ReadOnlySpan<uint> source, Span<uint> destination)
+    {
+        var left = new Vec2(source[index], 1);
+        var total = left + new Vec2(2, 3);
+        total.Shift(4);
+        destination[index] = total.Sum();
+    }
+}
+";
+
+        var slang = KernelTranspiler.Transpile(Source);
+
+        Assert.That(slang, Does.Contain("struct Vec2"), "the struct is a type of the device");
+        Assert.That(slang, Does.Contain("__init(uint x, uint y)"), "a constructor is the way a value is built");
+        Assert.That(slang, Does.Contain("operator+(Vec2 left, Vec2 right)"), "an operator is a function of the module");
+        Assert.That(slang, Does.Contain("[mutating] void Shift"), "a method that writes a field mutates the value");
+        Assert.That(slang, Does.Contain("Vec2(source[index], 1)"), "a value is built without an allocation");
+    }
+
+    [Test]
+    public void Kernel_DeclaresPropertiesStaticMethodsAndHelpers()
+    {
+        const string Source = @"
+using System;
+
+public struct Inner
+{
+    public uint Value;
+}
+
+public struct Outer
+{
+    public Inner Item;
+    public uint Scale;
+
+    public Outer(uint value, uint scale)
+    {
+        Item.Value = value;
+        Scale = scale;
+    }
+
+    public uint Total => Item.Value * Scale;
+
+    public static uint Twice(uint value) => value * 2;
+
+    public uint Read()
+    {
+        return Total;
+    }
+}
+
+public struct Holder<T>
+{
+    public T Value;
+
+    public T Get()
+    {
+        return Value;
+    }
+}
+
+public static unsafe class Values
+{
+    private static uint Helper(uint value)
+    {
+        return value + 7;
+    }
+
+    public static void Kernel(int index, ReadOnlySpan<uint> source, Span<uint> destination)
+    {
+        var outer = new Outer(Helper(source[index]), 3);
+        var inner = new Inner();
+        inner.Value = outer.Total;
+        var holder = new Holder<uint>();
+        holder.Value = Outer.Twice(inner.Value);
+        destination[index] = holder.Get() + outer.Read();
+    }
+}
+";
+
+        var slang = KernelTranspiler.Transpile(Source);
+
+        Assert.That(slang, Does.Contain("struct Inner"), "a struct that a struct holds is declared before it");
+        Assert.That(slang.IndexOf("struct Inner", StringComparison.Ordinal), Is.LessThan(slang.IndexOf("struct Outer", StringComparison.Ordinal)), "the order follows what holds what");
+        Assert.That(slang, Does.Contain("property uint Total { get { return Item.Value * Scale; } }"), "a read only property is a property of the type");
+        Assert.That(slang, Does.Contain("static uint Twice(uint value)"), "a static method stays static");
+        Assert.That(slang, Does.Contain("struct Holder<T>"), "a generic struct keeps its parameters");
+        Assert.That(slang, Does.Contain("uint Helper(uint value)"), "a helper method of the kernel's class is a function of the module");
+        Assert.That(slang, Does.Contain("Holder<uint> holder = {};"), "a value with no arguments is declared, which is what a generic one needs");
+    }
+
+    [Test]
+    public void Kernel_WalksACollectionWithForeach()
+    {
+        const string Source = @"
+using System;
+
+public static unsafe class Walks
+{
+    public static void Kernel(int index, ReadOnlySpan<uint> source, Span<uint> destination)
+    {
+        var total = 0u;
+
+        foreach (var value in source.Slice(1, 2))
+        {
+            total = total + value;
+        }
+
+        foreach (uint other in source)
+        {
+            total = total + other;
+        }
+
+        destination[index] = total;
+    }
+}
+";
+
+        var slang = KernelTranspiler.Transpile(Source);
+
+        Assert.That(slang, Does.Contain("for (int __gubbinsLoop0 = 0; __gubbinsLoop0 < 2; __gubbinsLoop0++)"), "a loop over a slice counts the elements of the slice");
+        Assert.That(slang, Does.Contain("uint value = source[(__gubbinsLoop0) + (1)];"), "the element of a slice is the buffer at the offset");
+        Assert.That(slang, Does.Contain("for (int __gubbinsLoop1 = 0; __gubbinsLoop1 < __length_source; __gubbinsLoop1++)"), "a loop over a buffer counts its elements");
+        Assert.That(slang, Does.Contain("uint other = source[__gubbinsLoop1];"), "the element of a buffer is its element");
+    }
+
+    [Test]
+    public void Kernel_SumsAForeachOnTheDeviceTheMachineHas()
+    {
+        const int Count = 4096;
+        const string Source = @"
+using System;
+
+public static unsafe class Walks
+{
+    public static void Kernel(int index, ReadOnlySpan<uint> source, Span<uint> destination)
+    {
+        var total = 0u;
+
+        foreach (var value in source.Slice(0, 16))
+        {
+            total = total + value;
+        }
+
+        destination[index] = total;
+    }
+}
+";
+
+        if (!TryUseDevice(out var device, out var directory, Source, "Walks"))
+        {
+            return;
+        }
+
+        using (device)
+        using (var memory = device.CreateMemory())
+        using (var kernel = GpuKernel.LoadFromDirectory(device, directory, "Walks"))
+        {
+            Assert.That(kernel, Is.Not.Null, "the artifact the backend needs was loaded");
+
+            var input = memory.Allocate((nuint)(Count * sizeof(uint)), GpuAccess.Shared);
+            var output = memory.Allocate((nuint)(Count * sizeof(uint)), GpuAccess.Shared);
+            var lengths = memory.Allocate(16, GpuAccess.Shared);
+            var values = new uint[Count];
+            var expected = 0u;
+
+            for (var index = 0; index < Count; index++)
+            {
+                values[index] = (uint)(index % 7);
+
+                if (index < 16)
+                {
+                    expected += values[index];
+                }
+            }
+
+            memory.Upload(input, MemoryMarshal.AsBytes(values.AsSpan()));
+            memory.Upload(lengths, MemoryMarshal.AsBytes(new uint[] { Count, Count, 0, 0 }.AsSpan()));
+
+            Assert.That(kernel!.TryDispatch(input, output, (uint)(Count / KernelTranspiler.THREADS_PER_GROUP), lengths), Is.True);
+
+            memory.MarkWrittenByGpu(output);
+            memory.Synchronize();
+
+            var result = MemoryMarshal.Cast<byte, uint>(output.CpuView());
+
+            for (var index = 0; index < Count; index++)
+            {
+                Assert.That(result[index], Is.EqualTo(expected), $"the loop added the first elements up at element {index}");
+            }
+        }
+
+        Directory.Delete(directory, true);
+    }
+
+    [Test]
+    public void Kernel_WritesThroughRefAndOutParameters()
+    {
+        const string Source = @"
+using System;
+
+public static unsafe class Writes
+{
+    private static void Bump(ref uint value)
+    {
+        value = value + 1;
+    }
+
+    private static void Split(uint value, out uint high, out uint low)
+    {
+        high = value / 2;
+        low = value - (value / 2);
+    }
+
+    public static void Kernel(int index, ReadOnlySpan<uint> source, Span<uint> destination)
+    {
+        var value = source[index];
+        Bump(ref value);
+        uint high;
+        uint low;
+        Split(value, out high, out low);
+        destination[index] = high + low + value;
+    }
+}
+";
+
+        var slang = KernelTranspiler.Transpile(Source);
+
+        Assert.That(slang, Does.Contain("void Bump(inout uint value)"), "a parameter a helper writes back to is inout");
+        Assert.That(slang, Does.Contain("void Split(uint value, out uint high, out uint low)"), "a parameter a helper only writes is out");
+        Assert.That(slang, Does.Contain("Bump(value);"), "the caller passes the variable itself");
+        Assert.That(slang, Does.Contain("Split(value, high, low);"), "the caller passes the variables the call writes back to");
+    }
+
+    [Test]
+    public void Kernel_DeclaresTheVariablesACallWritesBackTo()
+    {
+        const string Source = @"
+using System;
+
+public static unsafe class Writes
+{
+    private static void Split(uint value, out uint high, out uint low)
+    {
+        high = value / 2;
+        low = value - (value / 2);
+    }
+
+    public static void Kernel(int index, ReadOnlySpan<uint> source, Span<uint> destination)
+    {
+        Split(source[index], out var high, out var low);
+        destination[index] = high + low;
+    }
+}
+";
+
+        var slang = KernelTranspiler.Transpile(Source);
+
+        Assert.That(slang, Does.Contain("uint high;"), "the variable the call writes back to is declared with the type the call takes");
+        Assert.That(slang, Does.Contain("Split(source[index], high, low);"), "the call passes the variables themselves");
+    }
+
+    [Test]
+    public void Kernel_BranchesWithASwitchExpression()
+    {
+        const string Source = @"
+using System;
+
+public static unsafe class Grades
+{
+    public static void Kernel(int index, ReadOnlySpan<uint> source, Span<uint> destination)
+    {
+        var grade = source[index] switch
+        {
+            0 => 100u,
+            1 => 50u,
+            _ => 0u,
+        };
+
+        if (source[index] is 2)
+        {
+            grade = grade + 1;
+        }
+
+        destination[index] = grade;
+    }
+}
+";
+
+        var slang = KernelTranspiler.Transpile(Source);
+
+        Assert.That(slang, Does.Contain("== (0) ? (100u)"), "a switch expression is a chain of comparisons");
+        Assert.That(slang, Does.Contain("== (2)"), "a constant pattern is an equality");
+        Assert.That(slang, Does.Not.Contain("switch"), "the device branches with the comparisons");
+    }
+
+    [Test]
+    public void Kernel_RunsASwitchExpressionOnTheDeviceTheMachineHas()
+    {
+        const int Count = 4096;
+        const string Source = @"
+using System;
+
+public static unsafe class Grades
+{
+    public static void Kernel(int index, ReadOnlySpan<uint> source, Span<uint> destination)
+    {
+        destination[index] = (source[index] % 4) switch
+        {
+            0 => 7u,
+            1 => 11u,
+            2 => 13u,
+            _ => 17u,
+        };
+    }
+}
+";
+
+        if (!TryUseDevice(out var device, out var directory, Source, "Grades"))
+        {
+            return;
+        }
+
+        using (device)
+        using (var memory = device.CreateMemory())
+        using (var kernel = GpuKernel.LoadFromDirectory(device, directory, "Grades"))
+        {
+            Assert.That(kernel, Is.Not.Null, "the artifact the backend needs was loaded");
+
+            var input = memory.Allocate((nuint)(Count * sizeof(uint)), GpuAccess.Shared);
+            var output = memory.Allocate((nuint)(Count * sizeof(uint)), GpuAccess.Shared);
+            var lengths = memory.Allocate(16, GpuAccess.Shared);
+            var values = new uint[Count];
+            var expected = new uint[] { 7, 11, 13, 17 };
+
+            for (var index = 0; index < Count; index++)
+            {
+                values[index] = (uint)index;
+            }
+
+            memory.Upload(input, MemoryMarshal.AsBytes(values.AsSpan()));
+            memory.Upload(lengths, MemoryMarshal.AsBytes(new uint[] { Count, Count, 0, 0 }.AsSpan()));
+
+            Assert.That(kernel!.TryDispatch(input, output, (uint)(Count / KernelTranspiler.THREADS_PER_GROUP), lengths), Is.True);
+
+            memory.MarkWrittenByGpu(output);
+            memory.Synchronize();
+
+            var result = MemoryMarshal.Cast<byte, uint>(output.CpuView());
+
+            for (var index = 0; index < Count; index++)
+            {
+                Assert.That(result[index], Is.EqualTo(expected[values[index] % 4]), $"the arm of element {index} was taken");
+            }
+        }
+
+        Directory.Delete(directory, true);
+    }
+    [Test]
+    public void Kernel_DeclaresAFixedSizeLocalArray()
+    {
+        const string Source = @"
+using System;
+
+public static unsafe class Scratch
+{
+    public static void Kernel(int index, ReadOnlySpan<uint> source, Span<uint> destination)
+    {
+        var values = new uint[4] { 1, 2, 3, 4 };
+        destination[index] = values[2] + source[index];
+    }
+}
+";
+
+        var slang = KernelTranspiler.Transpile(Source);
+
+        Assert.That(slang, Does.Contain("uint values[4] = { 1, 2, 3, 4 };"), "the array is sized where it is declared");
+    }
+
+    [Test]
+    public void Kernel_MapsTheWaveCalls()
+    {
+        const string Source = @"
+using System;
+
+public static unsafe class Waves
+{
+    public static void Kernel(int index, ReadOnlySpan<uint> source, Span<uint> destination)
+    {
+        destination[index] = GpuWave.Sum(source[index]) + GpuWave.Max(source[index]);
+    }
+}
+";
+
+        var slang = KernelTranspiler.Transpile(Source);
+
+        Assert.That(slang, Does.Contain("WaveActiveSum("), "a wave sum is the intrinsic every backend has");
+        Assert.That(slang, Does.Contain("WaveActiveMax("));
+    }
+
+    [Test]
+    public void Kernel_RunsAValueTypeAndAnArrayOnTheDeviceTheMachineHas()
+    {
+        const int Count = 4096;
+        const string Source = @"
+using System;
+
+public struct Pair
+{
+    public uint Left;
+    public uint Right;
+
+    public Pair(uint left, uint right)
+    {
+        Left = left;
+        Right = right;
+    }
+
+    public static Pair operator +(Pair a, Pair b) => new Pair(a.Left + b.Left, a.Right + b.Right);
+
+    public void Scale(uint factor)
+    {
+        Left *= factor;
+    }
+
+    public uint Total()
+    {
+        return Left + Right;
+    }
+}
+
+public static unsafe class Values
+{
+    public static void Kernel(int index, ReadOnlySpan<uint> source, Span<uint> destination)
+    {
+        var values = new uint[3] { 1, 2, 3 };
+        var total = new Pair(source[index], values[1]) + new Pair(2, 3);
+        total.Scale(2);
+        destination[index] = total.Total();
+    }
+}
+";
+
+        if (!TryUseDevice(out var device, out var directory, Source, "Values"))
+        {
+            return;
+        }
+
+        using (device)
+        using (var memory = device.CreateMemory())
+        using (var kernel = GpuKernel.LoadFromDirectory(device, directory, "Values"))
+        {
+            Assert.That(kernel, Is.Not.Null, "the artifact the backend needs was loaded");
+
+            var input = memory.Allocate((nuint)(Count * sizeof(uint)), GpuAccess.Shared);
+            var output = memory.Allocate((nuint)(Count * sizeof(uint)), GpuAccess.Shared);
+            var lengths = memory.Allocate(16, GpuAccess.Shared);
+            var values = new uint[Count];
+
+            for (var index = 0; index < Count; index++)
+            {
+                values[index] = (uint)index;
+            }
+
+            memory.Upload(input, MemoryMarshal.AsBytes(values.AsSpan()));
+            memory.Upload(lengths, MemoryMarshal.AsBytes(new uint[] { Count, Count, 0, 0 }.AsSpan()));
+
+            Assert.That(kernel!.TryDispatch(input, output, (uint)(Count / KernelTranspiler.THREADS_PER_GROUP), lengths), Is.True);
+
+            memory.MarkWrittenByGpu(output);
+            memory.Synchronize();
+
+            var result = MemoryMarshal.Cast<byte, uint>(output.CpuView());
+
+            for (var index = 0; index < Count; index++)
+            {
+                // Pair(source, 2) + Pair(2, 3) then Left *= 2, so (source + 2) * 2 + (2 + 3).
+                var expected = (values[index] + 2) * 2 + 5;
+
+                Assert.That(result[index], Is.EqualTo(expected), $"the kernel wrote element {index}");
+            }
+        }
+
+        Directory.Delete(directory, true);
+    }
+
+    [Test]
+    public void Kernel_SubscribesAGroupThroughTheWaveOnTheDeviceTheMachineHas()
+    {
+        const int Count = 4096;
+        const string Source = @"
+using System;
+
+public static unsafe class Waves
+{
+    public static void Kernel(int index, ReadOnlySpan<uint> source, Span<uint> destination)
+    {
+        destination[index] = GpuWave.Sum(1);
+    }
+}
+";
+
+        if (!TryUseDevice(out var device, out var directory, Source, "Waves"))
+        {
+            return;
+        }
+
+        using (device)
+        using (var memory = device.CreateMemory())
+        using (var kernel = GpuKernel.LoadFromDirectory(device, directory, "Waves"))
+        {
+            Assert.That(kernel, Is.Not.Null, "the artifact the backend needs was loaded");
+
+            var input = memory.Allocate((nuint)(Count * sizeof(uint)), GpuAccess.Shared);
+            var output = memory.Allocate((nuint)(Count * sizeof(uint)), GpuAccess.Shared);
+            var lengths = memory.Allocate(16, GpuAccess.Shared);
+
+            memory.Upload(input, MemoryMarshal.AsBytes(new uint[Count].AsSpan()));
+            memory.Upload(lengths, MemoryMarshal.AsBytes(new uint[] { Count, Count, 0, 0 }.AsSpan()));
+
+            Assert.That(kernel!.TryDispatch(input, output, (uint)(Count / KernelTranspiler.THREADS_PER_GROUP), lengths), Is.True);
+
+            memory.MarkWrittenByGpu(output);
+            memory.Synchronize();
+
+            var result = MemoryMarshal.Cast<byte, uint>(output.CpuView());
+            var wave = result[0];
+
+            Assert.That(wave, Is.GreaterThan(0u), "a wave has threads in it");
+            Assert.That(KernelTranspiler.THREADS_PER_GROUP % wave, Is.Zero, "a group holds a whole number of waves");
+
+            for (var index = 0; index < Count; index++)
+            {
+                Assert.That(result[index], Is.EqualTo(wave), $"the wave a thread belongs to added its ones up at element {index}");
+            }
+        }
+
+        Directory.Delete(directory, true);
+    }
     [Test]
     public void Kernel_RefusesALambda()
     {
