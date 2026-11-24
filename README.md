@@ -24,76 +24,8 @@ Basic components of the Gubbins collection, including:
 * `Gubbins.Spawner`: Factory and object pooling system for efficient object creation and management.
 * `Gubbins.Unsafe`: Unsafe code utilities for performance-critical operations and low-level programming.
 * `Gubbins.Unmanaged`: Unmanaged types collections.
-
 * `Gubbins.Graphic`: Compute kernels written as C# methods, sharing their types and helpers with the code that runs on the CPU.
 
-Source generators, tests, benchmarks and engine integrations live inside the module they belong to:
-
-```text
-Unsafe/
-  Core/
-    Gubbins.Unsafe.csproj
-  Unity/
-  Godot/
-  Generator/
-  Tests/
-```
-
-## Graphic
-
-A kernel is an ordinary static method. It compiles, the central processor can call it directly as the reference
-implementation, and the source generator writes a typed entry point beside it that dispatches it on the device.
-
-```csharp
-using Gubbins.Graphic;
-
-[GpuStruct]
-public struct Position
-{
-    public float X;
-    public float Y;
-    public float Z;
-
-    public Position(float x, float y, float z)
-    {
-        X = x;
-        Y = y;
-        Z = z;
-    }
-}
-
-public static partial class Motion
-{
-    private const float Retention = 0.98f;
-
-    [GpuCompatible]
-    public static float Damping(float value) => value * Retention;
-
-    [GpuKernel]
-    public static void Integrate(int index, ReadOnlySpan<Position> source, Span<Position> target)
-        => target[index] = new Position(Damping(source[index].X), source[index].Y, source[index].Z);
-}
-
-// CPU: the method itself.
-for (var index = 0; index < positions.Length; index++)
-{
-    Motion.Integrate(index, positions, output);
-}
-
-// GPU: the entry point the generator wrote, over spans or over buffers of this layer.
-using var gpu = Gpu.Create();
-Motion.Run(gpu, positions, output);
-```
-
-The type that declares a kernel is `partial`, because the entry point is a member of it, and the project references
-`Gubbins.Graphic.Generator` as an analyzer. A kernel reads `ReadOnlySpan<T>` and writes `Span<T>`; `Shared<T>()` and
-`Barrier()` declare the memory of a group and `GpuWave` its wave operations, none of which has a central processor
-meaning, so calling one there throws instead of returning a value that only looks right.
-
-The translation happens while the program compiles, which is what turns a construct the device cannot run into an editor
-error. The artifacts are built after the program, by `Graphic/ArtifactTool`, which runs `slangc`: set `SLANGC` to its path,
-and have the Windows driver kit on `PATH` for the D3D12 target. A machine without the compiler still builds the program
-and skips the artifacts, so the same code runs on a build server that never dispatches a kernel.
 
 ## Unity
 

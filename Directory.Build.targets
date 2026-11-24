@@ -21,14 +21,14 @@
     </Target>
 
     <PropertyGroup>
-        <GubbinsArtifactTool>$(MSBuildThisFileDirectory)Graphic\ArtifactTool\Gubbins.Graphic.Artifacts.csproj</GubbinsArtifactTool>
+        <GubbinsArtifacts>$(MSBuildThisFileDirectory)Graphic\Artifacts\Gubbins.Graphic.Artifacts.csproj</GubbinsArtifacts>
     </PropertyGroup>
 
     <!-- A project that declares kernels with [GpuKernel] sets GubbinsKernels to true: the source generator translated them
          while the program compiled, and this step reads those programs back out of the assembly and runs slangc once per
          target, writing the artifacts beside the program where the generated entry points load them from. -->
-    <Target Name="CompileGubbinsKernelArtifacts" AfterTargets="Build" Condition="'$(GubbinsKernels)' == 'true' And '$(TargetFramework)' == 'net8.0' And Exists('$(TargetPath)')">
-        <Exec Command="dotnet run --project &quot;$(GubbinsArtifactTool)&quot; -c $(Configuration) -- --assembly &quot;$(TargetPath)&quot; --output &quot;$(OutDir)Kernels&quot;" />
+    <Target Name="BuildGubbinsArtifacts" AfterTargets="Build" Condition="'$(GubbinsKernels)' == 'true' And '$(TargetFramework)' == 'net8.0' And Exists('$(TargetPath)')">
+        <Exec Command="dotnet run --project &quot;$(GubbinsArtifacts)&quot; -c $(Configuration) -- --assembly &quot;$(TargetPath)&quot; --output &quot;$(OutDir)Kernels&quot;" />
     </Target>
 
 </Project>
