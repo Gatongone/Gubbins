@@ -23,9 +23,6 @@
     <PropertyGroup>
         <GubbinsArtifactTool>$(MSBuildThisFileDirectory)Graphic\ArtifactTool\Gubbins.Graphic.Artifacts.csproj</GubbinsArtifactTool>
     </PropertyGroup>
-    <PropertyGroup>
-        <GubbinsArtifactTool>$(MSBuildThisFileDirectory)Graphic\ArtifactTool\Gubbins.Graphic.Artifacts.csproj</GubbinsArtifactTool>
-    </PropertyGroup>
 
     <!-- A project that declares kernels with [GpuKernel] sets GubbinsKernels to true: the source generator translated them
          while the program compiled, and this step reads those programs back out of the assembly and runs slangc once per
