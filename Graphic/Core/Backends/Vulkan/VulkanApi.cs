@@ -262,6 +262,22 @@ internal static unsafe partial class VulkanApi
         (delegate* unmanaged[Cdecl]<nint, VkPhysicalDeviceMemoryProperties*, void>)Export("vkGetPhysicalDeviceMemoryProperties");
 
     /// <summary>
+    /// Reads the version the loader supports, which is what decides whether the 1.2 features are core or missing.
+    /// </summary>
+    /// <returns>The loader's API version, or 1.0 on a loader too old to report one.</returns>
+    internal static uint InstanceVersion()
+    {
+        if (!NativeInterop.TryGetExport(Loader.Handle, "vkEnumerateInstanceVersion", out var address))
+        {
+            return 1u << 22;
+        }
+
+        uint version;
+
+        return ((delegate* unmanaged[Cdecl]<uint*, int>) address)(&version) == SUCCESS ? version : 1u << 22;
+    }
+
+    /// <summary>
     /// Finds the Vulkan loader, whose file name differs per operating system.
     /// </summary>
     /// <returns>The library handle.</returns>

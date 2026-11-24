@@ -124,6 +124,12 @@ internal sealed unsafe class VulkanDevice : IDisposable
             WriteAscii(applicationName, "Gubbins.Graphic");
             WriteAscii(engineName, "Gubbins.Graphic.Vulkan");
 
+            // Buffer device addresses are core in 1.2: below it the feature structure is not part of the chain and the
+            // entry point the loader exports dispatches to nothing, which is a crash rather than an error.
+            var apiVersion = VulkanApi.InstanceVersion() >= VulkanApi.API_VERSION12
+                ? VulkanApi.API_VERSION12
+                : VulkanApi.API_VERSION11;
+
             var applicationInfo = new VkApplicationInfo
             {
                 StructureType = VulkanApi.APPLICATION_INFO_TYPE,
@@ -131,7 +137,7 @@ internal sealed unsafe class VulkanDevice : IDisposable
                 EngineName = (nint)engineName,
                 ApplicationVersion = 1,
                 EngineVersion = 1,
-                ApiVersion = VulkanApi.API_VERSION11
+                ApiVersion = apiVersion
             };
 
             var instanceInfo = new VkInstanceCreateInfo
@@ -173,22 +179,28 @@ internal sealed unsafe class VulkanDevice : IDisposable
             };
 
             // A buffer device address has to be enabled at device creation and allocated with the matching flag, so it is
-            // only turned on when the driver reports support.
+            // only turned on when the API version makes the feature core and the driver reports support.
             VkPhysicalDeviceBufferDeviceAddressFeatures deviceAddressFeatures = default;
-            deviceAddressFeatures.StructureType = VulkanApi.BUFFER_DEVICE_ADDRESS_FEATURES_TYPE;
+            var supportsDeviceAddress = false;
 
-            var features = new VkPhysicalDeviceFeatures2
+            if (apiVersion >= VulkanApi.API_VERSION12)
             {
-                StructureType = VulkanApi.FEATURES2_TYPE,
-                Next = (nint)(&deviceAddressFeatures)
-            };
+                deviceAddressFeatures.StructureType = VulkanApi.BUFFER_DEVICE_ADDRESS_FEATURES_TYPE;
 
-            VulkanApi.GetPhysicalDeviceFeatures2(physicalDevice, &features);
+                var features = new VkPhysicalDeviceFeatures2
+                {
+                    StructureType = VulkanApi.FEATURES2_TYPE,
+                    Next = (nint)(&deviceAddressFeatures)
+                };
 
-            var supportsDeviceAddress = deviceAddressFeatures.BufferDeviceAddress != 0;
-            if (supportsDeviceAddress)
-            {
-                deviceAddressFeatures.BufferDeviceAddress = 1;
+                VulkanApi.GetPhysicalDeviceFeatures2(physicalDevice, &features);
+
+                supportsDeviceAddress = deviceAddressFeatures.BufferDeviceAddress != 0;
+
+                if (supportsDeviceAddress)
+                {
+                    deviceAddressFeatures.BufferDeviceAddress = 1;
+                }
             }
 
             // The budget extension turns the working set from "not reported" into a real number, which is what a unified

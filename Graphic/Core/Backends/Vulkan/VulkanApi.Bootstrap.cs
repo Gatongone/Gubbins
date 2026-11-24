@@ -54,6 +54,11 @@ internal static unsafe partial class VulkanApi
     /// </summary>
     internal const uint API_VERSION11 = (1u << 22) | (1u << 12);
 
+    /// <summary>
+    /// <c>VK_API_VERSION_1_2</c>, which is the version buffer device addresses are core in.
+    /// </summary>
+    internal const uint API_VERSION12 = (1u << 22) | (2u << 12);
+
     internal static readonly delegate* unmanaged[Cdecl]<VkInstanceCreateInfo*, nint, nint*, int> CreateInstance =
         (delegate* unmanaged[Cdecl]<VkInstanceCreateInfo*, nint, nint*, int>)Export("vkCreateInstance");
 
