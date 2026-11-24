@@ -34,8 +34,8 @@ public sealed class ComponentsParallelTests
 
     private static void AssertAllValues(EntityRepository repository, int expected)
     {
-        using var chunks = repository.Search(filter);
-        using var components = chunks.GetComponents<int>();
+        var chunks = repository.Command(filter);
+        using var components = chunks.GetLayout<int>();
         var elements = components.Elements;
 
         Assert.That(elements.Count, Is.EqualTo(ENTITY_COUNT));
@@ -50,8 +50,8 @@ public sealed class ComponentsParallelTests
     {
         using var repository = CreateRepository();
 
-        using (var chunks = repository.Search(filter))
-        using (var components = chunks.GetComponents<int>())
+        var chunks = repository.Command(filter);
+        using (var components = chunks.GetLayout<int>())
         {
             components.Add(IterationMode.Serial, 2);
         }
@@ -64,8 +64,8 @@ public sealed class ComponentsParallelTests
     {
         using var repository = CreateRepository();
 
-        using (var chunks = repository.Search(filter))
-        using (var components = chunks.GetComponents<int>())
+        var chunks = repository.Command(filter);
+        using (var components = chunks.GetLayout<int>())
         {
             components.ApplyParallel(IterationMode.Simd, NumberOperation.Multiply, 3);
             components.ApplyParallel(IterationMode.Serial, NumberOperation.Subtract, 1);
@@ -85,8 +85,8 @@ public sealed class ComponentsParallelTests
     {
         using var repository = CreateRepository();
 
-        using (var chunks = repository.Search(filter))
-        using (var components = chunks.GetComponents<int>())
+        var chunks = repository.Command(filter);
+        using (var components = chunks.GetLayout<int>())
         {
             components.ApplyParallel(mask, NumberOperation.Add, 4);       // 5
             components.ApplyParallel(mask, NumberOperation.Multiply, 4);  // 20
@@ -107,8 +107,8 @@ public sealed class ComponentsParallelTests
     {
         using var repository = CreateRepository();
 
-        using (var chunks = repository.Search(filter))
-        using (var components = chunks.GetComponents<int>())
+        var chunks = repository.Command(filter);
+        using (var components = chunks.GetLayout<int>())
         {
             components.Add(mask, 4);       // 5
             components.Multiply(mask, 4);  // 20
@@ -126,8 +126,8 @@ public sealed class ComponentsParallelTests
         using var repository = CreateRepository();
         var operation = SpanOperations.GetOperation<int, ISpanNumberOperation<int>>(IterationMode.Simd)!;
 
-        using (var chunks = repository.Search(filter))
-        using (var components = chunks.GetComponents<int>())
+        var chunks = repository.Command(filter);
+        using (var components = chunks.GetLayout<int>())
         {
             components.ApplyParallel(
                 (Operation: operation, Operand: 3),
@@ -147,8 +147,8 @@ public sealed class ComponentsParallelTests
     {
         using var repository = CreateRepository(4f);
 
-        using (var chunks = repository.Search(new ComponentFilter().Include<float>()))
-        using (var components = chunks.GetComponents<float>())
+        var chunks = repository.Command(new ComponentFilter().Include<float>());
+        using (var components = chunks.GetLayout<float>())
         {
             components.ApplyReal(mask, 0, static (operation, span, _) => operation.Sqrt(span, span));
 
@@ -165,8 +165,8 @@ public sealed class ComponentsParallelTests
     {
         using var repository = CreateRepository(3f);
 
-        using (var chunks = repository.Search(new ComponentFilter().Include<float>()))
-        using (var components = chunks.GetComponents<float>())
+        var chunks = repository.Command(new ComponentFilter().Include<float>());
+        using (var components = chunks.GetLayout<float>())
         {
             components.ApplyReal(
                 IterationMode.Simd,
@@ -186,8 +186,8 @@ public sealed class ComponentsParallelTests
     {
         using var repository = CreateRepository(new Vector2(3f, 4f));
 
-        using (var chunks = repository.Search(new ComponentFilter().Include<Vector2>()))
-        using (var components = chunks.GetComponents<Vector2>())
+        var chunks = repository.Command(new ComponentFilter().Include<Vector2>());
+        using (var components = chunks.GetLayout<Vector2>())
         {
             components.ApplyVector(
                 IterationMode.Serial,
@@ -212,8 +212,8 @@ public sealed class ComponentsParallelTests
     {
         using var repository = CreateRepository(1);
 
-        using (var chunks = repository.Search(filter))
-        using (var components = chunks.GetComponents<int>())
+        var chunks = repository.Command(filter);
+        using (var components = chunks.GetLayout<int>())
         {
             components.ApplyShift(mask, 3, static (operation, span, count) => operation.ShiftLeft(span, count, span));
         }
@@ -226,8 +226,8 @@ public sealed class ComponentsParallelTests
     {
         using var repository = CreateRepository();
 
-        using (var chunks = repository.Search(filter))
-        using (var components = chunks.GetComponents<int>())
+        var chunks = repository.Command(filter);
+        using (var components = chunks.GetLayout<int>())
         {
             components.ApplyNumber(
                 IterationMode.Serial,

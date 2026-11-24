@@ -1,4 +1,4 @@
-﻿using Gubbins.Enhance;
+using Gubbins.Enhance;
 using Unity.Collections;
 
 namespace Gubbins.Entities
@@ -45,7 +45,7 @@ namespace Gubbins.Entities
         /// <param name="action">The action to perform on each chunk.</param>
         public static void ForEach(this Chunks chunks, NativeForeach action)
         {
-            using var entities = chunks.GetComponents<Entity>();
+            using var entities = chunks.GetLayout<Entity>();
             var segments = entities.Segments;
             for (var i = 0; i < segments.Count; i++)
             {
@@ -59,8 +59,8 @@ namespace Gubbins.Entities
         /// <param name="action">The action to perform on each chunk.</param>
         public static void ForEach<T>(this Chunks chunks, NativeForeach<T> action) where T : unmanaged
         {
-            using var entities = chunks.GetComponents<Entity>();
-            using var components = chunks.GetComponents<T>();
+            using var entities = chunks.GetLayout<Entity>();
+            using var components = chunks.GetLayout<T>();
             var segment0 = entities.Segments;
             var segment1 = components.Segments;
             for (var i = 0; i < segment0.Count; i++)
@@ -75,9 +75,9 @@ namespace Gubbins.Entities
         /// <param name="action">The action to perform on each chunk.</param>
         public static void ForEach<T1, T2>(this Chunks chunks, NativeForeach<T1, T2> action) where T1 : unmanaged where T2 : unmanaged
         {
-            using var entities = chunks.GetComponents<Entity>();
-            using var components1 = chunks.GetComponents<T1>();
-            using var components2 = chunks.GetComponents<T2>();
+            using var entities = chunks.GetLayout<Entity>();
+            using var components1 = chunks.GetLayout<T1>();
+            using var components2 = chunks.GetLayout<T2>();
             var segment0 = entities.Segments;
             var segment1 = components1.Segments;
             var segment2 = components2.Segments;
@@ -93,10 +93,10 @@ namespace Gubbins.Entities
         /// <param name="action">The action to perform on each chunk.</param>
         public static void ForEach<T1, T2, T3>(this Chunks chunks, NativeForeach<T1, T2, T3> action) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged
         {
-            using var entities = chunks.GetComponents<Entity>();
-            using var components1 = chunks.GetComponents<T1>();
-            using var components2 = chunks.GetComponents<T2>();
-            using var components3 = chunks.GetComponents<T3>();
+            using var entities = chunks.GetLayout<Entity>();
+            using var components1 = chunks.GetLayout<T1>();
+            using var components2 = chunks.GetLayout<T2>();
+            using var components3 = chunks.GetLayout<T3>();
             var segment0 = entities.Segments;
             var segment1 = components1.Segments;
             var segment2 = components2.Segments;
@@ -113,11 +113,11 @@ namespace Gubbins.Entities
         /// <param name="action">The action to perform on each chunk.</param>
         public static void ForEach<T1, T2, T3, T4>(this Chunks chunks, NativeForeach<T1, T2, T3, T4> action) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged
         {
-            using var entities = chunks.GetComponents<Entity>();
-            using var components1 = chunks.GetComponents<T1>();
-            using var components2 = chunks.GetComponents<T2>();
-            using var components3 = chunks.GetComponents<T3>();
-            using var components4 = chunks.GetComponents<T4>();
+            using var entities = chunks.GetLayout<Entity>();
+            using var components1 = chunks.GetLayout<T1>();
+            using var components2 = chunks.GetLayout<T2>();
+            using var components3 = chunks.GetLayout<T3>();
+            using var components4 = chunks.GetLayout<T4>();
             var segment0 = entities.Segments;
             var segment1 = components1.Segments;
             var segment2 = components2.Segments;
@@ -135,12 +135,12 @@ namespace Gubbins.Entities
         /// <param name="action">The action to perform on each chunk.</param>
         public static void ForEach<T1, T2, T3, T4, T5>(this Chunks chunks, NativeForeach<T1, T2, T3, T4, T5> action) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where T5 : unmanaged
         {
-            using var entities = chunks.GetComponents<Entity>();
-            using var components1 = chunks.GetComponents<T1>();
-            using var components2 = chunks.GetComponents<T2>();
-            using var components3 = chunks.GetComponents<T3>();
-            using var components4 = chunks.GetComponents<T4>();
-            using var components5 = chunks.GetComponents<T5>();
+            using var entities = chunks.GetLayout<Entity>();
+            using var components1 = chunks.GetLayout<T1>();
+            using var components2 = chunks.GetLayout<T2>();
+            using var components3 = chunks.GetLayout<T3>();
+            using var components4 = chunks.GetLayout<T4>();
+            using var components5 = chunks.GetLayout<T5>();
             var segment0 = entities.Segments;
             var segment1 = components1.Segments;
             var segment2 = components2.Segments;
@@ -159,13 +159,13 @@ namespace Gubbins.Entities
         /// <param name="action">The action to perform on each chunk.</param>
         public static void ForEach<T1, T2, T3, T4, T5, T6>(this Chunks chunks, NativeForeach<T1, T2, T3, T4, T5, T6> action) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where T5 : unmanaged where T6 : unmanaged
         {
-            using var entities = chunks.GetComponents<Entity>();
-            using var components1 = chunks.GetComponents<T1>();
-            using var components2 = chunks.GetComponents<T2>();
-            using var components3 = chunks.GetComponents<T3>();
-            using var components4 = chunks.GetComponents<T4>();
-            using var components5 = chunks.GetComponents<T5>();
-            using var components6 = chunks.GetComponents<T6>();
+            using var entities = chunks.GetLayout<Entity>();
+            using var components1 = chunks.GetLayout<T1>();
+            using var components2 = chunks.GetLayout<T2>();
+            using var components3 = chunks.GetLayout<T3>();
+            using var components4 = chunks.GetLayout<T4>();
+            using var components5 = chunks.GetLayout<T5>();
+            using var components6 = chunks.GetLayout<T6>();
             var segment0 = entities.Segments;
             var segment1 = components1.Segments;
             var segment2 = components2.Segments;
@@ -185,14 +185,14 @@ namespace Gubbins.Entities
         /// <param name="action">The action to perform on each chunk.</param>
         public static void ForEach<T1, T2, T3, T4, T5, T6, T7>(this Chunks chunks, NativeForeach<T1, T2, T3, T4, T5, T6, T7> action) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where T5 : unmanaged where T6 : unmanaged where T7 : unmanaged
         {
-            using var entities = chunks.GetComponents<Entity>();
-            using var components1 = chunks.GetComponents<T1>();
-            using var components2 = chunks.GetComponents<T2>();
-            using var components3 = chunks.GetComponents<T3>();
-            using var components4 = chunks.GetComponents<T4>();
-            using var components5 = chunks.GetComponents<T5>();
-            using var components6 = chunks.GetComponents<T6>();
-            using var components7 = chunks.GetComponents<T7>();
+            using var entities = chunks.GetLayout<Entity>();
+            using var components1 = chunks.GetLayout<T1>();
+            using var components2 = chunks.GetLayout<T2>();
+            using var components3 = chunks.GetLayout<T3>();
+            using var components4 = chunks.GetLayout<T4>();
+            using var components5 = chunks.GetLayout<T5>();
+            using var components6 = chunks.GetLayout<T6>();
+            using var components7 = chunks.GetLayout<T7>();
             var segment0 = entities.Segments;
             var segment1 = components1.Segments;
             var segment2 = components2.Segments;
@@ -213,15 +213,15 @@ namespace Gubbins.Entities
         /// <param name="action">The action to perform on each chunk.</param>
         public static void ForEach<T1, T2, T3, T4, T5, T6, T7, T8>(this Chunks chunks, NativeForeach<T1, T2, T3, T4, T5, T6, T7, T8> action) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where T5 : unmanaged where T6 : unmanaged where T7 : unmanaged where T8 : unmanaged
         {
-            using var entities = chunks.GetComponents<Entity>();
-            using var components1 = chunks.GetComponents<T1>();
-            using var components2 = chunks.GetComponents<T2>();
-            using var components3 = chunks.GetComponents<T3>();
-            using var components4 = chunks.GetComponents<T4>();
-            using var components5 = chunks.GetComponents<T5>();
-            using var components6 = chunks.GetComponents<T6>();
-            using var components7 = chunks.GetComponents<T7>();
-            using var components8 = chunks.GetComponents<T8>();
+            using var entities = chunks.GetLayout<Entity>();
+            using var components1 = chunks.GetLayout<T1>();
+            using var components2 = chunks.GetLayout<T2>();
+            using var components3 = chunks.GetLayout<T3>();
+            using var components4 = chunks.GetLayout<T4>();
+            using var components5 = chunks.GetLayout<T5>();
+            using var components6 = chunks.GetLayout<T6>();
+            using var components7 = chunks.GetLayout<T7>();
+            using var components8 = chunks.GetLayout<T8>();
             var segment0 = entities.Segments;
             var segment1 = components1.Segments;
             var segment2 = components2.Segments;
@@ -243,16 +243,16 @@ namespace Gubbins.Entities
         /// <param name="action">The action to perform on each chunk.</param>
         public static void ForEach<T1, T2, T3, T4, T5, T6, T7, T8, T9>(this Chunks chunks, NativeForeach<T1, T2, T3, T4, T5, T6, T7, T8, T9> action) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where T5 : unmanaged where T6 : unmanaged where T7 : unmanaged where T8 : unmanaged where T9 : unmanaged
         {
-            using var entities = chunks.GetComponents<Entity>();
-            using var components1 = chunks.GetComponents<T1>();
-            using var components2 = chunks.GetComponents<T2>();
-            using var components3 = chunks.GetComponents<T3>();
-            using var components4 = chunks.GetComponents<T4>();
-            using var components5 = chunks.GetComponents<T5>();
-            using var components6 = chunks.GetComponents<T6>();
-            using var components7 = chunks.GetComponents<T7>();
-            using var components8 = chunks.GetComponents<T8>();
-            using var components9 = chunks.GetComponents<T9>();
+            using var entities = chunks.GetLayout<Entity>();
+            using var components1 = chunks.GetLayout<T1>();
+            using var components2 = chunks.GetLayout<T2>();
+            using var components3 = chunks.GetLayout<T3>();
+            using var components4 = chunks.GetLayout<T4>();
+            using var components5 = chunks.GetLayout<T5>();
+            using var components6 = chunks.GetLayout<T6>();
+            using var components7 = chunks.GetLayout<T7>();
+            using var components8 = chunks.GetLayout<T8>();
+            using var components9 = chunks.GetLayout<T9>();
             var segment0 = entities.Segments;
             var segment1 = components1.Segments;
             var segment2 = components2.Segments;
@@ -275,17 +275,17 @@ namespace Gubbins.Entities
         /// <param name="action">The action to perform on each chunk.</param>
         public static void ForEach<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(this Chunks chunks, NativeForeach<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> action) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where T5 : unmanaged where T6 : unmanaged where T7 : unmanaged where T8 : unmanaged where T9 : unmanaged where T10 : unmanaged
         {
-            using var entities = chunks.GetComponents<Entity>();
-            using var components1 = chunks.GetComponents<T1>();
-            using var components2 = chunks.GetComponents<T2>();
-            using var components3 = chunks.GetComponents<T3>();
-            using var components4 = chunks.GetComponents<T4>();
-            using var components5 = chunks.GetComponents<T5>();
-            using var components6 = chunks.GetComponents<T6>();
-            using var components7 = chunks.GetComponents<T7>();
-            using var components8 = chunks.GetComponents<T8>();
-            using var components9 = chunks.GetComponents<T9>();
-            using var components10 = chunks.GetComponents<T10>();
+            using var entities = chunks.GetLayout<Entity>();
+            using var components1 = chunks.GetLayout<T1>();
+            using var components2 = chunks.GetLayout<T2>();
+            using var components3 = chunks.GetLayout<T3>();
+            using var components4 = chunks.GetLayout<T4>();
+            using var components5 = chunks.GetLayout<T5>();
+            using var components6 = chunks.GetLayout<T6>();
+            using var components7 = chunks.GetLayout<T7>();
+            using var components8 = chunks.GetLayout<T8>();
+            using var components9 = chunks.GetLayout<T9>();
+            using var components10 = chunks.GetLayout<T10>();
             var segment0 = entities.Segments;
             var segment1 = components1.Segments;
             var segment2 = components2.Segments;
@@ -309,18 +309,18 @@ namespace Gubbins.Entities
         /// <param name="action">The action to perform on each chunk.</param>
         public static void ForEach<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11>(this Chunks chunks, NativeForeach<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> action) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where T5 : unmanaged where T6 : unmanaged where T7 : unmanaged where T8 : unmanaged where T9 : unmanaged where T10 : unmanaged where T11 : unmanaged
         {
-            using var entities = chunks.GetComponents<Entity>();
-            using var components1 = chunks.GetComponents<T1>();
-            using var components2 = chunks.GetComponents<T2>();
-            using var components3 = chunks.GetComponents<T3>();
-            using var components4 = chunks.GetComponents<T4>();
-            using var components5 = chunks.GetComponents<T5>();
-            using var components6 = chunks.GetComponents<T6>();
-            using var components7 = chunks.GetComponents<T7>();
-            using var components8 = chunks.GetComponents<T8>();
-            using var components9 = chunks.GetComponents<T9>();
-            using var components10 = chunks.GetComponents<T10>();
-            using var components11 = chunks.GetComponents<T11>();
+            using var entities = chunks.GetLayout<Entity>();
+            using var components1 = chunks.GetLayout<T1>();
+            using var components2 = chunks.GetLayout<T2>();
+            using var components3 = chunks.GetLayout<T3>();
+            using var components4 = chunks.GetLayout<T4>();
+            using var components5 = chunks.GetLayout<T5>();
+            using var components6 = chunks.GetLayout<T6>();
+            using var components7 = chunks.GetLayout<T7>();
+            using var components8 = chunks.GetLayout<T8>();
+            using var components9 = chunks.GetLayout<T9>();
+            using var components10 = chunks.GetLayout<T10>();
+            using var components11 = chunks.GetLayout<T11>();
             var segment0 = entities.Segments;
             var segment1 = components1.Segments;
             var segment2 = components2.Segments;
@@ -345,19 +345,19 @@ namespace Gubbins.Entities
         /// <param name="action">The action to perform on each chunk.</param>
         public static void ForEach<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12>(this Chunks chunks, NativeForeach<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> action) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where T5 : unmanaged where T6 : unmanaged where T7 : unmanaged where T8 : unmanaged where T9 : unmanaged where T10 : unmanaged where T11 : unmanaged where T12 : unmanaged
         {
-            using var entities = chunks.GetComponents<Entity>();
-            using var components1 = chunks.GetComponents<T1>();
-            using var components2 = chunks.GetComponents<T2>();
-            using var components3 = chunks.GetComponents<T3>();
-            using var components4 = chunks.GetComponents<T4>();
-            using var components5 = chunks.GetComponents<T5>();
-            using var components6 = chunks.GetComponents<T6>();
-            using var components7 = chunks.GetComponents<T7>();
-            using var components8 = chunks.GetComponents<T8>();
-            using var components9 = chunks.GetComponents<T9>();
-            using var components10 = chunks.GetComponents<T10>();
-            using var components11 = chunks.GetComponents<T11>();
-            using var components12 = chunks.GetComponents<T12>();
+            using var entities = chunks.GetLayout<Entity>();
+            using var components1 = chunks.GetLayout<T1>();
+            using var components2 = chunks.GetLayout<T2>();
+            using var components3 = chunks.GetLayout<T3>();
+            using var components4 = chunks.GetLayout<T4>();
+            using var components5 = chunks.GetLayout<T5>();
+            using var components6 = chunks.GetLayout<T6>();
+            using var components7 = chunks.GetLayout<T7>();
+            using var components8 = chunks.GetLayout<T8>();
+            using var components9 = chunks.GetLayout<T9>();
+            using var components10 = chunks.GetLayout<T10>();
+            using var components11 = chunks.GetLayout<T11>();
+            using var components12 = chunks.GetLayout<T12>();
             var segment0 = entities.Segments;
             var segment1 = components1.Segments;
             var segment2 = components2.Segments;
@@ -383,20 +383,20 @@ namespace Gubbins.Entities
         /// <param name="action">The action to perform on each chunk.</param>
         public static void ForEach<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13>(this Chunks chunks, NativeForeach<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> action) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where T5 : unmanaged where T6 : unmanaged where T7 : unmanaged where T8 : unmanaged where T9 : unmanaged where T10 : unmanaged where T11 : unmanaged where T12 : unmanaged where T13 : unmanaged
         {
-            using var entities = chunks.GetComponents<Entity>();
-            using var components1 = chunks.GetComponents<T1>();
-            using var components2 = chunks.GetComponents<T2>();
-            using var components3 = chunks.GetComponents<T3>();
-            using var components4 = chunks.GetComponents<T4>();
-            using var components5 = chunks.GetComponents<T5>();
-            using var components6 = chunks.GetComponents<T6>();
-            using var components7 = chunks.GetComponents<T7>();
-            using var components8 = chunks.GetComponents<T8>();
-            using var components9 = chunks.GetComponents<T9>();
-            using var components10 = chunks.GetComponents<T10>();
-            using var components11 = chunks.GetComponents<T11>();
-            using var components12 = chunks.GetComponents<T12>();
-            using var components13 = chunks.GetComponents<T13>();
+            using var entities = chunks.GetLayout<Entity>();
+            using var components1 = chunks.GetLayout<T1>();
+            using var components2 = chunks.GetLayout<T2>();
+            using var components3 = chunks.GetLayout<T3>();
+            using var components4 = chunks.GetLayout<T4>();
+            using var components5 = chunks.GetLayout<T5>();
+            using var components6 = chunks.GetLayout<T6>();
+            using var components7 = chunks.GetLayout<T7>();
+            using var components8 = chunks.GetLayout<T8>();
+            using var components9 = chunks.GetLayout<T9>();
+            using var components10 = chunks.GetLayout<T10>();
+            using var components11 = chunks.GetLayout<T11>();
+            using var components12 = chunks.GetLayout<T12>();
+            using var components13 = chunks.GetLayout<T13>();
             var segment0 = entities.Segments;
             var segment1 = components1.Segments;
             var segment2 = components2.Segments;
@@ -423,21 +423,21 @@ namespace Gubbins.Entities
         /// <param name="action">The action to perform on each chunk.</param>
         public static void ForEach<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14>(this Chunks chunks, NativeForeach<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> action) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where T5 : unmanaged where T6 : unmanaged where T7 : unmanaged where T8 : unmanaged where T9 : unmanaged where T10 : unmanaged where T11 : unmanaged where T12 : unmanaged where T13 : unmanaged where T14 : unmanaged
         {
-            using var entities = chunks.GetComponents<Entity>();
-            using var components1 = chunks.GetComponents<T1>();
-            using var components2 = chunks.GetComponents<T2>();
-            using var components3 = chunks.GetComponents<T3>();
-            using var components4 = chunks.GetComponents<T4>();
-            using var components5 = chunks.GetComponents<T5>();
-            using var components6 = chunks.GetComponents<T6>();
-            using var components7 = chunks.GetComponents<T7>();
-            using var components8 = chunks.GetComponents<T8>();
-            using var components9 = chunks.GetComponents<T9>();
-            using var components10 = chunks.GetComponents<T10>();
-            using var components11 = chunks.GetComponents<T11>();
-            using var components12 = chunks.GetComponents<T12>();
-            using var components13 = chunks.GetComponents<T13>();
-            using var components14 = chunks.GetComponents<T14>();
+            using var entities = chunks.GetLayout<Entity>();
+            using var components1 = chunks.GetLayout<T1>();
+            using var components2 = chunks.GetLayout<T2>();
+            using var components3 = chunks.GetLayout<T3>();
+            using var components4 = chunks.GetLayout<T4>();
+            using var components5 = chunks.GetLayout<T5>();
+            using var components6 = chunks.GetLayout<T6>();
+            using var components7 = chunks.GetLayout<T7>();
+            using var components8 = chunks.GetLayout<T8>();
+            using var components9 = chunks.GetLayout<T9>();
+            using var components10 = chunks.GetLayout<T10>();
+            using var components11 = chunks.GetLayout<T11>();
+            using var components12 = chunks.GetLayout<T12>();
+            using var components13 = chunks.GetLayout<T13>();
+            using var components14 = chunks.GetLayout<T14>();
             var segment0 = entities.Segments;
             var segment1 = components1.Segments;
             var segment2 = components2.Segments;
@@ -465,22 +465,22 @@ namespace Gubbins.Entities
         /// <param name="action">The action to perform on each chunk.</param>
         public static void ForEach<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15>(this Chunks chunks, NativeForeach<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> action) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where T5 : unmanaged where T6 : unmanaged where T7 : unmanaged where T8 : unmanaged where T9 : unmanaged where T10 : unmanaged where T11 : unmanaged where T12 : unmanaged where T13 : unmanaged where T14 : unmanaged where T15 : unmanaged
         {
-            using var entities = chunks.GetComponents<Entity>();
-            using var components1 = chunks.GetComponents<T1>();
-            using var components2 = chunks.GetComponents<T2>();
-            using var components3 = chunks.GetComponents<T3>();
-            using var components4 = chunks.GetComponents<T4>();
-            using var components5 = chunks.GetComponents<T5>();
-            using var components6 = chunks.GetComponents<T6>();
-            using var components7 = chunks.GetComponents<T7>();
-            using var components8 = chunks.GetComponents<T8>();
-            using var components9 = chunks.GetComponents<T9>();
-            using var components10 = chunks.GetComponents<T10>();
-            using var components11 = chunks.GetComponents<T11>();
-            using var components12 = chunks.GetComponents<T12>();
-            using var components13 = chunks.GetComponents<T13>();
-            using var components14 = chunks.GetComponents<T14>();
-            using var components15 = chunks.GetComponents<T15>();
+            using var entities = chunks.GetLayout<Entity>();
+            using var components1 = chunks.GetLayout<T1>();
+            using var components2 = chunks.GetLayout<T2>();
+            using var components3 = chunks.GetLayout<T3>();
+            using var components4 = chunks.GetLayout<T4>();
+            using var components5 = chunks.GetLayout<T5>();
+            using var components6 = chunks.GetLayout<T6>();
+            using var components7 = chunks.GetLayout<T7>();
+            using var components8 = chunks.GetLayout<T8>();
+            using var components9 = chunks.GetLayout<T9>();
+            using var components10 = chunks.GetLayout<T10>();
+            using var components11 = chunks.GetLayout<T11>();
+            using var components12 = chunks.GetLayout<T12>();
+            using var components13 = chunks.GetLayout<T13>();
+            using var components14 = chunks.GetLayout<T14>();
+            using var components15 = chunks.GetLayout<T15>();
             var segment0 = entities.Segments;
             var segment1 = components1.Segments;
             var segment2 = components2.Segments;
@@ -509,23 +509,23 @@ namespace Gubbins.Entities
         /// <param name="action">The action to perform on each chunk.</param>
         public static void ForEach<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16>(this Chunks chunks, NativeForeach<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> action) where T1 : unmanaged where T2 : unmanaged where T3 : unmanaged where T4 : unmanaged where T5 : unmanaged where T6 : unmanaged where T7 : unmanaged where T8 : unmanaged where T9 : unmanaged where T10 : unmanaged where T11 : unmanaged where T12 : unmanaged where T13 : unmanaged where T14 : unmanaged where T15 : unmanaged where T16 : unmanaged
         {
-            using var entities = chunks.GetComponents<Entity>();
-            using var components1 = chunks.GetComponents<T1>();
-            using var components2 = chunks.GetComponents<T2>();
-            using var components3 = chunks.GetComponents<T3>();
-            using var components4 = chunks.GetComponents<T4>();
-            using var components5 = chunks.GetComponents<T5>();
-            using var components6 = chunks.GetComponents<T6>();
-            using var components7 = chunks.GetComponents<T7>();
-            using var components8 = chunks.GetComponents<T8>();
-            using var components9 = chunks.GetComponents<T9>();
-            using var components10 = chunks.GetComponents<T10>();
-            using var components11 = chunks.GetComponents<T11>();
-            using var components12 = chunks.GetComponents<T12>();
-            using var components13 = chunks.GetComponents<T13>();
-            using var components14 = chunks.GetComponents<T14>();
-            using var components15 = chunks.GetComponents<T15>();
-            using var components16 = chunks.GetComponents<T16>();
+            using var entities = chunks.GetLayout<Entity>();
+            using var components1 = chunks.GetLayout<T1>();
+            using var components2 = chunks.GetLayout<T2>();
+            using var components3 = chunks.GetLayout<T3>();
+            using var components4 = chunks.GetLayout<T4>();
+            using var components5 = chunks.GetLayout<T5>();
+            using var components6 = chunks.GetLayout<T6>();
+            using var components7 = chunks.GetLayout<T7>();
+            using var components8 = chunks.GetLayout<T8>();
+            using var components9 = chunks.GetLayout<T9>();
+            using var components10 = chunks.GetLayout<T10>();
+            using var components11 = chunks.GetLayout<T11>();
+            using var components12 = chunks.GetLayout<T12>();
+            using var components13 = chunks.GetLayout<T13>();
+            using var components14 = chunks.GetLayout<T14>();
+            using var components15 = chunks.GetLayout<T15>();
+            using var components16 = chunks.GetLayout<T16>();
             var segment0 = entities.Segments;
             var segment1 = components1.Segments;
             var segment2 = components2.Segments;

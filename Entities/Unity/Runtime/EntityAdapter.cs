@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -631,9 +631,9 @@ namespace Gubbins.Entities
                 return;
             }
 
-            using var chunks = group.Query.Search(context);
-            using var entities = chunks.GetComponents<Entity>();
-            using var components = chunks.GetComponents<T>();
+            var chunks = group.Query.Query(context);
+            using var entities = chunks.GetLayout<Entity>();
+            using var components = chunks.GetLayout<T>();
 
             var map = group.SlotMap;
 
@@ -678,9 +678,9 @@ namespace Gubbins.Entities
                 return dependency;
             }
 
-            using var chunks = group.Query.Search(context);
-            using var entities = chunks.GetComponents<Entity>();
-            using var components = chunks.GetComponents<T>();
+            var chunks = group.Query.Query(context);
+            using var entities = chunks.GetLayout<Entity>();
+            using var components = chunks.GetLayout<T>();
 
             for (var segment = 0; segment < chunks.Count; segment++)
             {

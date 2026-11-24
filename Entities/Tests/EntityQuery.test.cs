@@ -1,4 +1,4 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 
 namespace Gubbins.Entities.Tests;
 
@@ -26,9 +26,9 @@ public class EntityQueryTests
         var onlyA2 = repository.Insert(new CompA {Value = 2});
         var withAb = repository.Insert(new CompA {Value = 3}, new CompB {Value = 30});
         var filter = new ComponentFilter().Include<CompA>();
-        using var chunks = repository.Search(filter);
-        using var entities = chunks.GetComponents<Entity>();
-        using var values = chunks.GetComponents<Entity>();
+        var chunks = repository.Query(filter);
+        using var entities = chunks.GetLayout<Entity>();
+        using var values = chunks.GetLayout<Entity>();
 
         Assert.Multiple(() =>
         {
@@ -48,9 +48,9 @@ public class EntityQueryTests
         repository.Insert(new CompA {Value = 3});
 
         var filter = new ComponentFilter().Include<CompA>().Include<CompB>().Exclude<CompC>();
-        using var chunks = repository.Search(filter);
-        using var entities = chunks.GetComponents<Entity>();
-        using var valuesA = chunks.GetComponents<CompA>();
+        var chunks = repository.Query(filter);
+        using var entities = chunks.GetLayout<Entity>();
+        using var valuesA = chunks.GetLayout<CompA>();
 
         Assert.Multiple(() =>
         {
@@ -74,9 +74,9 @@ public class EntityQueryTests
         }
 
         var filter = new ComponentFilter().Include<HugeComp>();
-        using var chunks = repository.Search(filter);
-        var entities = chunks.GetComponents<Entity>();
-        var values = chunks.GetComponents<HugeComp>();
+        var chunks = repository.Query(filter);
+        var entities = chunks.GetLayout<Entity>();
+        var values = chunks.GetLayout<HugeComp>();
 
         Assert.Multiple(() =>
         {

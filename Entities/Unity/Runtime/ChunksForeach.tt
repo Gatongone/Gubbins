@@ -28,7 +28,7 @@ namespace Gubbins.Entities
         /// <param name="action">The action to perform on each chunk.</param>
         public static void ForEach(this Chunks chunks, NativeForeach action)
         {
-            using var entities = chunks.GetComponents<Entity>();
+            using var entities = chunks.GetLayout<Entity>();
             var segments = entities.Segments;
             for (var i = 0; i < segments.Count; i++)
             {
@@ -42,8 +42,8 @@ namespace Gubbins.Entities
         /// <param name="action">The action to perform on each chunk.</param>
         public static void ForEach<T>(this Chunks chunks, NativeForeach<T> action) where T : unmanaged
         {
-            using var entities = chunks.GetComponents<Entity>();
-            using var components = chunks.GetComponents<T>();
+            using var entities = chunks.GetLayout<Entity>();
+            using var components = chunks.GetLayout<T>();
             var segment0 = entities.Segments;
             var segment1 = components.Segments;
             for (var i = 0; i < segment0.Count; i++)
@@ -56,7 +56,7 @@ namespace Gubbins.Entities
     {
         var genericTypes = string.Join(", ", from index in Enumerable.Range(1, i) select $"T{index}");
         var genericConstraints = string.Join(" ", from index in Enumerable.Range(1, i) select $"where T{index} : unmanaged");
-        var componentStatements = string.Join(Environment.NewLine, from index in Enumerable.Range(1, i) select $"using var components{index} = chunks.GetComponents<T{index}>();");
+        var componentStatements = string.Join(Environment.NewLine, from index in Enumerable.Range(1, i) select $"using var components{index} = chunks.GetLayout<T{index}>();");
         var componentSegments = string.Join(Environment.NewLine, from index in Enumerable.Range(1, i) select $"var segment{index} = components{index}.Segments;");
 #>
         /// <summary>
@@ -65,7 +65,7 @@ namespace Gubbins.Entities
         /// <param name="action">The action to perform on each chunk.</param>
         public static void ForEach<#= $"<{genericTypes}>" #>(this Chunks chunks, NativeForeach<#= $"<{genericTypes}>" #> action) <#= genericConstraints #>
         {
-            using var entities = chunks.GetComponents<Entity>();
+            using var entities = chunks.GetLayout<Entity>();
             <#= componentStatements #>
             var segment0 = entities.Segments;
             <#= componentSegments #>

@@ -11,7 +11,7 @@ namespace Gubbins.Entities;
 /// </summary>
 /// <remarks>
 /// <para>
-/// This is the hand-written half of <c>Components</c>; <c>Components.tt</c> generates the typed <c>Create</c>
+/// This is the hand-written half of <c>ChunkLayout</c>; <c>Components.tt</c> generates the typed <c>Create</c>
 /// factories and the interned type lists on top of the buffer and helpers declared here.
 /// </para>
 /// <para>

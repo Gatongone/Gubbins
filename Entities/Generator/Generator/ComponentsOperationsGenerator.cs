@@ -39,7 +39,7 @@ public sealed class ComponentsOperationsGenerator : ISourceGenerator
     private const string SPAN_TO_ATTRIBUTE_NAME = "SpanToAttribute";
     private const string SPAN_OPERATION_INTERFACE_NAMESPACE = "Gubbins.Span";
     private const string SPAN_OPERATION_INTERFACE_NAME = "ISpanOperation";
-    private const string COMPONENTS_TYPE_METADATA_NAME = "Gubbins.Entities.Components`1";
+    private const string COMPONENTS_TYPE_METADATA_NAME = "Gubbins.Entities.ChunkLayout`1";
 
     /// <summary>
     /// <c>System.Runtime.InteropServices.LayoutKind.Explicit</c> (Auto = 0, Sequential = 1, Explicit = 2).
@@ -247,7 +247,7 @@ public sealed class ComponentsOperationsGenerator : ISourceGenerator
                     sb.AppendLine($"{methodIndent}/// Applies <c>{method.Name}</c> in place to every element of the component column.");
                     sb.AppendLine($"{methodIndent}/// </summary>");
                     sb.AppendLine($"{methodIndent}public static void {methodName}(");
-                    sb.AppendLine($"{methodIndent}    this global::Gubbins.Entities.Components<{componentTypeName}> components,");
+                    sb.AppendLine($"{methodIndent}    this global::Gubbins.Entities.ChunkLayout<{componentTypeName}> components,");
                     sb.AppendLine($"{methodIndent}    global::Gubbins.Span.IterationMode mask,");
                     sb.AppendLine($"{methodIndent}    {operandDeclaration}int workerCount = 0)");
                     sb.AppendLine($"{methodIndent}{{");

@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net8.0</TargetFramework>
+        <RootNamespace>Gubbins.Entities.TestRunner</RootNamespace>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <LangVersion>latestmajor</LangVersion>
+        <IsPackable>false</IsPackable>
+        <SkipDefaultPostBuild>true</SkipDefaultPostBuild>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="NUnitLite" Version="3.13.3" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Tests\Gubbins.Entities.Tests.csproj" />
+    </ItemGroup>
+
+</Project>

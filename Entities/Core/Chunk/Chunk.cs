@@ -58,6 +58,52 @@ internal sealed unsafe class Chunk : IDisposable
     public readonly int Capacity;
 
     /// <summary>
+    /// The repository change version at which this chunk was last written.
+    /// </summary>
+    /// <remarks>
+    /// Stamped by the repository after every structural change and every component write, and by a query that
+    /// declares write access. A query that carries a change filter compares this value against the version its owner
+    /// captured at the end of its previous run, which is how a chunk nothing touched is skipped.
+    /// </remarks>
+    internal long WrittenVersion => Volatile.Read(ref m_WrittenVersion);
+
+    /// <summary>
+    /// Marks this chunk as written at <paramref name="version"/>.
+    /// </summary>
+    /// <param name="version">The change version of written.</param>
+    /// <remarks>
+    /// The stamp only moves forward: a query created before the write holds an older version and must not roll it back.
+    /// It is published with an atomic exchange because a query on one thread reads stamps another thread's query
+    /// raises. Losing a stamp would make a chunk look unchanged and let a change-filtered search skip it.
+    /// </remarks>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal void MarkWritten(long version)
+    {
+        var current = Volatile.Read(ref m_WrittenVersion);
+        while (version > current)
+        {
+            var seen = Interlocked.CompareExchange(ref m_WrittenVersion, version, current);
+            if (seen == current)
+            {
+                return;
+            }
+
+            current = seen;
+        }
+    }
+
+    /// <summary>
+    /// The component types of this chunk in column order, excluding the entity column.
+    /// </summary>
+    internal ReadOnlySpan<Type> ComponentTypes => m_Types.AsSpan(1);
+
+    /// <summary>
+    /// Determines whether this chunk stores the specified component type.
+    /// </summary>
+    /// <param name="type">Component or entity type.</param>
+    internal bool ContainsType(Type type) => IndexOfColumn(type) >= 0;
+
+    /// <summary>
     /// Maximum component size per entity.
     /// </summary>
     private readonly int m_ComponentsSize;
@@ -81,6 +127,11 @@ internal sealed unsafe class Chunk : IDisposable
     /// SoA data.
     /// </summary>
     private byte* m_Data;
+
+    /// <summary>
+    /// The change version at which this chunk was last written. Read through <see cref="WrittenVersion"/>.
+    /// </summary>
+    private long m_WrittenVersion;
 
     /// <summary>
     /// The starting indexes of entities in <see cref="m_Data"/> by their components' memory layout.
@@ -366,6 +417,40 @@ internal sealed unsafe class Chunk : IDisposable
     /// <returns>Component value.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal Snippet<T> GetAllAt<T>(int columnIndex) => new(m_Data + m_Indexes[columnIndex], Count);
+
+    /// <summary>
+    /// Copies the components of one row into a payload laid out in a destination archetype's type order.
+    /// </summary>
+    /// <param name="index">Entity index in chunk.</param>
+    /// <param name="destinationTypes">The destination component order, excluding the entity column.</param>
+    /// <param name="destination">The payload to write, sized to the destination's component bytes.</param>
+    /// <remarks>
+    /// This is the read half of an archetype transition. Types the destination lists but this chunk does not hold are
+    /// left untouched, so the caller keeps whatever it pre-filled there: the value of a newly added component, or the
+    /// zeroes of a tag component. Types this chunk holds but the destination does not list are dropped.
+    /// </remarks>
+    internal void CopyRow(int index, ReadOnlySpan<Type> destinationTypes, Span<byte> destination)
+    {
+        if (index < 0 || index >= Count)
+        {
+            throw new ArgumentOutOfRangeException(nameof(index), "Index is out of range.");
+        }
+
+        var offset = 0;
+        for (var i = 0; i < destinationTypes.Length; i++)
+        {
+            var column = IndexOfColumn(destinationTypes[i]);
+            if (column < 0)
+            {
+                offset += (int)Native.GetStackSize(destinationTypes[i]);
+                continue;
+            }
+
+            var size = m_Sizes[column];
+            new ReadOnlySpan<byte>(m_Data + m_Indexes[column] + index * size, size).CopyTo(destination.Slice(offset, size));
+            offset += size;
+        }
+    }
 
     /// <summary>
     /// GetRecord all component references of the specified type.

@@ -21,8 +21,8 @@ public sealed class ChunksForeachAsyncTests
 
     private static void AssertAllValues(EntityRepository repository, int expected)
     {
-        using var chunks = repository.Search(filter);
-        using var components = chunks.GetComponents<int>();
+        var chunks = repository.Command(filter);
+        using var components = chunks.GetLayout<int>();
         var elements = components.Elements;
 
         Assert.That(elements.Count, Is.EqualTo(ENTITY_COUNT));
@@ -37,8 +37,9 @@ public sealed class ChunksForeachAsyncTests
     {
         using var repository = CreateRepository();
 
-        using (var chunks = repository.Search(filter))
         {
+
+            var chunks = repository.Command(filter);
             await chunks.ForEachAsync(static (in Entity _, ref int value) => value += 1);
         }
 
@@ -52,7 +53,7 @@ public sealed class ChunksForeachAsyncTests
 
         for (var i = 0; i < 3; i++)
         {
-            using var chunks = repository.Search(filter);
+            var chunks = repository.Command(filter);
             await chunks.ForEachAsync(static (in Entity _, ref int value) => value += 1);
         }
 
@@ -67,7 +68,7 @@ public sealed class ChunksForeachAsyncTests
 
         var invoked = 0;
         var filter = new ComponentFilter().Include<int>();
-        using var chunks = repository.Search(filter);
+        var chunks = repository.Command(filter);
         var pending = chunks.ForEachAsync((in Entity _, ref int _) => invoked++);
 
         Assert.That(pending.IsCompleted, Is.True);
@@ -83,7 +84,7 @@ public sealed class ChunksForeachAsyncTests
         source.Cancel();
 
         var invoked = 0;
-        using var chunks = repository.Search(filter);
+        var chunks = repository.Command(filter);
         var pending = chunks.ForEachAsync((in Entity _, ref int _) => invoked++, source.Token);
 
         Assert.That(pending.IsCompleted, Is.True);
@@ -98,8 +99,9 @@ public sealed class ChunksForeachAsyncTests
         using var source = new CancellationTokenSource();
         var invoked = 0;
 
-        using (var chunks = repository.Search(filter))
         {
+
+            var chunks = repository.Command(filter);
             await chunks.ForEachAsync((in Entity _, ref int _) =>
             {
                 Interlocked.Increment(ref invoked);
@@ -115,8 +117,9 @@ public sealed class ChunksForeachAsyncTests
     {
         using var repository = CreateRepository();
 
-        using (var chunks = repository.Search(filter))
         {
+
+            var chunks = repository.Command(filter);
             var exception = Assert.ThrowsAsync<AggregateException>(async () =>
                 await chunks.ForEachAsync(static (in Entity _, ref int _) =>
                     throw new InvalidOperationException("boom")));
@@ -124,8 +127,9 @@ public sealed class ChunksForeachAsyncTests
             Assert.That(exception!.InnerExceptions.Count, Is.GreaterThanOrEqualTo(1));
         }
 
-        using (var chunks = repository.Search(filter))
         {
+
+            var chunks = repository.Command(filter);
             await chunks.ForEachAsync(static (in Entity _, ref int value) => value += 1);
         }
 
@@ -142,13 +146,11 @@ public sealed class ChunksForeachAsyncTests
         }
 
         var filter = new ComponentFilter().Include<int>();
-        using (var chunks = repository.Search(filter))
-        {
-            await chunks.ForEachAsync(static (in Entity _, ref int value) => value += 1);
-        }
+        var chunks = repository.Command(filter);
+        await chunks.ForEachAsync(static (in Entity _, ref int value) => value += 1);
 
-        using (var chunks = repository.Search(filter))
-        using (var components = chunks.GetComponents<int>())
+        var readBack = repository.Command(filter);
+        using (var components = readBack.GetLayout<int>())
         {
             var elements = components.Elements;
             Assert.That(elements.Count, Is.EqualTo(100));
@@ -168,18 +170,16 @@ public sealed class ChunksForeachAsyncTests
             repository.Insert('a', 1, 1.2f);
         }
 
-        using (var chunks = repository.Search(filter))
+        var written = repository.Command(filter);
+        await written.ForEachAsync(static (in Entity _, ref char c, ref int i, ref float f) =>
         {
-            await chunks.ForEachAsync(static (in Entity _, ref char c, ref int i, ref float f) =>
-            {
-                c = 'b';
-                i += 1;
-                f += 1;
-            });
-        }
+            c = 'b';
+            i += 1;
+            f += 1;
+        });
 
-        using (var chunks = repository.Search(filter))
-        using (var components = chunks.GetComponents<int>())
+        var chunks = repository.Command(filter);
+        using (var components = chunks.GetLayout<int>())
         {
             var elements = components.Elements;
             Assert.That(elements.Count, Is.EqualTo(100));
@@ -201,7 +201,7 @@ public sealed class ChunksForeachAsyncTests
         {
             tasks[i] = Task.Run(async () =>
             {
-                using var chunks = repository.Search(filter);
+                var chunks = repository.Command(filter);
                 await chunks.ForEachAsync(static (in Entity _, ref int value) => Interlocked.Increment(ref value));
             });
         }

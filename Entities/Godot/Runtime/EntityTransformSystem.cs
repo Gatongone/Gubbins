@@ -368,9 +368,9 @@ internal static class EntityTransformSystem
             return;
         }
 
-        using var chunks     = group.Query.Search(context);
-        using var entities   = chunks.GetComponents<Entity>();
-        using var components = chunks.GetComponents<T>();
+        var chunks           = group.Query.Query(context);
+        using var entities   = chunks.GetLayout<Entity>();
+        using var components = chunks.GetLayout<T>();
 
         var map     = group.SlotMap;
         var idSegs  = entities.Segments;

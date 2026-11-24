@@ -9,7 +9,7 @@ public static class EntityQueryExtensions
         /// </summary>
         public bool Contains(Entity entity)
         {
-            return !query.Contains(entity.Index);
+            return query.Contains(entity.Index);
         }
     }
 }

@@ -119,13 +119,13 @@ public partial class SpanOperationTests
     }
 
     // ------------------------------------------------------------------
-    // Components<T> 层：与 ComponentsParallelExtensions 同形的 chunk 级扩展
+    // ChunkLayout<T> 层：与 ComponentsParallelExtensions 同形的 chunk 级扩展
     // ------------------------------------------------------------------
 
     private static float SumSpeed(EntityRepository repository, ComponentFilter filter)
     {
-        using var chunks = repository.Search(filter);
-        using var components = chunks.GetComponents<SpeedBox>();
+        var chunks = repository.Command(filter);
+        using var components = chunks.GetLayout<SpeedBox>();
         var segments = components.Segments;
         var sum = 0f;
         for (var i = 0; i < segments.Count; i++)
@@ -154,8 +154,8 @@ public partial class SpanOperationTests
         const int count = 5000;
         using var repository = CreateSpeedRepository(count);
         var filter = new ComponentFilter().Include<SpeedBox>();
-        using var chunks = repository.Search(filter);
-        using var components = chunks.GetComponents<SpeedBox>();
+        var chunks = repository.Command(filter);
+        using var components = chunks.GetLayout<SpeedBox>();
         components.Add(IterationMode.Simd, new SpeedBox { Value = 10f });
         Assert.That(components.Elements.Count, Is.EqualTo(count));
         Assert.That(SumSpeed(repository, filter), Is.EqualTo(count * (count - 1) / 2f + count * 10f));
@@ -167,8 +167,8 @@ public partial class SpanOperationTests
         const int count = 1000;
         using var repository = CreateSpeedRepository(count);
         var filter = new ComponentFilter().Include<SpeedBox>();
-        using var chunks = repository.Search(filter);
-        using var components = chunks.GetComponents<SpeedBox>();
+        var chunks = repository.Command(filter);
+        using var components = chunks.GetLayout<SpeedBox>();
         components.Add(IterationMode.Simd, 2.5f);
         Assert.That(SumSpeed(repository, filter), Is.EqualTo(count * (count - 1) / 2f + count * 2.5f));
     }
@@ -180,15 +180,15 @@ public partial class SpanOperationTests
         var filter = new ComponentFilter().Include<SpeedBox>();
 
         using var serialRepository = CreateSpeedRepository(count);
-        using (var chunks = serialRepository.Search(filter))
-        using (var components = chunks.GetComponents<SpeedBox>())
+        var chunks = serialRepository.Command(filter);
+        using (var components = chunks.GetLayout<SpeedBox>())
         {
             components.Add(IterationMode.Simd, 1.5f);
         }
 
         using var parallelRepository = CreateSpeedRepository(count);
-        using (var chunks = parallelRepository.Search(filter))
-        using (var components = chunks.GetComponents<SpeedBox>())
+        var parallelChunks = parallelRepository.Command(filter);
+        using (var components = parallelChunks.GetLayout<SpeedBox>())
         {
             components.Add(IterationMode.Simd | IterationMode.Parallel, 1.5f);
         }
@@ -202,8 +202,8 @@ public partial class SpanOperationTests
         const int count = 500;
         using var repository = CreateSpeedRepository(count);
         var filter = new ComponentFilter().Include<SpeedBox>();
-        using var chunks = repository.Search(filter);
-        using var components = chunks.GetComponents<SpeedBox>();
+        var chunks = repository.Command(filter);
+        using var components = chunks.GetLayout<SpeedBox>();
         components.Add(IterationMode.Serial, 3f);
         Assert.That(SumSpeed(repository, filter), Is.EqualTo(count * (count - 1) / 2f + count * 3f));
     }

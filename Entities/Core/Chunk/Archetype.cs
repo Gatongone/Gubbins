@@ -18,6 +18,15 @@ internal class Archetype(ReadOnlySpan<Type> componentTypes, Allocator allocator,
     public IReadOnlyList<Chunk> Chunks => m_Chunks;
 
     /// <summary>
+    /// The number of bytes one entity's components occupy in this archetype, excluding the entity handle.
+    /// </summary>
+    /// <remarks>
+    /// Every chunk of the archetype lays its columns out over exactly this many bytes, so a transition into the
+    /// archetype sizes its payload with it.
+    /// </remarks>
+    internal int ComponentSize { get; } = GetComponentSize(componentTypes);
+
+    /// <summary>
     /// The chunk list as a concrete <see cref="List{T}"/>, so hot query paths can use
     /// <see cref="System.Runtime.InteropServices.CollectionsMarshal.AsSpan{T}"/> and avoid interface dispatch per
     /// chunk when they walk the archetype.
@@ -29,6 +38,41 @@ internal class Archetype(ReadOnlySpan<Type> componentTypes, Allocator allocator,
 #else
     private readonly BloomFilter m_ComponentFilter = new(componentTypes);
 #endif
+
+    /// <summary>
+    /// Sizes one entity's components in this archetype, excluding the entity handle.
+    /// </summary>
+    /// <param name="types">The component types of the archetype.</param>
+    private static int GetComponentSize(ReadOnlySpan<Type> types)
+    {
+        var size = 0;
+        for (var i = 0; i < types.Length; i++)
+        {
+            if (types[i] != typeof(Entity))
+            {
+                size += (int)Native.GetStackSize(types[i]);
+            }
+        }
+
+        return size;
+    }
+
+    /// <summary>
+    /// Determines whether this archetype holds the specified component type.
+    /// </summary>
+    /// <param name="type">The component type to look for.</param>
+    internal bool ContainsType(Type type)
+    {
+        for (var i = 0; i < m_ComponentTypes.Length; i++)
+        {
+            if (m_ComponentTypes[i] == type)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     internal bool MatchComponents(ComponentFilter filter)
     {
@@ -100,8 +144,7 @@ internal class Archetype(ReadOnlySpan<Type> componentTypes, Allocator allocator,
 
     /// <summary>
     /// Determines whether this archetype holds exactly the specified component types.
-    /// </summary>
-    /// <param name="compTypes">A span of component types to match against this archetype.</param>
+    /// </summary>    /// <param name="compTypes">A span of component types to match against this archetype.</param>
     /// <returns>
     /// True when the archetype holds the same component types, duplicates included. Order is not significant, because
     /// a chunk maps every payload entry onto its own column by type.
@@ -171,7 +214,7 @@ internal class Archetype(ReadOnlySpan<Type> componentTypes, Allocator allocator,
     /// <typeparam name="T">The type of component to retrieve.</typeparam>
     /// <param name="result">A list that will be populated with snippets containing the requested components.</param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void GetComponents<T>(List<Snippet<T>> result)
+    public void GetLayout<T>(List<Snippet<T>> result)
     {
         if (m_Chunks.Count == 0)
         {

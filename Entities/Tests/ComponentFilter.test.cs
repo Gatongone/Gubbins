@@ -1,4 +1,4 @@
-﻿namespace Gubbins.Entities.Tests;
+namespace Gubbins.Entities.Tests;
 
 [TestFixture]
 public class ComponentFilterSemanticsTests
@@ -18,8 +18,8 @@ public class ComponentFilterSemanticsTests
     {
         using var repository = new EntityRepository(TestAllocator.Shared);
         var target = repository.Insert(new CompB {Value = 1});
-        var chunks = repository.Search(new ComponentFilter().Include<CompA>());
-        var entities = chunks.GetComponents<Entity>();
+        var chunks = repository.Command(new ComponentFilter().Include<CompA>());
+        var entities = chunks.GetLayout<Entity>();
         Assert.That(entities.Batch.GetIndexes(), Is.Not.EquivalentTo(new[] {target.Index}));
     }
 
@@ -32,8 +32,8 @@ public class ComponentFilterSemanticsTests
         repository.Insert(new CompA {Value = 4}, new CompC {Value = 5});
 
         var filter = new ComponentFilter().Include<CompA>().Include<CompB>().Include<CompC>();
-        using var chunks = repository.Search(filter);
-        using var entities = chunks.GetComponents<Entity>();
+        var chunks = repository.Command(filter);
+        using var entities = chunks.GetLayout<Entity>();
         Assert.That(entities.Batch.GetIndexes(), Is.EquivalentTo(new[] {abc.Index}));
     }
 
@@ -47,8 +47,8 @@ public class ComponentFilterSemanticsTests
         repository.Insert(new CompA(), new CompB(), new CompC(), new CompE());
 
         var filter = new ComponentFilter().Include<CompA, CompB, CompC>().Exclude<CompD, CompE>();
-        using var chunks = repository.Search(filter);
-        using var entities = chunks.GetComponents<Entity>();
+        var chunks = repository.Command(filter);
+        using var entities = chunks.GetLayout<Entity>();
         Assert.That(entities.Elements.Count, Is.EqualTo(1));
         Assert.That(entities.Batch.GetIndexes(), Is.EquivalentTo(new[] {target.Index}));
     }
@@ -65,10 +65,10 @@ public class ComponentFilterSemanticsTests
         var context1 = new ComponentFilter().Include<CompB>().Include<CompC>();
         var context2 = new ComponentFilter().Include<CompC>().Include<CompB>();
 
-        using var chunks1 = repository.Search(context1);
-        using var chunks2 = repository.Search(context2);
-        using var result1 = chunks1.GetComponents<Entity>();
-        using var result2 = chunks2.GetComponents<Entity>();
+        var chunks1 = repository.Command(context1);
+        var chunks2 = repository.Command(context2);
+        using var result1 = chunks1.GetLayout<Entity>();
+        using var result2 = chunks2.GetLayout<Entity>();
 
         Assert.Multiple(() =>
         {
@@ -88,10 +88,10 @@ public class ComponentFilterSemanticsTests
         var single = new ComponentFilter().Include<CompA, CompB>();
         var duplicate = new ComponentFilter().Include<CompA, CompB>().Include<CompB>();
 
-        using var chunksSingle = repository.Search(single);
-        using var chunksDuplicate = repository.Search(duplicate);
-        using var entitiesSingle = chunksSingle.GetComponents<Entity>();
-        using var entitiesDuplicate = chunksDuplicate.GetComponents<Entity>();
+        var chunksSingle = repository.Command(single);
+        var chunksDuplicate = repository.Command(duplicate);
+        using var entitiesSingle = chunksSingle.GetLayout<Entity>();
+        using var entitiesDuplicate = chunksDuplicate.GetLayout<Entity>();
 
         Assert.Multiple(() =>
         {
@@ -111,10 +111,10 @@ public class ComponentFilterSemanticsTests
         var single = new ComponentFilter().Include<CompA, CompB>().Exclude<CompC>();
         var duplicate = new ComponentFilter().Include<CompA, CompB>().Exclude<CompC>().Exclude<CompC>();
 
-        using var chunksSingle = repository.Search(single);
-        using var chunksDuplicate = repository.Search(duplicate);
-        using var entitiesSingle = chunksSingle.GetComponents<Entity>();
-        using var entitiesDuplicate = chunksDuplicate.GetComponents<Entity>();
+        var chunksSingle = repository.Command(single);
+        var chunksDuplicate = repository.Command(duplicate);
+        using var entitiesSingle = chunksSingle.GetLayout<Entity>();
+        using var entitiesDuplicate = chunksDuplicate.GetLayout<Entity>();
 
         Assert.Multiple(() =>
         {
@@ -136,10 +136,10 @@ public class ComponentFilterSemanticsTests
         var filter1 = new ComponentFilter().Include<CompA>().Include<CompB>().Exclude<CompD>().Include<CompC>();
         var filter2 = new ComponentFilter().Include<CompA>().Include<CompC>().Include<CompB>().Exclude<CompD>();
 
-        using var chunks1 = repository.Search(filter1);
-        using var chunks2 = repository.Search(filter2);
-        using var result1 = chunks1.GetComponents<Entity>();
-        using var result2 = chunks2.GetComponents<Entity>();
+        var chunks1 = repository.Command(filter1);
+        var chunks2 = repository.Command(filter2);
+        using var result1 = chunks1.GetLayout<Entity>();
+        using var result2 = chunks2.GetLayout<Entity>();
 
         var expected = new[] {target1.Index, target2.Index};
 
@@ -161,10 +161,10 @@ public class ComponentFilterSemanticsTests
         var single = new ComponentFilter().Include<CompA>().Include<CompB>().Exclude<CompD>().Include<CompC>();
         var duplicate = new ComponentFilter().Include<CompA>().Include<CompB>().Exclude<CompD>().Include<CompC>().Exclude<CompD>();
 
-        using var singleChunks = repository.Search(single);
-        using var duplicateChunks = repository.Search(duplicate);
-        using var singleResult = singleChunks.GetComponents<Entity>();
-        using var duplicateResult = duplicateChunks.GetComponents<Entity>();
+        var singleChunks = repository.Command(single);
+        var duplicateChunks = repository.Command(duplicate);
+        using var singleResult = singleChunks.GetLayout<Entity>();
+        using var duplicateResult = duplicateChunks.GetLayout<Entity>();
 
         Assert.Multiple(() =>
         {
@@ -185,10 +185,10 @@ public class ComponentFilterSemanticsTests
         var context1 = new ComponentFilter().Include<CompA>().Include<CompB>().Exclude<CompD>().Include<CompC>().Exclude<CompE>();
         var context2 = new ComponentFilter().Include<CompA>().Include<CompC>().Include<CompB>().Exclude<CompE>().Exclude<CompD>();
 
-        using var chunks1 = repository.Search(context1);
-        using var chunks2 = repository.Search(context2);
-        using var result1 = chunks1.GetComponents<Entity>();
-        using var result2 = chunks2.GetComponents<Entity>();
+        var chunks1 = repository.Command(context1);
+        var chunks2 = repository.Command(context2);
+        using var result1 = chunks1.GetLayout<Entity>();
+        using var result2 = chunks2.GetLayout<Entity>();
 
         Assert.Multiple(() =>
         {

@@ -48,7 +48,7 @@ public static class ComponentsParallelExtensions
     /// The requested worker count, or <c>0</c> to derive it from the total element count.
     /// </param>
     public static void ApplyParallel<T, TState>(
-        this Components<T> components,
+        this ChunkLayout<T> components,
         TState state,
         SpanSegmentAction<T, TState> action,
         int workerCount = 0)
@@ -87,7 +87,7 @@ public static class ComponentsParallelExtensions
     /// The requested worker count, or <c>0</c> to derive it from the total element count.
     /// </param>
     public static void ApplyParallel<T>(
-        this Components<T> components,
+        this ChunkLayout<T> components,
         IterationMode mask,
         NumberOperation operation,
         T operand,
@@ -110,7 +110,7 @@ public static class ComponentsParallelExtensions
     /// The requested worker count, or <c>0</c> to derive it from the total element count.
     /// </param>
     public static void ApplyParallel<T, TOperation, TState>(
-        this Components<T> components,
+        this ChunkLayout<T> components,
         IterationMode mask,
         TState state,
         SpanOperationAction<T, TOperation, TState> action,
@@ -134,7 +134,7 @@ public static class ComponentsParallelExtensions
     /// The requested worker count, or <c>0</c> to derive it from the total element count.
     /// </param>
     public static void ApplyNumber<T, TState>(
-        this Components<T> components,
+        this ChunkLayout<T> components,
         IterationMode mask,
         TState state,
         SpanOperationAction<T, ISpanNumberOperation<T>, TState> action,
@@ -156,7 +156,7 @@ public static class ComponentsParallelExtensions
     /// The requested worker count, or <c>0</c> to derive it from the total element count.
     /// </param>
     public static void ApplyReal<T, TState>(
-        this Components<T> components,
+        this ChunkLayout<T> components,
         IterationMode mask,
         TState state,
         SpanOperationAction<T, ISpanRealOperation<T>, TState> action,
@@ -178,7 +178,7 @@ public static class ComponentsParallelExtensions
     /// The requested worker count, or <c>0</c> to derive it from the total element count.
     /// </param>
     public static void ApplyVector<T, TState>(
-        this Components<T> components,
+        this ChunkLayout<T> components,
         IterationMode mask,
         TState state,
         SpanOperationAction<T, ISpanVectorOperation<T>, TState> action,
@@ -200,7 +200,7 @@ public static class ComponentsParallelExtensions
     /// The requested worker count, or <c>0</c> to derive it from the total element count.
     /// </param>
     public static void ApplyShift<T, TState>(
-        this Components<T> components,
+        this ChunkLayout<T> components,
         IterationMode mask,
         TState state,
         SpanOperationAction<T, ISpanShift<T>, TState> action,
@@ -222,7 +222,7 @@ public static class ComponentsParallelExtensions
     /// <param name="workerCount">
     /// The requested worker count, or <c>0</c> to derive it from the total element count.
     /// </param>
-    public static void Add<T>(this Components<T> components, IterationMode mask, T operand, int workerCount = 0)
+    public static void Add<T>(this ChunkLayout<T> components, IterationMode mask, T operand, int workerCount = 0)
         where T : unmanaged, INumber<T>
         => ApplyNumberStrategy(components, mask, NumberOperation.Add, operand, workerCount);
 
@@ -237,7 +237,7 @@ public static class ComponentsParallelExtensions
     /// <param name="workerCount">
     /// The requested worker count, or <c>0</c> to derive it from the total element count.
     /// </param>
-    public static void Subtract<T>(this Components<T> components, IterationMode mask, T operand, int workerCount = 0)
+    public static void Subtract<T>(this ChunkLayout<T> components, IterationMode mask, T operand, int workerCount = 0)
         where T : unmanaged, INumber<T>
         => ApplyNumberStrategy(components, mask, NumberOperation.Subtract, operand, workerCount);
 
@@ -252,7 +252,7 @@ public static class ComponentsParallelExtensions
     /// <param name="workerCount">
     /// The requested worker count, or <c>0</c> to derive it from the total element count.
     /// </param>
-    public static void Multiply<T>(this Components<T> components, IterationMode mask, T operand, int workerCount = 0)
+    public static void Multiply<T>(this ChunkLayout<T> components, IterationMode mask, T operand, int workerCount = 0)
         where T : unmanaged, INumber<T>
         => ApplyNumberStrategy(components, mask, NumberOperation.Multiply, operand, workerCount);
 
@@ -267,7 +267,7 @@ public static class ComponentsParallelExtensions
     /// <param name="workerCount">
     /// The requested worker count, or <c>0</c> to derive it from the total element count.
     /// </param>
-    public static void Divide<T>(this Components<T> components, IterationMode mask, T operand, int workerCount = 0)
+    public static void Divide<T>(this ChunkLayout<T> components, IterationMode mask, T operand, int workerCount = 0)
         where T : unmanaged, INumber<T>
         => ApplyNumberStrategy(components, mask, NumberOperation.Divide, operand, workerCount);
 
@@ -282,7 +282,7 @@ public static class ComponentsParallelExtensions
     /// <param name="workerCount">
     /// The requested worker count, or <c>0</c> to derive it from the total element count.
     /// </param>
-    public static void Modulo<T>(this Components<T> components, IterationMode mask, T operand, int workerCount = 0)
+    public static void Modulo<T>(this ChunkLayout<T> components, IterationMode mask, T operand, int workerCount = 0)
         where T : unmanaged, INumber<T>
         => ApplyNumberStrategy(components, mask, NumberOperation.Modulo, operand, workerCount);
 #else
@@ -293,7 +293,7 @@ public static class ComponentsParallelExtensions
     /// <param name="mask">The span operation strategy to use.</param>
     /// <param name="operand">The value to add to every element.</param>
     /// <param name="workerCount">The requested worker count, or <c>0</c> to derive it from the total element count.</param>
-    public static void Add(this Components<int> components, IterationMode mask, int operand, int workerCount = 0)
+    public static void Add(this ChunkLayout<int> components, IterationMode mask, int operand, int workerCount = 0)
         => ApplyNumberStrategy(components, mask, NumberOperation.Add, operand, workerCount);
 
     /// <summary>
@@ -303,7 +303,7 @@ public static class ComponentsParallelExtensions
     /// <param name="mask">The span operation strategy to use.</param>
     /// <param name="operand">The value to add to every element.</param>
     /// <param name="workerCount">The requested worker count, or <c>0</c> to derive it from the total element count.</param>
-    public static void Add(this Components<uint> components, IterationMode mask, uint operand, int workerCount = 0)
+    public static void Add(this ChunkLayout<uint> components, IterationMode mask, uint operand, int workerCount = 0)
         => ApplyNumberStrategy(components, mask, NumberOperation.Add, operand, workerCount);
 
     /// <summary>
@@ -313,7 +313,7 @@ public static class ComponentsParallelExtensions
     /// <param name="mask">The span operation strategy to use.</param>
     /// <param name="operand">The value to add to every element.</param>
     /// <param name="workerCount">The requested worker count, or <c>0</c> to derive it from the total element count.</param>
-    public static void Add(this Components<long> components, IterationMode mask, long operand, int workerCount = 0)
+    public static void Add(this ChunkLayout<long> components, IterationMode mask, long operand, int workerCount = 0)
         => ApplyNumberStrategy(components, mask, NumberOperation.Add, operand, workerCount);
 
     /// <summary>
@@ -323,7 +323,7 @@ public static class ComponentsParallelExtensions
     /// <param name="mask">The span operation strategy to use.</param>
     /// <param name="operand">The value to add to every element.</param>
     /// <param name="workerCount">The requested worker count, or <c>0</c> to derive it from the total element count.</param>
-    public static void Add(this Components<ulong> components, IterationMode mask, ulong operand, int workerCount = 0)
+    public static void Add(this ChunkLayout<ulong> components, IterationMode mask, ulong operand, int workerCount = 0)
         => ApplyNumberStrategy(components, mask, NumberOperation.Add, operand, workerCount);
 
     /// <summary>
@@ -333,7 +333,7 @@ public static class ComponentsParallelExtensions
     /// <param name="mask">The span operation strategy to use.</param>
     /// <param name="operand">The value to add to every element.</param>
     /// <param name="workerCount">The requested worker count, or <c>0</c> to derive it from the total element count.</param>
-    public static void Add(this Components<float> components, IterationMode mask, float operand, int workerCount = 0)
+    public static void Add(this ChunkLayout<float> components, IterationMode mask, float operand, int workerCount = 0)
         => ApplyNumberStrategy(components, mask, NumberOperation.Add, operand, workerCount);
 
     /// <summary>
@@ -343,7 +343,7 @@ public static class ComponentsParallelExtensions
     /// <param name="mask">The span operation strategy to use.</param>
     /// <param name="operand">The value to add to every element.</param>
     /// <param name="workerCount">The requested worker count, or <c>0</c> to derive it from the total element count.</param>
-    public static void Add(this Components<double> components, IterationMode mask, double operand, int workerCount = 0)
+    public static void Add(this ChunkLayout<double> components, IterationMode mask, double operand, int workerCount = 0)
         => ApplyNumberStrategy(components, mask, NumberOperation.Add, operand, workerCount);
 
     /// <summary>
@@ -353,7 +353,7 @@ public static class ComponentsParallelExtensions
     /// <param name="mask">The span operation strategy to use.</param>
     /// <param name="operand">The value to subtract from every element.</param>
     /// <param name="workerCount">The requested worker count, or <c>0</c> to derive it from the total element count.</param>
-    public static void Subtract(this Components<int> components, IterationMode mask, int operand, int workerCount = 0)
+    public static void Subtract(this ChunkLayout<int> components, IterationMode mask, int operand, int workerCount = 0)
         => ApplyNumberStrategy(components, mask, NumberOperation.Subtract, operand, workerCount);
 
     /// <summary>
@@ -363,7 +363,7 @@ public static class ComponentsParallelExtensions
     /// <param name="mask">The span operation strategy to use.</param>
     /// <param name="operand">The value to subtract from every element.</param>
     /// <param name="workerCount">The requested worker count, or <c>0</c> to derive it from the total element count.</param>
-    public static void Subtract(this Components<uint> components, IterationMode mask, uint operand, int workerCount = 0)
+    public static void Subtract(this ChunkLayout<uint> components, IterationMode mask, uint operand, int workerCount = 0)
         => ApplyNumberStrategy(components, mask, NumberOperation.Subtract, operand, workerCount);
 
     /// <summary>
@@ -373,7 +373,7 @@ public static class ComponentsParallelExtensions
     /// <param name="mask">The span operation strategy to use.</param>
     /// <param name="operand">The value to subtract from every element.</param>
     /// <param name="workerCount">The requested worker count, or <c>0</c> to derive it from the total element count.</param>
-    public static void Subtract(this Components<long> components, IterationMode mask, long operand, int workerCount = 0)
+    public static void Subtract(this ChunkLayout<long> components, IterationMode mask, long operand, int workerCount = 0)
         => ApplyNumberStrategy(components, mask, NumberOperation.Subtract, operand, workerCount);
 
     /// <summary>
@@ -383,7 +383,7 @@ public static class ComponentsParallelExtensions
     /// <param name="mask">The span operation strategy to use.</param>
     /// <param name="operand">The value to subtract from every element.</param>
     /// <param name="workerCount">The requested worker count, or <c>0</c> to derive it from the total element count.</param>
-    public static void Subtract(this Components<ulong> components, IterationMode mask, ulong operand, int workerCount = 0)
+    public static void Subtract(this ChunkLayout<ulong> components, IterationMode mask, ulong operand, int workerCount = 0)
         => ApplyNumberStrategy(components, mask, NumberOperation.Subtract, operand, workerCount);
 
     /// <summary>
@@ -393,7 +393,7 @@ public static class ComponentsParallelExtensions
     /// <param name="mask">The span operation strategy to use.</param>
     /// <param name="operand">The value to subtract from every element.</param>
     /// <param name="workerCount">The requested worker count, or <c>0</c> to derive it from the total element count.</param>
-    public static void Subtract(this Components<float> components, IterationMode mask, float operand, int workerCount = 0)
+    public static void Subtract(this ChunkLayout<float> components, IterationMode mask, float operand, int workerCount = 0)
         => ApplyNumberStrategy(components, mask, NumberOperation.Subtract, operand, workerCount);
 
     /// <summary>
@@ -403,7 +403,7 @@ public static class ComponentsParallelExtensions
     /// <param name="mask">The span operation strategy to use.</param>
     /// <param name="operand">The value to subtract from every element.</param>
     /// <param name="workerCount">The requested worker count, or <c>0</c> to derive it from the total element count.</param>
-    public static void Subtract(this Components<double> components, IterationMode mask, double operand, int workerCount = 0)
+    public static void Subtract(this ChunkLayout<double> components, IterationMode mask, double operand, int workerCount = 0)
         => ApplyNumberStrategy(components, mask, NumberOperation.Subtract, operand, workerCount);
 
     /// <summary>
@@ -413,7 +413,7 @@ public static class ComponentsParallelExtensions
     /// <param name="mask">The span operation strategy to use.</param>
     /// <param name="operand">The value to multiply every element by.</param>
     /// <param name="workerCount">The requested worker count, or <c>0</c> to derive it from the total element count.</param>
-    public static void Multiply(this Components<int> components, IterationMode mask, int operand, int workerCount = 0)
+    public static void Multiply(this ChunkLayout<int> components, IterationMode mask, int operand, int workerCount = 0)
         => ApplyNumberStrategy(components, mask, NumberOperation.Multiply, operand, workerCount);
 
     /// <summary>
@@ -423,7 +423,7 @@ public static class ComponentsParallelExtensions
     /// <param name="mask">The span operation strategy to use.</param>
     /// <param name="operand">The value to multiply every element by.</param>
     /// <param name="workerCount">The requested worker count, or <c>0</c> to derive it from the total element count.</param>
-    public static void Multiply(this Components<uint> components, IterationMode mask, uint operand, int workerCount = 0)
+    public static void Multiply(this ChunkLayout<uint> components, IterationMode mask, uint operand, int workerCount = 0)
         => ApplyNumberStrategy(components, mask, NumberOperation.Multiply, operand, workerCount);
 
     /// <summary>
@@ -433,7 +433,7 @@ public static class ComponentsParallelExtensions
     /// <param name="mask">The span operation strategy to use.</param>
     /// <param name="operand">The value to multiply every element by.</param>
     /// <param name="workerCount">The requested worker count, or <c>0</c> to derive it from the total element count.</param>
-    public static void Multiply(this Components<long> components, IterationMode mask, long operand, int workerCount = 0)
+    public static void Multiply(this ChunkLayout<long> components, IterationMode mask, long operand, int workerCount = 0)
         => ApplyNumberStrategy(components, mask, NumberOperation.Multiply, operand, workerCount);
 
     /// <summary>
@@ -443,7 +443,7 @@ public static class ComponentsParallelExtensions
     /// <param name="mask">The span operation strategy to use.</param>
     /// <param name="operand">The value to multiply every element by.</param>
     /// <param name="workerCount">The requested worker count, or <c>0</c> to derive it from the total element count.</param>
-    public static void Multiply(this Components<ulong> components, IterationMode mask, ulong operand, int workerCount = 0)
+    public static void Multiply(this ChunkLayout<ulong> components, IterationMode mask, ulong operand, int workerCount = 0)
         => ApplyNumberStrategy(components, mask, NumberOperation.Multiply, operand, workerCount);
 
     /// <summary>
@@ -453,7 +453,7 @@ public static class ComponentsParallelExtensions
     /// <param name="mask">The span operation strategy to use.</param>
     /// <param name="operand">The value to multiply every element by.</param>
     /// <param name="workerCount">The requested worker count, or <c>0</c> to derive it from the total element count.</param>
-    public static void Multiply(this Components<float> components, IterationMode mask, float operand, int workerCount = 0)
+    public static void Multiply(this ChunkLayout<float> components, IterationMode mask, float operand, int workerCount = 0)
         => ApplyNumberStrategy(components, mask, NumberOperation.Multiply, operand, workerCount);
 
     /// <summary>
@@ -463,7 +463,7 @@ public static class ComponentsParallelExtensions
     /// <param name="mask">The span operation strategy to use.</param>
     /// <param name="operand">The value to multiply every element by.</param>
     /// <param name="workerCount">The requested worker count, or <c>0</c> to derive it from the total element count.</param>
-    public static void Multiply(this Components<double> components, IterationMode mask, double operand, int workerCount = 0)
+    public static void Multiply(this ChunkLayout<double> components, IterationMode mask, double operand, int workerCount = 0)
         => ApplyNumberStrategy(components, mask, NumberOperation.Multiply, operand, workerCount);
 
     /// <summary>
@@ -473,7 +473,7 @@ public static class ComponentsParallelExtensions
     /// <param name="mask">The span operation strategy to use.</param>
     /// <param name="operand">The value to divide every element by.</param>
     /// <param name="workerCount">The requested worker count, or <c>0</c> to derive it from the total element count.</param>
-    public static void Divide(this Components<int> components, IterationMode mask, int operand, int workerCount = 0)
+    public static void Divide(this ChunkLayout<int> components, IterationMode mask, int operand, int workerCount = 0)
         => ApplyNumberStrategy(components, mask, NumberOperation.Divide, operand, workerCount);
 
     /// <summary>
@@ -483,7 +483,7 @@ public static class ComponentsParallelExtensions
     /// <param name="mask">The span operation strategy to use.</param>
     /// <param name="operand">The value to divide every element by.</param>
     /// <param name="workerCount">The requested worker count, or <c>0</c> to derive it from the total element count.</param>
-    public static void Divide(this Components<uint> components, IterationMode mask, uint operand, int workerCount = 0)
+    public static void Divide(this ChunkLayout<uint> components, IterationMode mask, uint operand, int workerCount = 0)
         => ApplyNumberStrategy(components, mask, NumberOperation.Divide, operand, workerCount);
 
     /// <summary>
@@ -493,7 +493,7 @@ public static class ComponentsParallelExtensions
     /// <param name="mask">The span operation strategy to use.</param>
     /// <param name="operand">The value to divide every element by.</param>
     /// <param name="workerCount">The requested worker count, or <c>0</c> to derive it from the total element count.</param>
-    public static void Divide(this Components<long> components, IterationMode mask, long operand, int workerCount = 0)
+    public static void Divide(this ChunkLayout<long> components, IterationMode mask, long operand, int workerCount = 0)
         => ApplyNumberStrategy(components, mask, NumberOperation.Divide, operand, workerCount);
 
     /// <summary>
@@ -503,7 +503,7 @@ public static class ComponentsParallelExtensions
     /// <param name="mask">The span operation strategy to use.</param>
     /// <param name="operand">The value to divide every element by.</param>
     /// <param name="workerCount">The requested worker count, or <c>0</c> to derive it from the total element count.</param>
-    public static void Divide(this Components<ulong> components, IterationMode mask, ulong operand, int workerCount = 0)
+    public static void Divide(this ChunkLayout<ulong> components, IterationMode mask, ulong operand, int workerCount = 0)
         => ApplyNumberStrategy(components, mask, NumberOperation.Divide, operand, workerCount);
 
     /// <summary>
@@ -513,7 +513,7 @@ public static class ComponentsParallelExtensions
     /// <param name="mask">The span operation strategy to use.</param>
     /// <param name="operand">The value to divide every element by.</param>
     /// <param name="workerCount">The requested worker count, or <c>0</c> to derive it from the total element count.</param>
-    public static void Divide(this Components<float> components, IterationMode mask, float operand, int workerCount = 0)
+    public static void Divide(this ChunkLayout<float> components, IterationMode mask, float operand, int workerCount = 0)
         => ApplyNumberStrategy(components, mask, NumberOperation.Divide, operand, workerCount);
 
     /// <summary>
@@ -523,7 +523,7 @@ public static class ComponentsParallelExtensions
     /// <param name="mask">The span operation strategy to use.</param>
     /// <param name="operand">The value to divide every element by.</param>
     /// <param name="workerCount">The requested worker count, or <c>0</c> to derive it from the total element count.</param>
-    public static void Divide(this Components<double> components, IterationMode mask, double operand, int workerCount = 0)
+    public static void Divide(this ChunkLayout<double> components, IterationMode mask, double operand, int workerCount = 0)
         => ApplyNumberStrategy(components, mask, NumberOperation.Divide, operand, workerCount);
 
     /// <summary>
@@ -534,7 +534,7 @@ public static class ComponentsParallelExtensions
     /// <param name="mask">The span operation strategy to use.</param>
     /// <param name="operand">The modulus applied to every element.</param>
     /// <param name="workerCount">The requested worker count, or <c>0</c> to derive it from the total element count.</param>
-    public static void Modulo(this Components<int> components, IterationMode mask, int operand, int workerCount = 0)
+    public static void Modulo(this ChunkLayout<int> components, IterationMode mask, int operand, int workerCount = 0)
         => ApplyNumberStrategy(components, mask, NumberOperation.Modulo, operand, workerCount);
 
     /// <summary>
@@ -545,7 +545,7 @@ public static class ComponentsParallelExtensions
     /// <param name="mask">The span operation strategy to use.</param>
     /// <param name="operand">The modulus applied to every element.</param>
     /// <param name="workerCount">The requested worker count, or <c>0</c> to derive it from the total element count.</param>
-    public static void Modulo(this Components<uint> components, IterationMode mask, uint operand, int workerCount = 0)
+    public static void Modulo(this ChunkLayout<uint> components, IterationMode mask, uint operand, int workerCount = 0)
         => ApplyNumberStrategy(components, mask, NumberOperation.Modulo, operand, workerCount);
 
     /// <summary>
@@ -556,7 +556,7 @@ public static class ComponentsParallelExtensions
     /// <param name="mask">The span operation strategy to use.</param>
     /// <param name="operand">The modulus applied to every element.</param>
     /// <param name="workerCount">The requested worker count, or <c>0</c> to derive it from the total element count.</param>
-    public static void Modulo(this Components<long> components, IterationMode mask, long operand, int workerCount = 0)
+    public static void Modulo(this ChunkLayout<long> components, IterationMode mask, long operand, int workerCount = 0)
         => ApplyNumberStrategy(components, mask, NumberOperation.Modulo, operand, workerCount);
 
     /// <summary>
@@ -567,7 +567,7 @@ public static class ComponentsParallelExtensions
     /// <param name="mask">The span operation strategy to use.</param>
     /// <param name="operand">The modulus applied to every element.</param>
     /// <param name="workerCount">The requested worker count, or <c>0</c> to derive it from the total element count.</param>
-    public static void Modulo(this Components<ulong> components, IterationMode mask, ulong operand, int workerCount = 0)
+    public static void Modulo(this ChunkLayout<ulong> components, IterationMode mask, ulong operand, int workerCount = 0)
         => ApplyNumberStrategy(components, mask, NumberOperation.Modulo, operand, workerCount);
 
     /// <summary>
@@ -578,7 +578,7 @@ public static class ComponentsParallelExtensions
     /// <param name="mask">The span operation strategy to use.</param>
     /// <param name="operand">The modulus applied to every element.</param>
     /// <param name="workerCount">The requested worker count, or <c>0</c> to derive it from the total element count.</param>
-    public static void Modulo(this Components<float> components, IterationMode mask, float operand, int workerCount = 0)
+    public static void Modulo(this ChunkLayout<float> components, IterationMode mask, float operand, int workerCount = 0)
         => ApplyNumberStrategy(components, mask, NumberOperation.Modulo, operand, workerCount);
 
     /// <summary>
@@ -589,12 +589,12 @@ public static class ComponentsParallelExtensions
     /// <param name="mask">The span operation strategy to use.</param>
     /// <param name="operand">The modulus applied to every element.</param>
     /// <param name="workerCount">The requested worker count, or <c>0</c> to derive it from the total element count.</param>
-    public static void Modulo(this Components<double> components, IterationMode mask, double operand, int workerCount = 0)
+    public static void Modulo(this ChunkLayout<double> components, IterationMode mask, double operand, int workerCount = 0)
         => ApplyNumberStrategy(components, mask, NumberOperation.Modulo, operand, workerCount);
 #endif
 
     private static void ApplyNumberStrategy<T>(
-        Components<T> components,
+        ChunkLayout<T> components,
         IterationMode mask,
         NumberOperation operation,
         T operand,
@@ -629,7 +629,7 @@ public static class ComponentsParallelExtensions
     }
 
     private static void ApplyOperationParallel<T, TOperation, TState>(
-        Components<T> components,
+        ChunkLayout<T> components,
         IterationMode mask,
         TState state,
         SpanOperationAction<T, TOperation, TState> action,
@@ -652,11 +652,11 @@ public static class ComponentsParallelExtensions
     /// <typeparam name="TState">The state passed to the action.</typeparam>
     private readonly struct ApplyState<T, TState> where T : unmanaged
     {
-        private readonly Components<T>.SegmentsEnumerable m_Segments;
+        private readonly ChunkLayout<T>.SegmentsEnumerable m_Segments;
         private readonly SpanSegmentAction<T, TState> m_Action;
         private readonly TState m_State;
 
-        public ApplyState(Components<T>.SegmentsEnumerable segments, SpanSegmentAction<T, TState> action, TState state)
+        public ApplyState(ChunkLayout<T>.SegmentsEnumerable segments, SpanSegmentAction<T, TState> action, TState state)
         {
             m_Segments = segments;
             m_Action = action;
