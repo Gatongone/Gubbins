@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net8.0</TargetFramework>
+        <TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>
         <RootNamespace>Gubbins.Graphic.Kernels</RootNamespace>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
@@ -13,6 +13,13 @@
 
     <ItemGroup>
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.11.0" />
+    </ItemGroup>
+
+    <!-- The compiler that runs slangc starts a process, which is not a part of .NET Standard 2.0. The generator that
+         reads a kernel needs the translation and nothing that runs a tool, so the target the generator is built for
+         leaves the compiler out. -->
+    <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+        <Compile Remove="KernelCompiler.cs" />
     </ItemGroup>
 
 </Project>

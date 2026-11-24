@@ -1,0 +1,941 @@
+using System.Globalization;
+using System.Text;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+
+namespace Gubbins.Graphic.Kernels;
+
+/// <summary>
+/// The half of the translator that reads a kernel the compiler has resolved, rather than a text that happens to parse as
+/// one.
+/// </summary>
+/// <remarks>
+/// <para>
+/// A kernel is ordinary C#, so the compiler has already decided what every name in it means: which <c>Span&lt;T&gt;</c> a
+/// parameter is, which method a call reaches, which constant a field holds, and which structure a value is built from. The
+/// translator reads those answers from a <see cref="Compilation"/> instead of guessing from the spelling, which is what
+/// lets a kernel call a helper declared in another file and hold a structure the central processor also uses.
+/// </para>
+/// <para>
+/// The boundary is the same as it has always been, moved from names to symbols: a helper is followed only when it carries
+/// <c>[GpuCompatible]</c>, a structure is emitted only when it carries <c>[GpuStruct]</c>, and a call that reaches
+/// anything else is refused with the name the compiler resolved. A helper has to be declared in source the compilation
+/// contains, because the translator reads its body and a referenced assembly only has its signature.
+/// </para>
+/// </remarks>
+public static partial class KernelTranspiler
+{
+    /// <summary>
+    /// Translates one kernel the compiler resolved into Slang.
+    /// </summary>
+    /// <param name="compilation">The compilation the kernel was resolved in, which is what the helper calls are read from.</param>
+    /// <param name="kernel">The method marked <c>[GpuKernel]</c>.</param>
+    /// <returns>The Slang program, with the bindings the backends expect.</returns>
+    /// <exception cref="KernelTranslationException">Thrown when the kernel, a helper or a structure is outside the subset.</exception>
+    public static string Transpile(Compilation compilation, IMethodSymbol kernel)
+    {
+        if (compilation is null)
+        {
+            throw new ArgumentNullException(nameof(compilation));
+        }
+
+        if (kernel is null)
+        {
+            throw new ArgumentNullException(nameof(kernel));
+        }
+
+        return Emit(KernelSemantics.Create(compilation, kernel));
+    }
+
+    /// <summary>
+    /// Reads the group size of a kernel the compiler resolved.
+    /// </summary>
+    /// <param name="kernel">The method marked <c>[GpuKernel]</c>.</param>
+    /// <returns>The number of threads in a group, which is what a dispatch divides its element count by.</returns>
+    /// <exception cref="KernelTranslationException">Thrown when the attribute does not declare a size a device can run.</exception>
+    public static int ThreadsPerGroup(IMethodSymbol kernel)
+    {
+        if (kernel is null)
+        {
+            throw new ArgumentNullException(nameof(kernel));
+        }
+
+        var threads = THREADS_PER_GROUP;
+
+        foreach (var attribute in kernel.GetAttributes())
+        {
+            if (attribute.AttributeClass?.ToDisplayString() != "Gubbins.Graphic.GpuThreadsAttribute")
+            {
+                continue;
+            }
+
+            if (attribute.ConstructorArguments.Length != 1 || attribute.ConstructorArguments[0].Value is not int count || count < 1 || count > 1024)
+            {
+                throw new KernelTranslationException("[GpuThreads(count)] takes the number of threads in a group as a literal a device can run.");
+            }
+
+            threads = count;
+        }
+
+        return threads;
+    }
+
+    /// <summary>
+    /// Translates the program of a kernel whose symbols have been resolved.
+    /// </summary>
+    /// <param name="semantics">The kernel and everything it reaches.</param>
+    /// <returns>The Slang program.</returns>
+    private static string Emit(KernelSemantics semantics)
+    {
+        var parameters = semantics.Parameters;
+        var shared = new StringBuilder();
+        var body = RewriteBody(semantics.Declaration, parameters, shared, semantics.StructNames, semantics);
+        var count = parameters.Count(parameter => parameter.Kind != KernelParameterKind.Index);
+        var text = new StringBuilder();
+
+        text.Append(StructureText(semantics));
+        text.Append(FunctionText(semantics));
+
+        // Every buffer is writable here because a backend that binds one address space for all resources cannot tell a
+        // readable buffer from a writable one: Metal would place the two at the same index. The kernel the subset
+        // accepts writes only the buffer it declares writable, so nothing is lost but the read-only cache hint.
+        foreach (var parameter in parameters)
+        {
+            if (parameter.Kind == KernelParameterKind.Index)
+            {
+                continue;
+            }
+
+            text.AppendLine($"[[vk::binding({parameter.Binding}, 0)]] RWStructuredBuffer<{parameter.ElementType}> {parameter.Name} : register(u{parameter.Binding});");
+        }
+
+        if (count > 0)
+        {
+            text.AppendLine($"[[vk::binding({count}, 0)]] RWStructuredBuffer<uint> {LENGTHS_BUFFER} : register(u{count});");
+        }
+
+        text.Append(shared.ToString());
+
+        var index = parameters.First(parameter => parameter.Kind == KernelParameterKind.Index);
+
+        text.AppendLine();
+        text.AppendLine($"#define {index.Name} (__gubbinsThreadId.x)");
+        text.AppendLine();
+        text.AppendLine("[shader(\"compute\")]");
+        text.AppendLine($"[numthreads({semantics.Threads}, 1, 1)]");
+        text.AppendLine($"void {ENTRY_POINT}(uint3 __gubbinsThreadId : SV_DispatchThreadID)");
+        text.AppendLine("{");
+        text.Append(Prologue(parameters));
+        text.AppendLine();
+        text.AppendLine(body);
+        text.AppendLine("}");
+
+        return text.ToString();
+    }
+
+    /// <summary>
+    /// Translates the structures the kernel works with, in an order where a structure comes before the one that holds it.
+    /// </summary>
+    /// <param name="semantics">The kernel and everything it reaches.</param>
+    /// <returns>The declarations.</returns>
+    private static string StructureText(KernelSemantics semantics)
+    {
+        var text = new StringBuilder();
+
+        foreach (var declaration in semantics.Structs)
+        {
+            var rewriter = new SliceRewriter(
+                Array.Empty<KernelParameter>(),
+                semantics.StructNames,
+                semantics.CallableNames,
+                semantics.Signatures,
+                semantics);
+
+            var structure = (StructDeclarationSyntax) rewriter.Visit(declaration.Syntax)!;
+
+            text.AppendLine($"struct {declaration.Symbol.Name}");
+            text.AppendLine("{");
+
+            var operators = new StringBuilder();
+
+            foreach (var member in structure.Members)
+            {
+                if (member is OperatorDeclarationSyntax operation)
+                {
+                    operators.AppendLine($"{operation.ReturnType} operator{operation.OperatorToken.Text}({Parameters(operation.ParameterList)}){Body(operation.Body, operation.ExpressionBody, 0)}");
+                    continue;
+                }
+
+                text.Append(StructureMember(declaration.Symbol.Name, member));
+            }
+
+            text.AppendLine("}");
+            text.Append(operators.ToString());
+            text.AppendLine();
+        }
+
+        return text.ToString();
+    }
+
+    /// <summary>
+    /// Translates the methods the kernel calls and that carry <c>[GpuCompatible]</c>.
+    /// </summary>
+    /// <param name="semantics">The kernel and everything it reaches.</param>
+    /// <returns>The helpers, as the shading language writes them.</returns>
+    private static string FunctionText(KernelSemantics semantics)
+    {
+        var text = new StringBuilder();
+
+        foreach (var helper in semantics.Helpers)
+        {
+            var rewriter = new SliceRewriter(
+                Array.Empty<KernelParameter>(),
+                semantics.StructNames,
+                semantics.CallableNames,
+                semantics.Signatures,
+                semantics);
+
+            var method = (MethodDeclarationSyntax) rewriter.Visit(helper.Syntax)!;
+
+            text.AppendLine($"{method.ReturnType} {method.Identifier.ValueText}({Parameters(method.ParameterList)}){Body(method.Body, method.ExpressionBody, 0)}");
+        }
+
+        return text.ToString();
+    }
+
+    /// <summary>
+    /// Everything a kernel the compiler resolved reaches: its parameters, the helpers marked for the device, and the
+    /// structures both processors use.
+    /// </summary>
+    /// <remarks>
+    /// The discovery is a walk of the symbols the compiler resolved, starting at the kernel: every call inside the kernel
+    /// and inside each helper it reaches is looked at once, and a call either maps to an intrinsic, belongs to a
+    /// <c>[GpuStruct]</c>, or names a helper that must carry <c>[GpuCompatible]</c>. The walk is what makes a helper in
+    /// another file reachable, and it is what refuses one that was never marked.
+    /// </remarks>
+    internal sealed class KernelSemantics
+    {
+        /// <summary>
+        /// How a call may be made: the names the body can use for a function.
+        /// </summary>
+        private readonly HashSet<string> m_Callables = new(StringComparer.Ordinal);
+
+        /// <summary>
+        /// The parameter lists of those calls, by name.
+        /// </summary>
+        private readonly Dictionary<string, IReadOnlyList<ParameterSyntax>> m_Signatures = new(StringComparer.Ordinal);
+
+        /// <summary>
+        /// The structures reached so far, by symbol.
+        /// </summary>
+        private readonly Dictionary<INamedTypeSymbol, StructDeclaration> m_Structs = new(SymbolEqualityComparer.Default);
+
+        /// <summary>
+        /// The structures whose fields have not been walked yet.
+        /// </summary>
+        private readonly Queue<INamedTypeSymbol> m_Pending = new();
+
+        /// <summary>
+        /// The semantic model of every syntax tree the walk touched, built once.
+        /// </summary>
+        private readonly Dictionary<SyntaxTree, SemanticModel> m_Models = new();
+
+        private readonly INamedTypeSymbol m_GpuStruct;
+        private readonly INamedTypeSymbol m_GpuCompatible;
+
+        private KernelSemantics(Compilation compilation, IMethodSymbol kernel, MethodDeclarationSyntax declaration, int threads, INamedTypeSymbol gpuStruct, INamedTypeSymbol gpuCompatible)
+        {
+            Compilation = compilation;
+            Kernel = kernel;
+            Declaration = declaration;
+            Threads = threads;
+            m_GpuStruct = gpuStruct;
+            m_GpuCompatible = gpuCompatible;
+        }
+
+        /// <summary>
+        /// Gets the compilation the kernel was resolved in.
+        /// </summary>
+        internal Compilation Compilation { get; }
+
+        /// <summary>
+        /// Gets the method marked as the kernel.
+        /// </summary>
+        internal IMethodSymbol Kernel { get; }
+
+        /// <summary>
+        /// Gets the declaration of that method.
+        /// </summary>
+        internal MethodDeclarationSyntax Declaration { get; }
+
+        /// <summary>
+        /// Gets the number of threads in a group.
+        /// </summary>
+        internal int Threads { get; }
+
+        /// <summary>
+        /// Gets the parameters of the kernel.
+        /// </summary>
+        internal IReadOnlyList<KernelParameter> Parameters { get; private set; } = Array.Empty<KernelParameter>();
+
+        /// <summary>
+        /// Gets the helpers the kernel reaches, in the order they were reached.
+        /// </summary>
+        internal IReadOnlyList<HelperMethod> Helpers { get; private set; } = Array.Empty<HelperMethod>();
+
+        /// <summary>
+        /// Gets the structures the kernel works with, in an order where a structure comes before the one that holds it.
+        /// </summary>
+        internal IReadOnlyList<StructDeclaration> Structs { get; private set; } = Array.Empty<StructDeclaration>();
+
+        /// <summary>
+        /// Gets the names of those structures, which are the types a value can be built from.
+        /// </summary>
+        internal IReadOnlyCollection<string> StructNames => m_Structs.Values.Select(structure => structure.Symbol.Name).ToList();
+
+        /// <summary>
+        /// Gets the names a kernel body may call.
+        /// </summary>
+        internal IReadOnlyCollection<string> CallableNames => m_Callables;
+
+        /// <summary>
+        /// Gets the parameter lists of those calls, by name.
+        /// </summary>
+        internal IReadOnlyDictionary<string, IReadOnlyList<ParameterSyntax>> Signatures => m_Signatures;
+
+        /// <summary>
+        /// Resolves a kernel and everything it reaches.
+        /// </summary>
+        /// <param name="compilation">The compilation the kernel was resolved in.</param>
+        /// <param name="kernel">The method marked <c>[GpuKernel]</c>.</param>
+        /// <returns>The resolved kernel.</returns>
+        /// <exception cref="KernelTranslationException">Thrown when the kernel is outside the subset.</exception>
+        internal static KernelSemantics Create(Compilation compilation, IMethodSymbol kernel)
+        {
+            var gpuKernel = compilation.GetTypeByMetadataName("Gubbins.Graphic.GpuKernelAttribute")
+                ?? throw new KernelTranslationException("The kernel vocabulary was not found: the compilation does not reference Gubbins.Graphic.");
+
+            var gpuThreads = compilation.GetTypeByMetadataName("Gubbins.Graphic.GpuThreadsAttribute");
+            var gpuStruct = compilation.GetTypeByMetadataName("Gubbins.Graphic.GpuStructAttribute")
+                ?? throw new KernelTranslationException("The kernel vocabulary was not found: the compilation does not reference Gubbins.Graphic.");
+
+            var gpuCompatible = compilation.GetTypeByMetadataName("Gubbins.Graphic.GpuCompatibleAttribute")
+                ?? throw new KernelTranslationException("The kernel vocabulary was not found: the compilation does not reference Gubbins.Graphic.");
+
+            if (kernel.MethodKind != MethodKind.Ordinary || !kernel.IsStatic)
+            {
+                throw new KernelTranslationException($"'{kernel.ToDisplayString()}' is not a kernel: a kernel is a static method.");
+            }
+
+            if (!kernel.ReturnsVoid)
+            {
+                throw new KernelTranslationException($"'{kernel.ToDisplayString()}' returns a value: a kernel writes its result to a buffer.");
+            }
+
+            if (!HasAttribute(kernel, gpuKernel))
+            {
+                throw new KernelTranslationException($"'{kernel.ToDisplayString()}' is not marked [GpuKernel], so there is no kernel to translate.");
+            }
+
+            var threads = THREADS_PER_GROUP;
+
+            foreach (var attribute in kernel.GetAttributes())
+            {
+                if (SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, gpuKernel))
+                {
+                    continue;
+                }
+
+                if (gpuThreads is not null && SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, gpuThreads))
+                {
+                    if (attribute.ConstructorArguments.Length != 1 || attribute.ConstructorArguments[0].Value is not int count || count < 1 || count > 1024)
+                    {
+                        throw new KernelTranslationException($"[{THREADS_ATTRIBUTE}(count)] takes the number of threads in a group as a literal.");
+                    }
+
+                    threads = count;
+                    continue;
+                }
+
+                throw new KernelTranslationException($"The attribute '{attribute.AttributeClass?.Name}' means nothing to the device. A kernel declares at most [{KERNEL_ATTRIBUTE}] and [{THREADS_ATTRIBUTE}(count)].");
+            }
+            var reference = kernel.DeclaringSyntaxReferences.FirstOrDefault()
+                ?? throw new KernelTranslationException($"'{kernel.ToDisplayString()}' was not declared in source, so its body cannot be read.");
+
+            var declaration = reference.GetSyntax() as MethodDeclarationSyntax
+                ?? throw new KernelTranslationException($"'{kernel.ToDisplayString()}' is not declared as a method.");
+
+            var semantics = new KernelSemantics(compilation, kernel, declaration, threads, gpuStruct, gpuCompatible);
+            semantics.Discover();
+
+            return semantics;
+        }
+
+        /// <summary>
+        /// Walks the kernel and the helpers it reaches, then the structures they use.
+        /// </summary>
+        private void Discover()
+        {
+            RejectUnsupported(Declaration, Declaration.SyntaxTree, semantic: true);
+            ReadParameters();
+
+            var pending = new Queue<IMethodSymbol>();
+            var seen = new HashSet<IMethodSymbol>(SymbolEqualityComparer.Default) { Kernel };
+
+            pending.Enqueue(Kernel);
+
+            while (pending.Count > 0)
+            {
+                var method = pending.Dequeue();
+                var syntax = SyntaxOf(method);
+                var model = ModelFor(syntax.SyntaxTree);
+
+                if (!SymbolEqualityComparer.Default.Equals(method, Kernel))
+                {
+                    RejectUnsupported(syntax, syntax.SyntaxTree, semantic: true);
+                }
+
+                foreach (var node in syntax.DescendantNodes())
+                {
+                    switch (node)
+                    {
+                        case InvocationExpressionSyntax invocation:
+                            Reach(model.GetSymbolInfo(invocation).Symbol as IMethodSymbol, invocation, pending, seen);
+                            break;
+
+                        case ObjectCreationExpressionSyntax creation:
+                            RequireStruct(model.GetTypeInfo(creation).Type, "a value the kernel builds");
+                            break;
+
+                        case VariableDeclaratorSyntax declarator when model.GetDeclaredSymbol(declarator) is ILocalSymbol local:
+                            RequireStruct(local.Type, "a local of the kernel");
+                            break;
+                    }
+                }
+            }
+
+            // The structures are closed over their fields, which is what makes a structure that holds another one emit
+            // both of them.
+            while (m_Pending.Count > 0)
+            {
+                var structure = m_Pending.Dequeue();
+
+                foreach (var field in structure.GetMembers().OfType<IFieldSymbol>())
+                {
+                    if (field.IsStatic || field.AssociatedSymbol is not null)
+                    {
+                        continue;
+                    }
+
+                    RequireStruct(field.Type, $"a field of '{structure.Name}'");
+                }
+            }
+
+            OrderStructures();
+
+            foreach (var helper in Helpers)
+            {
+                m_Callables.Add(helper.Symbol.Name);
+                m_Signatures[helper.Symbol.Name] = helper.Syntax.ParameterList.Parameters;
+            }
+
+            foreach (var structure in m_Structs.Keys)
+            {
+                foreach (var method in structure.GetMembers().OfType<IMethodSymbol>())
+                {
+                    m_Callables.Add(method.Name);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Resolves one call the kernel or a helper makes, following it when it is a helper.
+        /// </summary>
+        /// <param name="symbol">The method the call resolved to, or <see langword="null"/> when it did not resolve.</param>
+        /// <param name="invocation">The call.</param>
+        /// <param name="pending">The methods whose bodies are still to be walked.</param>
+        /// <param name="seen">The methods already followed.</param>
+        /// <returns><see langword="true"/> when the call is part of the subset; <see langword="false"/> when it is an intrinsic.</returns>
+        /// <exception cref="KernelTranslationException">Thrown when the call reaches something the device cannot run.</exception>
+        private bool Reach(IMethodSymbol? symbol, InvocationExpressionSyntax invocation, Queue<IMethodSymbol> pending, HashSet<IMethodSymbol> seen)
+        {
+            if (symbol is null)
+            {
+                throw new KernelTranslationException($"'{invocation}' is not a call the compiler could resolve, so the device has nothing to run.");
+            }
+
+            if (symbol.ReducedFrom is not null)
+            {
+                throw new KernelTranslationException($"'{invocation}' is an extension method: a kernel calls a helper the compiler can follow, not one that is written as an extension.");
+            }
+
+            if (IsIntrinsic(symbol) || IsShared(symbol) || IsBarrier(symbol) || (symbol.Name == SLICE && symbol.ContainingType is { } sliceOwner && IsSpan(sliceOwner)))
+            {
+                return false;
+            }
+
+            if (symbol.ContainingType is { TypeKind: TypeKind.Struct } owner && HasAttribute(owner, m_GpuStruct))
+            {
+                RequireStruct(owner, "a call of the kernel");
+                return false;
+            }
+
+            if (!HasAttribute(symbol, m_GpuCompatible))
+            {
+                throw new KernelTranslationException($"'{symbol.ToDisplayString()}' is called from the kernel but is not marked [GpuCompatible]: a helper the device runs is declared for both processors.");
+            }
+
+            if (!symbol.IsStatic || symbol.TypeParameters.Length > 0)
+            {
+                throw new KernelTranslationException($"'{symbol.ToDisplayString()}' is not a plain static method: a helper of a kernel is static and not generic.");
+            }
+
+            if (symbol.Parameters.Any(parameter => IsSpan(parameter.Type)) || IsSpan(symbol.ReturnType))
+            {
+                throw new KernelTranslationException($"'{symbol.ToDisplayString()}' takes or returns a span: a helper of a kernel works on values, and the buffers are read by the kernel itself.");
+            }
+
+            foreach (var parameter in symbol.Parameters)
+            {
+                RequireStruct(parameter.Type, $"parameter '{parameter.Name}' of '{symbol.Name}'");
+            }
+
+            RequireStruct(symbol.ReturnType, $"the result of '{symbol.Name}'");
+
+            var helpers = Helpers as List<HelperMethod> ?? new List<HelperMethod>();
+            Helpers = helpers;
+
+            if (symbol.DeclaringSyntaxReferences.Length == 0)
+            {
+                throw new KernelTranslationException($"'{symbol.ToDisplayString()}' is declared in an assembly this compilation does not hold the source of. A helper has to be compiled with the kernel, or linked into it as source.");
+            }
+
+            if (seen.Add(symbol))
+            {
+                helpers.Add(new HelperMethod(symbol, SyntaxOf(symbol)));
+                pending.Enqueue(symbol);
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Reads the parameters of the kernel from the symbols the compiler resolved.
+        /// </summary>
+        /// <exception cref="KernelTranslationException">Thrown when a parameter is not one the device has.</exception>
+        private void ReadParameters()
+        {
+            var parameters = new List<KernelParameter>();
+
+            foreach (var parameter in Kernel.Parameters)
+            {
+                if (parameter.RefKind != RefKind.None)
+                {
+                    throw new KernelTranslationException($"Parameter '{parameter.Name}' is passed by reference: a kernel reads and writes the buffers it is given.");
+                }
+
+                if (parameter.Type.SpecialType == SpecialType.System_Int32)
+                {
+                    parameters.Add(new KernelParameter(parameter.Name, KernelParameterKind.Index, string.Empty, -1));
+                    continue;
+                }
+
+                if (parameter.Type is INamedTypeSymbol span && IsSpan(span))
+                {
+                    var element = span.TypeArguments[0];
+                    RequireStruct(element, $"parameter '{parameter.Name}'");
+
+                    var kind = span.Name == "ReadOnlySpan" ? KernelParameterKind.ReadOnlyBuffer : KernelParameterKind.WritableBuffer;
+                    parameters.Add(new KernelParameter(parameter.Name, kind, ElementName(element), parameters.Count(candidate => candidate.Kind != KernelParameterKind.Index)));
+                    continue;
+                }
+
+                throw new KernelTranslationException($"Parameter '{parameter.Name}': only an int index, ReadOnlySpan<T> or Span<T> are supported, and the element type is int, uint or float.");
+            }
+
+            if (!parameters.Any(parameter => parameter.Kind == KernelParameterKind.Index))
+            {
+                throw new KernelTranslationException("The kernel has no thread index parameter.");
+            }
+
+            if (!parameters.Any(parameter => parameter.Kind == KernelParameterKind.WritableBuffer))
+            {
+                throw new KernelTranslationException("The kernel writes nothing: a writable buffer parameter is required.");
+            }
+
+            Parameters = parameters;
+        }
+
+        /// <summary>
+        /// Requires a type to be one the device has, and records the structure when it is one of the kernel's.
+        /// </summary>
+        /// <param name="type">The type a kernel value has.</param>
+        /// <param name="use">What uses it, for the message.</param>
+        /// <exception cref="KernelTranslationException">Thrown when the type has no representation on the device.</exception>
+        private void RequireStruct(ITypeSymbol? type, string use)
+        {
+            if (type is null)
+            {
+                return;
+            }
+
+            if (type is IArrayTypeSymbol array)
+            {
+                RequireStruct(array.ElementType, use);
+                return;
+            }
+
+            if (type is not INamedTypeSymbol named)
+            {
+                throw new KernelTranslationException($"'{type.ToDisplayString()}' is used by {use} and has no representation on the device.");
+            }
+
+            if (IsSpan(named))
+            {
+                RequireStruct(named.TypeArguments[0], use);
+                return;
+            }
+
+            if (named.OriginalDefinition.SpecialType != SpecialType.None)
+            {
+                return;
+            }
+
+            if (named.TypeKind != TypeKind.Struct)
+            {
+                throw new KernelTranslationException($"'{named.ToDisplayString()}' is used by {use} and is not a structure: the device holds values, not objects.");
+            }
+
+            if (named.ContainingType is not null)
+            {
+                throw new KernelTranslationException($"'{named.ToDisplayString()}' is nested inside another type: a structure of the device is declared at the top of a namespace.");
+            }
+
+            if (!HasAttribute(named, m_GpuStruct))
+            {
+                throw new KernelTranslationException($"'{named.ToDisplayString()}' is used by {use} but is not marked [GpuStruct]: a value the device holds is a structure declared for both processors.");
+            }
+
+            if (!named.IsUnmanagedType)
+            {
+                throw new KernelTranslationException($"'{named.ToDisplayString()}' holds a reference, so the device cannot lay it out.");
+            }
+
+            if (m_Structs.ContainsKey(named))
+            {
+                return;
+            }
+
+            var references = named.DeclaringSyntaxReferences;
+
+            if (references.Length != 1)
+            {
+                throw new KernelTranslationException($"'{named.ToDisplayString()}' is declared in more than one place: a structure of a kernel is declared once.");
+            }
+
+            var syntax = references[0].GetSyntax() as StructDeclarationSyntax
+                ?? throw new KernelTranslationException($"'{named.ToDisplayString()}' is not declared as a structure.");
+
+            m_Structs.Add(named, new StructDeclaration(named, syntax));
+            m_Pending.Enqueue(named);
+        }
+
+        /// <summary>
+        /// Orders the structures so that one comes after every structure it holds.
+        /// </summary>
+        /// <exception cref="KernelTranslationException">Thrown when two structures hold each other.</exception>
+        private void OrderStructures()
+        {
+            var ordered = new List<StructDeclaration>();
+            var visiting = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
+            var visited = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
+
+            void Visit(INamedTypeSymbol structure)
+            {
+                if (visited.Contains(structure))
+                {
+                    return;
+                }
+
+                if (!visiting.Add(structure))
+                {
+                    throw new KernelTranslationException($"'{structure.Name}' holds itself: a structure of a kernel is a value, so it cannot contain its own type.");
+                }
+
+                foreach (var field in structure.GetMembers().OfType<IFieldSymbol>())
+                {
+                    if (field.IsStatic || field.Type is not INamedTypeSymbol fieldType || !m_Structs.ContainsKey(fieldType))
+                    {
+                        continue;
+                    }
+
+                    Visit(fieldType);
+                }
+
+                visiting.Remove(structure);
+                visited.Add(structure);
+                ordered.Add(m_Structs[structure]);
+            }
+
+            foreach (var structure in m_Structs.Keys)
+            {
+                Visit(structure);
+            }
+
+            Structs = ordered;
+        }
+
+        /// <summary>
+        /// Resolves the type name a buffer of the device holds.
+        /// </summary>
+        /// <param name="element">The element type of the buffer.</param>
+        /// <returns>The name the shading language declares it with.</returns>
+        private static string ElementName(ITypeSymbol element)
+            => element is INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.None } named ? named.Name : element.ToDisplayString();
+
+        /// <summary>
+        /// Reports whether a type is a span, which is how a kernel declares a buffer.
+        /// </summary>
+        /// <param name="type">The type to test.</param>
+        /// <returns><see langword="true"/> when it is <c>Span&lt;T&gt;</c> or <c>ReadOnlySpan&lt;T&gt;</c>.</returns>
+        private static bool IsSpan(ITypeSymbol type)
+            => type is INamedTypeSymbol { Arity: 1 } named &&
+               named.ContainingNamespace?.ToDisplayString() == "System" &&
+               (named.Name == SPAN_TYPE || named.Name == READ_ONLY_SPAN_TYPE);
+
+        /// <summary>
+        /// Reports whether a method is one the intrinsics table maps.
+        /// </summary>
+        /// <param name="method">The method.</param>
+        /// <returns><see langword="true"/> when it maps to an intrinsic.</returns>
+        private static bool IsIntrinsic(IMethodSymbol method)
+            => (method.ContainingType?.ToDisplayString() == "System.Threading.Interlocked" && method.Name == "Add") ||
+               (method.ContainingType?.Name is { } owner && INTRINSICS.ContainsKey($"{owner}.{method.Name}"));
+
+        /// <summary>
+        /// Reports whether a method is the call that declares a group shared array.
+        /// </summary>
+        /// <param name="method">The method.</param>
+        /// <returns><see langword="true"/> when it is <c>GpuIntrinsics.Shared</c>.</returns>
+        private static bool IsShared(IMethodSymbol method)
+            => method.Name == SHARED && method.ContainingType?.ToDisplayString() == "Gubbins.Graphic.GpuIntrinsics";
+
+        /// <summary>
+        /// Reports whether a method is the call that synchronizes a group.
+        /// </summary>
+        /// <param name="method">The method.</param>
+        /// <returns><see langword="true"/> when it is <c>GpuIntrinsics.Barrier</c>.</returns>
+        private static bool IsBarrier(IMethodSymbol method)
+            => method.Name == BARRIER && method.ContainingType?.ToDisplayString() == "Gubbins.Graphic.GpuIntrinsics";
+
+        /// <summary>
+        /// Reports whether a symbol carries an attribute.
+        /// </summary>
+        /// <param name="symbol">The symbol.</param>
+        /// <param name="attribute">The attribute type.</param>
+        /// <returns><see langword="true"/> when it does.</returns>
+        private static bool HasAttribute(ISymbol symbol, INamedTypeSymbol attribute)
+            => symbol.GetAttributes().Any(candidate => SymbolEqualityComparer.Default.Equals(candidate.AttributeClass, attribute));
+
+        /// <summary>
+        /// Finds the declaration of a method.
+        /// </summary>
+        /// <param name="method">The method.</param>
+        /// <returns>Its declaration.</returns>
+        private static MethodDeclarationSyntax SyntaxOf(IMethodSymbol method)
+            => method.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax() as MethodDeclarationSyntax
+               ?? throw new KernelTranslationException($"'{method.ToDisplayString()}' has no declaration this compilation can read.");
+
+        /// <summary>
+        /// Gets the semantic model of a tree, building it once.
+        /// </summary>
+        /// <param name="tree">The tree.</param>
+        /// <returns>The model.</returns>
+        internal SemanticModel ModelFor(SyntaxTree tree)
+        {
+            if (!m_Models.TryGetValue(tree, out var model))
+            {
+                model = Compilation.GetSemanticModel(tree);
+                m_Models.Add(tree, model);
+            }
+
+            return model;
+        }
+
+        /// <summary>
+        /// Rewrites a call the way the device reads it: an intrinsic under the name the shading language gives it, a
+        /// helper under its own name, and a call to anything else refused.
+        /// </summary>
+        /// <param name="original">The call the kernel wrote.</param>
+        /// <param name="visited">The same call, with its arguments already rewritten.</param>
+        /// <returns>The expression to emit.</returns>
+        /// <exception cref="KernelTranslationException">Thrown when the call is not one the device can run.</exception>
+        internal ExpressionSyntax RewriteInvocation(InvocationExpressionSyntax original, InvocationExpressionSyntax visited)
+        {
+            var symbol = ModelFor(original.SyntaxTree).GetSymbolInfo(original).Symbol as IMethodSymbol
+                ?? throw new KernelTranslationException($"'{original}' is not a call the compiler could resolve, so the device has nothing to run.");
+
+            if (IsShared(symbol))
+            {
+                throw new KernelTranslationException($"'{SHARED}<T>(count)' declares an array and is not an expression.");
+            }
+
+            if (IsBarrier(symbol))
+            {
+                return SyntaxFactory.ParseExpression("GroupMemoryBarrierWithGroupSync()");
+            }
+
+            if (symbol.ContainingType?.ToDisplayString() == "System.Threading.Interlocked" && symbol.Name == "Add")
+            {
+                if (original.Parent is not ExpressionStatementSyntax)
+                {
+                    throw new KernelTranslationException($"'{INTERLOCKED}' is called as a statement: the value an atomic add returns is not part of the subset.");
+                }
+
+                return SyntaxFactory.ParseExpression($"InterlockedAdd({Arguments(visited)})");
+            }
+
+            if (IsIntrinsic(symbol))
+            {
+                var intrinsic = INTRINSICS[$"{symbol.ContainingType!.Name}.{symbol.Name}"];
+
+                return SyntaxFactory.ParseExpression($"{intrinsic}({Arguments(visited)})");
+            }
+
+            if (symbol.Name == SLICE && symbol.ContainingType is { } sliceOwner && IsSpan(sliceOwner))
+            {
+                return visited;
+            }
+
+            if (symbol.ContainingType is { TypeKind: TypeKind.Struct } owner && HasAttribute(owner, m_GpuStruct))
+            {
+                return SyntaxFactory.ParseExpression($"{visited.Expression}({Arguments(visited)})");
+            }
+
+            if (!HasAttribute(symbol, m_GpuCompatible))
+            {
+                throw new KernelTranslationException($"'{symbol.ToDisplayString()}' is called from the kernel but is not marked [{m_GpuCompatible.Name}]: a helper the device runs is declared for both processors.");
+            }
+
+            // A helper is a free function in the program, so the name the call was qualified with is not written.
+            return SyntaxFactory.ParseExpression($"{symbol.Name}({Arguments(visited)})");
+        }
+
+        /// <summary>
+        /// Reads the constant a name stands for, when it stands for one.
+        /// </summary>
+        /// <param name="node">The name or member access.</param>
+        /// <param name="literal">When the method returns, the literal the device reads.</param>
+        /// <returns><see langword="true"/> when the name is a constant.</returns>
+        internal bool TryConstant(SyntaxNode node, out string literal)
+        {
+            literal = string.Empty;
+
+            if (ModelFor(node.SyntaxTree).GetSymbolInfo(node).Symbol is not IFieldSymbol { IsConst: true, HasConstantValue: true } field)
+            {
+                return false;
+            }
+
+            literal = Literal(field.ConstantValue!);
+            return true;
+        }
+
+        /// <summary>
+        /// Reads a shared array declaration.
+        /// </summary>
+        /// <param name="invocation">The call.</param>
+        /// <param name="element">When the method returns, the type of the elements.</param>
+        /// <param name="count">When the method returns, the number of elements.</param>
+        /// <returns><see langword="true"/> when the call declares one.</returns>
+        /// <exception cref="KernelTranslationException">Thrown when the count is not a literal.</exception>
+        internal bool TryShared(InvocationExpressionSyntax invocation, out string element, out string count)
+        {
+            element = string.Empty;
+            count = string.Empty;
+
+            if (ModelFor(invocation.SyntaxTree).GetSymbolInfo(invocation).Symbol is not IMethodSymbol symbol || !IsShared(symbol))
+            {
+                return false;
+            }
+
+            count = invocation.ArgumentList.Arguments[0].Expression.ToString();
+
+            if (!int.TryParse(count, out _))
+            {
+                throw new KernelTranslationException($"'{SHARED}<{symbol.TypeArguments[0].ToDisplayString()}>' takes the number of elements as a literal, which is what the device sizes the array with.");
+            }
+
+            element = symbol.TypeArguments[0].ToDisplayString();
+            return true;
+        }
+
+        /// <summary>
+        /// Reports whether a value is built from a structure the kernel declares.
+        /// </summary>
+        /// <param name="node">The construction.</param>
+        /// <param name="name">When the method returns, the name of the structure.</param>
+        /// <returns><see langword="true"/> when it is one.</returns>
+        internal bool IsStructType(ObjectCreationExpressionSyntax node, out string name)
+        {
+            name = string.Empty;
+
+            if (ModelFor(node.SyntaxTree).GetSymbolInfo(node).Symbol is not IMethodSymbol { ContainingType: { } type } || !m_Structs.ContainsKey(type))
+            {
+                return false;
+            }
+
+            name = type.Name;
+            return true;
+        }
+
+        /// <summary>
+        /// Writes the arguments of a call without the keyword they were passed with.
+        /// </summary>
+        /// <param name="invocation">The call.</param>
+        /// <returns>The arguments, separated by commas.</returns>
+        private static string Arguments(InvocationExpressionSyntax invocation)
+            => string.Join(", ", invocation.ArgumentList.Arguments.Select(argument => argument.Expression.ToString()));
+
+        /// <summary>
+        /// Writes a constant as the literal the shading language reads.
+        /// </summary>
+        /// <param name="value">The value of the constant.</param>
+        /// <returns>The literal.</returns>
+        /// <exception cref="KernelTranslationException">Thrown when the value has no literal on the device.</exception>
+        private static string Literal(object value) => value switch
+        {
+            float number => Float(number),
+            int number => number.ToString(CultureInfo.InvariantCulture),
+            uint number => number.ToString(CultureInfo.InvariantCulture) + "u",
+            bool number => number ? "true" : "false",
+            _ => throw new KernelTranslationException($"A constant of type '{value.GetType().Name}' has no literal on the device."),
+        };
+
+        /// <summary>
+        /// Writes a single precision number so that the shading language reads it as one.
+        /// </summary>
+        /// <param name="value">The number.</param>
+        /// <returns>The literal.</returns>
+        private static string Float(float value)
+        {
+            var text = value.ToString("R", CultureInfo.InvariantCulture);
+
+            return text.Contains('.') || text.Contains('E') || text.Contains('e') ? text : text + ".0";
+        }
+
+        /// <summary>
+        /// One method the kernel calls, with the declaration its body is read from.
+        /// </summary>
+        /// <param name="Symbol">The method.</param>
+        /// <param name="Syntax">Its declaration.</param>
+        internal readonly record struct HelperMethod(IMethodSymbol Symbol, MethodDeclarationSyntax Syntax);
+
+        /// <summary>
+        /// One structure the kernel holds, with the declaration it is emitted from.
+        /// </summary>
+        /// <param name="Symbol">The structure.</param>
+        /// <param name="Syntax">Its declaration.</param>
+        internal readonly record struct StructDeclaration(INamedTypeSymbol Symbol, StructDeclarationSyntax Syntax);
+    }
+}

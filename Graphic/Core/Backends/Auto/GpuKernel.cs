@@ -1,4 +1,5 @@
 
+using System.ComponentModel;
 using Gubbins.Graphic.D3D12;
 using Gubbins.Graphic;
 using Gubbins.Graphic.Metal;
@@ -13,7 +14,12 @@ namespace Gubbins.Graphic;
 /// The caller never names a graphics API: the kernel dispatches through whichever backend <see cref="GpuDevice.TryCreate"/>
 /// selected, and the output block is written by the device, so it is marked with
 /// <see cref="GpuMemory.MarkWrittenByGpu"/> and is only readable after a synchronization point.
+/// <para>
+/// This is the primitive layer. The surface a program uses is <see cref="Kernel"/>, which the typed entry point the source
+/// generator writes beside a <c>[GpuKernel]</c> method calls; this type is hidden from completion for that reason.
+/// </para>
 /// </remarks>
+[EditorBrowsable(EditorBrowsableState.Never)]
 public sealed class GpuKernel : IDisposable
 {
     private readonly GpuDevice m_Device;

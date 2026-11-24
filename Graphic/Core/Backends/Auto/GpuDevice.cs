@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using Gubbins.Unsafe;
 
 namespace Gubbins.Graphic;
@@ -15,7 +16,12 @@ namespace Gubbins.Graphic;
 /// A host engine that already owns a device should keep constructing the bridge for its own API directly instead: this
 /// type exists for the case where the allocator is the only thing that knows a device exists.
 /// </para>
+/// <para>
+/// This is the primitive layer. The surface a program uses is <see cref="Gpu"/>, which owns a device, the memory
+/// allocated on it and the kernels loaded for it; this type is hidden from completion for that reason.
+/// </para>
 /// </remarks>
+[EditorBrowsable(EditorBrowsableState.Never)]
 public sealed class GpuDevice : IDisposable
 {
     /// <summary>

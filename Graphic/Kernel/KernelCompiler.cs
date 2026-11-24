@@ -91,7 +91,7 @@ public static class KernelCompiler
     /// <returns>The artifacts that were written, in the order they were produced.</returns>
     /// <exception cref="KernelTranslationException">Thrown when the kernel is outside the supported subset.</exception>
     /// <exception cref="InvalidOperationException">Thrown when the compiler is missing or refuses the program.</exception>
-    public static IReadOnlyList<string> Compile(string source, string outputDirectory, string kernelName, string? slangc = null)
+    internal static IReadOnlyList<string> Compile(string source, string outputDirectory, string kernelName, string? slangc = null)
     {
         if (source is null)
         {
@@ -116,6 +116,55 @@ public static class KernelCompiler
         var program = Path.Combine(outputDirectory, kernelName + ".slang");
         File.WriteAllText(program, KernelTranspiler.Transpile(source));
 
+        return CompileProgram(compiler, program, outputDirectory, kernelName);
+    }
+
+    /// <summary>
+    /// Compiles a Slang program that was already translated, which is what the build does for a kernel the source
+    /// generator read.
+    /// </summary>
+    /// <param name="slang">The Slang program.</param>
+    /// <param name="outputDirectory">The directory the artifacts are written to.</param>
+    /// <param name="kernelName">The kernel name, which is the file name of every artifact.</param>
+    /// <param name="slangc">The path of <c>slangc</c>, or <see langword="null"/> to look it up.</param>
+    /// <returns>The artifacts that were written, in the order they were produced.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when the compiler is missing or refuses the program.</exception>
+    public static IReadOnlyList<string> CompileSlang(string slang, string outputDirectory, string kernelName, string? slangc = null)
+    {
+        if (slang is null)
+        {
+            throw new ArgumentNullException(nameof(slang));
+        }
+
+        if (string.IsNullOrEmpty(outputDirectory))
+        {
+            throw new ArgumentException("An output directory is required.", nameof(outputDirectory));
+        }
+
+        if (string.IsNullOrEmpty(kernelName))
+        {
+            throw new ArgumentException("A kernel name is required.", nameof(kernelName));
+        }
+
+        var compiler = slangc ?? FindSlangC();
+        Directory.CreateDirectory(outputDirectory);
+
+        var program = Path.Combine(outputDirectory, kernelName + ".slang");
+        File.WriteAllText(program, slang);
+
+        return CompileProgram(compiler, program, outputDirectory, kernelName);
+    }
+
+    /// <summary>
+    /// Runs the compiler once per target for one program.
+    /// </summary>
+    /// <param name="compiler">The path of <c>slangc</c>.</param>
+    /// <param name="program">The Slang file to compile.</param>
+    /// <param name="outputDirectory">The directory the artifacts are written to.</param>
+    /// <param name="kernelName">The kernel name, which is the file name of every artifact.</param>
+    /// <returns>The artifacts that were written, in the order they were produced.</returns>
+    private static IReadOnlyList<string> CompileProgram(string compiler, string program, string outputDirectory, string kernelName)
+    {
         var targets = new (string Target, string Extension)[]
         {
             ("dxil", ".dxil"),

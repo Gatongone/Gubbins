@@ -21,27 +21,17 @@
     </Target>
 
     <PropertyGroup>
-        <GubbinsKernelTool>$(MSBuildThisFileDirectory)Graphic\KernelTool\Gubbins.Graphic.Kernels.Tool.csproj</GubbinsKernelTool>
-        <GubbinsKernelOutput Condition="'$(GubbinsKernelOutput)' == ''">$(IntermediateOutputPath)kernels</GubbinsKernelOutput>
+        <GubbinsArtifactTool>$(MSBuildThisFileDirectory)Graphic\ArtifactTool\Gubbins.Graphic.Artifacts.csproj</GubbinsArtifactTool>
+    </PropertyGroup>
+    <PropertyGroup>
+        <GubbinsArtifactTool>$(MSBuildThisFileDirectory)Graphic\ArtifactTool\Gubbins.Graphic.Artifacts.csproj</GubbinsArtifactTool>
     </PropertyGroup>
 
-    <!-- A project that declares kernels with <GubbinsKernel Include="..." /> gets them compiled before it builds: a kernel
-         file is named <Name>.Kernel.cs, and the artifacts every backend can load are written under its name and copied
-         beside the program, where GpuKernel.LoadFromDirectory reads them from its "Kernels" directory. -->
-    <Target Name="CompileGubbinsKernels" BeforeTargets="BeforeBuild" Condition="'@(GubbinsKernel)' != ''" Inputs="@(GubbinsKernel)" Outputs="@(GubbinsKernel->'$(GubbinsKernelOutput)\$([System.String]::Copy('%(Filename)').Replace('.Kernel','')).ptx')">
-        <Exec Command="dotnet run --project &quot;$(GubbinsKernelTool)&quot; -c $(Configuration) -- --output &quot;$(GubbinsKernelOutput)&quot; @(GubbinsKernel->'&quot;%(FullPath)&quot;', ' ')" />
-    </Target>
-
-    <Target Name="CopyGubbinsKernels" AfterTargets="Build" Condition="'@(GubbinsKernel)' != ''">
-        <ItemGroup>
-            <_GubbinsKernelArtifact Include="$(GubbinsKernelOutput)\*.dxil" />
-            <_GubbinsKernelArtifact Include="$(GubbinsKernelOutput)\*.spv" />
-            <_GubbinsKernelArtifact Include="$(GubbinsKernelOutput)\*.comp" />
-            <_GubbinsKernelArtifact Include="$(GubbinsKernelOutput)\*.metal" />
-            <_GubbinsKernelArtifact Include="$(GubbinsKernelOutput)\*.ptx" />
-        </ItemGroup>
-
-        <Copy SourceFiles="@(_GubbinsKernelArtifact)" DestinationFolder="$(OutDir)Kernels" SkipUnchangedFiles="true" />
+    <!-- A project that declares kernels with [GpuKernel] sets GubbinsKernels to true: the source generator translated them
+         while the program compiled, and this step reads those programs back out of the assembly and runs slangc once per
+         target, writing the artifacts beside the program where the generated entry points load them from. -->
+    <Target Name="CompileGubbinsKernelArtifacts" AfterTargets="Build" Condition="'$(GubbinsKernels)' == 'true' And '$(TargetFramework)' == 'net8.0' And Exists('$(TargetPath)')">
+        <Exec Command="dotnet run --project &quot;$(GubbinsArtifactTool)&quot; -c $(Configuration) -- --assembly &quot;$(TargetPath)&quot; --output &quot;$(OutDir)Kernels&quot;" />
     </Target>
 
 </Project>

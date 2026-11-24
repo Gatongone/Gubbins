@@ -3,13 +3,17 @@
     <PropertyGroup>
         <OutputType>Exe</OutputType>
         <TargetFramework>net8.0</TargetFramework>
-        <RootNamespace>Gubbins.Graphic.Kernels.Tool</RootNamespace>
+        <RootNamespace>Gubbins.Graphic.Artifacts</RootNamespace>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <LangVersion>latestmajor</LangVersion>
         <IsPackable>false</IsPackable>
         <SkipDefaultPostBuild>true</SkipDefaultPostBuild>
     </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="System.Reflection.MetadataLoadContext" Version="7.0.0" />
+    </ItemGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\Kernel\Gubbins.Graphic.Kernels.csproj" />

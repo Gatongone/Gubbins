@@ -38,7 +38,7 @@ namespace Gubbins.Graphic.Kernels;
 /// deliberately small language, not a compiler.
 /// </para>
 /// </remarks>
-public static class KernelTranspiler
+public static partial class KernelTranspiler
 {
     /// <summary>
     /// The type name a kernel declares its thread index with.
@@ -194,7 +194,7 @@ public static class KernelTranspiler
     /// One program serves all five backends, because the bindings are annotated for each of them at once: D3D12, Vulkan,
     /// OpenGL, Metal and CUDA each read the artifact they can load out of the same translation.
     /// </remarks>
-    public static string Transpile(string source, string? entryName = null)
+    internal static string Transpile(string source, string? entryName = null)
     {
         var (method, tree) = Locate(source, entryName);
 
@@ -367,7 +367,7 @@ public static class KernelTranspiler
     /// <param name="entryName">The kernel to read, or <see langword="null"/> to take the only one there is.</param>
     /// <returns>The number of threads in a group, which is what a dispatch divides its element count by.</returns>
     /// <exception cref="KernelTranslationException">Thrown when the source is outside the supported subset.</exception>
-    public static int ThreadsPerGroup(string source, string? entryName = null) => Threads(Locate(source, entryName).Method);
+    internal static int ThreadsPerGroup(string source, string? entryName = null) => Threads(Locate(source, entryName).Method);
 
     /// <summary>
     /// Reads the names of the structs a source declares.
@@ -820,29 +820,35 @@ public static class KernelTranspiler
     /// <param name="shared">Receives the declarations a shared array needs, which the prologue carries.</param>
     /// <param name="structures">The names of the structs the kernel declares, which are the types it may construct.</param>
     /// <returns>The body text.</returns>
-    private static string RewriteBody(MethodDeclarationSyntax method, IReadOnlyList<KernelParameter> parameters, StringBuilder shared, IReadOnlyCollection<string> structures)
+    private static string RewriteBody(MethodDeclarationSyntax method, IReadOnlyList<KernelParameter> parameters, StringBuilder shared, IReadOnlyCollection<string> structures, KernelSemantics? semantics = null)
     {
-        var rewriter = new SliceRewriter(parameters, structures, Callables(method.SyntaxTree), Signatures(method.SyntaxTree));
+        var rewriter = semantics is null
+            ? new SliceRewriter(parameters, structures, Callables(method.SyntaxTree), Signatures(method.SyntaxTree))
+            : new SliceRewriter(parameters, structures, semantics.CallableNames, semantics.Signatures, semantics);
         var body = method.Body is null
             ? $"    {method.ExpressionBody!.Expression};"
             : Indent(((BlockSyntax)rewriter.Visit(method.Body)!).Statements);
 
-        foreach (var parameter in parameters.Where(parameter => parameter.Kind != KernelParameterKind.Index))
+        // The name based pass is all a source text without a semantic model can offer. A kernel the compiler resolved has
+        // its calls rewritten by symbol in the rewriter, so its text is never searched for what a name might mean.
+        if (semantics is null)
         {
-            body = System.Text.RegularExpressions.Regex.Replace(
-                body,
-                $@"\b{parameter.Name}\.Length\b",
-                $"__length_{parameter.Name}");
+            foreach (var parameter in parameters.Where(parameter => parameter.Kind != KernelParameterKind.Index))
+            {
+                body = System.Text.RegularExpressions.Regex.Replace(
+                    body,
+                    $@"\b{parameter.Name}\.Length\b",
+                    $"__length_{parameter.Name}");
+            }
+
+            foreach (var intrinsic in INTRINSICS)
+            {
+                var parts = intrinsic.Key.Split('.');
+                var pattern = $@"(?<![\w.])(?:System\.)?{parts[0]}\.{parts[1]}\(";
+
+                body = System.Text.RegularExpressions.Regex.Replace(body, pattern, $"{intrinsic.Value}(");
+            }
         }
-
-        foreach (var intrinsic in INTRINSICS)
-        {
-            var parts = intrinsic.Key.Split('.');
-            var pattern = $@"(?<![\w.])(?:System\.)?{parts[0]}\.{parts[1]}\(";
-
-            body = System.Text.RegularExpressions.Regex.Replace(body, pattern, $"{intrinsic.Value}(");
-        }
-
 
         if (body.Contains(RANGE, StringComparison.Ordinal))
         {
@@ -856,17 +862,20 @@ public static class KernelTranspiler
 
         // The call that makes a group wait for its own writes is the one synchronization the subset has, and every
         // backend has it under a different name.
-        body = System.Text.RegularExpressions.Regex.Replace(body, $@"\b{BARRIER}\(\)", "GroupMemoryBarrierWithGroupSync()");
-        body = System.Text.RegularExpressions.Regex.Replace(body, $@"(?:System\.Threading\.)?{INTERLOCKED.Replace(".", "\\.")}\(\s*ref\s+", "InterlockedAdd(");
-
-        if (body.Contains("Interlocked", StringComparison.Ordinal) && !body.Contains("InterlockedAdd(", StringComparison.Ordinal))
+        if (semantics is null)
         {
-            throw new KernelTranslationException($"The subset maps '{INTERLOCKED}' and no other atomic operation.");
-        }
+            body = System.Text.RegularExpressions.Regex.Replace(body, $@"\b{BARRIER}\(\)", "GroupMemoryBarrierWithGroupSync()");
+            body = System.Text.RegularExpressions.Regex.Replace(body, $@"(?:System\.Threading\.)?{INTERLOCKED.Replace(".", "\\.")}\(\s*ref\s+", "InterlockedAdd(");
 
-        if (body.Contains(BARRIER + "(", StringComparison.Ordinal))
-        {
-            throw new KernelTranslationException("The barrier of a group takes no arguments.");
+            if (body.Contains("Interlocked", StringComparison.Ordinal) && !body.Contains("InterlockedAdd(", StringComparison.Ordinal))
+            {
+                throw new KernelTranslationException($"The subset maps '{INTERLOCKED}' and no other atomic operation.");
+            }
+
+            if (body.Contains(BARRIER + "(", StringComparison.Ordinal))
+            {
+                throw new KernelTranslationException("The barrier of a group takes no arguments.");
+            }
         }
 
         shared.Append(rewriter.Declarations());
@@ -888,6 +897,7 @@ public static class KernelTranspiler
         private readonly IReadOnlyCollection<string> m_Structures;
         private readonly IReadOnlyCollection<string> m_Callables;
         private readonly IReadOnlyDictionary<string, IReadOnlyList<ParameterSyntax>> m_Signatures;
+        private readonly KernelSemantics? m_Semantics;
         private readonly Dictionary<string, SpanView> m_Views = new(StringComparer.Ordinal);
         private readonly Dictionary<string, SharedArray> m_Arrays = new(StringComparer.Ordinal);
         private readonly List<SharedArray> m_Shared = new();
@@ -901,12 +911,14 @@ public static class KernelTranspiler
             IReadOnlyList<KernelParameter> parameters,
             IReadOnlyCollection<string> structures,
             IReadOnlyCollection<string>? callables = null,
-            IReadOnlyDictionary<string, IReadOnlyList<ParameterSyntax>>? signatures = null)
+            IReadOnlyDictionary<string, IReadOnlyList<ParameterSyntax>>? signatures = null,
+            KernelSemantics? semantics = null)
         {
             m_Parameters = parameters.ToList();
             m_Structures = structures;
             m_Callables = callables ?? Array.Empty<string>();
             m_Signatures = signatures ?? new Dictionary<string, IReadOnlyList<ParameterSyntax>>(StringComparer.Ordinal);
+            m_Semantics = semantics;
         }
 
         /// <inheritdoc/>
@@ -1049,9 +1061,29 @@ public static class KernelTranspiler
         }
 
         /// <inheritdoc/>
+        public override SyntaxNode? VisitIdentifierName(IdentifierNameSyntax node)
+        {
+            // A constant of the central processor is a literal on the device: the name it was declared under has no
+            // meaning there, and the value is what the kernel was written against. A constant reached through its type is
+            // folded where the member access is, so that the name is not left behind without the type it was qualified by.
+            if (m_Semantics is not null && node.Parent is not MemberAccessExpressionSyntax && m_Semantics.TryConstant(node, out var literal))
+            {
+                return SyntaxFactory.ParseExpression(literal);
+            }
+
+            return base.VisitIdentifierName(node);
+        }
+
+        /// <inheritdoc/>
         public override SyntaxNode? VisitInvocationExpression(InvocationExpressionSyntax node)
         {
             var visited = (InvocationExpressionSyntax)base.VisitInvocationExpression(node)!;
+
+            if (m_Semantics is not null)
+            {
+                return m_Semantics.RewriteInvocation(node, visited);
+            }
+
             var name = visited.Expression switch
             {
                 MemberAccessExpressionSyntax member => member.Name.Identifier.ValueText,
@@ -1079,7 +1111,14 @@ public static class KernelTranspiler
         {
             var type = TypeName(node.Type);
 
-            if (!m_Structures.Contains(type) || node.Initializer is not null)
+            if (m_Semantics is not null)
+            {
+                if (!m_Semantics.IsStructType(node, out _) || node.Initializer is not null)
+                {
+                    throw new KernelTranslationException($"'{node.Type}' is not a struct the kernel declares, so a value of it cannot be built on the device.");
+                }
+            }
+            else if (!m_Structures.Contains(type) || node.Initializer is not null)
             {
                 throw new KernelTranslationException($"'{node.Type}' is not a struct the kernel declares, so a value of it cannot be built on the device.");
             }
@@ -1182,6 +1221,11 @@ public static class KernelTranspiler
         /// <inheritdoc/>
         public override SyntaxNode? VisitMemberAccessExpression(MemberAccessExpressionSyntax node)
         {
+            if (m_Semantics is not null && m_Semantics.TryConstant(node, out var literal))
+            {
+                return SyntaxFactory.ParseExpression(literal);
+            }
+
             if (node.Name.Identifier.ValueText == "Length")
             {
                 if (node.Expression is IdentifierNameSyntax identifier)
@@ -1359,10 +1403,15 @@ public static class KernelTranspiler
         /// <param name="element">When the method returns, the type of the elements.</param>
         /// <param name="count">When the method returns, the number of elements.</param>
         /// <returns><see langword="true"/> when the call declares a shared array.</returns>
-        private static bool IsShared(InvocationExpressionSyntax invocation, out string element, out string count)
+        private bool IsShared(InvocationExpressionSyntax invocation, out string element, out string count)
         {
             element = string.Empty;
             count = string.Empty;
+
+            if (m_Semantics is not null)
+            {
+                return m_Semantics.TryShared(invocation, out element, out count);
+            }
 
             if (invocation.Expression is not GenericNameSyntax generic ||
                 generic.Identifier.ValueText != SHARED ||
@@ -1571,7 +1620,7 @@ public static class KernelTranspiler
     /// </summary>
     /// <param name="method">The kernel.</param>
     /// <param name="tree">The tree the kernel was parsed from.</param>
-    private static void RejectUnsupported(MethodDeclarationSyntax method, SyntaxTree tree)
+    private static void RejectUnsupported(MethodDeclarationSyntax method, SyntaxTree tree, bool semantic = false)
     {
         // Constructs whose meaning the device does not have, or has under different rules. Each one is refused here rather
         // than carried into the program the compiler would reject with a message about the generated text.
@@ -1622,57 +1671,61 @@ public static class KernelTranspiler
             }
         }
 
-        // A method a struct of the kernel declares is a call the device has, as long as it is called on a value of that
-        // struct, which the language checks.
-        var methods = tree
-            .GetCompilationUnitRoot()
-            .DescendantNodes()
-            .OfType<StructDeclarationSyntax>()
-            .SelectMany(structure => structure.Members.OfType<MethodDeclarationSyntax>())
-            .Select(method => method.Identifier.ValueText)
-            .ToHashSet(StringComparer.Ordinal);
-
-        var functions = Functions(tree);
-
-        foreach (var invocation in method.DescendantNodes().OfType<InvocationExpressionSyntax>())
+        // A source text has nothing but its names to go on, so the calls it makes are the ones the file declares. A kernel
+        // the compiler resolved is checked by the symbol each call resolves to, which is what lets a helper come from
+        // another file and what refuses a call to something the device cannot run.
+        if (!semantic)
         {
-            if (INTRINSICS.ContainsKey(CallName(invocation.Expression)))
-            {
-                continue;
-            }
+            var methods = tree
+                .GetCompilationUnitRoot()
+                .DescendantNodes()
+                .OfType<StructDeclarationSyntax>()
+                .SelectMany(structure => structure.Members.OfType<MethodDeclarationSyntax>())
+                .Select(method => method.Identifier.ValueText)
+                .ToHashSet(StringComparer.Ordinal);
 
-            if (invocation.Expression is MemberAccessExpressionSyntax member && methods.Contains(member.Name.Identifier.ValueText))
-            {
-                continue;
-            }
+            var functions = Functions(tree);
 
-            if (functions.Contains(CallName(invocation.Expression)))
+            foreach (var invocation in method.DescendantNodes().OfType<InvocationExpressionSyntax>())
             {
-                continue;
-            }
-
-            if (invocation.Expression is MemberAccessExpressionSyntax access && access.Name.Identifier.ValueText == SLICE)
-            {
-                continue;
-            }
-
-            if (CallName(invocation.Expression) is BARRIER ||
-                (invocation.Expression is GenericNameSyntax generic && generic.Identifier.ValueText == SHARED))
-            {
-                continue;
-            }
-
-            if (CallName(invocation.Expression) == INTERLOCKED)
-            {
-                if (invocation.Parent is not ExpressionStatementSyntax)
+                if (INTRINSICS.ContainsKey(CallName(invocation.Expression)))
                 {
-                    throw new KernelTranslationException($"'{INTERLOCKED}' is called as a statement: the value an atomic add returns is not part of the subset.");
+                    continue;
                 }
 
-                continue;
-            }
+                if (invocation.Expression is MemberAccessExpressionSyntax member && methods.Contains(member.Name.Identifier.ValueText))
+                {
+                    continue;
+                }
 
-            throw new KernelTranslationException($"A kernel body supports operators, indexing, control flow and the maths calls the subset maps; the call to '{invocation.Expression}' is not supported.");
+                if (functions.Contains(CallName(invocation.Expression)))
+                {
+                    continue;
+                }
+
+                if (invocation.Expression is MemberAccessExpressionSyntax access && access.Name.Identifier.ValueText == SLICE)
+                {
+                    continue;
+                }
+
+                if (CallName(invocation.Expression) is BARRIER ||
+                    (invocation.Expression is GenericNameSyntax generic && generic.Identifier.ValueText == SHARED))
+                {
+                    continue;
+                }
+
+                if (CallName(invocation.Expression) == INTERLOCKED)
+                {
+                    if (invocation.Parent is not ExpressionStatementSyntax)
+                    {
+                        throw new KernelTranslationException($"'{INTERLOCKED}' is called as a statement: the value an atomic add returns is not part of the subset.");
+                    }
+
+                    continue;
+                }
+
+                throw new KernelTranslationException($"A kernel body supports operators, indexing, control flow and the maths calls the subset maps; the call to '{invocation.Expression}' is not supported.");
+            }
         }
 
         foreach (var lambda in method.DescendantNodes().OfType<LambdaExpressionSyntax>())

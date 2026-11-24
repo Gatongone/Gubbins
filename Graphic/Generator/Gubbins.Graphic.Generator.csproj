@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>netstandard2.0</TargetFramework>
+        <LangVersion>latestmajor</LangVersion>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <IsPackable>false</IsPackable>
+        <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+        <IsRoslynComponent>true</IsRoslynComponent>
+        <RootNamespace>Gubbins.Graphic.Generator</RootNamespace>
+        <SkipDefaultPostBuild>true</SkipDefaultPostBuild>
+        <!-- The translator is shared with the tool that runs slangc, where reading the environment is what finds the
+             compiler. The half compiled into this generator only formats text with Environment.NewLine, which the
+             analyzer rule cannot tell apart from a setting. -->
+        <NoWarn>$(NoWarn);RS1035</NoWarn>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.11.0" />
+    </ItemGroup>
+
+    <!-- A generator is loaded into the compiler with nothing but its own assembly, so the translator it runs is compiled
+         into it rather than referenced beside it. The files are the same ones the kernel tool builds; the tool's half
+         that starts slangc is not one of them. -->
+    <ItemGroup>
+        <Compile Include="..\Kernel\KernelParameter.cs" Link="Kernel\KernelParameter.cs" />
+        <Compile Include="..\Kernel\KernelTranspiler.cs" Link="Kernel\KernelTranspiler.cs" />
+        <Compile Include="..\Kernel\KernelTranspiler.Semantic.cs" Link="Kernel\KernelTranspiler.Semantic.cs" />
+        <Compile Include="..\Kernel\Polyfills.cs" Link="Kernel\Polyfills.cs" />
+    </ItemGroup>
+
+</Project>

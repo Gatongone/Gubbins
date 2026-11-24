@@ -1,3 +1,5 @@
+using System.ComponentModel;
+
 namespace Gubbins.Graphic;
 
 /// <summary>
@@ -35,6 +37,12 @@ public enum GpuAccess : byte
 /// A block allocated by <see cref="GpuMemory"/>: the memory the device works on, plus the memory the central processor
 /// reads, which are the same block unless the machine cannot share them.
 /// </summary>
+/// <remarks>
+/// The block is what a kernel binds, and what the layer copies back at a synchronization point. The surface a program
+/// uses is <see cref="GpuBuffer{T}"/>, which is a block read as elements of a type; this type is hidden from completion
+/// for that reason.
+/// </remarks>
+[EditorBrowsable(EditorBrowsableState.Never)]
 public sealed unsafe class GpuBlock
 {
     /// <param name="storage">The block the device works on.</param>
@@ -128,6 +136,7 @@ public sealed unsafe class GpuBlock
 /// <see cref="Synchronize"/> has returned is refused rather than answered with stale bytes.
 /// </para>
 /// </remarks>
+[EditorBrowsable(EditorBrowsableState.Never)]
 public sealed unsafe class GpuMemory : IDisposable
 {
     private UnifiedAllocator m_Allocator;
