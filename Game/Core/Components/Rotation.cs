@@ -2,60 +2,60 @@ using System.Numerics;
 using System.Runtime.InteropServices;
 using Gubbins.Span;
 
-namespace Gubbins.Game.Components;
+namespace Gubbins.Game;
 
 [Serializable, StructLayout(LayoutKind.Sequential), SpanAs(typeof(ISpanRealOperation<float>))]
-public partial struct RotationX
+public partial struct RotationX(float value)
 {
-    public float Value;
+    public float Value = value;
 }
 
 [Serializable, StructLayout(LayoutKind.Sequential), SpanAs(typeof(ISpanRealOperation<float>))]
-public partial struct RotationY
+public partial struct RotationY(float value)
 {
-    public float Value;
+    public float Value = value;
 }
 
 [Serializable, StructLayout(LayoutKind.Sequential), SpanAs(typeof(ISpanRealOperation<float>))]
-public partial struct RotationZ
+public partial struct RotationZ(float value)
 {
-    public float Value;
+    public float Value = value;
 }
 
 [Serializable, StructLayout(LayoutKind.Sequential), SpanTo(typeof(ISpanVectorOperation<Vector2>))]
-public partial struct RotationXY(float X, float Y)
+public partial struct RotationXY(float x, float y)
 {
-    public float X;
-    public float Y;
+    public float X = x;
+    public float Y = y;
 }
 
 [Serializable, StructLayout(LayoutKind.Sequential), SpanTo(typeof(ISpanVectorOperation<Vector2>), Lane = ["Z:Y"])]
-public partial struct RotationXZ
+public partial struct RotationXZ(float x, float z)
 {
-    public float X;
-    public float Z;
+    public float X = x;
+    public float Z = z;
 }
 
 [Serializable, StructLayout(LayoutKind.Sequential), SpanTo(typeof(ISpanVectorOperation<Vector2>), Lane = ["Y:X", "Z:Y"])]
-public partial struct RotationYZ
+public partial struct RotationYZ(float y, float z)
 {
-    public float Y;
-    public float Z;
+    public float Y = y;
+    public float Z = z;
 }
 
 [Serializable, StructLayout(LayoutKind.Sequential), SpanTo(typeof(ISpanVectorOperation<Vector3>))]
-public partial struct Rotation
+public partial struct Rotation(float x, float y, float z)
 {
-    public float X;
-    public float Y;
-    public float Z;
+    public float x = x;
+    public float y = y;
+    public float z = z;
 }
 
 [Serializable, SpanTo(typeof(ISpanVectorOperation<Vector4>))]
-public partial struct Orientation
+public partial struct Orientation(float x, float y, float z, float w)
 {
-    public float X;
-    public float Y;
-    public float Z;
-    public float W;
+    public float X = x;
+    public float Y = y;
+    public float Z = z;
+    public float W = w;
 }
