@@ -37,6 +37,8 @@ public abstract class KernelTextEmitter
             throw new ArgumentNullException(nameof(program));
         }
 
+        Prepare(program);
+
         var text = new StringBuilder();
         var header = Header(program);
 
@@ -47,12 +49,12 @@ public abstract class KernelTextEmitter
 
         foreach (var structure in program.Structs)
         {
-            text.AppendLine($"struct {structure.Name}");
+            text.AppendLine($"struct {Identifier(structure.Name)}");
             text.AppendLine("{");
 
             foreach (var field in structure.Fields)
             {
-                text.AppendLine(INDENT + Type(field.Type) + " " + field.Name + ";");
+                text.AppendLine(INDENT + Type(field.Type) + " " + Identifier(field.Name) + ";");
             }
 
             text.AppendLine("};");
@@ -78,7 +80,7 @@ public abstract class KernelTextEmitter
         {
             if (!function.IsEntryPoint)
             {
-                text.AppendLine($"{Type(function.ReturnType)} {function.Name}({Parameters(function)});");
+                text.AppendLine($"{Type(function.ReturnType)} {Identifier(function.Name)}({Parameters(function)});");
             }
         }
 
@@ -103,13 +105,26 @@ public abstract class KernelTextEmitter
     }
 
     /// <summary>
+    /// Gives a backend the program before it writes anything, so a language that has to rename a name can decide once.
+    /// </summary>
+    /// <param name="program">The kernel.</param>
+    protected virtual void Prepare(KernelProgram program) { }
+
+    /// <summary>
+    /// Writes one name the program declares.
+    /// </summary>
+    /// <param name="name">The name as the kernel declares it.</param>
+    /// <returns>The name as the language takes it.</returns>
+    protected virtual string Identifier(string name) => name;
+
+    /// <summary>
     /// Writes the functions of a program that are not its entry point.
     /// </summary>
     /// <param name="function">The function.</param>
     /// <param name="text">The source being written.</param>
     private void Function(KernelFunction function, StringBuilder text)
     {
-        text.AppendLine($"{Type(function.ReturnType)} {function.Name}({Parameters(function)})");
+        text.AppendLine($"{Type(function.ReturnType)} {Identifier(function.Name)}({Parameters(function)})");
         Block(function.Body, text, 0);
         text.AppendLine();
     }
@@ -121,6 +136,14 @@ public abstract class KernelTextEmitter
     /// <param name="text">The source being written.</param>
     private void Entry(KernelProgram program, StringBuilder text)
     {
+        foreach (var line in EntrySignature(program))
+        {
+            text.AppendLine(line);
+        }
+
+        text.AppendLine("{");
+
+        // Group memory a kernel declares belongs inside the function, after its signature.
         if (SharedInEntry)
         {
             foreach (var array in program.EntryPoint.SharedArrays)
@@ -133,13 +156,6 @@ public abstract class KernelTextEmitter
                 text.AppendLine();
             }
         }
-
-        foreach (var line in EntrySignature(program))
-        {
-            text.AppendLine(line);
-        }
-
-        text.AppendLine("{");
 
         var prologue = EntryPrologue(program);
 
@@ -296,8 +312,8 @@ public abstract class KernelTextEmitter
     private string Inline(KernelDeclaration declaration)
     {
         var text = declaration.Type is ArrayType array
-            ? $"{Type(array.Element)} {declaration.Name}[{array.Length}]"
-            : $"{Type(declaration.Type)} {declaration.Name}";
+            ? $"{Type(array.Element)} {Identifier(declaration.Name)}[{array.Length}]"
+            : $"{Type(declaration.Type)} {Identifier(declaration.Name)}";
 
         return declaration.Initializer is null ? text : text + " = " + Value(declaration.Initializer);
     }
@@ -374,19 +390,19 @@ public abstract class KernelTextEmitter
                 return (Literal(literal), Precedence.Primary);
 
             case KernelLocal local:
-                return (local.Name, Precedence.Primary);
+                return (Identifier(local.Name), Precedence.Primary);
 
             case KernelBufferElement element:
-                return (element.Buffer + "[" + Value(element.Index) + "]", Precedence.Primary);
+                return (Identifier(element.Buffer) + "[" + Value(element.Index) + "]", Precedence.Primary);
 
             case KernelArrayElement element:
-                return (element.Array + "[" + Value(element.Index) + "]", Precedence.Primary);
+                return (Identifier(element.Array) + "[" + Value(element.Index) + "]", Precedence.Primary);
 
             case KernelSharedElement element:
-                return (element.Array + "[" + Value(element.Index) + "]", Precedence.Primary);
+                return (Identifier(element.Array) + "[" + Value(element.Index) + "]", Precedence.Primary);
 
             case KernelFieldAccess field:
-                return (Value(field.Target, Precedence.Primary) + "." + field.Field, Precedence.Primary);
+                return (Value(field.Target, Precedence.Primary) + "." + Identifier(field.Field), Precedence.Primary);
 
             case KernelThreadIndex:
                 return (ThreadIndex(), Precedence.Primary);
@@ -395,7 +411,7 @@ public abstract class KernelTextEmitter
                 return (LengthsElement(lengths.Index), Precedence.Primary);
 
             case KernelCall call:
-                return (call.Function.Name + "(" + string.Join(", ", call.Arguments.Select(argument => Value(argument))) + ")", Precedence.Primary);
+                return (Identifier(call.Function.Name) + "(" + string.Join(", ", call.Arguments.Select(argument => Value(argument))) + ")", Precedence.Primary);
 
             case KernelIntrinsicCall intrinsic:
                 return (Intrinsic(intrinsic.Intrinsic, intrinsic.Arguments.Select(argument => Value(argument)).ToList()), Precedence.Primary);
@@ -469,7 +485,13 @@ public abstract class KernelTextEmitter
     {
         var text = value.ToString("R", CultureInfo.InvariantCulture);
 
-        return text.IndexOf('.') >= 0 || text.IndexOf('E') >= 0 || text.IndexOf('e') >= 0 ? text : text + ".0";
+        if (text.IndexOf('.') < 0 && text.IndexOf('E') < 0 && text.IndexOf('e') < 0)
+        {
+            text += ".0";
+        }
+
+        // The suffix is what every one of these languages reads as single precision, which is the only kind a kernel has.
+        return text + "f";
     }
 
     /// <summary>

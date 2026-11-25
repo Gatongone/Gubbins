@@ -136,7 +136,7 @@ internal sealed class PtxWriter
         {
             var name = "__shared" + m_Shared++;
             m_Locals.AppendLine($"    .shared .align 4 .b8 {name}[{Stride(shared.Element) * shared.Length}];");
-            m_Globals[shared.Name] = Pointer($"mov.u64 %rd, {name};");
+            m_Globals[shared.Name] = Pointer($"cvta.shared.u64 %rd, {name};");
         }
 
         foreach (var statement in m_Program.EntryPoint.Body.Statements)
@@ -1112,7 +1112,7 @@ internal sealed class PtxWriter
         m_Locals.AppendLine($"    .local .align 4 .b8 {storage}[{Stride(type)}];");
 
         var address = "%rd" + m_Pointers++;
-        m_Body.AppendLine($"    mov.u64 {address}, {storage};");
+        m_Body.AppendLine($"    cvta.local.u64 {address}, {storage};");
 
         var slot = new PtxSlot(address, type);
         m_Scopes[m_Scopes.Count - 1][name] = slot;

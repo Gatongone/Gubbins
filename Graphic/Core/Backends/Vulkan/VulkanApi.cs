@@ -102,7 +102,7 @@ internal static unsafe partial class VulkanApi
         0x00000020 | // STORAGE_BUFFER
         0x00000040 | // INDEX_BUFFER
         0x00000080 | // VERTEX_BUFFER
-        0x00000200;  // INDIRECT_BUFFER
+        0x00000100;  // INDIRECT_BUFFER
 
     /// <summary>
     /// <c>VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT</c>.
@@ -137,12 +137,12 @@ internal static unsafe partial class VulkanApi
     /// <summary>
     /// <c>VK_ACCESS_HOST_READ_BIT</c>.
     /// </summary>
-    internal const uint ACCESS_HOST_READ = 0x00000200;
+    internal const uint ACCESS_HOST_READ = 0x00002000;
 
     /// <summary>
     /// <c>VK_ACCESS_HOST_WRITE_BIT</c>.
     /// </summary>
-    internal const uint ACCESS_HOST_WRITE = 0x00000400;
+    internal const uint ACCESS_HOST_WRITE = 0x00004000;
 
     /// <summary>
     /// <c>VK_SUCCESS</c>.

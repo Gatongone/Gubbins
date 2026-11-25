@@ -16,6 +16,7 @@ internal sealed unsafe class MetalCompute : IDisposable
     private nint m_Library;
     private nint m_Function;
     private nint m_Pipeline;
+    private string m_Error = string.Empty;
     private bool m_Disposed;
 
     /// <param name="device">The <c>MTLDevice</c> to run on.</param>
@@ -25,6 +26,11 @@ internal sealed unsafe class MetalCompute : IDisposable
         m_Device = device;
         m_Queue = queue;
     }
+
+    /// <summary>
+    /// Gets the text Metal gave for the last pipeline that was refused, which is empty when the last one loaded.
+    /// </summary>
+    internal string LastError => m_Error;
 
     /// <summary>
     /// Loads a kernel from a metallib.
@@ -41,10 +47,8 @@ internal sealed unsafe class MetalCompute : IDisposable
 
         var library = MetalApi.NewLibraryWithFile(m_Device, path, out var error);
 
-        if (error != 0)
-        {
-            MetalApi.Release(error);
-        }
+        // Only the library is owned here; the error text is a managed copy.
+        m_Error = error;
 
         return SetPipeline(library, function);
     }
@@ -74,11 +78,7 @@ internal sealed unsafe class MetalCompute : IDisposable
         m_Function = entry;
 
         var pipeline = MetalApi.NewComputePipelineState(m_Device, entry, out var error);
-
-        if (error != 0)
-        {
-            MetalApi.Release(error);
-        }
+        m_Error = error;
 
         if (pipeline == 0)
         {
@@ -103,11 +103,7 @@ internal sealed unsafe class MetalCompute : IDisposable
         }
 
         var library = MetalApi.NewLibrary(m_Device, source, out var error);
-
-        if (error != 0)
-        {
-            MetalApi.Release(error);
-        }
+        m_Error = error;
 
         return SetPipeline(library, function);
     }
@@ -133,48 +129,58 @@ internal sealed unsafe class MetalCompute : IDisposable
             return false;
         }
 
-        var commandBuffer = MetalApi.Send(m_Queue, "commandBuffer");
+        // Metal returns the command buffer and the encoder autoreleased, so the dispatch runs inside a pool of its own.
+        var pool = MetalApi.PushAutoreleasePool();
 
-        if (commandBuffer == 0)
+        try
         {
-            return false;
-        }
+            var commandBuffer = MetalApi.Send(m_Queue, "commandBuffer");
 
-        var encoder = MetalApi.ComputeCommandEncoder(commandBuffer);
-
-        if (encoder == 0)
-        {
-            return false;
-        }
-
-        MetalApi.SetComputePipelineState(encoder, m_Pipeline);
-        MetalApi.SetBuffer(encoder, sourceBuffer, sourceOffset, 0);
-        MetalApi.SetBuffer(encoder, destinationBuffer, destinationOffset, 1);
-
-        // The block of the structure a kernel takes is bound after the buffers, and the counts after it when it is there.
-        if (parametersBuffer != 0)
-        {
-            MetalApi.SetBuffer(encoder, parametersBuffer, parametersOffset, 2);
-
-            if (lengthsBuffer != 0)
+            if (commandBuffer == 0)
             {
-                MetalApi.SetBuffer(encoder, lengthsBuffer, lengthsOffset, 3);
+                return false;
             }
+
+            var encoder = MetalApi.ComputeCommandEncoder(commandBuffer);
+
+            if (encoder == 0)
+            {
+                return false;
+            }
+
+            MetalApi.SetComputePipelineState(encoder, m_Pipeline);
+            MetalApi.SetBuffer(encoder, sourceBuffer, sourceOffset, 0);
+            MetalApi.SetBuffer(encoder, destinationBuffer, destinationOffset, 1);
+
+            // The block of the structure a kernel takes is bound after the buffers, and the counts after it when it is there.
+            if (parametersBuffer != 0)
+            {
+                MetalApi.SetBuffer(encoder, parametersBuffer, parametersOffset, 2);
+
+                if (lengthsBuffer != 0)
+                {
+                    MetalApi.SetBuffer(encoder, lengthsBuffer, lengthsOffset, 3);
+                }
+            }
+            else if (lengthsBuffer != 0)
+            {
+                MetalApi.SetBuffer(encoder, lengthsBuffer, lengthsOffset, 2);
+            }
+
+            var threadgroups = new MetalSize { Width = groups, Height = 1, Depth = 1 };
+            var threads = new MetalSize { Width = threadsPerGroup, Height = 1, Depth = 1 };
+            MetalApi.DispatchThreadgroups(encoder, threadgroups, threads);
+
+            // The encoder has to be closed before the buffer is committed, and the wait is what makes the write visible.
+            MetalApi.Send(encoder, "endEncoding");
+            MetalApi.Send(commandBuffer, "commit");
+            MetalApi.Send(commandBuffer, "waitUntilCompleted");
+            return true;
         }
-        else if (lengthsBuffer != 0)
+        finally
         {
-            MetalApi.SetBuffer(encoder, lengthsBuffer, lengthsOffset, 2);
+            MetalApi.PopAutoreleasePool(pool);
         }
-
-        var threadgroups = new MetalSize { Width = groups, Height = 1, Depth = 1 };
-        var threads = new MetalSize { Width = threadsPerGroup, Height = 1, Depth = 1 };
-        MetalApi.DispatchThreadgroups(encoder, threadgroups, threads);
-
-        // The encoder has to be closed before the buffer is committed, and the wait is what makes the write visible.
-        MetalApi.Send(encoder, "endEncoding");
-        MetalApi.Send(commandBuffer, "commit");
-        MetalApi.Send(commandBuffer, "waitUntilCompleted");
-        return true;
     }
 
     /// <summary>

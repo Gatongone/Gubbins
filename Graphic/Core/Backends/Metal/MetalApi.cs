@@ -24,11 +24,9 @@ namespace Gubbins.Graphic;
 /// </para>
 /// <para>
 /// The constants below are the ones the bridge passes to Metal. The values come from the Metal headers as they are
-/// published in the .NET for macOS bindings, because the bridge is written on a machine that has no Metal framework to
-/// compile against: <c>MTLStorageModeShared</c> is 0, <c>Managed</c> is 1 and <c>Private</c> is 2, and
-/// <c>MTLResourceStorageModePrivate</c> is the storage mode shifted into the resource options
-/// (<c>2 &lt;&lt; 4</c>), with <c>MTLResourceCPUCacheModeWriteCombined</c> as its low bit. The harness checks the buffer
-/// addresses and the round trips on a real Mac, which is where a wrong constant would show up.
+/// published in the .NET for macOS bindings: <c>MTLStorageModeShared</c> is 0, <c>Managed</c> is 1 and <c>Private</c> is
+/// 2, and <c>MTLResourceStorageModePrivate</c> is the storage mode shifted into the resource options (<c>2 &lt;&lt; 4</c>),
+/// with <c>MTLResourceCPUCacheModeWriteCombined</c> as its low bit.
 /// </para>
 /// </remarks>
 internal static unsafe class MetalApi
@@ -50,8 +48,7 @@ internal static unsafe class MetalApi
 
     /// <summary>
     /// The alignment a Metal buffer address is reported to have. Metal does not document a buffer base alignment, and the
-    /// addresses the driver hands out are page aligned in practice, so the bridge asks for the arena alignment and the
-    /// harness checks it on the machine.
+    /// addresses the driver hands out are page aligned in practice, so the bridge asks for the arena alignment.
     /// </summary>
     internal const nuint SEGMENT_ALIGNMENT = 256;
 
@@ -131,6 +128,7 @@ internal static unsafe class MetalApi
     internal static bool RespondsToSelector(nint receiver, string selector)
         => receiver != 0
             && ((delegate* unmanaged[Cdecl]<nint, nint, nint, byte>)send)(receiver, Selector("respondsToSelector:"), Selector(selector)) != 0;
+
     /// <summary>
     /// Sends a message that returns an object pointer.
     /// </summary>
@@ -227,9 +225,13 @@ internal static unsafe class MetalApi
     /// </summary>
     /// <param name="device">The <c>MTLDevice</c>.</param>
     /// <param name="source">The shader source.</param>
-    /// <param name="error">When the method returns, the <c>NSError</c> describing the failure, or <see langword="0"/>.</param>
+    /// <param name="error">When the method returns, the text of the <c>NSError</c> describing the failure, or an empty string.</param>
     /// <returns>The library, or <see langword="0"/> when the source does not compile.</returns>
-    internal static nint NewLibrary(nint device, string source, out nint error)
+    /// <remarks>
+    /// The <c>NSError</c> an out-parameter returns is autoreleased, so its description is copied to a managed string before
+    /// this method returns.
+    /// </remarks>
+    internal static nint NewLibrary(nint device, string source, out string error)
     {
         var pool = PushAutoreleasePool();
         nint failure = 0;
@@ -244,7 +246,7 @@ internal static unsafe class MetalApi
                 0,
                 &failure);
 
-            error = failure;
+            error = DescribeError(failure);
             return library;
         }
         finally
@@ -257,16 +259,15 @@ internal static unsafe class MetalApi
     /// Loads a precompiled <c>.metallib</c> with <c>newLibraryWithFile:error:</c>.
     /// </summary>
     /// <remarks>
-    /// The runtime compiler behind <c>newLibraryWithSource:</c> is a system service that needs a logged in session, so it is
-    /// not usable from a remote shell; a library compiled ahead of time by <c>xcrun metal</c> loads fine everywhere.
-    /// <c>newLibraryWithData:</c> is not an alternative here: it takes a <c>dispatch_data_t</c>, not an <c>NSData</c>, and
-    /// handing it the wrong object crashes the process.
+    /// A <c>metallib</c> loads without the runtime compiler behind <c>newLibraryWithSource:</c>, so a build that has
+    /// <c>xcrun metal</c> can ship one. <c>newLibraryWithData:</c> is not an alternative here: it takes a
+    /// <c>dispatch_data_t</c>, not an <c>NSData</c>, and handing it the wrong object crashes the process.
     /// </remarks>
     /// <param name="device">The <c>MTLDevice</c>.</param>
     /// <param name="path">The path of the <c>.metallib</c> file.</param>
-    /// <param name="error">When the method returns, the <c>NSError</c> describing the failure, or <see langword="0"/>.</param>
+    /// <param name="error">When the method returns, the text of the <c>NSError</c> describing the failure, or an empty string.</param>
     /// <returns>The library, or <see langword="0"/> when Metal refused the file.</returns>
-    internal static nint NewLibraryWithFile(nint device, string path, out nint error)
+    internal static nint NewLibraryWithFile(nint device, string path, out string error)
     {
         var pool = PushAutoreleasePool();
         nint failure = 0;
@@ -279,7 +280,7 @@ internal static unsafe class MetalApi
                 NewString(path),
                 &failure);
 
-            error = failure;
+            error = DescribeError(failure);
             return library;
         }
         finally
@@ -287,6 +288,7 @@ internal static unsafe class MetalApi
             PopAutoreleasePool(pool);
         }
     }
+
     /// <summary>
     /// Looks a kernel up in a library with <c>newFunctionWithName:</c>.
     /// </summary>
@@ -315,19 +317,28 @@ internal static unsafe class MetalApi
     /// </summary>
     /// <param name="device">The <c>MTLDevice</c>.</param>
     /// <param name="function">The kernel function.</param>
-    /// <param name="error">When the method returns, the <c>NSError</c> describing the failure, or <see langword="0"/>.</param>
+    /// <param name="error">When the method returns, the text of the <c>NSError</c> describing the failure, or an empty string.</param>
     /// <returns>The pipeline state, or <see langword="0"/> when Metal refused.</returns>
-    internal static nint NewComputePipelineState(nint device, nint function, out nint error)
+    internal static nint NewComputePipelineState(nint device, nint function, out string error)
     {
+        var pool = PushAutoreleasePool();
         nint failure = 0;
-        var state = ((delegate* unmanaged[Cdecl]<nint, nint, nint, nint*, nint>)send)(
-            device,
-            Selector("newComputePipelineStateWithFunction:error:"),
-            function,
-            &failure);
 
-        error = failure;
-        return state;
+        try
+        {
+            var state = ((delegate* unmanaged[Cdecl]<nint, nint, nint, nint*, nint>)send)(
+                device,
+                Selector("newComputePipelineStateWithFunction:error:"),
+                function,
+                &failure);
+
+            error = DescribeError(failure);
+            return state;
+        }
+        finally
+        {
+            PopAutoreleasePool(pool);
+        }
     }
 
     /// <summary>
@@ -376,6 +387,14 @@ internal static unsafe class MetalApi
             threads);
 
     /// <summary>
+    /// Reads the text of an <c>NSError</c>.
+    /// </summary>
+    /// <param name="error">The error, which may be <see langword="0"/>.</param>
+    /// <returns>The localized description, or an empty string when there is none.</returns>
+    internal static string DescribeError(nint error)
+        => error == 0 ? string.Empty : Describe(Send(error, "localizedDescription"));
+
+    /// <summary>
     /// Reads the text out of an <c>NSString</c> or of an <c>NSError</c>'s description.
     /// </summary>
     /// <param name="instance">The object, which may be <see langword="0"/>.</param>
@@ -406,6 +425,7 @@ internal static unsafe class MetalApi
             return getClass(text);
         }
     }
+
     /// <summary>
     /// Retains an Objective-C object so that it outlives the autorelease pool it was created in.
     /// </summary>

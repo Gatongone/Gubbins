@@ -19,7 +19,22 @@ public sealed class KernelGlsl : KernelTextEmitter
     /// <summary>
     /// The name of the local that holds the thread index the body reads.
     /// </summary>
-    private const string INDEX = "__gubbinsIndex";
+    private const string INDEX = "gubbins_index";
+
+    /// <summary>
+    /// The prefix of the block name of a buffer.
+    /// </summary>
+    private const string BUFFER_BLOCK = "gubbins_buffer";
+
+    /// <summary>
+    /// The block name the lengths are read through.
+    /// </summary>
+    private const string LENGTHS_BLOCK = "gubbins_lengths";
+
+    /// <summary>
+    /// The name of the array the lengths are read through.
+    /// </summary>
+    private const string LENGTHS = "gubbins_lengths_data";
 
     /// <inheritdoc/>
     protected override string Header(KernelProgram program)
@@ -45,18 +60,35 @@ public sealed class KernelGlsl : KernelTextEmitter
         VectorType vector => vector.TypeName.Replace("float2", "vec2").Replace("float3", "vec3").Replace("float4", "vec4")
             .Replace("int2", "ivec2").Replace("int3", "ivec3").Replace("int4", "ivec4")
             .Replace("uint2", "uvec2").Replace("uint3", "uvec3").Replace("uint4", "uvec4"),
-        StructType structure => structure.Name,
+        StructType structure => Identifier(structure.Name),
         ArrayType array => Type(array.Element),
         _ => "void"
     };
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// Names containing <c>__</c>, starting with <c>gl_</c>, or starting with an underscore are reserved by OpenGL, so a
+    /// name the program declares is written under a prefix that keeps it out of those.
+    /// </remarks>
+    protected override string Identifier(string name)
+    {
+        if (!name.Contains("__") &&
+            !name.StartsWith("gl_", StringComparison.Ordinal) &&
+            !name.StartsWith("_", StringComparison.Ordinal))
+        {
+            return name;
+        }
+
+        return "gubbins_" + name.TrimStart('_').Replace("__", "_");
+    }
+
+    /// <inheritdoc/>
     protected override string Buffer(KernelProgram program, KernelBuffer buffer)
-        => $"layout(std430, binding = {buffer.Binding}) {(buffer.ReadOnly ? "readonly " : string.Empty)}buffer __gubbins_buffer{buffer.Binding} {{ {Type(buffer.ElementType)} {buffer.Name}[]; }};";
+        => $"layout(std430, binding = {buffer.Binding}) {(buffer.ReadOnly ? "readonly " : string.Empty)}buffer {BUFFER_BLOCK}{buffer.Binding} {{ {Type(buffer.ElementType)} {Identifier(buffer.Name)}[]; }};";
 
     /// <inheritdoc/>
     protected override string Lengths(KernelProgram program)
-        => $"layout(std430, binding = {LengthsBinding(program)}) buffer __gubbins_lengths {{ uint {KernelTranspiler.LENGTHS_BUFFER}[]; }};";
+        => $"layout(std430, binding = {LengthsBinding(program)}) buffer {LENGTHS_BLOCK} {{ uint {LENGTHS}[]; }};";
 
     /// <inheritdoc/>
     protected override IReadOnlyList<string> EntrySignature(KernelProgram program) => new[]
@@ -68,14 +100,14 @@ public sealed class KernelGlsl : KernelTextEmitter
     protected override string EntryPrologue(KernelProgram program) => $"int {INDEX} = int(gl_GlobalInvocationID.x);";
 
     /// <inheritdoc/>
-    protected override string Shared(KernelSharedArray array) => $"shared {Type(array.Element)} {array.Name}[{array.Length}];";
+    protected override string Shared(KernelSharedArray array) => $"shared {Type(array.Element)} {Identifier(array.Name)}[{array.Length}];";
 
     /// <inheritdoc/>
     protected override string Parameter(KernelFunctionParameter parameter) => parameter.Mode switch
     {
-        KernelParameterMode.InOut => $"inout {Type(parameter.Type)} {parameter.Name}",
-        KernelParameterMode.Out => $"out {Type(parameter.Type)} {parameter.Name}",
-        _ => $"{Type(parameter.Type)} {parameter.Name}"
+        KernelParameterMode.InOut => $"inout {Type(parameter.Type)} {Identifier(parameter.Name)}",
+        KernelParameterMode.Out => $"out {Type(parameter.Type)} {Identifier(parameter.Name)}",
+        _ => $"{Type(parameter.Type)} {Identifier(parameter.Name)}"
     };
 
     /// <inheritdoc/>
@@ -115,7 +147,7 @@ public sealed class KernelGlsl : KernelTextEmitter
     protected override string ThreadIndex() => INDEX;
 
     /// <inheritdoc/>
-    protected override string LengthsElement(int index) => $"{KernelTranspiler.LENGTHS_BUFFER}[{index}]";
+    protected override string LengthsElement(int index) => $"{LENGTHS}[{index}]";
 
     /// <summary>
     /// Reports whether a program makes a call over the lanes of a wave.

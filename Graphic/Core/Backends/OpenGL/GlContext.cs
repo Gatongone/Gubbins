@@ -122,12 +122,13 @@ internal sealed unsafe class GlContext : IDisposable
             return false;
         }
 
-        // The attributes ask for OpenGL 4.5 with the core profile, which is what ARB_buffer_storage and compute need.
+        // The attributes ask for OpenGL 4.6 with the core profile, which is what compute, ARB_buffer_storage and the
+        // #version 460 the emitter writes need.
         var attributes = stackalloc int[7];
         attributes[0] = 0x2091; // GL_CONTEXT_MAJOR_VERSION
         attributes[1] = 4;
         attributes[2] = 0x2092; // GL_CONTEXT_MINOR_VERSION
-        attributes[3] = 5;
+        attributes[3] = 6;
         attributes[4] = 0x9126; // GL_CONTEXT_PROFILE_MASK
         attributes[5] = 1; // GL_CONTEXT_CORE_PROFILE_BIT
         attributes[6] = 0;

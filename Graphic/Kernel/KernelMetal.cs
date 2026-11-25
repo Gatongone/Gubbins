@@ -29,7 +29,7 @@ public sealed class KernelMetal : KernelTextEmitter
     {
         ScalarType scalar => scalar.TypeName,
         VectorType vector => vector.TypeName,
-        StructType structure => structure.Name,
+        StructType structure => Identifier(structure.Name),
         ArrayType array => Type(array.Element),
         _ => "void"
     };
@@ -53,12 +53,12 @@ public sealed class KernelMetal : KernelTextEmitter
 
         foreach (var buffer in program.Buffers)
         {
-            arguments.Add($"{(buffer.ReadOnly ? "const " : string.Empty)}device {Type(buffer.ElementType)}* {buffer.Name} [[buffer({buffer.Binding})]]");
+            arguments.Add($"{(buffer.ReadOnly ? "const " : string.Empty)}device {Type(buffer.ElementType)}* {Identifier(buffer.Name)} [[buffer({buffer.Binding})]]");
         }
 
         if (program.Parameters is not null)
         {
-            arguments.Add($"constant {Type(program.Parameters.ElementType)}* {program.Parameters.Name} [[buffer({program.Parameters.Binding})]]");
+            arguments.Add($"constant {Type(program.Parameters.ElementType)}* {Identifier(program.Parameters.Name)} [[buffer({program.Parameters.Binding})]]");
         }
 
         arguments.Add($"device uint* {KernelTranspiler.LENGTHS_BUFFER} [[buffer({LengthsBinding(program)})]]");
@@ -81,14 +81,14 @@ public sealed class KernelMetal : KernelTextEmitter
     protected override bool SharedInEntry => true;
 
     /// <inheritdoc/>
-    protected override string Shared(KernelSharedArray array) => $"threadgroup {Type(array.Element)} {array.Name}[{array.Length}];";
+    protected override string Shared(KernelSharedArray array) => $"threadgroup {Type(array.Element)} {Identifier(array.Name)}[{array.Length}];";
 
     /// <inheritdoc/>
     protected override string Parameter(KernelFunctionParameter parameter) => parameter.Mode switch
     {
-        KernelParameterMode.InOut => $"thread {Type(parameter.Type)}& {parameter.Name}",
-        KernelParameterMode.Out => $"thread {Type(parameter.Type)}& {parameter.Name}",
-        _ => $"{Type(parameter.Type)} {parameter.Name}"
+        KernelParameterMode.InOut => $"thread {Type(parameter.Type)}& {Identifier(parameter.Name)}",
+        KernelParameterMode.Out => $"thread {Type(parameter.Type)}& {Identifier(parameter.Name)}",
+        _ => $"{Type(parameter.Type)} {Identifier(parameter.Name)}"
     };
 
     /// <inheritdoc/>
@@ -129,4 +129,166 @@ public sealed class KernelMetal : KernelTextEmitter
 
     /// <inheritdoc/>
     protected override string LengthsElement(int index) => $"{KernelTranspiler.LENGTHS_BUFFER}[{index}]";
+
+    /// <summary>
+    /// The names this emitter maps for Metal, keyed by the name the kernel declares.
+    /// </summary>
+    private readonly Dictionary<string, string> m_Escaped = new(StringComparer.Ordinal);
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Names the program declares are renamed when they are words Metal already means, so a C# local called <c>half</c>
+    /// does not take the place of the Metal scalar type. Only the names the program declares are touched, so the qualifiers
+    /// and the types the emitter writes keep their meaning.
+    /// </remarks>
+    protected override void Prepare(KernelProgram program)
+    {
+        m_Escaped.Clear();
+
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        Collect(program, names);
+
+        foreach (var name in names)
+        {
+            if (!RESERVED.Contains(name))
+            {
+                continue;
+            }
+
+            var escaped = name + "_";
+
+            // A suffix is only enough when the name it makes is not one the program already uses itself.
+            while (names.Contains(escaped) || RESERVED.Contains(escaped))
+            {
+                escaped += "_";
+            }
+
+            m_Escaped[name] = escaped;
+        }
+    }
+
+    /// <inheritdoc/>
+    protected override string Identifier(string name)
+        => m_Escaped.TryGetValue(name, out var escaped) ? escaped : name;
+
+    /// <summary>
+    /// Gathers every name the program declares, wherever the language writes it.
+    /// </summary>
+    /// <param name="program">The kernel.</param>
+    /// <param name="names">The set the names are added to.</param>
+    private static void Collect(KernelProgram program, HashSet<string> names)
+    {
+        foreach (var structure in program.Structs)
+        {
+            names.Add(structure.Name);
+
+            foreach (var field in structure.Fields)
+            {
+                names.Add(field.Name);
+            }
+        }
+
+        foreach (var buffer in program.Buffers)
+        {
+            names.Add(buffer.Name);
+        }
+
+        if (program.Parameters is not null)
+        {
+            names.Add(program.Parameters.Name);
+        }
+
+        foreach (var function in program.Functions)
+        {
+            names.Add(function.Name);
+
+            foreach (var parameter in function.Parameters)
+            {
+                names.Add(parameter.Name);
+            }
+
+            foreach (var shared in function.SharedArrays)
+            {
+                names.Add(shared.Name);
+            }
+
+            Collect(function.Body, names);
+        }
+    }
+
+    /// <summary>
+    /// Gathers the names a block declares, including the ones in a nested statement.
+    /// </summary>
+    /// <param name="block">The block.</param>
+    /// <param name="names">The set the names are added to.</param>
+    private static void Collect(KernelBlock block, HashSet<string> names)
+    {
+        foreach (var statement in block.Statements)
+        {
+            switch (statement)
+            {
+                case KernelDeclaration declaration:
+                    names.Add(declaration.Name);
+                    break;
+
+                case KernelBlock nested:
+                    Collect(nested, names);
+                    break;
+
+                case KernelIf branch:
+                    Collect(branch.Then, names);
+
+                    if (branch.Else is not null)
+                    {
+                        Collect(branch.Else, names);
+                    }
+
+                    break;
+
+                case KernelWhile loop:
+                    Collect(loop.Body, names);
+                    break;
+
+                case KernelDoWhile loop:
+                    Collect(loop.Body, names);
+                    break;
+
+                case KernelFor loop:
+                    if (loop.Run is KernelDeclaration run)
+                    {
+                        names.Add(run.Name);
+                    }
+
+                    if (loop.Next is KernelDeclaration next)
+                    {
+                        names.Add(next.Name);
+                    }
+
+                    Collect(loop.Body, names);
+                    break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// The words Metal already means, which a C# name has to be kept out of.
+    /// </summary>
+    private static readonly HashSet<string> RESERVED = new(StringComparer.Ordinal)
+    {
+        "alignas", "alignof", "and", "and_eq", "asm", "atomic_bool", "atomic_float", "atomic_int", "atomic_uint",
+        "auto", "bitand", "bitor", "bool", "bool2", "bool3", "bool4", "break", "case", "catch", "char", "char2",
+        "char3", "char4", "char16_t", "char32_t", "class", "compl", "concept", "const", "const_cast", "consteval",
+        "constexpr", "constinit", "continue", "co_await", "co_return", "co_yield", "decltype", "default", "delete",
+        "device", "do", "double", "dynamic_cast", "else", "enum", "explicit", "export", "extern", "false", "float",
+        "float2", "float3", "float4", "for", "fragment", "friend", "goto", "half", "half2", "half3", "half4", "if",
+        "inline", "int", "int2", "int3", "int4", "kernel", "long", "long2", "long3", "long4", "matrix", "mutable",
+        "namespace", "new", "noexcept", "not", "not_eq", "nullptr", "object_data", "operator", "or", "or_eq",
+        "packed_float", "private", "protected", "public", "ray_data", "register", "reinterpret_cast", "requires",
+        "return", "sampler", "short", "short2", "short3", "short4", "signed", "sizeof", "static", "static_assert",
+        "static_cast", "struct", "switch", "template", "texture", "this", "thread", "thread_local", "threadgroup",
+        "threadgroup_imageblock", "throw", "true", "try", "typedef", "typeid", "typename", "uchar", "uchar2", "uchar3",
+        "uchar4", "uint", "uint2", "uint3", "uint4", "ulong", "ulong2", "ulong3", "ulong4", "union", "unsigned",
+        "ushort", "ushort2", "ushort3", "ushort4", "using", "vec", "vertex", "virtual", "void", "volatile", "wchar_t",
+        "while", "xor", "xor_eq"
+    };
 }

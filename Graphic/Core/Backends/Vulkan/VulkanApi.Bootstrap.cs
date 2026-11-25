@@ -95,7 +95,7 @@ internal static unsafe partial class VulkanApi
     /// <summary>
     /// <c>VkStructureType</c> for <c>VkPhysicalDeviceFeatures2</c>.
     /// </summary>
-    internal const uint FEATURES2_TYPE = 1000050001;
+    internal const uint FEATURES2_TYPE = 1000059000;
 
     /// <summary>
     /// <c>VkStructureType</c> for <c>VkPhysicalDeviceMemoryProperties2</c>.
@@ -110,7 +110,7 @@ internal static unsafe partial class VulkanApi
     /// <summary>
     /// <c>VkStructureType</c> for <c>VkPhysicalDeviceBufferDeviceAddressFeatures</c>.
     /// </summary>
-    internal const uint BUFFER_DEVICE_ADDRESS_FEATURES_TYPE = 1000244000;
+    internal const uint BUFFER_DEVICE_ADDRESS_FEATURES_TYPE = 1000257000;
 
     /// <summary>
     /// <c>VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT</c>, which every allocation behind a device address must carry.

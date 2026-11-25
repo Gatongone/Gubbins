@@ -367,12 +367,12 @@ internal sealed unsafe class CudaCompute : IDisposable
         }
         else
         {
-            // A kernel whose PTX takes its buffers as arguments has no constant to fill, so they are passed instead.
-            var list = stackalloc void*[4];
+            // A kernel whose PTX takes its buffers as arguments has no constant to fill, so the three parameters the
+            // emitter writes are passed instead: the source, the destination and the block the counts live in.
+            var list = stackalloc void*[3];
             list[0] = &source;
             list[1] = &destination;
-            list[2] = &parametersAddress;
-            list[3] = &lengths;
+            list[2] = &lengths;
             arguments = list;
         }
 

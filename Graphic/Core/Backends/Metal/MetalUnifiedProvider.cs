@@ -15,18 +15,6 @@ namespace Gubbins.Graphic;
 /// owns the command queue. Dispose it before the device disappears.
 /// </para>
 /// <para>
-/// The bridge is checked on hardware by <c>Gubbins.Graphic.Metal.Harness</c>, which runs 36 checks against the real device:
-/// the shared storage mode is CPU addressable and coherent, the private mode is not and round trips through a blit copy,
-/// two blocks of one segment really share one <c>MTLBuffer</c> at different offsets, a released range comes back, a
-/// per-heap reset leaves the other heaps alone, trimming returns the buffers to Metal, and thirty frames of churn do not
-/// grow the arena. All of them pass on an Apple silicon Mac running macOS 26. The storage-mode policy and the constants are
-/// additionally covered by <c>Gubbins.Graphic.Metal.Tests</c>, which runs on any host.
-/// </para>
-/// <para>
-/// What the harness does not cover is a Mac with a discrete GPU and <c>MTLStorageModeManaged</c>: the bridge never asks for
-/// that mode, so there is nothing to check, but it also means the path is unexplored rather than verified-absent.
-/// </para>
-/// <para>
 /// Metal keeps <c>MTLStorageModeShared</c> coherent on every Mac, so <see cref="Flush"/> and <see cref="Invalidate"/> are
 /// no-ops and the bridge reports <see cref="UnifiedMemoryKind.SharedCoherent"/>. The storage mode that would need cache
 /// maintenance, <c>MTLStorageModeManaged</c>, is only an optimisation on the discrete Macs and the bridge does not ask for

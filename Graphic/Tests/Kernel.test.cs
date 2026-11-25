@@ -1132,11 +1132,6 @@ public static unsafe class Callback
             {
                 Assert.That(new FileInfo(Path.Combine(directory, "Scale.ptx")).Length, Is.GreaterThan(0), "the CUDA artifact is the PTX text the driver compiles");
             }
-
-            if (OperatingSystem.IsMacOS())
-            {
-                Assert.That(names, Does.Contain("Scale.metallib"), "a macOS build machine turns the source into the library Metal loads");
-            }
         }
         finally
         {
@@ -1296,6 +1291,40 @@ public static unsafe class Reduce
         Assert.That(hlsl, Does.Contain("GroupMemoryBarrierWithGroupSync();"), "the barrier becomes the one call every backend has");
         Assert.That(hlsl, Does.Contain("tile[0] + 64u"), "the length of a shared array is the number it was declared with");
         Assert.That(hlsl, Does.Not.Contain("Shared<"), "the declaration has no representation on the device");
+    }
+
+    [Test]
+    public void Kernel_AvoidsTheNamesMetalReserves()
+    {
+        const string Source = @"
+using System;
+
+public static unsafe class Reserved
+{
+    public static void Kernel(int index, ReadOnlySpan<uint> device, Span<uint> destination)
+    {
+        var half = 2u;
+        var tile = Shared<uint>(64);
+
+        tile[index % 64] = device[index] + half;
+        Barrier();
+        destination[index] = tile[index % 64];
+    }
+}
+";
+
+        var metal = Metal(Source);
+
+        // A buffer named device is renamed, while the address-space qualifier the emitter writes keeps its meaning: only
+        // the names the program declares are touched.
+        Assert.That(metal, Does.Contain("const device uint* device_ [[buffer(0)]]"), "a buffer named device is renamed but the qualifier is not");
+        Assert.That(metal, Does.Contain("device_[__gubbinsIndex]"), "every use of the renamed buffer follows the declaration");
+        Assert.That(metal, Does.Contain("int half_ = 2u;"), "a local named after the Metal scalar type is renamed");
+
+        // Metal has no module scope for group memory, so it is a local of the kernel and has to follow the signature.
+        var signature = metal.IndexOf("kernel void gubbins_main(", StringComparison.Ordinal);
+
+        Assert.That(metal.IndexOf("threadgroup uint tile[64];", StringComparison.Ordinal), Is.GreaterThan(signature), "the group memory is declared inside the kernel");
     }
 
     [Test]
@@ -1579,6 +1608,50 @@ public static unsafe class Histogram
     public void Kernel_RunsOnEveryBackendTheMachineHas()
     {
         const int Count = 4096;
+        const string Structure = @"
+using System;
+using Gubbins.Graphic;
+
+[GpuStruct]
+public struct Step
+{
+    public float Damping;
+    public float Offset;
+}
+
+public static partial class Motion
+{
+    [GpuKernel]
+    public static void Scale(int index, ReadOnlySpan<float> source, Span<float> destination, in Step step)
+    {
+        destination[index] = source[index] * step.Damping + step.Offset;
+    }
+}
+";
+        const string Counting = @"
+using System;
+
+public static unsafe class Histogram
+{
+    public static void Kernel(int index, ReadOnlySpan<uint> source, Span<uint> destination)
+    {
+        var bucket = index % 16;
+        Interlocked.Add(ref destination[bucket], 1);
+    }
+}
+";
+        const string Squaring = @"
+using System;
+
+public static unsafe class Square
+{
+    public static void Kernel(int index, ReadOnlySpan<float4> source, Span<float4> destination)
+    {
+        var value = source[index];
+        destination[index] = value * value;
+    }
+}
+";
 
         var directory = Directory.CreateTempSubdirectory("gubbins-backends-").FullName;
 
@@ -1586,6 +1659,9 @@ public static unsafe class Histogram
         {
             KernelCompiler.Compile(Kernel, directory, "Scale");
             KernelCompiler.Compile(Reduction, directory, "Reduce");
+            KernelCompiler.Compile(Structure, directory, "Scaled");
+            KernelCompiler.Compile(Counting, directory, "Histogram");
+            KernelCompiler.Compile(Squaring, directory, "Square");
 
             var ran = 0;
 
@@ -1600,7 +1676,18 @@ public static unsafe class Histogram
 
                 ran++;
                 VerifyScale(device, directory, name, Count);
+                VerifyScaleOnDeviceMemory(device, directory, name, Count);
                 VerifyReduction(device, directory, name, Count);
+
+                // The PTX the CUDA backend loads has no parameter block, so a kernel that takes a structure is not one it
+                // can express.
+                if (name != "CUDA")
+                {
+                    VerifyStructure(device, directory, name);
+                }
+
+                VerifyAtomic(device, directory, name);
+                VerifyVector(device, directory, name);
             }
 
             if (ran == 0)
@@ -1693,6 +1780,179 @@ public static unsafe class Histogram
     }
 
     /// <summary>
+    /// Runs the scale kernel with an output that lives in device-only memory on one backend.
+    /// </summary>
+    /// <param name="device">The device to run on.</param>
+    /// <param name="directory">The directory the artifacts are in.</param>
+    /// <param name="name">The backend, for the assertions.</param>
+    /// <param name="count">The number of elements to work on.</param>
+    private static void VerifyScaleOnDeviceMemory(GpuDevice device, string directory, string name, int count)
+    {
+        using var memory = device.CreateMemory();
+        using var kernel = GpuKernel.LoadFromDirectory(device, directory, "Scale");
+
+        Assert.That(kernel, Is.Not.Null, $"{name}: the artifact for the device-only output was loaded");
+
+        var input = memory.Allocate((nuint)(count * sizeof(uint)), GpuAccess.Shared);
+        var output = memory.Allocate((nuint)(count * sizeof(uint)), GpuAccess.Sync);
+        var lengths = memory.Allocate(16, GpuAccess.Shared);
+        var values = new uint[count];
+
+        for (var index = 0; index < count; index++)
+        {
+            values[index] = (uint)index;
+        }
+
+        memory.Upload(input, MemoryMarshal.AsBytes(values.AsSpan()));
+        memory.Upload(lengths, MemoryMarshal.AsBytes(new uint[] { (uint)count, (uint)count, 0, 0 }.AsSpan()));
+
+        Assert.That(kernel!.TryDispatch(input, output, (uint)(count / KernelTranspiler.THREADS_PER_GROUP), lengths), Is.True, $"{name}: the dispatch over device-only output ran");
+        memory.MarkWrittenByGpu(output);
+        Assert.That(memory.Synchronize(), Is.True, $"{name}: the device-only output was copied back");
+
+        var result = MemoryMarshal.Cast<byte, uint>(output.CpuView());
+        var addend = (uint)Math.Min(count, 4096);
+
+        for (var index = 0; index < count; index++)
+        {
+            Assert.That(result[index], Is.EqualTo(values[index] + addend), $"{name}: device-only element {index}");
+        }
+    }
+
+    /// <summary>
+    /// Runs the kernel that takes a structure on one backend, which binds the structure after the buffers.
+    /// </summary>
+    /// <param name="device">The device to run on.</param>
+    /// <param name="directory">The directory the artifacts are in.</param>
+    /// <param name="name">The backend, for the assertions.</param>
+    private static void VerifyStructure(GpuDevice device, string directory, string name)
+    {
+        const int count = 256;
+
+        using var memory = device.CreateMemory();
+        using var kernel = GpuKernel.LoadFromDirectory(device, directory, "Scaled");
+
+        Assert.That(kernel, Is.Not.Null, $"{name}: the structure kernel was loaded");
+
+        var input = memory.Allocate((nuint)(count * sizeof(float)), GpuAccess.Shared);
+        var output = memory.Allocate((nuint)(count * sizeof(float)), GpuAccess.Shared);
+        var lengths = memory.Allocate(16, GpuAccess.Shared);
+        var parameters = memory.Allocate((nuint)(2 * sizeof(float)), GpuAccess.Shared);
+        var values = new float[count];
+
+        for (var index = 0; index < count; index++)
+        {
+            values[index] = index;
+        }
+
+        memory.Upload(input, MemoryMarshal.AsBytes(values.AsSpan()));
+        memory.Upload(lengths, MemoryMarshal.AsBytes(new uint[] { count, count, 0, 0 }.AsSpan()));
+
+        foreach (var (damping, offset) in new[] { (2f, 1f), (5f, -3f) })
+        {
+            memory.Upload(parameters, MemoryMarshal.AsBytes(new[] { damping, offset }.AsSpan()));
+
+            Assert.That(kernel!.TryDispatch(input, output, (uint)(count / KernelTranspiler.THREADS_PER_GROUP), lengths, parameters), Is.True, $"{name}: the structure dispatch ran");
+
+            memory.MarkWrittenByGpu(output);
+            Assert.That(memory.Synchronize(), Is.True, $"{name}: the structure output was copied back");
+
+            var result = MemoryMarshal.Cast<byte, float>(output.CpuView());
+
+            for (var index = 0; index < count; index++)
+            {
+                Assert.That(result[index], Is.EqualTo(values[index] * damping + offset).Within(0.001f), $"{name}: structure element {index}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Runs the kernel that counts into buckets with an atomic add on one backend.
+    /// </summary>
+    /// <param name="device">The device to run on.</param>
+    /// <param name="directory">The directory the artifacts are in.</param>
+    /// <param name="name">The backend, for the assertions.</param>
+    private static void VerifyAtomic(GpuDevice device, string directory, string name)
+    {
+        const int count = 65536;
+        const int buckets = 16;
+
+        using var memory = device.CreateMemory();
+        using var kernel = GpuKernel.LoadFromDirectory(device, directory, "Histogram");
+
+        Assert.That(kernel, Is.Not.Null, $"{name}: the atomic kernel was loaded");
+
+        var input = memory.Allocate((nuint)(count * sizeof(uint)), GpuAccess.Shared);
+        var output = memory.Allocate((nuint)(buckets * sizeof(uint)), GpuAccess.Shared);
+        var lengths = memory.Allocate(16, GpuAccess.Shared);
+        var values = new uint[count];
+
+        for (var index = 0; index < count; index++)
+        {
+            values[index] = (uint)index;
+        }
+
+        memory.Upload(input, MemoryMarshal.AsBytes(values.AsSpan()));
+        memory.Upload(output, MemoryMarshal.AsBytes(new uint[buckets].AsSpan()));
+        memory.Upload(lengths, MemoryMarshal.AsBytes(new uint[] { count, buckets, 0, 0 }.AsSpan()));
+
+        Assert.That(kernel!.TryDispatch(input, output, (uint)(count / KernelTranspiler.THREADS_PER_GROUP), lengths), Is.True, $"{name}: the atomic dispatch ran");
+
+        memory.MarkWrittenByGpu(output);
+        Assert.That(memory.Synchronize(), Is.True, $"{name}: the atomic output was copied back");
+
+        var result = MemoryMarshal.Cast<byte, uint>(output.CpuView());
+
+        for (var bucket = 0; bucket < buckets; bucket++)
+        {
+            Assert.That(result[bucket], Is.EqualTo(count / buckets), $"{name}: bucket {bucket}");
+        }
+    }
+
+    /// <summary>
+    /// Runs the kernel whose element is a vector on one backend.
+    /// </summary>
+    /// <param name="device">The device to run on.</param>
+    /// <param name="directory">The directory the artifacts are in.</param>
+    /// <param name="name">The backend, for the assertions.</param>
+    private static void VerifyVector(GpuDevice device, string directory, string name)
+    {
+        const int count = 8192;
+        var elements = count * 4;
+
+        using var memory = device.CreateMemory();
+        using var kernel = GpuKernel.LoadFromDirectory(device, directory, "Square");
+
+        Assert.That(kernel, Is.Not.Null, $"{name}: the vector kernel was loaded");
+
+        var input = memory.Allocate((nuint)(elements * sizeof(float)), GpuAccess.Shared);
+        var output = memory.Allocate((nuint)(elements * sizeof(float)), GpuAccess.Shared);
+        var lengths = memory.Allocate(16, GpuAccess.Shared);
+        var values = new float[elements];
+
+        for (var index = 0; index < elements; index++)
+        {
+            values[index] = index % 7 * 1.5f;
+        }
+
+        memory.Upload(input, MemoryMarshal.AsBytes(values.AsSpan()));
+        memory.Upload(lengths, MemoryMarshal.AsBytes(new uint[] { count, count, 0, 0 }.AsSpan()));
+
+        Assert.That(kernel!.TryDispatch(input, output, (uint)(count / KernelTranspiler.THREADS_PER_GROUP), lengths), Is.True, $"{name}: the vector dispatch ran");
+
+        memory.MarkWrittenByGpu(output);
+        Assert.That(memory.Synchronize(), Is.True, $"{name}: the vector output was copied back");
+
+        var result = MemoryMarshal.Cast<byte, float>(output.CpuView());
+
+        for (var index = 0; index < elements; index++)
+        {
+            var expected = values[index] * values[index];
+            Assert.That(result[index], Is.EqualTo(expected).Within(1e-4f * MathF.Max(1f, expected)), $"{name}: vector element {index}");
+        }
+    }
+
+    /// <summary>
     /// Runs the kernel that synchronizes a group through shared memory on one backend.
     /// </summary>
     /// <param name="device">The device to run on.</param>
@@ -1745,6 +2005,14 @@ public static unsafe class Histogram
     /// <param name="source">The C# source that declares the kernel.</param>
     /// <returns>The HLSL the program is written as.</returns>
     private static string Hlsl(string source) => new KernelHlsl().Emit(KernelTranspiler.Transpile(source));
+
+    /// <summary>
+    /// Emits the Metal source of the kernel a source declares, which is the artifact a Metal device compiles when it creates
+    /// the pipeline.
+    /// </summary>
+    /// <param name="source">The C# source that declares the kernel.</param>
+    /// <returns>The Metal source the program is written as.</returns>
+    private static string Metal(string source) => new KernelMetal().Emit(KernelTranspiler.Transpile(source));
 
     /// <summary>
     /// Compiles a kernel for the device this machine has, skipping the test when either is missing.

@@ -67,6 +67,7 @@ internal sealed class SpirVWriter
     private const uint OP_VARIABLE = 59;
     private const uint OP_LOAD = 61;
     private const uint OP_STORE = 62;
+    private const uint OP_COPY_LOGICAL = 400;
     private const uint OP_ACCESS_CHAIN = 65;
     private const uint OP_DECORATE = 71;
     private const uint OP_MEMBER_DECORATE = 72;
@@ -559,7 +560,7 @@ internal sealed class SpirVWriter
     /// <param name="id">Its id.</param>
     private void Function(KernelFunction function, int id)
     {
-        var returnType = function.ReturnType is VoidType ? m_Void : TypeOf(function.ReturnType);
+        var returnType = function.ReturnType is VoidType ? m_Void : LocalType(function.ReturnType);
         var parameters = function.Parameters.Select(ParameterType).ToList();
         var type = Type(OP_TYPE_FUNCTION, "function" + id, new[] { returnType }.Concat(parameters).Select(operand => (uint)operand).ToArray());
 
@@ -612,8 +613,8 @@ internal sealed class SpirVWriter
     /// <param name="parameter">The parameter.</param>
     /// <returns>The type.</returns>
     private int ParameterType(KernelFunctionParameter parameter) => parameter.Mode == KernelParameterMode.In
-        ? TypeOf(parameter.Type)
-        : Type(OP_TYPE_POINTER, "parameter" + parameter.Name, (uint)STORAGE_CLASS_FUNCTION, (uint)TypeOf(parameter.Type));
+        ? LocalType(parameter.Type)
+        : Type(OP_TYPE_POINTER, "parameter" + parameter.Name, (uint)STORAGE_CLASS_FUNCTION, (uint)LocalType(parameter.Type));
 
     /// <summary>
     /// Writes the variables of a body, which a function keeps in its first block.
@@ -692,7 +693,17 @@ internal sealed class SpirVWriter
             case KernelDeclaration declaration:
                 if (declaration.Initializer is not null)
                 {
-                    Op(OP_STORE, (uint)Slot(declaration.Name).Value, (uint)Value(declaration.Initializer));
+                    var slot = Slot(declaration.Name);
+                    var value = Value(declaration.Initializer);
+
+                    // A structure that comes from a buffer carries the explicit layout of that buffer, which a variable of
+                    // the function may not have; the logical copy converts it to the type the function uses.
+                    if (declaration.Type is StructType)
+                    {
+                        value = Result(OP_COPY_LOGICAL, LocalType(declaration.Type), (uint)value);
+                    }
+
+                    Op(OP_STORE, (uint)slot.Value, (uint)value);
                 }
 
                 return;
@@ -764,9 +775,10 @@ internal sealed class SpirVWriter
         var then = NewBlock();
         var otherwise = branch.Else is null ? null : NewBlock();
         var merge = NewBlock();
+        var condition = Value(branch.Condition);
 
         Op(OP_SELECTION_MERGE, (uint)merge.Id, 0);
-        Op(OP_BRANCH_CONDITIONAL, (uint)Value(branch.Condition), (uint)then.Id, (uint)(otherwise ?? merge).Id);
+        Op(OP_BRANCH_CONDITIONAL, (uint)condition, (uint)then.Id, (uint)(otherwise ?? merge).Id);
         End();
 
         Start(then);
@@ -796,8 +808,9 @@ internal sealed class SpirVWriter
 
         Jump(header.Id);
         Start(header);
+        var condition = Value(loop.Condition);
         Op(OP_LOOP_MERGE, (uint)merge.Id, (uint)next.Id, 0);
-        Op(OP_BRANCH_CONDITIONAL, (uint)Value(loop.Condition), (uint)body.Id, (uint)merge.Id);
+        Op(OP_BRANCH_CONDITIONAL, (uint)condition, (uint)body.Id, (uint)merge.Id);
         End();
 
         Start(body);
@@ -818,13 +831,18 @@ internal sealed class SpirVWriter
     /// <param name="loop">The statement.</param>
     private void DoWhile(KernelDoWhile loop)
     {
+        var header = NewBlock();
         var body = NewBlock();
         var next = NewBlock();
         var merge = NewBlock();
 
-        Jump(body.Id);
-        Start(body);
+        Jump(header.Id);
+        Start(header);
         Op(OP_LOOP_MERGE, (uint)merge.Id, (uint)next.Id, 0);
+        Op(OP_BRANCH, (uint)body.Id);
+        End();
+
+        Start(body);
         m_Loops.Push((merge.Id, next.Id));
         Statement(loop.Body);
         m_Loops.Pop();
@@ -855,15 +873,16 @@ internal sealed class SpirVWriter
 
         Jump(header.Id);
         Start(header);
+        var condition = loop.Condition is null ? (int?)null : Value(loop.Condition);
         Op(OP_LOOP_MERGE, (uint)merge.Id, (uint)next.Id, 0);
 
-        if (loop.Condition is null)
+        if (condition is null)
         {
             Op(OP_BRANCH, (uint)body.Id);
         }
         else
         {
-            Op(OP_BRANCH_CONDITIONAL, (uint)Value(loop.Condition), (uint)body.Id, (uint)merge.Id);
+            Op(OP_BRANCH_CONDITIONAL, (uint)condition.Value, (uint)body.Id, (uint)merge.Id);
         }
 
         End();
@@ -903,7 +922,7 @@ internal sealed class SpirVWriter
                 var slot = Slot(local.Name);
 
                 return slot.Address
-                    ? Result(OP_LOAD, TypeOf(local.ResultType), (uint)slot.Value)
+                    ? Result(OP_LOAD, LocalType(local.ResultType), (uint)slot.Value)
                     : slot.Value;
             }
 
@@ -912,7 +931,7 @@ internal sealed class SpirVWriter
 
             case KernelLengthsElement lengths:
             {
-                var pointer = Result(OP_ACCESS_CHAIN, Pointer(m_UInt), (uint)m_Globals[KernelTranspiler.LENGTHS_BUFFER], (uint)ConstantInt(0), (uint)ConstantInt(lengths.Index));
+                var pointer = Result(OP_ACCESS_CHAIN, Pointer((int)STORAGE_CLASS_STORAGE_BUFFER, m_UInt), (uint)m_Globals[KernelTranspiler.LENGTHS_BUFFER], (uint)ConstantInt(0), (uint)ConstantInt(lengths.Index));
 
                 return Result(OP_LOAD, m_UInt, (uint)pointer);
             }
@@ -936,7 +955,7 @@ internal sealed class SpirVWriter
                 return Conditional(conditional);
 
             default:
-                return Result(OP_LOAD, TypeOf(expression.ResultType), (uint)Address(expression));
+                return Result(OP_LOAD, LoadedType(expression), (uint)Address(expression));
         }
     }
 
@@ -972,22 +991,40 @@ internal sealed class SpirVWriter
             }
 
             case KernelBufferElement element:
-                return Result(OP_ACCESS_CHAIN, Pointer(TypeOf(element.ResultType)), (uint)m_Globals[element.Buffer], (uint)ConstantInt(0), (uint)Value(element.Index));
+                return Result(OP_ACCESS_CHAIN, Pointer((int)STORAGE_CLASS_STORAGE_BUFFER, TypeOf(element.ResultType)), (uint)m_Globals[element.Buffer], (uint)ConstantInt(0), (uint)Value(element.Index));
 
             case KernelArrayElement array:
-                return Result(OP_ACCESS_CHAIN, Pointer(TypeOf(array.ResultType)), (uint)Slot(array.Array).Value, (uint)Value(array.Index));
+                return Result(OP_ACCESS_CHAIN, Pointer(LocalType(array.ResultType)), (uint)Slot(array.Array).Value, (uint)Value(array.Index));
 
             case KernelSharedElement shared:
-                return Result(OP_ACCESS_CHAIN, Pointer(TypeOf(shared.ResultType)), (uint)m_Globals[shared.Array], (uint)Value(shared.Index));
+                return Result(OP_ACCESS_CHAIN, Pointer((int)STORAGE_CLASS_WORKGROUP, TypeOf(shared.ResultType)), (uint)m_Globals[shared.Array], (uint)Value(shared.Index));
 
             case KernelFieldAccess field:
-                return Result(OP_ACCESS_CHAIN, Pointer(TypeOf(field.ResultType)), (uint)Address(field.Target), (uint)ConstantInt(MemberIndex(field.Target.ResultType, field.Field)));
+            {
+                var storage = StorageClassOf(field.Target);
+                var type = storage == (int)STORAGE_CLASS_FUNCTION ? LocalType(field.ResultType) : TypeOf(field.ResultType);
+
+                return Result(OP_ACCESS_CHAIN, Pointer(storage, type), (uint)Address(field.Target), (uint)ConstantInt(MemberIndex(field.Target.ResultType, field.Field)));
+            }
 
 
             default:
                 throw new KernelTranslationException($"'{expression}' is not a value the device addresses.");
         }
     }
+
+    /// <summary>
+    /// Reads the storage class a value that can be addressed lives in.
+    /// </summary>
+    /// <param name="expression">The value.</param>
+    /// <returns>The storage class of its pointer.</returns>
+    private static int StorageClassOf(KernelExpression expression) => expression switch
+    {
+        KernelBufferElement => (int)STORAGE_CLASS_STORAGE_BUFFER,
+        KernelSharedElement => (int)STORAGE_CLASS_WORKGROUP,
+        KernelFieldAccess field => StorageClassOf(field.Target),
+        _ => (int)STORAGE_CLASS_FUNCTION
+    };
 
     /// <summary>
     /// Writes a call of a function of the program.
@@ -997,7 +1034,7 @@ internal sealed class SpirVWriter
     private int Call(KernelCall call)
     {
         var id = Id();
-        var words = new List<uint> { OP_FUNCTION_CALL, (uint)TypeOf(call.Function.ReturnType), (uint)id, (uint)m_Functions[call.Function] };
+        var words = new List<uint> { OP_FUNCTION_CALL, (uint)LocalType(call.Function.ReturnType), (uint)id, (uint)m_Functions[call.Function] };
 
         for (var index = 0; index < call.Arguments.Count; index++)
         {
@@ -1259,7 +1296,6 @@ internal sealed class SpirVWriter
     private void Shared(KernelSharedArray array)
     {
         var type = Type(OP_TYPE_ARRAY, "shared" + array.Name, (uint)TypeOf(array.Element), (uint)ConstantInt(array.Length));
-        m_Annotations.Add(Instruction(OP_DECORATE, (uint)type, DECORATION_ARRAY_STRIDE, (uint)Stride(array.Element)));
 
         var pointer = Type(OP_TYPE_POINTER, "shared.pointer" + array.Name, (uint)STORAGE_CLASS_WORKGROUP, (uint)type);
         var variable = Id();
@@ -1405,20 +1441,50 @@ internal sealed class SpirVWriter
     }
 
     /// <summary>
+    /// Reads the type a value of the function takes, which carries no explicit layout.
+    /// </summary>
+    /// <param name="type">The type.</param>
+    /// <returns>The id of the type.</returns>
+    private int LocalType(KernelType type) => type switch
+    {
+        StructType structure => Structure(structure, false),
+        ArrayType array => Type(OP_TYPE_ARRAY, "array.local." + array.TypeName, (uint)LocalType(array.Element), (uint)ConstantInt(array.Length)),
+        _ => TypeOf(type)
+    };
+
+    /// <summary>
+    /// Reads the type a value is loaded as, which depends on where it lives.
+    /// </summary>
+    /// <param name="expression">The value.</param>
+    /// <returns>The id of the type.</returns>
+    private int LoadedType(KernelExpression expression)
+        => StorageClassOf(expression) == (int)STORAGE_CLASS_FUNCTION ? LocalType(expression.ResultType) : TypeOf(expression.ResultType);
+
+    /// <summary>
     /// Declares one structure of the program.
     /// </summary>
     /// <param name="structure">The structure.</param>
+    /// <param name="layout">Whether the structure needs the explicit layout of a buffer.</param>
     /// <returns>The id of the type.</returns>
-    private int Structure(StructType structure)
+    private int Structure(StructType structure, bool layout = true)
     {
-        if (m_Types.TryGetValue("struct:" + structure.Name, out var known))
+        var prefix = layout ? "struct:" : "struct.local:";
+        var key = OP_TYPE_STRUCT + ":" + prefix + structure.Name;
+
+        if (m_Types.TryGetValue(key, out var known))
         {
             return known;
         }
 
         var declaration = m_Program.Structs.First(candidate => candidate.Name == structure.Name);
-        var fields = declaration.Fields.Select(field => TypeOf(field.Type)).ToArray();
-        var type = Type(OP_TYPE_STRUCT, "struct:" + structure.Name, fields.Select(field => (uint)field).ToArray());
+        var fields = declaration.Fields.Select(field => layout ? TypeOf(field.Type) : LocalType(field.Type)).ToArray();
+        var type = Type(OP_TYPE_STRUCT, prefix + structure.Name, fields.Select(field => (uint)field).ToArray());
+
+        if (!layout)
+        {
+            return type;
+        }
+
         var offset = 0;
 
         for (var index = 0; index < declaration.Fields.Count; index++)
@@ -1509,7 +1575,15 @@ internal sealed class SpirVWriter
     /// </summary>
     /// <param name="type">The type it points to.</param>
     /// <returns>The id of the pointer type.</returns>
-    private int Pointer(int type) => Type(OP_TYPE_POINTER, "pointer" + type, (uint)STORAGE_CLASS_FUNCTION, (uint)type);
+    private int Pointer(int type) => Pointer((int)STORAGE_CLASS_FUNCTION, type);
+
+    /// <summary>
+    /// Writes a pointer type in the storage class the value it points at lives in.
+    /// </summary>
+    /// <param name="storageClass">The storage class.</param>
+    /// <param name="type">The type pointed at.</param>
+    /// <returns>The id of the pointer type.</returns>
+    private int Pointer(int storageClass, int type) => Type(OP_TYPE_POINTER, "pointer" + storageClass + ":" + type, (uint)storageClass, (uint)type);
 
 
     /// <summary>
@@ -1546,7 +1620,7 @@ internal sealed class SpirVWriter
     private int Variable(KernelType type)
     {
         var id = Id();
-        m_Body.Add(Instruction(OP_VARIABLE, (uint)Pointer(TypeOf(type)), (uint)id, STORAGE_CLASS_FUNCTION));
+        m_Body.Add(Instruction(OP_VARIABLE, (uint)Pointer(LocalType(type)), (uint)id, STORAGE_CLASS_FUNCTION));
 
         return id;
     }
