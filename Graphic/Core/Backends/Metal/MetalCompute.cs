@@ -17,6 +17,7 @@ internal sealed unsafe class MetalCompute : IDisposable
     private nint m_Function;
     private nint m_Pipeline;
     private string m_Error = string.Empty;
+    private readonly List<nint> m_Pending = [];
     private bool m_Disposed;
 
     /// <param name="device">The <c>MTLDevice</c> to run on.</param>
@@ -122,7 +123,7 @@ internal sealed unsafe class MetalCompute : IDisposable
     /// <param name="groups">The number of thread groups on the x axis.</param>
     /// <param name="threadsPerGroup">The threads in a group.</param>
     /// <returns><see langword="true"/> if the dispatch ran to completion.</returns>
-    internal bool Dispatch(nint sourceBuffer, nuint sourceOffset, nint destinationBuffer, nuint destinationOffset, nint parametersBuffer, nuint parametersOffset, nint lengthsBuffer, nuint lengthsOffset, uint groups, uint threadsPerGroup)
+    internal bool Dispatch(nint sourceBuffer, nuint sourceOffset, nint destinationBuffer, nuint destinationOffset, nint parametersBuffer, nuint parametersOffset, nint lengthsBuffer, nuint lengthsOffset, nint texture, nint sampler, uint groups, uint threadsPerGroup, bool wait)
     {
         if (m_Disposed || m_Pipeline == 0 || sourceBuffer == 0 || destinationBuffer == 0 || groups == 0 || threadsPerGroup == 0)
         {
@@ -167,6 +168,16 @@ internal sealed unsafe class MetalCompute : IDisposable
                 MetalApi.SetBuffer(encoder, lengthsBuffer, lengthsOffset, 2);
             }
 
+            if (texture != 0)
+            {
+                MetalApi.SetTexture(encoder, texture, 0);
+            }
+
+            if (sampler != 0)
+            {
+                MetalApi.SetSamplerState(encoder, sampler, 0);
+            }
+
             var threadgroups = new MetalSize { Width = groups, Height = 1, Depth = 1 };
             var threads = new MetalSize { Width = threadsPerGroup, Height = 1, Depth = 1 };
             MetalApi.DispatchThreadgroups(encoder, threadgroups, threads);
@@ -174,13 +185,39 @@ internal sealed unsafe class MetalCompute : IDisposable
             // The encoder has to be closed before the buffer is committed, and the wait is what makes the write visible.
             MetalApi.Send(encoder, "endEncoding");
             MetalApi.Send(commandBuffer, "commit");
-            MetalApi.Send(commandBuffer, "waitUntilCompleted");
+
+            if (wait)
+            {
+                MetalApi.Send(commandBuffer, "waitUntilCompleted");
+            }
+            else
+            {
+                MetalApi.Retain(commandBuffer);
+                m_Pending.Add(commandBuffer);
+            }
+
             return true;
         }
         finally
         {
             MetalApi.PopAutoreleasePool(pool);
         }
+    }
+
+    /// <summary>
+    /// Waits for the dispatches that were recorded without waiting.
+    /// </summary>
+    /// <returns><see langword="true"/> when every submission has completed.</returns>
+    internal bool WaitPending()
+    {
+        foreach (var commandBuffer in m_Pending)
+        {
+            MetalApi.Send(commandBuffer, "waitUntilCompleted");
+            MetalApi.Release(commandBuffer);
+        }
+
+        m_Pending.Clear();
+        return true;
     }
 
     /// <summary>
@@ -194,6 +231,7 @@ internal sealed unsafe class MetalCompute : IDisposable
         }
 
         m_Disposed = true;
+        WaitPending();
 
         if (m_Pipeline != 0)
         {

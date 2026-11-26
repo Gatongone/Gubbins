@@ -48,11 +48,13 @@ public sealed unsafe class GpuBlock
     /// <param name="storage">The block the device works on.</param>
     /// <param name="readable">The block the central processor reads.</param>
     /// <param name="access">What the central processor is allowed to do with it.</param>
-    internal GpuBlock(UnifiedMemoryBlock storage, UnifiedMemoryBlock readable, GpuAccess access)
+    /// <param name="owned">Whether this layer created the storage and may release it.</param>
+    internal GpuBlock(UnifiedMemoryBlock storage, UnifiedMemoryBlock readable, GpuAccess access, bool owned = true)
     {
         Storage = storage;
         Readable = readable;
         Access = access;
+        Owned = owned;
     }
 
     /// <summary>
@@ -69,6 +71,11 @@ public sealed unsafe class GpuBlock
     /// Gets what the central processor is allowed to do with this block.
     /// </summary>
     public GpuAccess Access { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether this layer created the storage and may release it.
+    /// </summary>
+    internal bool Owned { get; }
 
     /// <summary>
     /// Gets the size of the block, in bytes.
@@ -216,6 +223,55 @@ public sealed unsafe class GpuMemory : IDisposable
     }
 
     /// <summary>
+    /// Wraps memory the engine owns as a block this layer can bind, without taking ownership of it.
+    /// </summary>
+    /// <param name="storage">The imported block.</param>
+    /// <param name="access">What the central processor is allowed to do with it.</param>
+    /// <returns>The block, released without freeing the imported memory.</returns>
+    /// <exception cref="NotSupportedException">Thrown when the access cannot be served for the imported memory.</exception>
+    /// <remarks>
+    /// A <see cref="GpuAccess.Shared"/> block must already be CPU addressable. A <see cref="GpuAccess.Sync"/> block that is
+    /// not gets a staging block from this layer, which is freed with the wrapper.
+    /// </remarks>
+    public GpuBlock Wrap(in UnifiedMemoryBlock storage, GpuAccess access)
+    {
+        if (m_Disposed)
+        {
+            throw new ObjectDisposedException(nameof(GpuMemory));
+        }
+
+        if (storage.Length == 0)
+        {
+            throw new ArgumentException("A wrapped block has at least one byte.", nameof(storage));
+        }
+
+        if (access == GpuAccess.Shared)
+        {
+            if (storage.Host == null)
+            {
+                throw new NotSupportedException("This block has no memory both processors can address.");
+            }
+
+            return Track(new GpuBlock(storage, storage, GpuAccess.Shared, false));
+        }
+
+        if (storage.Host != null)
+        {
+            return Track(new GpuBlock(storage, storage, GpuAccess.Sync, false));
+        }
+
+        var readable = m_Allocator.AllocBlock(storage.Length, UnifiedMemoryUsage.General);
+
+        if (readable.Host == null)
+        {
+            m_Allocator.TryFree(readable);
+            throw new NotSupportedException("This device has no memory the central processor can read.");
+        }
+
+        return Track(new GpuBlock(storage, readable, GpuAccess.Sync, false));
+    }
+
+    /// <summary>
     /// Writes data into a block starting at an offset.
     /// </summary>
     /// <param name="block">The block to write.</param>
@@ -309,7 +365,7 @@ public sealed unsafe class GpuMemory : IDisposable
             throw new ArgumentNullException(nameof(block));
         }
 
-        var released = m_Allocator.TryFree(block.Storage);
+        var released = block.Owned ? m_Allocator.TryFree(block.Storage) : true;
 
         if (block.Readable.Host != block.Storage.Host)
         {
@@ -438,7 +494,11 @@ public sealed unsafe class GpuMemory : IDisposable
         for (var i = m_Live.Count - 1; i >= m_FrameMark; i--)
         {
             var block = m_Live[i];
-            m_Allocator.TryFree(block.Storage);
+
+            if (block.Owned)
+            {
+                m_Allocator.TryFree(block.Storage);
+            }
 
             if (block.Readable.Host != block.Storage.Host)
             {
@@ -483,7 +543,10 @@ public sealed unsafe class GpuMemory : IDisposable
 
         for (var i = 0; i < m_Live.Count; i++)
         {
-            m_Allocator.TryFree(m_Live[i].Storage);
+            if (m_Live[i].Owned)
+            {
+                m_Allocator.TryFree(m_Live[i].Storage);
+            }
 
             if (m_Live[i].Readable.Host != m_Live[i].Storage.Host)
             {

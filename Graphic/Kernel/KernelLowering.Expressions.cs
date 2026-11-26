@@ -622,6 +622,30 @@ internal sealed partial class KernelLowering
         var name = CallName(invocation.Expression);
         var qualified = Qualified(invocation.Expression);
 
+        if (invocation.Expression is MemberAccessExpressionSyntax sample &&
+            sample.Expression is IdentifierNameSyntax sampled &&
+            sample.Name.Identifier.ValueText == "Sample" &&
+            invocation.ArgumentList.Arguments.Count == 2)
+        {
+            var texture = m_Textures.FirstOrDefault(candidate => candidate.Name == sampled.Identifier.ValueText);
+
+            if (texture is not null)
+            {
+                if (invocation.ArgumentList.Arguments[0].Expression is not IdentifierNameSyntax samplerName)
+                {
+                    throw new KernelTranslationException("A texture is sampled through a sampler state the kernel declares.");
+                }
+
+                var sampler = m_Samplers.FirstOrDefault(candidate => candidate.Name == samplerName.Identifier.ValueText)
+                              ?? throw new KernelTranslationException($"'{samplerName.Identifier.ValueText}' is not a sampler state of the kernel.");
+
+                return new KernelTextureSample(
+                    texture,
+                    sampler,
+                    Expression(invocation.ArgumentList.Arguments[1].Expression, new VectorType(KernelScalar.Float, 2)));
+            }
+        }
+
         if (qualified.StartsWith("System.", StringComparison.Ordinal))
         {
             qualified = qualified.Substring("System.".Length);

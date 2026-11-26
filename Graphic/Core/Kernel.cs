@@ -184,16 +184,18 @@ public sealed class Kernel
             var counts = new uint[] { (uint) source.Length, (uint) target.Length, 0, 0 };
             memory.Upload(lengths, MemoryMarshal.AsBytes(counts.AsSpan()));
 
-            if (!m_Program.TryDispatch(source.Block, target.Block, groups, lengths, parameters))
+            if (!m_Gpu.Queue.Dispatch(m_Program, source.Block, target.Block, groups, lengths, parameters))
             {
                 throw new GpuExecutionException($"The kernel '{Name}' did not run.");
             }
 
             target.MarkWrittenByGpu();
+            m_Gpu.Queue.Retain(memory, lengths);
         }
-        finally
+        catch
         {
             memory.Release(lengths);
+            throw;
         }
     }
 

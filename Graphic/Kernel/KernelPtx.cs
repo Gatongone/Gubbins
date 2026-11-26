@@ -37,7 +37,7 @@ public sealed class KernelPtx
             throw new ArgumentNullException(nameof(program));
         }
 
-        if (program.Buffers.Count != 2 || program.Parameters is not null || Wave(program))
+        if (program.Buffers.Count != 2 || program.Parameters is not null || Wave(program) || (program.Textures?.Count ?? 0) > 0)
         {
             return string.Empty;
         }

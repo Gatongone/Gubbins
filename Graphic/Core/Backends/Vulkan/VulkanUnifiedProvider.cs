@@ -97,6 +97,11 @@ public sealed unsafe class VulkanUnifiedProvider : IUnifiedProvider, IDisposable
         /// How the segment is shared between the CPU and the device.
         /// </summary>
         public UnifiedMemoryKind Kind;
+
+        /// <summary>
+        /// Whether this bridge created the buffer and memory, so it may release them.
+        /// </summary>
+        public bool Owned;
     }
 
     private readonly nint m_PhysicalDevice;
@@ -503,6 +508,7 @@ public sealed unsafe class VulkanUnifiedProvider : IUnifiedProvider, IDisposable
         arena->MemoryFlags = flags;
         arena->MemoryTypeIndex = (uint)memoryType;
         arena->Kind = kind;
+        arena->Owned = true;
         arena->Next = m_First;
         m_First = arena;
 
@@ -765,6 +771,74 @@ public sealed unsafe class VulkanUnifiedProvider : IUnifiedProvider, IDisposable
     }
 
     /// <summary>
+    /// Wraps a buffer the engine owns as a block this layer can bind, without taking ownership of it.
+    /// </summary>
+    /// <param name="buffer">The <c>VkBuffer</c>.</param>
+    /// <param name="offset">The offset of the block inside the buffer, in bytes.</param>
+    /// <param name="length">The length of the block, in bytes.</param>
+    /// <param name="host">The persistent mapping of the buffer, or <see langword="0"/> when it is device only.</param>
+    /// <param name="kind">How the buffer is shared between the processors.</param>
+    /// <param name="block">When the method returns, the block.</param>
+    /// <returns><see langword="true"/> when the bookkeeping for the block was created.</returns>
+    public bool TryImport(nint buffer, nuint offset, nuint length, nint host, UnifiedMemoryKind kind, out UnifiedMemoryBlock block)
+    {
+        block = default;
+
+        if (m_Disposed || buffer == 0 || length == 0)
+        {
+            return false;
+        }
+
+        var arena = (Arena*)NativeInterop.AllocZeroed((nuint)sizeof(Arena));
+
+        if (arena == null)
+        {
+            return false;
+        }
+
+        arena->Buffer = buffer;
+        arena->Host = (byte*)host;
+        arena->Size = length;
+        arena->AllocationSize = length;
+        arena->Kind = kind;
+        arena->Owned = false;
+        arena->Next = m_First;
+        m_First = arena;
+
+        block = new UnifiedMemoryBlock(
+            arena,
+            (byte*)host,
+            host == 0 ? null : (byte*)host + (long)offset,
+            0,
+            offset,
+            length,
+            length,
+            kind);
+
+        return true;
+    }
+
+    /// <summary>
+    /// Gets the <c>VkDevice</c> the bridge allocates on.
+    /// </summary>
+    internal nint Device => m_Device;
+
+    /// <summary>
+    /// Gets the <c>VkPhysicalDevice</c> the bridge reads its memory types from.
+    /// </summary>
+    internal nint PhysicalDevice => m_PhysicalDevice;
+
+    /// <summary>
+    /// Gets the <c>VkQueue</c> the bridge submits copies to.
+    /// </summary>
+    internal nint Queue => m_Queue;
+
+    /// <summary>
+    /// Gets the family of <see cref="Queue"/>.
+    /// </summary>
+    internal uint QueueFamily => m_QueueFamilyIndex;
+
+    /// <summary>
     /// Gets the memory type index of the segment that owns <paramref name="block"/>.
     /// </summary>
     /// <param name="block">The block to describe.</param>
@@ -939,6 +1013,12 @@ public sealed unsafe class VulkanUnifiedProvider : IUnifiedProvider, IDisposable
     /// <param name="arena">The segment to release.</param>
     private void DestroyArena(Arena* arena)
     {
+        if (!arena->Owned)
+        {
+            NativeInterop.Free(arena);
+            return;
+        }
+
         if (arena->Host != null)
         {
             VulkanApi.UnmapMemory(m_Device, arena->Memory);

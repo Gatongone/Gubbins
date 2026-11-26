@@ -55,6 +55,43 @@ internal sealed unsafe class GlUnifiedProvider : IUnifiedProvider
     /// <inheritdoc/>
     public UnifiedProvider GetProvider() => ProviderAdapter<GlUnifiedProvider>.Create(this, ref m_Self);
 
+    /// <summary>
+    /// Creates a two dimensional texture on the current context.
+    /// </summary>
+    /// <param name="width">The width, in pixels.</param>
+    /// <param name="height">The height, in pixels.</param>
+    /// <param name="format">The pixel format.</param>
+    /// <returns>The texture, to be disposed when it is no longer read.</returns>
+    public GpuTexture2D CreateTexture(int width, int height, GpuTextureFormat format)
+    {
+        if (m_Disposed)
+        {
+            throw new ObjectDisposedException(nameof(GlUnifiedProvider));
+        }
+
+        if (width <= 0 || height <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(width), "A texture is at least one pixel wide and high.");
+        }
+
+        return new GpuTexture2D(new GlTexture(m_Api, width, height, format), width, height, format);
+    }
+
+    /// <summary>
+    /// Creates a sampler object on the current context.
+    /// </summary>
+    /// <param name="sampler">The sampler description.</param>
+    /// <returns>The sampler, to be disposed when it is no longer bound.</returns>
+    public GpuSamplerState CreateSampler(GpuSampler sampler)
+    {
+        if (m_Disposed)
+        {
+            throw new ObjectDisposedException(nameof(GlUnifiedProvider));
+        }
+
+        return new GpuSamplerState(new GlSamplerState(m_Api, sampler));
+    }
+
     /// <inheritdoc/>
     public void* Alloc(nuint size, nuint alignment, UnifiedMemoryUsage usage, out void* deviceHandle, out ulong deviceAddress, out UnifiedMemoryKind kind)
     {

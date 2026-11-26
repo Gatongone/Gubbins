@@ -30,9 +30,11 @@ internal sealed unsafe class VulkanDevice : IDisposable
     private readonly uint m_QueueFlags;
     private readonly bool m_BufferDeviceAddress;
     private readonly nuint m_WorkingSetLimit;
+    private readonly bool m_OwnsProvider;
+    private readonly bool m_OwnsDevice;
     private bool m_Disposed;
 
-    private VulkanDevice(nint instance, nint physicalDevice, nint device, nint queue, uint queueFamily, uint queueFlags, bool bufferDeviceAddress, nuint workingSetLimit)
+    private VulkanDevice(nint instance, nint physicalDevice, nint device, nint queue, uint queueFamily, uint queueFlags, bool bufferDeviceAddress, nuint workingSetLimit, VulkanUnifiedProvider provider, bool ownsProvider, bool ownsDevice)
     {
         m_Instance = instance;
         m_PhysicalDevice = physicalDevice;
@@ -42,13 +44,9 @@ internal sealed unsafe class VulkanDevice : IDisposable
         m_QueueFlags = queueFlags;
         m_BufferDeviceAddress = bufferDeviceAddress;
         m_WorkingSetLimit = workingSetLimit;
-        Provider = new VulkanUnifiedProvider(
-            physicalDevice,
-            device,
-            queue,
-            queueFamily,
-            bufferDeviceAddress: bufferDeviceAddress,
-            workingSetLimit: workingSetLimit);
+        m_OwnsProvider = ownsProvider;
+        m_OwnsDevice = ownsDevice;
+        Provider = provider;
     }
 
     /// <summary>
@@ -236,7 +234,25 @@ internal sealed unsafe class VulkanDevice : IDisposable
                 ? reported
                 : 0;
 
-            created = new VulkanDevice(instance, physicalDevice, device, queue, (uint)family, queueFlags, supportsDeviceAddress, workingSetLimit);
+            created = new VulkanDevice(
+                instance,
+                physicalDevice,
+                device,
+                queue,
+                (uint)family,
+                queueFlags,
+                supportsDeviceAddress,
+                workingSetLimit,
+                new VulkanUnifiedProvider(
+                    physicalDevice,
+                    device,
+                    queue,
+                    (uint)family,
+                    bufferDeviceAddress: supportsDeviceAddress,
+                    workingSetLimit: workingSetLimit),
+                true,
+                true);
+
             instance = 0;
             device = 0;
             return true;
@@ -264,6 +280,26 @@ internal sealed unsafe class VulkanDevice : IDisposable
     }
 
     /// <summary>
+    /// Wraps a bridge the engine created around its own device.
+    /// </summary>
+    /// <param name="provider">The bridge.</param>
+    /// <param name="ownsProvider">Whether disposing the device also disposes the bridge.</param>
+    /// <returns>The device.</returns>
+    internal static VulkanDevice FromProvider(VulkanUnifiedProvider provider, bool ownsProvider)
+        => new VulkanDevice(
+            0,
+            provider.PhysicalDevice,
+            provider.Device,
+            provider.Queue,
+            provider.QueueFamily,
+            0,
+            false,
+            0,
+            provider,
+            ownsProvider,
+            false);
+
+    /// <summary>
     /// Releases the bridge, then the device and the instance it was created from.
     /// </summary>
     public void Dispose()
@@ -275,7 +311,15 @@ internal sealed unsafe class VulkanDevice : IDisposable
 
         m_Disposed = true;
 
-        Provider.Dispose();
+        if (m_OwnsProvider)
+        {
+            Provider.Dispose();
+        }
+
+        if (!m_OwnsDevice)
+        {
+            return;
+        }
 
         if (m_Device != 0)
         {

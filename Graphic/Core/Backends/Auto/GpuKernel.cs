@@ -229,7 +229,7 @@ public sealed class GpuKernel : IDisposable
     /// The block that holds the structure the kernel takes as one value; <see langword="null"/> when the kernel takes none.
     /// </param>
     /// <returns><see langword="true"/> if the dispatch ran to completion.</returns>
-    public bool TryDispatch(GpuBlock source, GpuBlock destination, uint groups, GpuBlock? lengths = null, GpuBlock? parameters = null)
+    public bool TryDispatch(GpuBlock source, GpuBlock destination, uint groups, GpuBlock? lengths = null, GpuBlock? parameters = null, bool wait = true)
     {
         if (m_Disposed)
         {
@@ -265,7 +265,7 @@ public sealed class GpuKernel : IDisposable
                 parametersPointer = availableParameters;
             }
 
-            return m_Cuda.Dispatch(sourcePointer, (ulong)source.Storage.Length, destinationPointer, (ulong)destination.Storage.Length, parametersPointer, lengthsPointer, lengthsLength, groups, 64);
+            return m_Cuda.Dispatch(sourcePointer, (ulong)source.Storage.Length, destinationPointer, (ulong)destination.Storage.Length, parametersPointer, lengthsPointer, lengthsLength, groups, 64, wait);
         }
 
         if (m_OpenGL is not null && m_Device.Backend is GlDevice openGL)
@@ -296,7 +296,7 @@ public sealed class GpuKernel : IDisposable
                 parametersSize = (ulong)parameters.Storage.Length;
             }
 
-            return m_OpenGL.Dispatch(sourceBuffer, sourceOffset, (ulong)source.Length, destinationBuffer, destinationOffset, (ulong)destination.Length, parametersBuffer, parametersOffset, parametersSize, lengthsBuffer, lengthsOffset, LengthsSize, groups);
+            return m_OpenGL.Dispatch(sourceBuffer, sourceOffset, (ulong)source.Length, destinationBuffer, destinationOffset, (ulong)destination.Length, parametersBuffer, parametersOffset, parametersSize, lengthsBuffer, lengthsOffset, LengthsSize, 0, 0, groups, wait);
         }
 
         if (m_Metal is not null && m_Device.Backend is MetalDevice metal)
@@ -327,7 +327,7 @@ public sealed class GpuKernel : IDisposable
                 parametersOffset = availableParametersOffset;
             }
 
-            return m_Metal.Dispatch(sourceBuffer, (nuint)sourceOffset, destinationBuffer, (nuint)destinationOffset, parametersBuffer, (nuint)parametersOffset, lengthsBuffer, (nuint)lengthsOffset, groups, 64);
+            return m_Metal.Dispatch(sourceBuffer, (nuint)sourceOffset, destinationBuffer, (nuint)destinationOffset, parametersBuffer, (nuint)parametersOffset, lengthsBuffer, (nuint)lengthsOffset, 0, 0, groups, 64, wait);
         }
 
         if (m_Vulkan is not null && m_Device.Backend is VulkanDevice vulkan)
@@ -360,7 +360,7 @@ public sealed class GpuKernel : IDisposable
                 parametersSize = (ulong)parameters.Storage.Length;
             }
 
-            return m_Vulkan.Dispatch(sourceBuffer, sourceOffset, (ulong)source.Length, destinationBuffer, destinationOffset, (ulong)destination.Length, parametersBuffer, parametersOffset, parametersSize, lengthsBuffer, lengthsOffset, groups);
+            return m_Vulkan.Dispatch(sourceBuffer, sourceOffset, (ulong)source.Length, destinationBuffer, destinationOffset, (ulong)destination.Length, parametersBuffer, parametersOffset, parametersSize, lengthsBuffer, lengthsOffset, groups, wait);
         }
 
         if (m_D3D12 is null || m_Device.Backend is not D3D12Device d3d12)
@@ -393,7 +393,184 @@ public sealed class GpuKernel : IDisposable
             parametersAddress = D3D12Api.GetVirtualAddress(parametersResource) + (ulong)parameters.Storage.Offset;
         }
 
-        return m_D3D12.Dispatch(sourceResource, sourceAddress, destinationResource, destinationAddress, parametersAddress, lengthsAddress, groups);
+        return m_D3D12.Dispatch(sourceResource, sourceAddress, destinationResource, destinationAddress, parametersAddress, lengthsAddress, groups, wait);
+    }
+
+    /// <summary>
+    /// Runs a kernel that samples a texture, on the backend that can bind one.
+    /// </summary>
+    /// <param name="source">The block the kernel reads.</param>
+    /// <param name="destination">The block the kernel writes.</param>
+    /// <param name="lengths">The block that carries the element counts, or <see langword="null"/>.</param>
+    /// <param name="parameters">The block that carries the structure the kernel takes, or <see langword="null"/>.</param>
+    /// <param name="texture">The texture to sample.</param>
+    /// <param name="sampler">The sampler state.</param>
+    /// <param name="groups">The number of groups on the x axis.</param>
+    /// <param name="wait">Whether to wait for the dispatch.</param>
+    /// <returns><see langword="true"/> if the dispatch ran.</returns>
+    public bool TryDispatch(GpuBlock source, GpuBlock destination, GpuBlock? lengths, GpuBlock? parameters, GpuTexture2D texture, GpuSamplerState sampler, uint groups, bool wait = true)
+    {
+        if (m_Disposed)
+        {
+            throw new ObjectDisposedException(nameof(GpuKernel));
+        }
+
+        if (m_Metal is null || m_Device.Backend is not MetalDevice metal)
+        {
+            return false;
+        }
+
+        if (texture.Backend is not MetalTexture metalTexture || sampler.Backend is not MetalSamplerState metalSampler)
+        {
+            return false;
+        }
+
+        if (!metal.Provider.TryGetBuffer(source.Storage, out var sourceBuffer, out var sourceOffset) ||
+            !metal.Provider.TryGetBuffer(destination.Storage, out var destinationBuffer, out var destinationOffset))
+        {
+            return false;
+        }
+
+        nint lengthsBuffer = 0;
+        var lengthsOffset = 0ul;
+
+        if (lengths is not null && metal.Provider.TryGetBuffer(lengths.Storage, out var availableLengths, out var availableLengthsOffset))
+        {
+            lengthsBuffer = availableLengths;
+            lengthsOffset = availableLengthsOffset;
+        }
+
+        nint parametersBuffer = 0;
+        var parametersOffset = 0ul;
+
+        if (parameters is not null && metal.Provider.TryGetBuffer(parameters.Storage, out var availableParameters, out var availableParametersOffset))
+        {
+            parametersBuffer = availableParameters;
+            parametersOffset = availableParametersOffset;
+        }
+
+        return m_Metal.Dispatch(
+            sourceBuffer,
+            (nuint)sourceOffset,
+            destinationBuffer,
+            (nuint)destinationOffset,
+            parametersBuffer,
+            (nuint)parametersOffset,
+            lengthsBuffer,
+            (nuint)lengthsOffset,
+            metalTexture.Handle,
+            metalSampler.Handle,
+            groups,
+            64,
+            wait);
+    }
+
+    /// <summary>
+    /// Runs a kernel that samples a texture on OpenGL.
+    /// </summary>
+    /// <param name="source">The block the kernel reads.</param>
+    /// <param name="destination">The block the kernel writes.</param>
+    /// <param name="lengths">The block that carries the element counts, or <see langword="null"/>.</param>
+    /// <param name="parameters">The block that carries the structure the kernel takes, or <see langword="null"/>.</param>
+    /// <param name="texture">The texture to sample.</param>
+    /// <param name="sampler">The sampler state.</param>
+    /// <param name="groups">The number of groups on the x axis.</param>
+    /// <param name="wait">Whether to wait for the dispatch.</param>
+    /// <returns><see langword="true"/> if the dispatch ran.</returns>
+    public bool TryDispatchOpenGl(GpuBlock source, GpuBlock destination, GpuBlock? lengths, GpuBlock? parameters, GpuTexture2D texture, GpuSamplerState sampler, uint groups, bool wait = true)
+    {
+        if (m_Disposed)
+        {
+            throw new ObjectDisposedException(nameof(GpuKernel));
+        }
+
+        if (m_OpenGL is null || m_Device.Backend is not GlDevice openGL)
+        {
+            return false;
+        }
+
+        if (texture.Backend is not GlTexture glTexture || sampler.Backend is not GlSamplerState glSampler)
+        {
+            return false;
+        }
+
+        if (!openGL.Provider.TryGetBuffer(source.Storage, out var sourceBuffer, out var sourceOffset) ||
+            !openGL.Provider.TryGetBuffer(destination.Storage, out var destinationBuffer, out var destinationOffset))
+        {
+            return false;
+        }
+
+        var lengthsBuffer = 0u;
+        var lengthsOffset = 0ul;
+
+        if (lengths is not null && openGL.Provider.TryGetBuffer(lengths.Storage, out var availableLengths, out var availableLengthsOffset))
+        {
+            lengthsBuffer = availableLengths;
+            lengthsOffset = availableLengthsOffset;
+        }
+
+        var parametersBuffer = 0u;
+        var parametersOffset = 0ul;
+        var parametersSize = 0ul;
+
+        if (parameters is not null && openGL.Provider.TryGetBuffer(parameters.Storage, out var availableParameters, out var availableParametersOffset))
+        {
+            parametersBuffer = availableParameters;
+            parametersOffset = availableParametersOffset;
+            parametersSize = (ulong)parameters.Storage.Length;
+        }
+
+        return m_OpenGL.Dispatch(
+            sourceBuffer,
+            sourceOffset,
+            (ulong)source.Length,
+            destinationBuffer,
+            destinationOffset,
+            (ulong)destination.Length,
+            parametersBuffer,
+            parametersOffset,
+            parametersSize,
+            lengthsBuffer,
+            lengthsOffset,
+            LengthsSize,
+            glTexture.Handle,
+            glSampler.Handle,
+            groups,
+            wait);
+    }
+
+    /// <summary>
+    /// Waits for the dispatches of this kernel that were recorded without waiting.
+    /// </summary>
+    /// <returns><see langword="true"/> when every submission has completed.</returns>
+    public bool Wait()
+    {
+        if (m_Disposed)
+        {
+            throw new ObjectDisposedException(nameof(GpuKernel));
+        }
+
+        if (m_Metal is not null)
+        {
+            return m_Metal.WaitPending();
+        }
+
+        if (m_Vulkan is not null)
+        {
+            return m_Vulkan.WaitPending();
+        }
+
+        if (m_D3D12 is not null)
+        {
+            return m_D3D12.WaitPending();
+        }
+
+        if (m_OpenGL is not null)
+        {
+            return m_OpenGL.WaitPending();
+        }
+
+        return m_Cuda is null || m_Cuda.WaitPending();
     }
 
     /// <summary>

@@ -807,4 +807,33 @@ public sealed record KernelProgram(
     IReadOnlyList<KernelStruct> Structs,
     IReadOnlyList<KernelFunction> Functions,
     KernelFunction EntryPoint,
-    KernelBuffer? Parameters = null);
+    KernelBuffer? Parameters = null,
+    IReadOnlyList<KernelTexture>? Textures = null,
+    IReadOnlyList<KernelSampler>? Samplers = null);
+
+/// <summary>
+/// A texture a kernel samples.
+/// </summary>
+/// <param name="Name">The name the kernel declares it with.</param>
+/// <param name="ElementType">The type one sample returns.</param>
+/// <param name="Binding">The index every backend binds it at.</param>
+public sealed record KernelTexture(string Name, KernelType ElementType, int Binding);
+
+/// <summary>
+/// A sampler state a kernel samples a texture through.
+/// </summary>
+/// <param name="Name">The name the kernel declares it with.</param>
+/// <param name="Binding">The index every backend binds it at.</param>
+public sealed record KernelSampler(string Name, int Binding);
+
+/// <summary>
+/// A sampled read of a texture at one coordinate.
+/// </summary>
+/// <param name="Texture">The texture.</param>
+/// <param name="Sampler">The sampler state.</param>
+/// <param name="Coordinates">The coordinate, in normalized texture space.</param>
+public sealed record KernelTextureSample(KernelTexture Texture, KernelSampler Sampler, KernelExpression Coordinates) : KernelExpression
+{
+    /// <inheritdoc/>
+    public override KernelType ResultType => Texture.ElementType;
+}

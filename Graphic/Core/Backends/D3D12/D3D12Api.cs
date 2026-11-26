@@ -37,6 +37,11 @@ internal static unsafe partial class D3D12Api
     internal static readonly Guid ResourceId = new("696442be-a72e-4059-bc79-5b5c98040fad");
 
     /// <summary>
+    /// The IID of <c>ID3D12DescriptorHeap</c>.
+    /// </summary>
+    internal static readonly Guid DescriptorHeapId = new("8efb471d-616c-4f49-90f7-127bb763fa51");
+
+    /// <summary>
     /// The IID of <c>ID3D12CommandQueue</c>.
     /// </summary>
     internal static readonly Guid CommandQueueId = new("0ec870a6-5d7e-4c22-8cfc-5baae07616ed");
@@ -312,6 +317,118 @@ internal static unsafe partial class D3D12Api
     }
 
     /// <summary>
+    /// Calls <c>ID3D12Device::CreateCommittedResource</c>.
+    /// </summary>
+    /// <param name="device">The device.</param>
+    /// <param name="properties">The heap properties.</param>
+    /// <param name="flags">The heap flags.</param>
+    /// <param name="desc">The resource description.</param>
+    /// <param name="state">The initial resource state.</param>
+    /// <param name="resource">When the method returns, the resource.</param>
+    /// <returns>The HRESULT.</returns>
+    internal static int CreateCommittedResource(nint device, D3D12HeapProperties* properties, int flags, D3D12ResourceDesc* desc, int state, out nint resource)
+    {
+        var iid = ResourceId;
+        nint created;
+        var create = (delegate* unmanaged[Cdecl]<nint, D3D12HeapProperties*, int, D3D12ResourceDesc*, int, void*, Guid*, nint*, int>)Method(device, 27);
+        var hr = create(device, properties, flags, desc, state, null, &iid, &created);
+        resource = hr >= 0 ? created : 0;
+        return hr;
+    }
+
+    /// <summary>
+    /// Calls <c>ID3D12Device::CreateDescriptorHeap</c>.
+    /// </summary>
+    /// <param name="device">The device.</param>
+    /// <param name="desc">The heap description.</param>
+    /// <param name="heap">When the method returns, the heap.</param>
+    /// <returns>The HRESULT.</returns>
+    internal static int CreateDescriptorHeap(nint device, D3D12DescriptorHeapDesc* desc, out nint heap)
+    {
+        var iid = DescriptorHeapId;
+        nint created;
+        var create = (delegate* unmanaged[Cdecl]<nint, D3D12DescriptorHeapDesc*, Guid*, nint*, int>)Method(device, 14);
+        var hr = create(device, desc, &iid, &created);
+        heap = hr >= 0 ? created : 0;
+        return hr;
+    }
+
+    /// <summary>
+    /// Calls <c>ID3D12Device::GetDescriptorHandleIncrementSize</c>.
+    /// </summary>
+    /// <param name="device">The device.</param>
+    /// <param name="type">The descriptor heap type.</param>
+    /// <returns>The increment.</returns>
+    internal static uint GetDescriptorHandleIncrementSize(nint device, int type)
+        => ((delegate* unmanaged[Cdecl]<nint, int, uint>)Method(device, 15))(device, type);
+
+    /// <summary>
+    /// Calls <c>ID3D12Device::CreateShaderResourceView</c>.
+    /// </summary>
+    /// <param name="device">The device.</param>
+    /// <param name="resource">The resource.</param>
+    /// <param name="desc">The view description.</param>
+    /// <param name="handle">The destination descriptor.</param>
+    internal static void CreateShaderResourceView(nint device, nint resource, D3D12ShaderResourceViewDesc* desc, D3D12CpuDescriptorHandle handle)
+        => ((delegate* unmanaged[Cdecl]<nint, nint, D3D12ShaderResourceViewDesc*, D3D12CpuDescriptorHandle, void>)Method(device, 18))(device, resource, desc, handle);
+
+    /// <summary>
+    /// Calls <c>ID3D12Device::CreateSampler</c>.
+    /// </summary>
+    /// <param name="device">The device.</param>
+    /// <param name="desc">The sampler description.</param>
+    /// <param name="handle">The destination descriptor.</param>
+    internal static void CreateSampler(nint device, D3D12SamplerDesc* desc, D3D12CpuDescriptorHandle handle)
+        => ((delegate* unmanaged[Cdecl]<nint, D3D12SamplerDesc*, D3D12CpuDescriptorHandle, void>)Method(device, 22))(device, desc, handle);
+
+    /// <summary>
+    /// Calls <c>ID3D12GraphicsCommandList::CopyTextureRegion</c>.
+    /// </summary>
+    /// <param name="list">The command list.</param>
+    /// <param name="destination">The destination.</param>
+    /// <param name="destinationX">The destination x.</param>
+    /// <param name="destinationY">The destination y.</param>
+    /// <param name="destinationZ">The destination z.</param>
+    /// <param name="source">The source.</param>
+    /// <param name="box">The source box, or <see langword="null"/> for the whole footprint.</param>
+    internal static void CopyTextureRegion(nint list, D3D12TextureCopyLocation* destination, uint destinationX, uint destinationY, uint destinationZ, D3D12TextureCopyLocation* source, D3D12Box* box)
+        => ((delegate* unmanaged[Cdecl]<nint, D3D12TextureCopyLocation*, uint, uint, uint, D3D12TextureCopyLocation*, D3D12Box*, void>)Method(list, 16))(list, destination, destinationX, destinationY, destinationZ, source, box);
+
+    /// <summary>
+    /// Calls <c>ID3D12GraphicsCommandList::SetDescriptorHeaps</c>.
+    /// </summary>
+    /// <param name="list">The command list.</param>
+    /// <param name="count">The number of heaps.</param>
+    /// <param name="heaps">The heaps.</param>
+    internal static void SetDescriptorHeaps(nint list, uint count, nint* heaps)
+        => ((delegate* unmanaged[Cdecl]<nint, uint, nint*, void>)Method(list, 28))(list, count, heaps);
+
+    /// <summary>
+    /// Calls <c>ID3D12GraphicsCommandList::SetComputeRootDescriptorTable</c>.
+    /// </summary>
+    /// <param name="list">The command list.</param>
+    /// <param name="index">The root parameter index.</param>
+    /// <param name="handle">The GPU descriptor handle.</param>
+    internal static void SetComputeRootDescriptorTable(nint list, uint index, D3D12GpuDescriptorHandle handle)
+        => ((delegate* unmanaged[Cdecl]<nint, uint, D3D12GpuDescriptorHandle, void>)Method(list, 31))(list, index, handle);
+
+    /// <summary>
+    /// Calls <c>ID3D12DescriptorHeap::GetCPUDescriptorHandleForHeapStart</c>.
+    /// </summary>
+    /// <param name="heap">The descriptor heap.</param>
+    /// <returns>The handle.</returns>
+    internal static D3D12CpuDescriptorHandle GetCpuDescriptorHandle(nint heap)
+        => ((delegate* unmanaged[Cdecl]<nint, D3D12CpuDescriptorHandle>)Method(heap, 9))(heap);
+
+    /// <summary>
+    /// Calls <c>ID3D12DescriptorHeap::GetGPUDescriptorHandleForHeapStart</c>.
+    /// </summary>
+    /// <param name="heap">The descriptor heap.</param>
+    /// <returns>The handle.</returns>
+    internal static D3D12GpuDescriptorHandle GetGpuDescriptorHandle(nint heap)
+        => ((delegate* unmanaged[Cdecl]<nint, D3D12GpuDescriptorHandle>)Method(heap, 10))(heap);
+
+    /// <summary>
     /// Calls <c>ID3D12Device::CreateHeap</c>.
     /// </summary>
     /// <param name="device">The device.</param>
@@ -554,8 +671,124 @@ internal struct D3D12ResourceDesc
 }
 
 /// <summary>
-/// <c>D3D12_RANGE</c>, 16 bytes on a 64-bit build.
+/// <c>D3D12_DESCRIPTOR_HEAP_DESC</c>, 16 bytes.
 /// </summary>
+[StructLayout(LayoutKind.Sequential)]
+internal struct D3D12DescriptorHeapDesc
+{
+    public int Type;
+    public uint NumDescriptors;
+    public int Flags;
+    public uint NodeMask;
+}
+
+/// <summary>
+/// <c>D3D12_CPU_DESCRIPTOR_HANDLE</c>, 8 bytes.
+/// </summary>
+[StructLayout(LayoutKind.Sequential)]
+internal struct D3D12CpuDescriptorHandle
+{
+    public nuint Pointer;
+}
+
+/// <summary>
+/// <c>D3D12_GPU_DESCRIPTOR_HANDLE</c>, 8 bytes.
+/// </summary>
+[StructLayout(LayoutKind.Sequential)]
+internal struct D3D12GpuDescriptorHandle
+{
+    public ulong Pointer;
+}
+
+/// <summary>
+/// <c>D3D12_SHADER_RESOURCE_VIEW_DESC</c> for a two dimensional texture, 32 bytes.
+/// </summary>
+[StructLayout(LayoutKind.Sequential)]
+internal struct D3D12ShaderResourceViewDesc
+{
+    public uint Format;
+    public int ViewDimension;
+    public uint Shader4ComponentMapping;
+    public uint MostDetailedMip;
+    public uint MipLevels;
+    public uint PlaneSlice;
+    public float ResourceMinLodClamp;
+}
+
+/// <summary>
+/// <c>D3D12_SAMPLER_DESC</c>, 52 bytes.
+/// </summary>
+[StructLayout(LayoutKind.Sequential)]
+internal struct D3D12SamplerDesc
+{
+    public uint Filter;
+    public uint AddressU;
+    public uint AddressV;
+    public uint AddressW;
+    public float MipLodBias;
+    public uint MaxAnisotropy;
+    public uint ComparisonFunc;
+    public float BorderRed;
+    public float BorderGreen;
+    public float BorderBlue;
+    public float BorderAlpha;
+    public float MinLod;
+    public float MaxLod;
+}
+
+/// <summary>
+/// <c>D3D12_SUBRESOURCE_FOOTPRINT</c>, 20 bytes.
+/// </summary>
+[StructLayout(LayoutKind.Sequential)]
+internal struct D3D12SubresourceFootprint
+{
+    public uint Format;
+    public uint Width;
+    public uint Height;
+    public uint Depth;
+    public uint RowPitch;
+}
+
+/// <summary>
+/// <c>D3D12_TEXTURE_COPY_LOCATION</c>, 48 bytes.
+/// </summary>
+[StructLayout(LayoutKind.Explicit)]
+internal struct D3D12TextureCopyLocation
+{
+    [FieldOffset(0)]
+    public nint Resource;
+
+    [FieldOffset(8)]
+    public uint Type;
+
+    [FieldOffset(12)]
+    public uint Padding;
+
+    [FieldOffset(16)]
+    public ulong Offset;
+
+    [FieldOffset(24)]
+    public D3D12SubresourceFootprint Footprint;
+
+    [FieldOffset(16)]
+    public uint SubresourceIndex;
+}
+
+/// <summary>
+/// <c>D3D12_BOX</c>, 24 bytes.
+/// </summary>
+[StructLayout(LayoutKind.Sequential)]
+internal struct D3D12Box
+{
+    public uint Left;
+    public uint Top;
+    public uint Front;
+    public uint Right;
+    public uint Bottom;
+    public uint Back;
+}
+
+
 [StructLayout(LayoutKind.Sequential)]
 internal struct D3D12Range
 {

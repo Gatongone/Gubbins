@@ -24,14 +24,18 @@ internal sealed unsafe class D3D12Device : IDisposable
     private readonly nint m_Device;
     private readonly nint m_Queue;
     private readonly nint m_Allocator;
+    private readonly bool m_OwnsProvider;
+    private readonly bool m_OwnsDevice;
     private bool m_Disposed;
 
-    private D3D12Device(nint device, nint queue, nint allocator)
+    private D3D12Device(nint device, nint queue, nint allocator, D3D12UnifiedProvider provider, bool ownsProvider, bool ownsDevice)
     {
         m_Device = device;
         m_Queue = queue;
         m_Allocator = allocator;
-        Provider = new D3D12UnifiedProvider(device, queue, allocator);
+        Provider = provider;
+        m_OwnsProvider = ownsProvider;
+        m_OwnsDevice = ownsDevice;
     }
 
     /// <summary>
@@ -87,9 +91,25 @@ internal sealed unsafe class D3D12Device : IDisposable
             return false;
         }
 
-        created = new D3D12Device(device, queue, allocator);
+        created = new D3D12Device(
+            device,
+            queue,
+            allocator,
+            new D3D12UnifiedProvider(device, queue, allocator),
+            true,
+            true);
+
         return true;
     }
+
+    /// <summary>
+    /// Wraps a bridge the engine created around its own device.
+    /// </summary>
+    /// <param name="provider">The bridge.</param>
+    /// <param name="ownsProvider">Whether disposing the device also disposes the bridge.</param>
+    /// <returns>The device.</returns>
+    internal static D3D12Device FromProvider(D3D12UnifiedProvider provider, bool ownsProvider)
+        => new D3D12Device(provider.Device, provider.Queue, 0, provider, ownsProvider, false);
 
     /// <summary>
     /// Releases the bridge, then the allocator, the queue and the device it was created on.
@@ -103,7 +123,16 @@ internal sealed unsafe class D3D12Device : IDisposable
 
         m_Disposed = true;
 
-        Provider.Dispose();
+        if (m_OwnsProvider)
+        {
+            Provider.Dispose();
+        }
+
+        if (!m_OwnsDevice)
+        {
+            return;
+        }
+
         D3D12Api.Release(m_Allocator);
         D3D12Api.Release(m_Queue);
         D3D12Api.Release(m_Device);

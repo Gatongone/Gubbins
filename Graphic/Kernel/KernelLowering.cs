@@ -107,6 +107,16 @@ internal sealed partial class KernelLowering
     private readonly List<KernelBuffer> m_Buffers = new();
 
     /// <summary>
+    /// The textures of the kernel, in the order it declares them.
+    /// </summary>
+    private readonly List<KernelTexture> m_Textures = new();
+
+    /// <summary>
+    /// The sampler states of the kernel, in the order it declares them.
+    /// </summary>
+    private readonly List<KernelSampler> m_Samplers = new();
+
+    /// <summary>
     /// The parameter of the kernel that carries the thread index, when it is being lowered.
     /// </summary>
     private string? m_IndexParameter;
@@ -169,7 +179,16 @@ internal sealed partial class KernelLowering
         var body = Entry();
         var entry = Function(KernelTranspiler.ENTRY_POINT, VoidType.Void, Array.Empty<KernelFunctionParameter>(), body, m_Shared, true);
 
-        return new KernelProgram(m_Kernel.Identifier.ValueText, m_Threads, m_Buffers, m_Structures.Values.ToList(), m_Ordered, entry, m_Parameters);
+        return new KernelProgram(
+            m_Kernel.Identifier.ValueText,
+            m_Threads,
+            m_Buffers,
+            m_Structures.Values.ToList(),
+            m_Ordered,
+            entry,
+            m_Parameters,
+            m_Textures,
+            m_Samplers);
     }
 
     /// <summary>
@@ -257,6 +276,8 @@ internal sealed partial class KernelLowering
     private void ReadParameters()
     {
         m_Buffers.Clear();
+        m_Textures.Clear();
+        m_Samplers.Clear();
         m_IndexParameter = null;
 
         m_ParameterName = null;
@@ -266,6 +287,28 @@ internal sealed partial class KernelLowering
         {
             var name = parameter.Identifier.ValueText;
             var type = KernelTranspiler.TypeName(parameter.Type);
+
+            if (type == "GpuTexture2D")
+            {
+                if (parameter.Modifiers.Count > 0)
+                {
+                    throw new KernelTranslationException($"Parameter '{name}' is passed by reference: a texture is read through its sampler.");
+                }
+
+                m_Textures.Add(new KernelTexture(name, new VectorType(KernelScalar.Float, 4), m_Textures.Count));
+                continue;
+            }
+
+            if (type == "GpuSamplerState")
+            {
+                if (parameter.Modifiers.Count > 0)
+                {
+                    throw new KernelTranslationException($"Parameter '{name}' is passed by reference: a sampler is a value.");
+                }
+
+                m_Samplers.Add(new KernelSampler(name, m_Samplers.Count));
+                continue;
+            }
 
             if (type == KernelTranspiler.INDEX_TYPE || type == KernelTranspiler.SPAN_INDEX_TYPE)
             {

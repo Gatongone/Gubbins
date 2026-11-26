@@ -13,12 +13,16 @@ namespace Gubbins.Graphic;
 internal sealed class MetalDevice : IDisposable
 {
     private readonly nint m_Device;
+    private readonly bool m_OwnsProvider;
+    private readonly bool m_OwnsDevice;
     private bool m_Disposed;
 
-    private MetalDevice(nint device)
+    private MetalDevice(nint device, MetalUnifiedProvider provider, bool ownsProvider, bool ownsDevice)
     {
         m_Device = device;
-        Provider = new MetalUnifiedProvider(device);
+        Provider = provider;
+        m_OwnsProvider = ownsProvider;
+        m_OwnsDevice = ownsDevice;
     }
 
     /// <summary>
@@ -56,9 +60,18 @@ internal sealed class MetalDevice : IDisposable
             return false;
         }
 
-        created = new MetalDevice(device);
+        created = new MetalDevice(device, new MetalUnifiedProvider(device), true, true);
         return true;
     }
+
+    /// <summary>
+    /// Wraps a bridge the engine created around its own device.
+    /// </summary>
+    /// <param name="provider">The bridge.</param>
+    /// <param name="ownsProvider">Whether disposing the device also disposes the bridge.</param>
+    /// <returns>The device.</returns>
+    internal static MetalDevice FromProvider(MetalUnifiedProvider provider, bool ownsProvider)
+        => new MetalDevice(provider.Device, provider, ownsProvider, false);
 
     /// <summary>
     /// Releases the bridge, then the device it was created on.
@@ -72,8 +85,15 @@ internal sealed class MetalDevice : IDisposable
 
         m_Disposed = true;
 
-        Provider.Dispose();
-        MetalApi.Release(m_Device);
+        if (m_OwnsProvider)
+        {
+            Provider.Dispose();
+        }
+
+        if (m_OwnsDevice)
+        {
+            MetalApi.Release(m_Device);
+        }
     }
 }
 

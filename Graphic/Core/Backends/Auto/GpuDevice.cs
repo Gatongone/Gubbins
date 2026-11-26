@@ -51,6 +51,72 @@ public sealed class GpuDevice : IDisposable
     }
 
     /// <summary>
+    /// Creates a layer on a Metal device the engine owns.
+    /// </summary>
+    /// <param name="provider">The bridge the engine created around its own device.</param>
+    /// <param name="ownsProvider">Whether disposing the layer also disposes the bridge.</param>
+    /// <returns>The layer, to be disposed before the device.</returns>
+    public static GpuDevice FromMetal(MetalUnifiedProvider provider, bool ownsProvider = false)
+    {
+        if (provider is null)
+        {
+            throw new ArgumentNullException(nameof(provider));
+        }
+
+        return new GpuDevice(
+            MetalDevice.FromProvider(provider, ownsProvider),
+            provider.GetProvider(),
+            provider.MaxSegmentSize,
+            provider.IsUnifiedMemory,
+            provider.WorkingSetLimit,
+            "Metal");
+    }
+
+    /// <summary>
+    /// Creates a layer on a D3D12 device the engine owns.
+    /// </summary>
+    /// <param name="provider">The bridge the engine created around its own device.</param>
+    /// <param name="ownsProvider">Whether disposing the layer also disposes the bridge.</param>
+    /// <returns>The layer, to be disposed before the device.</returns>
+    public static GpuDevice FromD3D12(D3D12UnifiedProvider provider, bool ownsProvider = false)
+    {
+        if (provider is null)
+        {
+            throw new ArgumentNullException(nameof(provider));
+        }
+
+        return new GpuDevice(
+            D3D12Device.FromProvider(provider, ownsProvider),
+            provider.GetProvider(),
+            provider.MaxSegmentSize,
+            provider.IsUnifiedMemory,
+            provider.WorkingSetLimit,
+            "D3D12");
+    }
+
+    /// <summary>
+    /// Creates a layer on a Vulkan device the engine owns.
+    /// </summary>
+    /// <param name="provider">The bridge the engine created around its own device.</param>
+    /// <param name="ownsProvider">Whether disposing the layer also disposes the bridge.</param>
+    /// <returns>The layer, to be disposed before the device.</returns>
+    public static GpuDevice FromVulkan(VulkanUnifiedProvider provider, bool ownsProvider = false)
+    {
+        if (provider is null)
+        {
+            throw new ArgumentNullException(nameof(provider));
+        }
+
+        return new GpuDevice(
+            VulkanDevice.FromProvider(provider, ownsProvider),
+            provider.GetProvider(),
+            provider.MaxSegmentSize,
+            provider.IsUnifiedMemory,
+            provider.WorkingSetLimit,
+            "Vulkan");
+    }
+
+    /// <summary>
     /// Creates the layer that hands out blocks whose contents are stable between synchronization points.
     /// </summary>
     /// <param name="segmentSize">The size a segment grows by, or <see langword="0"/> for the default.</param>

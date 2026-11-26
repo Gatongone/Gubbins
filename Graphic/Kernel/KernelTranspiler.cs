@@ -353,6 +353,13 @@ public static partial class KernelTranspiler
                     continue;
                 }
 
+                if (invocation.Expression is MemberAccessExpressionSyntax sample &&
+                    sample.Name.Identifier.ValueText == "Sample" &&
+                    invocation.ArgumentList.Arguments.Count == 2)
+                {
+                    continue;
+                }
+
                 if (functions.Contains(name))
                 {
                     continue;

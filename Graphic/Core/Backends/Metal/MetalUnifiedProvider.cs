@@ -47,6 +47,7 @@ public sealed unsafe class MetalUnifiedProvider : IUnifiedProvider, IDisposable
     private nint m_Committed;
 
     private GCHandle m_Self;
+    private readonly bool m_OwnsQueue;
     private bool m_Disposed;
 
     /// <param name="device">The <c>MTLDevice</c> to allocate from.</param>
@@ -54,6 +55,16 @@ public sealed unsafe class MetalUnifiedProvider : IUnifiedProvider, IDisposable
     /// <exception cref="ArgumentException">Thrown when <paramref name="device"/> is <see langword="0"/>.</exception>
     /// <exception cref="MetalException">Thrown when Metal refuses to create the command queue.</exception>
     public MetalUnifiedProvider(nint device, nuint workingSetLimit = 0)
+        : this(device, 0, workingSetLimit)
+    {
+    }
+
+    /// <param name="device">The <c>MTLDevice</c> to allocate from.</param>
+    /// <param name="queue">The command queue the engine owns, or <see langword="0"/> to create one.</param>
+    /// <param name="workingSetLimit">The working set the caller wants reported, or <see langword="0"/> to use the device's.</param>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="device"/> is <see langword="0"/>.</exception>
+    /// <exception cref="MetalException">Thrown when Metal refuses to create the command queue.</exception>
+    public MetalUnifiedProvider(nint device, nint queue, nuint workingSetLimit = 0)
     {
         if (device == 0)
         {
@@ -62,10 +73,16 @@ public sealed unsafe class MetalUnifiedProvider : IUnifiedProvider, IDisposable
 
         m_Device = device;
 
-        var queue = MetalApi.Send(device, "newCommandQueue");
         if (queue == 0)
         {
-            throw new MetalException("Metal refused to create a command queue.");
+            queue = MetalApi.Send(device, "newCommandQueue");
+
+            if (queue == 0)
+            {
+                throw new MetalException("Metal refused to create a command queue.");
+            }
+
+            m_OwnsQueue = true;
         }
 
         m_Queue = queue;
@@ -138,6 +155,110 @@ public sealed unsafe class MetalUnifiedProvider : IUnifiedProvider, IDisposable
         buffer = (nint)block.DeviceHandle;
         offset = (ulong)block.Offset;
         return true;
+    }
+
+    /// <summary>
+    /// Wraps a buffer the engine owns as a block this layer can bind, without taking ownership of it.
+    /// </summary>
+    /// <param name="buffer">The <c>MTLBuffer</c>.</param>
+    /// <param name="offset">The offset of the block inside the buffer, in bytes.</param>
+    /// <param name="length">The length of the block, in bytes.</param>
+    /// <param name="block">When the method returns, the block.</param>
+    /// <returns><see langword="true"/> when the buffer is CPU addressable and the range fits it.</returns>
+    public bool TryImport(nint buffer, nuint offset, nuint length, out UnifiedMemoryBlock block)
+    {
+        block = default;
+
+        if (m_Disposed || buffer == 0 || length == 0)
+        {
+            return false;
+        }
+
+        var bufferLength = (nuint)MetalApi.SendUInt64(buffer, "length");
+
+        if (offset > bufferLength || length > bufferLength - offset)
+        {
+            return false;
+        }
+
+        var host = MetalApi.Send(buffer, "contents");
+
+        if (host == 0)
+        {
+            return false;
+        }
+
+        block = new UnifiedMemoryBlock(
+            (void*)buffer,
+            (byte*)host,
+            (byte*)host + (long)offset,
+            0,
+            offset,
+            length,
+            bufferLength,
+            UnifiedMemoryKind.SharedCoherent);
+
+        return true;
+    }
+
+    /// <summary>
+    /// Gets the <c>MTLDevice</c> the bridge allocates from.
+    /// </summary>
+    internal nint Device => m_Device;
+
+    /// <summary>
+    /// Creates a two dimensional texture on the device.
+    /// </summary>
+    /// <param name="width">The width, in pixels.</param>
+    /// <param name="height">The height, in pixels.</param>
+    /// <param name="format">The pixel format.</param>
+    /// <param name="usage">What the texture is created for.</param>
+    /// <returns>The texture, to be disposed when it is no longer read.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the extent is not positive.</exception>
+    /// <exception cref="MetalException">Thrown when Metal refuses the texture.</exception>
+    public GpuTexture2D CreateTexture(int width, int height, GpuTextureFormat format, GpuTextureUsage usage = GpuTextureUsage.Sampled)
+    {
+        if (m_Disposed)
+        {
+            throw new ObjectDisposedException(nameof(MetalUnifiedProvider));
+        }
+
+        if (width <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(width), width, "A texture is at least one pixel wide.");
+        }
+
+        if (height <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(height), height, "A texture is at least one pixel high.");
+        }
+
+        return new GpuTexture2D(new MetalTexture(m_Device, width, height, format, usage), width, height, format);
+    }
+
+    /// <summary>
+    /// Creates a sampler state on the device.
+    /// </summary>
+    /// <param name="sampler">The sampler description.</param>
+    /// <returns>The state, to be disposed when it is no longer bound.</returns>
+    /// <exception cref="MetalException">Thrown when Metal refuses the sampler state.</exception>
+    public GpuSamplerState CreateSampler(GpuSampler sampler)
+    {
+        if (m_Disposed)
+        {
+            throw new ObjectDisposedException(nameof(MetalUnifiedProvider));
+        }
+
+        var filter = (nuint)(sampler.Filter == GpuTextureFilter.Linear ? 1 : 0);
+        var address = (nuint)sampler.Address;
+        var state = MetalApi.NewSamplerState(m_Device, filter, filter, address);
+
+        if (state == 0)
+        {
+            throw new MetalException("Metal refused the sampler state.");
+        }
+
+        return new GpuSamplerState(new MetalSamplerState(state));
     }
 
     /// <inheritdoc/>
@@ -444,7 +565,11 @@ public sealed unsafe class MetalUnifiedProvider : IUnifiedProvider, IDisposable
         }
 
         m_Buffers.Clear();
-        MetalApi.Release(m_Queue);
+
+        if (m_OwnsQueue)
+        {
+            MetalApi.Release(m_Queue);
+        }
 
         if (m_Self.IsAllocated)
         {

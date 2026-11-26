@@ -264,6 +264,7 @@ internal sealed unsafe class CudaCompute : IDisposable
     private nint m_Function;
     private ulong m_Parameters;
     private nuint m_ParameterSize;
+    private bool m_Pending;
     private bool m_Disposed;
 
 
@@ -337,9 +338,14 @@ internal sealed unsafe class CudaCompute : IDisposable
     /// <param name="groups">The number of thread blocks on the x axis.</param>
     /// <param name="threadsPerGroup">The threads in a block.</param>
     /// <returns><see langword="true"/> if the launch completed.</returns>
-    internal bool Dispatch(ulong source, ulong sourceSize, ulong destination, ulong destinationSize, ulong parametersAddress, ulong lengths, ulong lengthsSize, uint groups, uint threadsPerGroup)
+    internal bool Dispatch(ulong source, ulong sourceSize, ulong destination, ulong destinationSize, ulong parametersAddress, ulong lengths, ulong lengthsSize, uint groups, uint threadsPerGroup, bool wait)
     {
         if (m_Disposed || m_Function == 0 || groups == 0 || threadsPerGroup == 0)
+        {
+            return false;
+        }
+
+        if (m_Pending && !WaitPending())
         {
             return false;
         }
@@ -381,7 +387,33 @@ internal sealed unsafe class CudaCompute : IDisposable
             return false;
         }
 
+        if (!wait)
+        {
+            m_Pending = true;
+            return true;
+        }
+
         return CudaApi.cuCtxSynchronize() == 0;
+    }
+
+    /// <summary>
+    /// Waits for the dispatches that were recorded without waiting.
+    /// </summary>
+    /// <returns><see langword="true"/> when every submission has completed.</returns>
+    internal bool WaitPending()
+    {
+        if (!m_Pending)
+        {
+            return true;
+        }
+
+        if (CudaApi.cuCtxSynchronize() != 0)
+        {
+            return false;
+        }
+
+        m_Pending = false;
+        return true;
     }
     /// <summary>
     /// Releases the module.
@@ -394,6 +426,7 @@ internal sealed unsafe class CudaCompute : IDisposable
         }
 
         m_Disposed = true;
+        WaitPending();
 
         if (m_Module != 0)
         {

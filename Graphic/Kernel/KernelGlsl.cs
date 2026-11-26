@@ -1,5 +1,7 @@
 namespace Gubbins.Graphic.Kernels;
 
+using System.Text;
+
 /// <summary>
 /// Writes one program as the GLSL OpenGL compiles.
 /// </summary>
@@ -70,6 +72,7 @@ public sealed class KernelGlsl : KernelTextEmitter
     /// Names containing <c>__</c>, starting with <c>gl_</c>, or starting with an underscore are reserved by OpenGL, so a
     /// name the program declares is written under a prefix that keeps it out of those.
     /// </remarks>
+    /// <inheritdoc/>
     protected override string Identifier(string name)
     {
         if (!name.Contains("__") &&
@@ -95,6 +98,24 @@ public sealed class KernelGlsl : KernelTextEmitter
     {
         "void main()"
     };
+
+    /// <inheritdoc/>
+    protected override void Bindings(KernelProgram program, StringBuilder text)
+    {
+        base.Bindings(program, text);
+
+        foreach (var texture in program.Textures ?? System.Array.Empty<KernelTexture>())
+        {
+            text.AppendLine($"uniform sampler2D gubbins_tex_{Identifier(texture.Name)};");
+        }
+    }
+
+    /// <inheritdoc/>
+    protected override bool SupportsTextures => true;
+
+    /// <inheritdoc/>
+    protected override string TextureSample(KernelTextureSample sample)
+        => $"texture(gubbins_tex_{Identifier(sample.Texture.Name)}, {Value(sample.Coordinates)})";
 
     /// <inheritdoc/>
     protected override string EntryPrologue(KernelProgram program) => $"int {INDEX} = int(gl_GlobalInvocationID.x);";

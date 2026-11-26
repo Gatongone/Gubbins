@@ -40,6 +40,7 @@ public sealed class Gpu : IDisposable
     private readonly GpuDevice m_Device;
     private readonly GpuMemory m_Memory;
     private readonly Dictionary<string, Kernel> m_Kernels = new(StringComparer.Ordinal);
+    private readonly GpuQueue m_Queue = new();
     private bool m_Disposed;
 
     private Gpu(GpuDevice device)
@@ -47,6 +48,11 @@ public sealed class Gpu : IDisposable
         m_Device = device;
         m_Memory = device.CreateMemory();
     }
+
+    /// <summary>
+    /// Gets the queue the dispatches made without waiting are waited for on.
+    /// </summary>
+    public GpuQueue Queue => m_Queue;
 
     /// <summary>
     /// Creates the layer on the device this machine has.
@@ -73,6 +79,41 @@ public sealed class Gpu : IDisposable
         gpu = null;
 
         if (!GpuDevice.TryCreate(out var device) || device is null)
+        {
+            return false;
+        }
+
+        gpu = new Gpu(device);
+        return true;
+    }
+
+    /// <summary>
+    /// Creates the layer on a device the caller already has.
+    /// </summary>
+    /// <param name="device">The device, which this layer owns and releases with itself.</param>
+    /// <returns>The layer, to be disposed when the program is done with it.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="device"/> is <see langword="null"/>.</exception>
+    public static Gpu Create(GpuDevice device)
+    {
+        if (device is null)
+        {
+            throw new ArgumentNullException(nameof(device));
+        }
+
+        return new Gpu(device);
+    }
+
+    /// <summary>
+    /// Creates the layer on a device the caller already has, when there is one.
+    /// </summary>
+    /// <param name="device">The device, or <see langword="null"/> when there is none.</param>
+    /// <param name="gpu">When the method returns, the layer, or <see langword="null"/> when there is no device.</param>
+    /// <returns><see langword="true"/> when a layer was created; otherwise, <see langword="false"/>.</returns>
+    public static bool TryCreate(GpuDevice? device, out Gpu? gpu)
+    {
+        gpu = null;
+
+        if (device is null)
         {
             return false;
         }
@@ -194,9 +235,20 @@ public sealed class Gpu : IDisposable
     /// Makes every write recorded since the last synchronization visible to the other processor.
     /// </summary>
     /// <exception cref="GpuExecutionException">Thrown when a write could not be published.</exception>
+    public void Barrier() => Synchronize();
+
+    /// <summary>
+    /// Makes every write recorded since the last synchronization visible to the other processor.
+    /// </summary>
+    /// <exception cref="GpuExecutionException">Thrown when a write could not be published.</exception>
     public void Synchronize()
     {
         ThrowIfDisposed();
+
+        if (!m_Queue.Wait())
+        {
+            throw new GpuExecutionException("A dispatch could not be waited for.");
+        }
 
         if (!m_Memory.Synchronize())
         {
@@ -215,6 +267,8 @@ public sealed class Gpu : IDisposable
         }
 
         m_Disposed = true;
+
+        m_Queue.Dispose();
 
         foreach (var kernel in m_Kernels.Values)
         {

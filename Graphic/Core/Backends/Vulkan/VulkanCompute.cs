@@ -23,6 +23,7 @@ internal sealed unsafe class VulkanCompute : IDisposable
     private nint m_CommandPool;
     private nint m_CommandBuffer;
     private nint m_Fence;
+    private bool m_Pending;
     private bool m_Disposed;
 
     /// <summary>
@@ -170,9 +171,14 @@ internal sealed unsafe class VulkanCompute : IDisposable
     /// <param name="lengthsOffset">The offset of the lengths inside it.</param>
     /// <param name="groups">The number of thread groups on the x axis.</param>
     /// <returns><see langword="true"/> if the dispatch ran to completion.</returns>
-    internal bool Dispatch(nint sourceBuffer, ulong sourceOffset, ulong sourceSize, nint destinationBuffer, ulong destinationOffset, ulong destinationSize, nint parametersBuffer, ulong parametersOffset, ulong parametersSize, nint lengthsBuffer, ulong lengthsOffset, uint groups)
+    internal bool Dispatch(nint sourceBuffer, ulong sourceOffset, ulong sourceSize, nint destinationBuffer, ulong destinationOffset, ulong destinationSize, nint parametersBuffer, ulong parametersOffset, ulong parametersSize, nint lengthsBuffer, ulong lengthsOffset, uint groups, bool wait)
     {
         if (m_Disposed || m_Pipeline == 0 || sourceBuffer == 0 || destinationBuffer == 0 || groups == 0)
+        {
+            return false;
+        }
+
+        if (m_Pending && !WaitPending())
         {
             return false;
         }
@@ -215,12 +221,41 @@ internal sealed unsafe class VulkanCompute : IDisposable
 
         var fence = m_Fence;
 
+        if (!wait)
+        {
+            m_Pending = true;
+            return true;
+        }
+
         if (VulkanApi.WaitForFences(m_Device, 1, &fence, 1, ulong.MaxValue) != VulkanApi.SUCCESS)
         {
             return false;
         }
 
         VulkanApi.ResetFences(m_Device, 1, &fence);
+        return true;
+    }
+
+    /// <summary>
+    /// Waits for the dispatches that were recorded without waiting.
+    /// </summary>
+    /// <returns><see langword="true"/> when every submission has completed.</returns>
+    internal bool WaitPending()
+    {
+        if (!m_Pending)
+        {
+            return true;
+        }
+
+        var fence = m_Fence;
+
+        if (VulkanApi.WaitForFences(m_Device, 1, &fence, 1, ulong.MaxValue) != VulkanApi.SUCCESS)
+        {
+            return false;
+        }
+
+        VulkanApi.ResetFences(m_Device, 1, &fence);
+        m_Pending = false;
         return true;
     }
 

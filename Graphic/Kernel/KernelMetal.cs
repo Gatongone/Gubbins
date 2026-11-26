@@ -62,6 +62,17 @@ public sealed class KernelMetal : KernelTextEmitter
         }
 
         arguments.Add($"device uint* {KernelTranspiler.LENGTHS_BUFFER} [[buffer({LengthsBinding(program)})]]");
+
+        foreach (var texture in program.Textures ?? System.Array.Empty<KernelTexture>())
+        {
+            arguments.Add($"texture2d<float, access::sample> {Identifier(texture.Name)} [[texture({texture.Binding})]]");
+        }
+
+        foreach (var sampler in program.Samplers ?? System.Array.Empty<KernelSampler>())
+        {
+            arguments.Add($"sampler {Identifier(sampler.Name)} [[sampler({sampler.Binding})]]");
+        }
+
         arguments.Add($"uint3 {THREAD_ID} [[thread_position_in_grid]]");
 
         var lines = new List<string> { $"kernel void {KernelTranspiler.ENTRY_POINT}(" };
@@ -129,6 +140,13 @@ public sealed class KernelMetal : KernelTextEmitter
 
     /// <inheritdoc/>
     protected override string LengthsElement(int index) => $"{KernelTranspiler.LENGTHS_BUFFER}[{index}]";
+
+    /// <inheritdoc/>
+    protected override bool SupportsTextures => true;
+
+    /// <inheritdoc/>
+    protected override string TextureSample(KernelTextureSample sample)
+        => $"{Identifier(sample.Texture.Name)}.sample({Identifier(sample.Sampler.Name)}, {Value(sample.Coordinates)})";
 
     /// <summary>
     /// The names this emitter maps for Metal, keyed by the name the kernel declares.

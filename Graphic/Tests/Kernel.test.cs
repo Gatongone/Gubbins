@@ -1677,6 +1677,7 @@ public static unsafe class Square
                 ran++;
                 VerifyScale(device, directory, name, Count);
                 VerifyScaleOnDeviceMemory(device, directory, name, Count);
+                VerifyQueue(device, directory, name, Count);
                 VerifyReduction(device, directory, name, Count);
 
                 // The PTX the CUDA backend loads has no parameter block, so a kernel that takes a structure is not one it
@@ -1776,6 +1777,49 @@ public static unsafe class Square
         for (var index = 0; index < count; index++)
         {
             Assert.That(result[index], Is.EqualTo(values[index] + addend), $"{name}: element {index}");
+        }
+    }
+
+    /// <summary>
+    /// Runs the scale kernel through a queue, which records without waiting and waits once.
+    /// </summary>
+    /// <param name="device">The device to run on.</param>
+    /// <param name="directory">The directory the artifacts are in.</param>
+    /// <param name="name">The backend, for the assertions.</param>
+    /// <param name="count">The number of elements to work on.</param>
+    private static void VerifyQueue(GpuDevice device, string directory, string name, int count)
+    {
+        using var memory = device.CreateMemory();
+        using var kernel = GpuKernel.LoadFromDirectory(device, directory, "Scale");
+        using var queue = new GpuQueue();
+
+        Assert.That(kernel, Is.Not.Null, $"{name}: the kernel for the queue was loaded");
+
+        var input = memory.Allocate((nuint)(count * sizeof(uint)), GpuAccess.Shared);
+        var output = memory.Allocate((nuint)(count * sizeof(uint)), GpuAccess.Shared);
+        var lengths = memory.Allocate(16, GpuAccess.Shared);
+        var values = new uint[count];
+
+        for (var index = 0; index < count; index++)
+        {
+            values[index] = (uint)index;
+        }
+
+        memory.Upload(input, MemoryMarshal.AsBytes(values.AsSpan()));
+        memory.Upload(lengths, MemoryMarshal.AsBytes(new uint[] { (uint)count, (uint)count, 0, 0 }.AsSpan()));
+
+        Assert.That(queue.Dispatch(kernel!, input, output, (uint)(count / KernelTranspiler.THREADS_PER_GROUP), lengths), Is.True, $"{name}: the queue recorded the dispatch");
+        Assert.That(queue.Wait(), Is.True, $"{name}: the queue waited for the dispatch");
+
+        memory.MarkWrittenByGpu(output);
+        Assert.That(memory.Synchronize(), Is.True, $"{name}: the queued output was synchronized");
+
+        var result = MemoryMarshal.Cast<byte, uint>(output.CpuView());
+        var addend = (uint)Math.Min(count, 4096);
+
+        for (var index = 0; index < count; index++)
+        {
+            Assert.That(result[index], Is.EqualTo(values[index] + addend), $"{name}: queued element {index}");
         }
     }
 
@@ -2013,6 +2057,293 @@ public static unsafe class Square
     /// <param name="source">The C# source that declares the kernel.</param>
     /// <returns>The Metal source the program is written as.</returns>
     private static string Metal(string source) => new KernelMetal().Emit(KernelTranspiler.Transpile(source));
+
+    [Test]
+    public unsafe void GpuDevice_RunsOnAnEngineOwnedMetalDevice()
+    {
+        if (!OperatingSystem.IsMacOS() || !MetalDevice.TryCreate(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no Metal device.");
+            return;
+        }
+
+        using (owner)
+        using (var device = GpuDevice.FromMetal(owner.Provider))
+        {
+            VerifyEngineOwnedDevice(device, "Metal", (memory, source) =>
+            {
+                Assert.That(owner.Provider.TryImport((nint)source.Storage.DeviceHandle, source.Storage.Offset, source.Length, out var imported), Is.True, "the engine buffer is imported");
+                return memory.Wrap(imported, GpuAccess.Shared);
+            });
+        }
+    }
+
+    [Test]
+    public unsafe void GpuDevice_RunsOnAnEngineOwnedD3D12Device()
+    {
+        if (!OperatingSystem.IsWindows() || !D3D12Device.TryCreate(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no D3D12 device.");
+            return;
+        }
+
+        using (owner)
+        using (var device = GpuDevice.FromD3D12(owner.Provider))
+        {
+            VerifyEngineOwnedDevice(device, "D3D12", (memory, source) =>
+            {
+                Assert.That(owner.Provider.TryGetResource(source.Storage, out var resource, out _), Is.True, "the engine resource is readable");
+                Assert.That(owner.Provider.TryImport(resource, source.Storage.Offset, source.Length, (nint)source.Storage.SegmentHost, UnifiedMemoryKind.SharedCoherent, out var imported), Is.True, "the engine resource is imported");
+                return memory.Wrap(imported, GpuAccess.Shared);
+            });
+        }
+    }
+
+    [Test]
+    public unsafe void GpuDevice_RunsOnAnEngineOwnedVulkanDevice()
+    {
+        VulkanDevice? owner;
+
+        try
+        {
+            if (!VulkanDevice.TryCreate(out owner) || owner is null)
+            {
+                Assert.Ignore("This machine has no Vulkan device.");
+                return;
+            }
+        }
+        catch (Exception)
+        {
+            Assert.Ignore("This machine has no Vulkan loader.");
+            return;
+        }
+
+        using (owner)
+        using (var device = GpuDevice.FromVulkan(owner.Provider))
+        {
+            VerifyEngineOwnedDevice(device, "Vulkan", (memory, source) =>
+            {
+                Assert.That(owner.Provider.TryGetVulkanBuffer(source.Storage, out var buffer, out _), Is.True, "the engine buffer is readable");
+                Assert.That(owner.Provider.TryImport(buffer, source.Storage.Offset, source.Length, (nint)source.Storage.SegmentHost, UnifiedMemoryKind.SharedCoherent, out var imported), Is.True, "the engine buffer is imported");
+                return memory.Wrap(imported, GpuAccess.Shared);
+            });
+        }
+    }
+
+    [Test]
+    public void Gpu_CreatesOnAnEngineOwnedD3D12Device()
+    {
+        if (!OperatingSystem.IsWindows() || !D3D12Device.TryCreate(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no D3D12 device.");
+            return;
+        }
+
+        using (owner)
+        using (var gpu = Gpu.Create(GpuDevice.FromD3D12(owner.Provider)))
+        {
+            Assert.That(gpu.Description, Is.EqualTo("D3D12"), "the layer uses the device the engine handed it");
+
+            using var buffer = gpu.Upload(new uint[] { 1, 2, 3, 4 });
+
+            Assert.That(buffer.CpuSpan.ToArray(), Is.EqualTo(new uint[] { 1, 2, 3, 4 }), "the layer allocates through the engine device");
+        }
+    }
+
+    [Test]
+    public void MetalTexture_KernelSamplesHardwareTexture()
+    {
+        const string Source = @"
+using System;
+using Gubbins.Graphic;
+
+public static class Textured
+{
+    public static void Kernel(int index, ReadOnlySpan<float2> source, Span<float4> destination, GpuTexture2D texture, GpuSamplerState sampler)
+    {
+        destination[index] = texture.Sample(sampler, source[index]);
+    }
+}
+";
+
+        if (!OperatingSystem.IsMacOS() || !MetalDevice.TryCreate(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no Metal device.");
+            return;
+        }
+
+        var directory = Directory.CreateTempSubdirectory("gubbins-texture-").FullName;
+
+        try
+        {
+            KernelCompiler.Compile(Source, directory, "Textured");
+
+            using (owner)
+            using (var device = GpuDevice.FromMetal(owner.Provider))
+            using (var memory = device.CreateMemory())
+            using (var texture = owner.Provider.CreateTexture(2, 2, GpuTextureFormat.Rgba8Unorm))
+            using (var sampler = owner.Provider.CreateSampler(new GpuSampler(GpuTextureFilter.Nearest, GpuAddressMode.Clamp)))
+            using (var kernel = GpuKernel.LoadFromDirectory(device, directory, "Textured"))
+            {
+                Assert.That(kernel, Is.Not.Null, "the texture kernel loads on Metal");
+
+                texture.Upload(new byte[]
+                {
+                    255, 0, 0, 255, 0, 255, 0, 255,
+                    0, 0, 255, 255, 255, 255, 255, 255
+                }, 8);
+
+                var input = memory.Allocate(8, GpuAccess.Shared);
+                var output = memory.Allocate(16, GpuAccess.Shared);
+                var lengths = memory.Allocate(16, GpuAccess.Shared);
+
+                memory.Upload(input, MemoryMarshal.AsBytes(new float[] { 0.25f, 0.25f }.AsSpan()));
+                memory.Upload(lengths, MemoryMarshal.AsBytes(new uint[] { 1, 1, 0, 0 }.AsSpan()));
+
+                Assert.That(kernel!.TryDispatch(input, output, lengths, null, texture, sampler, 1), Is.True, "the hardware texture dispatch ran");
+
+                memory.MarkWrittenByGpu(output);
+                Assert.That(memory.Synchronize(), Is.True, "the texture output was synchronized");
+
+                var result = MemoryMarshal.Cast<byte, float>(output.CpuView());
+
+                Assert.That(result[0], Is.EqualTo(1f).Within(0.001f), "the red channel came from the sampled texel");
+                Assert.That(result[1], Is.EqualTo(0f).Within(0.001f), "the green channel came from the sampled texel");
+                Assert.That(result[2], Is.EqualTo(0f).Within(0.001f), "the blue channel came from the sampled texel");
+                Assert.That(result[3], Is.EqualTo(1f).Within(0.001f), "the alpha channel came from the sampled texel");
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Test]
+    public void GlTexture_KernelSamplesHardwareTexture()
+    {
+        const string Source = @"
+using System;
+using Gubbins.Graphic;
+
+public static class GlTextured
+{
+    public static void Kernel(int index, ReadOnlySpan<float2> source, Span<float4> destination, GpuTexture2D texture, GpuSamplerState sampler)
+    {
+        destination[index] = texture.Sample(sampler, source[index]);
+    }
+}
+";
+
+        if (!GlDevice.TryCreate(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no OpenGL context.");
+            return;
+        }
+
+        var directory = Directory.CreateTempSubdirectory("gubbins-gltexture-").FullName;
+
+        try
+        {
+            KernelCompiler.Compile(Source, directory, "GlTextured");
+
+            using (var device = new GpuDevice(owner, owner.Provider.GetProvider(), 0, false, 0, "OpenGL"))
+            using (var memory = device.CreateMemory())
+            using (var texture = owner.Provider.CreateTexture(2, 2, GpuTextureFormat.Rgba8Unorm))
+            using (var sampler = owner.Provider.CreateSampler(new GpuSampler(GpuTextureFilter.Nearest, GpuAddressMode.Clamp)))
+            using (var kernel = GpuKernel.LoadFromDirectory(device, directory, "GlTextured"))
+            {
+                Assert.That(kernel, Is.Not.Null, "the texture kernel loads on OpenGL");
+
+                texture.Upload(new byte[]
+                {
+                    255, 0, 0, 255, 0, 255, 0, 255,
+                    0, 0, 255, 255, 255, 255, 255, 255
+                }, 8);
+
+                var input = memory.Allocate(8, GpuAccess.Shared);
+                var output = memory.Allocate(16, GpuAccess.Shared);
+                var lengths = memory.Allocate(16, GpuAccess.Shared);
+
+                memory.Upload(input, MemoryMarshal.AsBytes(new float[] { 0.25f, 0.25f }.AsSpan()));
+                memory.Upload(lengths, MemoryMarshal.AsBytes(new uint[] { 1, 1, 0, 0 }.AsSpan()));
+
+                Assert.That(kernel!.TryDispatchOpenGl(input, output, lengths, null, texture, sampler, 1), Is.True, "the hardware texture dispatch ran");
+
+                memory.MarkWrittenByGpu(output);
+                Assert.That(memory.Synchronize(), Is.True, "the texture output was synchronized");
+
+                var result = MemoryMarshal.Cast<byte, float>(output.CpuView());
+
+                Assert.That(result[0], Is.EqualTo(1f).Within(0.001f), "the red channel came from the sampled texel");
+                Assert.That(result[1], Is.EqualTo(0f).Within(0.001f), "the green channel came from the sampled texel");
+                Assert.That(result[2], Is.EqualTo(0f).Within(0.001f), "the blue channel came from the sampled texel");
+                Assert.That(result[3], Is.EqualTo(1f).Within(0.001f), "the alpha channel came from the sampled texel");
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    /// <summary>
+    /// Runs a kernel on an engine-owned device, with one of the buffers wrapped from a resource the engine owns.
+    /// </summary>
+    /// <param name="device">The engine-owned device.</param>
+    /// <param name="name">The backend, for the assertions.</param>
+    /// <param name="import">Wraps one block as an imported block.</param>
+    private static void VerifyEngineOwnedDevice(GpuDevice device, string name, Func<GpuMemory, GpuBlock, GpuBlock> import)
+    {
+        const int Count = 4096;
+
+        var directory = Directory.CreateTempSubdirectory("gubbins-engine-").FullName;
+
+        try
+        {
+            KernelCompiler.Compile(Kernel, directory, "Scale");
+
+            using var memory = device.CreateMemory();
+            using var kernel = GpuKernel.LoadFromDirectory(device, directory, "Scale");
+
+            Assert.That(kernel, Is.Not.Null, $"{name}: the kernel loads on the engine device");
+
+            var input = memory.Allocate((nuint)(Count * sizeof(uint)), GpuAccess.Shared);
+            var output = memory.Allocate((nuint)(Count * sizeof(uint)), GpuAccess.Shared);
+            var lengths = memory.Allocate(16, GpuAccess.Shared);
+            var values = new uint[Count];
+
+            for (var index = 0; index < Count; index++)
+            {
+                values[index] = (uint)index;
+            }
+
+            memory.Upload(input, MemoryMarshal.AsBytes(values.AsSpan()));
+            memory.Upload(lengths, MemoryMarshal.AsBytes(new uint[] { Count, Count, 0, 0 }.AsSpan()));
+
+            var imported = import(memory, output);
+
+            Assert.That(kernel!.TryDispatch(input, imported, (uint)(Count / KernelTranspiler.THREADS_PER_GROUP), lengths), Is.True, $"{name}: the dispatch over the imported block ran");
+
+            memory.MarkWrittenByGpu(imported);
+            Assert.That(memory.Synchronize(), Is.True, $"{name}: the imported block was synchronized");
+
+            var result = MemoryMarshal.Cast<byte, uint>(imported.CpuView());
+            var addend = (uint)Math.Min(Count, 4096);
+
+            for (var index = 0; index < Count; index++)
+            {
+                Assert.That(result[index], Is.EqualTo(values[index] + addend), $"{name}: imported element {index}");
+            }
+
+            Assert.That(memory.Release(imported), Is.True, $"{name}: the imported wrapper is released");
+            Assert.That(memory.Release(output), Is.True, $"{name}: the owning block is released");
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
 
     /// <summary>
     /// Compiles a kernel for the device this machine has, skipping the test when either is missing.

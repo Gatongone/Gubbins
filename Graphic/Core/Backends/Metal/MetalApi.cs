@@ -165,6 +165,25 @@ internal static unsafe class MetalApi
         => ((delegate* unmanaged[Cdecl]<nint, nint, ulong>)send)(receiver, Selector(selector));
 
     /// <summary>
+    /// Sends a message that takes one object and returns an object.
+    /// </summary>
+    /// <param name="receiver">The object.</param>
+    /// <param name="selector">The selector.</param>
+    /// <param name="argument">The object argument.</param>
+    /// <returns>The returned object, or <see langword="0"/>.</returns>
+    internal static nint SendObject(nint receiver, string selector, nint argument)
+        => ((delegate* unmanaged[Cdecl]<nint, nint, nint, nint>)send)(receiver, Selector(selector), argument);
+
+    /// <summary>
+    /// Sends a message that takes one unsigned integer and returns nothing.
+    /// </summary>
+    /// <param name="receiver">The object.</param>
+    /// <param name="selector">The selector.</param>
+    /// <param name="argument">The value.</param>
+    internal static void SendUInt(nint receiver, string selector, nuint argument)
+        => ((delegate* unmanaged[Cdecl]<nint, nint, nuint, void>)send)(receiver, Selector(selector), argument);
+
+    /// <summary>
     /// Creates a buffer with <c>newBufferWithLength:options:</c>.
     /// </summary>
     /// <param name="device">The <c>MTLDevice</c>.</param>
@@ -177,6 +196,101 @@ internal static unsafe class MetalApi
             Selector("newBufferWithLength:options:"),
             length,
             (nuint)options);
+
+    /// <summary>
+    /// Creates a two dimensional texture with <c>newTextureWithDescriptor:</c>.
+    /// </summary>
+    /// <param name="device">The <c>MTLDevice</c>.</param>
+    /// <param name="format">The <c>MTLPixelFormat</c>.</param>
+    /// <param name="width">The width, in pixels.</param>
+    /// <param name="height">The height, in pixels.</param>
+    /// <param name="usage">The <c>MTLTextureUsage</c> flags.</param>
+    /// <returns>The texture, or <see langword="0"/> when Metal refused.</returns>
+    internal static nint NewTexture(nint device, uint format, nuint width, nuint height, nuint usage)
+    {
+        var descriptor = ((delegate* unmanaged[Cdecl]<nint, nint, nuint, nuint, nuint, byte, nint>)send)(
+            Class("MTLTextureDescriptor"),
+            Selector("texture2DDescriptorWithPixelFormat:width:height:mipmapped:"),
+            format,
+            width,
+            height,
+            0);
+
+        if (descriptor == 0)
+        {
+            return 0;
+        }
+
+        SendUInt(descriptor, "setUsage:", usage);
+
+        return SendObject(device, "newTextureWithDescriptor:", descriptor);
+    }
+
+    /// <summary>
+    /// Writes one region of a texture with <c>replaceRegion:mipmapLevel:withBytes:bytesPerRow:</c>.
+    /// </summary>
+    /// <param name="texture">The <c>MTLTexture</c>.</param>
+    /// <param name="region">The region.</param>
+    /// <param name="level">The mip level.</param>
+    /// <param name="bytes">The pixels.</param>
+    /// <param name="bytesPerRow">The number of bytes in one row.</param>
+    internal static void ReplaceRegion(nint texture, MetalRegion region, nuint level, void* bytes, nuint bytesPerRow)
+        => ((delegate* unmanaged[Cdecl]<nint, nint, MetalRegion, nuint, void*, nuint, void>)send)(
+            texture,
+            Selector("replaceRegion:mipmapLevel:withBytes:bytesPerRow:"),
+            region,
+            level,
+            bytes,
+            bytesPerRow);
+
+    /// <summary>
+    /// Reads one region of a texture with <c>getBytes:bytesPerRow:fromRegion:mipmapLevel:</c>.
+    /// </summary>
+    /// <param name="texture">The <c>MTLTexture</c>.</param>
+    /// <param name="bytes">The destination.</param>
+    /// <param name="bytesPerRow">The number of bytes in one row.</param>
+    /// <param name="region">The region.</param>
+    /// <param name="level">The mip level.</param>
+    internal static void GetBytes(nint texture, void* bytes, nuint bytesPerRow, MetalRegion region, nuint level)
+        => ((delegate* unmanaged[Cdecl]<nint, nint, void*, nuint, MetalRegion, nuint, void>)send)(
+            texture,
+            Selector("getBytes:bytesPerRow:fromRegion:mipmapLevel:"),
+            bytes,
+            bytesPerRow,
+            region,
+            level);
+
+    /// <summary>
+    /// Creates a sampler state with <c>newSamplerStateWithDescriptor:</c>.
+    /// </summary>
+    /// <param name="device">The <c>MTLDevice</c>.</param>
+    /// <param name="minFilter">The <c>MTLSamplerMinMagFilter</c>.</param>
+    /// <param name="magFilter">The <c>MTLSamplerMinMagFilter</c>.</param>
+    /// <param name="address">The <c>MTLSamplerAddressMode</c>.</param>
+    /// <returns>The sampler state, or <see langword="0"/> when Metal refused.</returns>
+    internal static nint NewSamplerState(nint device, nuint minFilter, nuint magFilter, nuint address)
+    {
+        var descriptor = Send(Class("MTLSamplerDescriptor"), "new");
+
+        if (descriptor == 0)
+        {
+            return 0;
+        }
+
+        try
+        {
+            SendUInt(descriptor, "setMinFilter:", minFilter);
+            SendUInt(descriptor, "setMagFilter:", magFilter);
+            SendUInt(descriptor, "setSAddressMode:", address);
+            SendUInt(descriptor, "setTAddressMode:", address);
+
+            return SendObject(device, "newSamplerStateWithDescriptor:", descriptor);
+        }
+        finally
+        {
+            Release(descriptor);
+        }
+    }
 
     /// <summary>
     /// Records <c>copyFromBuffer:sourceOffset:toBuffer:destinationOffset:size:</c> on a blit encoder.
@@ -373,6 +487,32 @@ internal static unsafe class MetalApi
             index);
 
     /// <summary>
+    /// Binds a texture with <c>setTexture:atIndex:</c>.
+    /// </summary>
+    /// <param name="encoder">The <c>MTLComputeCommandEncoder</c>.</param>
+    /// <param name="texture">The <c>MTLTexture</c>.</param>
+    /// <param name="index">The texture index.</param>
+    internal static void SetTexture(nint encoder, nint texture, nuint index)
+        => ((delegate* unmanaged[Cdecl]<nint, nint, nint, nuint, void>)send)(
+            encoder,
+            Selector("setTexture:atIndex:"),
+            texture,
+            index);
+
+    /// <summary>
+    /// Binds a sampler state with <c>setSamplerState:atIndex:</c>.
+    /// </summary>
+    /// <param name="encoder">The <c>MTLComputeCommandEncoder</c>.</param>
+    /// <param name="sampler">The <c>MTLSamplerState</c>.</param>
+    /// <param name="index">The sampler index.</param>
+    internal static void SetSamplerState(nint encoder, nint sampler, nuint index)
+        => ((delegate* unmanaged[Cdecl]<nint, nint, nint, nuint, void>)send)(
+            encoder,
+            Selector("setSamplerState:atIndex:"),
+            sampler,
+            index);
+
+    /// <summary>
     /// Calls <c>dispatchThreadgroups:threadsPerThreadgroup:</c>. Both arguments are <c>MTLSize</c>, which is three 64-bit
     /// fields, so the ABI hands them over by memory rather than in registers.
     /// </summary>
@@ -522,6 +662,43 @@ internal struct MetalSize
 
     /// <summary>
     /// The count along z.
+    /// </summary>
+    public nuint Depth;
+}
+
+/// <summary>
+/// <c>MTLRegion</c>: an origin and a size, each three 64-bit counts, 48 bytes.
+/// </summary>
+[StructLayout(LayoutKind.Sequential)]
+internal struct MetalRegion
+{
+    /// <summary>
+    /// The origin along x.
+    /// </summary>
+    public nuint X;
+
+    /// <summary>
+    /// The origin along y.
+    /// </summary>
+    public nuint Y;
+
+    /// <summary>
+    /// The origin along z.
+    /// </summary>
+    public nuint Z;
+
+    /// <summary>
+    /// The size along x.
+    /// </summary>
+    public nuint Width;
+
+    /// <summary>
+    /// The size along y.
+    /// </summary>
+    public nuint Height;
+
+    /// <summary>
+    /// The size along z.
     /// </summary>
     public nuint Depth;
 }

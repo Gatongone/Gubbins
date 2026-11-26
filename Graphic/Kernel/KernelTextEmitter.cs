@@ -37,6 +37,11 @@ public abstract class KernelTextEmitter
             throw new ArgumentNullException(nameof(program));
         }
 
+        if ((program.Textures?.Count ?? 0) > 0 && !SupportsTextures)
+        {
+            return string.Empty;
+        }
+
         Prepare(program);
 
         var text = new StringBuilder();
@@ -116,6 +121,19 @@ public abstract class KernelTextEmitter
     /// <param name="name">The name as the kernel declares it.</param>
     /// <returns>The name as the language takes it.</returns>
     protected virtual string Identifier(string name) => name;
+
+    /// <summary>
+    /// Gets a value indicating whether this language can emit a kernel that samples a texture.
+    /// </summary>
+    protected virtual bool SupportsTextures => false;
+
+    /// <summary>
+    /// Writes a sampled read of a texture.
+    /// </summary>
+    /// <param name="sample">The read.</param>
+    /// <returns>The expression.</returns>
+    protected virtual string TextureSample(KernelTextureSample sample)
+        => throw new KernelTranslationException($"'{GetType().Name}' has no texture sampling.");
 
     /// <summary>
     /// Writes the functions of a program that are not its entry point.
@@ -415,6 +433,9 @@ public abstract class KernelTextEmitter
 
             case KernelIntrinsicCall intrinsic:
                 return (Intrinsic(intrinsic.Intrinsic, intrinsic.Arguments.Select(argument => Value(argument)).ToList()), Precedence.Primary);
+
+            case KernelTextureSample sample:
+                return (TextureSample(sample), Precedence.Primary);
 
             case KernelConvert convert:
                 // A conversion is written as the constructor of the type, which is the form every one of these languages

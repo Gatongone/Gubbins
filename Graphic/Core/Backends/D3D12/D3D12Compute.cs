@@ -23,6 +23,7 @@ internal sealed unsafe class D3D12Compute : IDisposable
     private nint m_RootSignature;
     private nint m_Pipeline;
     private ulong m_FenceValue;
+    private bool m_Pending;
     private bool m_Disposed;
 
     /// <param name="device">The <c>ID3D12Device</c> to run on.</param>
@@ -131,9 +132,14 @@ internal sealed unsafe class D3D12Compute : IDisposable
     /// <param name="lengthsAddress">The GPU address of the lengths, or <see langword="0"/> when the kernel takes none.</param>
     /// <param name="groups">The number of thread groups to dispatch on the x axis.</param>
     /// <returns><see langword="true"/> if the dispatch ran to completion.</returns>
-    internal bool Dispatch(nint sourceResource, ulong sourceAddress, nint destinationResource, ulong destinationAddress, ulong parametersAddress, ulong lengthsAddress, uint groups)
+    internal bool Dispatch(nint sourceResource, ulong sourceAddress, nint destinationResource, ulong destinationAddress, ulong parametersAddress, ulong lengthsAddress, uint groups, bool wait)
     {
         if (m_Disposed || m_Pipeline == 0 || sourceResource == 0 || destinationResource == 0 || groups == 0)
+        {
+            return false;
+        }
+
+        if (m_Pending && !WaitPending())
         {
             return false;
         }
@@ -217,7 +223,39 @@ internal sealed unsafe class D3D12Compute : IDisposable
         D3D12Api.ExecuteCommandLists(m_Queue, m_List);
 
         m_FenceValue++;
-        return D3D12Api.Signal(m_Queue, m_Fence, m_FenceValue) >= 0 && D3D12Api.WaitForFence(m_Fence, m_FenceValue);
+
+        if (D3D12Api.Signal(m_Queue, m_Fence, m_FenceValue) < 0)
+        {
+            return false;
+        }
+
+        if (!wait)
+        {
+            m_Pending = true;
+            return true;
+        }
+
+        return D3D12Api.WaitForFence(m_Fence, m_FenceValue);
+    }
+
+    /// <summary>
+    /// Waits for the dispatches that were recorded without waiting.
+    /// </summary>
+    /// <returns><see langword="true"/> when every submission has completed.</returns>
+    internal bool WaitPending()
+    {
+        if (!m_Pending)
+        {
+            return true;
+        }
+
+        if (!D3D12Api.WaitForFence(m_Fence, m_FenceValue))
+        {
+            return false;
+        }
+
+        m_Pending = false;
+        return true;
     }
 
     /// <summary>
@@ -281,6 +319,7 @@ internal sealed unsafe class D3D12Compute : IDisposable
         }
 
         m_Disposed = true;
+        WaitPending();
 
         if (m_Pipeline != 0)
         {

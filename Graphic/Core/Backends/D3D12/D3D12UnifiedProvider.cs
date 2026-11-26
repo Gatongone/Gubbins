@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using Gubbins.Graphic;
+using Gubbins.Graphic.D3D12;
 
 #pragma warning disable CS8500 // This takes the address of, gets the size of, or declares a pointer to a managed type
 
@@ -47,6 +48,7 @@ public sealed unsafe class D3D12UnifiedProvider : IUnifiedProvider, IDisposable
         public nuint Size;
         public nuint AllocationSize;
         public UnifiedMemoryKind Kind;
+        public bool Owned;
     }
 
     private readonly nint m_Device;
@@ -214,6 +216,28 @@ public sealed unsafe class D3D12UnifiedProvider : IUnifiedProvider, IDisposable
     /// <inheritdoc/>
     public UnifiedProvider GetProvider() => ProviderAdapter<D3D12UnifiedProvider>.Create(this, ref m_Self);
 
+    /// <summary>
+    /// Creates a two dimensional texture on the device.
+    /// </summary>
+    /// <param name="width">The width, in pixels.</param>
+    /// <param name="height">The height, in pixels.</param>
+    /// <param name="format">The pixel format.</param>
+    /// <returns>The texture, to be disposed when it is no longer read.</returns>
+    public GpuTexture2D CreateTexture(int width, int height, GpuTextureFormat format)
+    {
+        if (m_Disposed)
+        {
+            throw new ObjectDisposedException(nameof(D3D12UnifiedProvider));
+        }
+
+        if (width <= 0 || height <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(width), "A texture is at least one pixel wide and high.");
+        }
+
+        return new GpuTexture2D(new D3D12Texture(m_Device, width, height, format), width, height, format);
+    }
+
     /// <inheritdoc/>
     /// <exception cref="OutOfMemoryException">Thrown when the driver cannot create the heap.</exception>
     /// <exception cref="D3D12Exception">Thrown when the heap or the placed resource cannot be created for another reason.</exception>
@@ -303,6 +327,7 @@ public sealed unsafe class D3D12UnifiedProvider : IUnifiedProvider, IDisposable
         arena->Size = size;
         arena->AllocationSize = size;
         arena->Kind = choice.Kind;
+        arena->Owned = true;
         arena->Next = m_First;
         m_First = arena;
 
@@ -514,6 +539,64 @@ public sealed unsafe class D3D12UnifiedProvider : IUnifiedProvider, IDisposable
     }
 
     /// <summary>
+    /// Wraps a resource the engine owns as a block this layer can bind, without taking ownership of it.
+    /// </summary>
+    /// <param name="resource">The <c>ID3D12Resource</c>.</param>
+    /// <param name="offset">The offset of the block inside the resource, in bytes.</param>
+    /// <param name="length">The length of the block, in bytes.</param>
+    /// <param name="host">The CPU mapping of the resource, or <see langword="0"/> when it is device only.</param>
+    /// <param name="kind">How the resource is shared between the processors.</param>
+    /// <param name="block">When the method returns, the block.</param>
+    /// <returns><see langword="true"/> when the bookkeeping for the block was created.</returns>
+    public bool TryImport(nint resource, nuint offset, nuint length, nint host, UnifiedMemoryKind kind, out UnifiedMemoryBlock block)
+    {
+        block = default;
+
+        if (m_Disposed || resource == 0 || length == 0)
+        {
+            return false;
+        }
+
+        var arena = (Arena*)NativeInterop.AllocZeroed((nuint)sizeof(Arena));
+
+        if (arena == null)
+        {
+            return false;
+        }
+
+        arena->Resource = resource;
+        arena->Host = (byte*)host;
+        arena->Size = length;
+        arena->AllocationSize = length;
+        arena->Kind = kind;
+        arena->Owned = false;
+        arena->Next = m_First;
+        m_First = arena;
+
+        block = new UnifiedMemoryBlock(
+            arena,
+            (byte*)host,
+            host == 0 ? null : (byte*)host + (long)offset,
+            0,
+            offset,
+            length,
+            length,
+            kind);
+
+        return true;
+    }
+
+    /// <summary>
+    /// Gets the <c>ID3D12Device</c> the bridge allocates on.
+    /// </summary>
+    internal nint Device => m_Device;
+
+    /// <summary>
+    /// Gets the <c>ID3D12CommandQueue</c> the bridge submits copies to.
+    /// </summary>
+    internal nint Queue => m_Queue;
+
+    /// <summary>
     /// Gets the <c>ID3D12Heap</c> of the segment that owns <paramref name="block"/>, plus the block's offset.
     /// </summary>
     /// <param name="block">The block to describe.</param>
@@ -649,6 +732,12 @@ public sealed unsafe class D3D12UnifiedProvider : IUnifiedProvider, IDisposable
     /// <param name="arena">The segment to release.</param>
     private static void DestroyArena(Arena* arena)
     {
+        if (!arena->Owned)
+        {
+            NativeInterop.Free(arena);
+            return;
+        }
+
         if (arena->Host != null)
         {
             D3D12Api.Unmap(arena->Resource, null);

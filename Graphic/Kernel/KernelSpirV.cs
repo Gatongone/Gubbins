@@ -32,6 +32,11 @@ public sealed class KernelSpirV
             throw new ArgumentNullException(nameof(program));
         }
 
+        if ((program.Textures?.Count ?? 0) > 0)
+        {
+            return System.Array.Empty<byte>();
+        }
+
         return new SpirVWriter(program).Write();
     }
 }

@@ -36,6 +36,18 @@ internal sealed unsafe class GlEntryPoints
         MemoryBarrier = (delegate* unmanaged[Cdecl]<uint, void>)GlContext.Resolve(module, "glMemoryBarrier");
         Finish = (delegate* unmanaged[Cdecl]<void>)GlContext.Resolve(module, "glFinish");
         GetError = (delegate* unmanaged[Cdecl]<uint>)GlContext.Resolve(module, "glGetError");
+        GenTextures = (delegate* unmanaged[Cdecl]<int, uint*, void>)GlContext.Resolve(module, "glGenTextures");
+        DeleteTextures = (delegate* unmanaged[Cdecl]<int, uint*, void>)GlContext.Resolve(module, "glDeleteTextures");
+        BindTexture = (delegate* unmanaged[Cdecl]<uint, uint, void>)GlContext.Resolve(module, "glBindTexture");
+        TexImage2D = (delegate* unmanaged[Cdecl]<uint, int, int, int, int, int, uint, uint, void*, void>)GlContext.Resolve(module, "glTexImage2D");
+        TexSubImage2D = (delegate* unmanaged[Cdecl]<uint, int, int, int, int, int, uint, uint, void*, void>)GlContext.Resolve(module, "glTexSubImage2D");
+        GetTexImage = (delegate* unmanaged[Cdecl]<uint, int, uint, uint, void*, void>)GlContext.Resolve(module, "glGetTexImage");
+        PixelStore = (delegate* unmanaged[Cdecl]<uint, int, void>)GlContext.Resolve(module, "glPixelStorei");
+        ActiveTexture = (delegate* unmanaged[Cdecl]<uint, void>)GlContext.Resolve(module, "glActiveTexture");
+        GenSamplers = (delegate* unmanaged[Cdecl]<int, uint*, void>)GlContext.Resolve(module, "glGenSamplers");
+        DeleteSamplers = (delegate* unmanaged[Cdecl]<int, uint*, void>)GlContext.Resolve(module, "glDeleteSamplers");
+        BindSampler = (delegate* unmanaged[Cdecl]<uint, uint, void>)GlContext.Resolve(module, "glBindSampler");
+        SamplerParameter = (delegate* unmanaged[Cdecl]<uint, uint, int, void>)GlContext.Resolve(module, "glSamplerParameteri");
     }
 
     internal delegate* unmanaged[Cdecl]<int, uint*, void> GenBuffers;
@@ -65,5 +77,17 @@ internal sealed unsafe class GlEntryPoints
     internal delegate* unmanaged[Cdecl]<uint, void> MemoryBarrier;
     internal delegate* unmanaged[Cdecl]<void> Finish;
     internal delegate* unmanaged[Cdecl]<uint> GetError;
+    internal delegate* unmanaged[Cdecl]<int, uint*, void> GenTextures;
+    internal delegate* unmanaged[Cdecl]<int, uint*, void> DeleteTextures;
+    internal delegate* unmanaged[Cdecl]<uint, uint, void> BindTexture;
+    internal delegate* unmanaged[Cdecl]<uint, int, int, int, int, int, uint, uint, void*, void> TexImage2D;
+    internal delegate* unmanaged[Cdecl]<uint, int, int, int, int, int, uint, uint, void*, void> TexSubImage2D;
+    internal delegate* unmanaged[Cdecl]<uint, int, uint, uint, void*, void> GetTexImage;
+    internal delegate* unmanaged[Cdecl]<uint, int, void> PixelStore;
+    internal delegate* unmanaged[Cdecl]<uint, void> ActiveTexture;
+    internal delegate* unmanaged[Cdecl]<int, uint*, void> GenSamplers;
+    internal delegate* unmanaged[Cdecl]<int, uint*, void> DeleteSamplers;
+    internal delegate* unmanaged[Cdecl]<uint, uint, void> BindSampler;
+    internal delegate* unmanaged[Cdecl]<uint, uint, int, void> SamplerParameter;
 }
 
