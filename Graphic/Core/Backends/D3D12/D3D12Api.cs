@@ -709,10 +709,13 @@ internal struct D3D12ShaderResourceViewDesc
     public uint Format;
     public int ViewDimension;
     public uint Shader4ComponentMapping;
+    public uint UnionPadding;
     public uint MostDetailedMip;
     public uint MipLevels;
     public uint PlaneSlice;
     public float ResourceMinLodClamp;
+    public uint Padding0;
+    public uint Padding1;
 }
 
 /// <summary>

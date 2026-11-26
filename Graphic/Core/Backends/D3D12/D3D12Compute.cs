@@ -132,7 +132,7 @@ internal sealed unsafe class D3D12Compute : IDisposable
     /// <param name="lengthsAddress">The GPU address of the lengths, or <see langword="0"/> when the kernel takes none.</param>
     /// <param name="groups">The number of thread groups to dispatch on the x axis.</param>
     /// <returns><see langword="true"/> if the dispatch ran to completion.</returns>
-    internal bool Dispatch(nint sourceResource, ulong sourceAddress, nint destinationResource, ulong destinationAddress, ulong parametersAddress, ulong lengthsAddress, uint groups, bool wait)
+    internal bool Dispatch(nint sourceResource, ulong sourceAddress, nint destinationResource, ulong destinationAddress, ulong parametersAddress, ulong lengthsAddress, nint textureResource, nint textureHeap, D3D12GpuDescriptorHandle srv, nint samplerHeap, D3D12GpuDescriptorHandle sampler, uint groups, bool wait)
     {
         if (m_Disposed || m_Pipeline == 0 || sourceResource == 0 || destinationResource == 0 || groups == 0)
         {
@@ -189,6 +189,17 @@ internal sealed unsafe class D3D12Compute : IDisposable
         {
             D3D12Api.SetComputeRootUnorderedAccessView(m_List, 2, lengthsAddress);
         }
+
+        if (textureHeap != 0 && samplerHeap != 0)
+        {
+            var heaps = stackalloc nint[2];
+            heaps[0] = textureHeap;
+            heaps[1] = samplerHeap;
+            D3D12Api.SetDescriptorHeaps(m_List, 2, heaps);
+            D3D12Api.SetComputeRootDescriptorTable(m_List, 4, srv);
+            D3D12Api.SetComputeRootDescriptorTable(m_List, 5, sampler);
+        }
+
         D3D12Api.ResourceBarrier(m_List, &destination);
         D3D12Api.Dispatch(m_List, groups, 1, 1);
 

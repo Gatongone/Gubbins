@@ -16,6 +16,7 @@ internal sealed unsafe class D3D12Texture : IGpuTexture
     private const int StateCopyDestination = 0x400;
     private const int StateCopySource = 0x800;
     private const int StateGenericRead = 0xAC;
+    private const int StateNonPixelShaderResource = 0x40;
     private const int ResourceDimensionBuffer = 1;
     private const int ResourceDimensionTexture2D = 3;
     private const uint AllSubresources = 0xFFFFFFFF;
@@ -110,6 +111,32 @@ internal sealed unsafe class D3D12Texture : IGpuTexture
         m_State = StateCopyDestination;
         m_SrvHeap = 0;
         m_Srv = default;
+
+        var heapDescription = new D3D12DescriptorHeapDesc { Type = 0, NumDescriptors = 1, Flags = 1, NodeMask = 0 };
+
+        if (D3D12Api.CreateDescriptorHeap(device, &heapDescription, out m_SrvHeap) < 0 || m_SrvHeap == 0)
+        {
+            D3D12Api.Release(m_Resource);
+            D3D12Api.Release(m_Fence);
+            D3D12Api.Release(m_List);
+            D3D12Api.Release(m_Allocator);
+            D3D12Api.Release(m_Queue);
+            throw new D3D12Exception("CreateDescriptorHeap failed for the texture shader resource view.");
+        }
+
+        var view = new D3D12ShaderResourceViewDesc
+        {
+            Format = m_Format,
+            ViewDimension = 4,
+            Shader4ComponentMapping = 0x1688,
+            MostDetailedMip = 0,
+            MipLevels = 1,
+            PlaneSlice = 0,
+            ResourceMinLodClamp = 0
+        };
+
+        D3D12Api.CreateShaderResourceView(device, m_Resource, &view, D3D12Api.GetCpuDescriptorHandle(m_SrvHeap));
+        m_Srv = D3D12Api.GetGpuDescriptorHandle(m_SrvHeap);
     }
 
     /// <summary>
@@ -258,6 +285,11 @@ internal sealed unsafe class D3D12Texture : IGpuTexture
             D3D12Api.Release(heap);
         }
     }
+
+    /// <summary>
+    /// Moves the texture to the state a compute shader samples it from.
+    /// </summary>
+    internal void PrepareSrv() => Execute(list => Transition(list, StateNonPixelShaderResource));
 
     /// <summary>
     /// Releases the resource, the copy queue and the fence.

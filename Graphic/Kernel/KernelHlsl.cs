@@ -1,5 +1,7 @@
 namespace Gubbins.Graphic.Kernels;
 
+using System.Text;
+
 /// <summary>
 /// Writes one program as the HLSL D3D12 compiles, which is the language the subset is closest to.
 /// </summary>
@@ -37,6 +39,29 @@ public sealed class KernelHlsl : KernelTextEmitter
     /// <inheritdoc/>
     protected override string Lengths(KernelProgram program)
         => $"RWStructuredBuffer<uint> {KernelTranspiler.LENGTHS_BUFFER} : register(u{LengthsBinding(program)});";
+
+    /// <inheritdoc/>
+    protected override void Bindings(KernelProgram program, StringBuilder text)
+    {
+        base.Bindings(program, text);
+
+        foreach (var texture in program.Textures ?? System.Array.Empty<KernelTexture>())
+        {
+            text.AppendLine($"Texture2D<float4> gubbins_tex_{Identifier(texture.Name)} : register(t{texture.Binding});");
+        }
+
+        foreach (var sampler in program.Samplers ?? System.Array.Empty<KernelSampler>())
+        {
+            text.AppendLine($"SamplerState gubbins_samp_{Identifier(sampler.Name)} : register(s{sampler.Binding});");
+        }
+    }
+
+    /// <inheritdoc/>
+    protected override bool SupportsTextures => true;
+
+    /// <inheritdoc/>
+    protected override string TextureSample(KernelTextureSample sample)
+        => $"gubbins_tex_{Identifier(sample.Texture.Name)}.Sample(gubbins_samp_{Identifier(sample.Sampler.Name)}, {Value(sample.Coordinates)})";
 
     /// <inheritdoc/>
     protected override IReadOnlyList<string> EntrySignature(KernelProgram program) => new[]

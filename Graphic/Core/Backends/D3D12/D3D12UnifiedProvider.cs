@@ -238,6 +238,21 @@ public sealed unsafe class D3D12UnifiedProvider : IUnifiedProvider, IDisposable
         return new GpuTexture2D(new D3D12Texture(m_Device, width, height, format), width, height, format);
     }
 
+    /// <summary>
+    /// Creates a sampler state on the device.
+    /// </summary>
+    /// <param name="sampler">The sampler description.</param>
+    /// <returns>The state, to be disposed when it is no longer bound.</returns>
+    public GpuSamplerState CreateSampler(GpuSampler sampler)
+    {
+        if (m_Disposed)
+        {
+            throw new ObjectDisposedException(nameof(D3D12UnifiedProvider));
+        }
+
+        return new GpuSamplerState(new D3D12SamplerState(m_Device, sampler));
+    }
+
     /// <inheritdoc/>
     /// <exception cref="OutOfMemoryException">Thrown when the driver cannot create the heap.</exception>
     /// <exception cref="D3D12Exception">Thrown when the heap or the placed resource cannot be created for another reason.</exception>

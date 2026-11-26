@@ -34,6 +34,21 @@ internal static unsafe partial class D3D12Api
     internal const int ROOT_PARAMETER_TYPE_UAV = 4;
 
     /// <summary>
+    /// <c>D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE</c>: a table of descriptors.
+    /// </summary>
+    internal const int ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE = 0;
+
+    /// <summary>
+    /// <c>D3D12_DESCRIPTOR_RANGE_TYPE_SRV</c>.
+    /// </summary>
+    internal const int DESCRIPTOR_RANGE_TYPE_SRV = 0;
+
+    /// <summary>
+    /// <c>D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER</c>.
+    /// </summary>
+    internal const int DESCRIPTOR_RANGE_TYPE_SAMPLER = 3;
+
+    /// <summary>
     /// <c>D3D12_SHADER_VISIBILITY_ALL</c>.
     /// </summary>
     internal const int SHADER_VISIBILITY_ALL = 0;
@@ -340,7 +355,30 @@ internal struct D3D12RootParameter
     /// </summary>
     [FieldOffset(16)] public uint Num32BitValues;
 
+    /// <summary>
+    /// The range array of a descriptor table, which is the union the table parameter uses.
+    /// </summary>
+    [FieldOffset(8)] public nint DescriptorTable;
+
+    /// <summary>
+    /// The number of ranges of the descriptor table.
+    /// </summary>
+    [FieldOffset(16)] public uint NumDescriptorRanges;
+
     [FieldOffset(24)] public int ShaderVisibility;
+}
+
+/// <summary>
+/// <c>D3D12_DESCRIPTOR_RANGE</c>, 20 bytes.
+/// </summary>
+[StructLayout(LayoutKind.Sequential)]
+internal struct D3D12DescriptorRange
+{
+    public int RangeType;
+    public uint NumDescriptors;
+    public uint BaseShaderRegister;
+    public uint RegisterSpace;
+    public uint OffsetInDescriptorsFromTableStart;
 }
 
 /// <summary>

@@ -393,7 +393,7 @@ public sealed class GpuKernel : IDisposable
             parametersAddress = D3D12Api.GetVirtualAddress(parametersResource) + (ulong)parameters.Storage.Offset;
         }
 
-        return m_D3D12.Dispatch(sourceResource, sourceAddress, destinationResource, destinationAddress, parametersAddress, lengthsAddress, groups, wait);
+        return m_D3D12.Dispatch(sourceResource, sourceAddress, destinationResource, destinationAddress, parametersAddress, lengthsAddress, 0, 0, default, 0, default, groups, wait);
     }
 
     /// <summary>
@@ -535,6 +535,76 @@ public sealed class GpuKernel : IDisposable
             LengthsSize,
             glTexture.Handle,
             glSampler.Handle,
+            groups,
+            wait);
+    }
+
+    /// <summary>
+    /// Runs a kernel that samples a texture on D3D12.
+    /// </summary>
+    /// <param name="source">The block the kernel reads.</param>
+    /// <param name="destination">The block the kernel writes.</param>
+    /// <param name="lengths">The block that carries the element counts, or <see langword="null"/>.</param>
+    /// <param name="parameters">The block that carries the structure the kernel takes, or <see langword="null"/>.</param>
+    /// <param name="texture">The texture to sample.</param>
+    /// <param name="sampler">The sampler state.</param>
+    /// <param name="groups">The number of groups on the x axis.</param>
+    /// <param name="wait">Whether to wait for the dispatch.</param>
+    /// <returns><see langword="true"/> if the dispatch ran.</returns>
+    public bool TryDispatchD3D12(GpuBlock source, GpuBlock destination, GpuBlock? lengths, GpuBlock? parameters, GpuTexture2D texture, GpuSamplerState sampler, uint groups, bool wait = true)
+    {
+        if (m_Disposed)
+        {
+            throw new ObjectDisposedException(nameof(GpuKernel));
+        }
+
+        if (m_D3D12 is null || m_Device.Backend is not D3D12Device d3d12)
+        {
+            return false;
+        }
+
+        if (texture.Backend is not D3D12Texture d3d12Texture || sampler.Backend is not D3D12SamplerState d3d12Sampler)
+        {
+            return false;
+        }
+
+        var provider = d3d12.Provider;
+
+        if (!provider.TryGetResource(source.Storage, out var sourceResource, out _) ||
+            !provider.TryGetResource(destination.Storage, out var destinationResource, out _))
+        {
+            return false;
+        }
+
+        var sourceAddress = D3D12Api.GetVirtualAddress(sourceResource) + (ulong)source.Storage.Offset;
+        var destinationAddress = D3D12Api.GetVirtualAddress(destinationResource) + (ulong)destination.Storage.Offset;
+
+        var lengthsAddress = 0ul;
+        if (lengths is not null && provider.TryGetResource(lengths.Storage, out var lengthsResource, out _))
+        {
+            lengthsAddress = D3D12Api.GetVirtualAddress(lengthsResource) + (ulong)lengths.Storage.Offset;
+        }
+
+        var parametersAddress = 0ul;
+        if (parameters is not null && provider.TryGetResource(parameters.Storage, out var parametersResource, out _))
+        {
+            parametersAddress = D3D12Api.GetVirtualAddress(parametersResource) + (ulong)parameters.Storage.Offset;
+        }
+
+        d3d12Texture.PrepareSrv();
+
+        return m_D3D12.Dispatch(
+            sourceResource,
+            sourceAddress,
+            destinationResource,
+            destinationAddress,
+            parametersAddress,
+            lengthsAddress,
+            d3d12Texture.Resource,
+            d3d12Texture.SrvHeap,
+            d3d12Texture.Srv,
+            d3d12Sampler.Heap,
+            d3d12Sampler.Descriptor,
             groups,
             wait);
     }

@@ -114,6 +114,37 @@ public sealed class GpuTests
     }
 
     [Test]
+    public unsafe void D3D12Texture_NullSrv()
+    {
+        if (!OperatingSystem.IsWindows() || !D3D12Device.TryCreate(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no D3D12 device.");
+            return;
+        }
+
+        using (owner)
+        using (var texture = owner.Provider.CreateTexture(4, 4, GpuTextureFormat.Rgba8Unorm))
+        {
+            texture.Upload(new byte[4 * 4 * 4], 4 * 4);
+
+            var heapDescription = new D3D12DescriptorHeapDesc { Type = 0, NumDescriptors = 1, Flags = 1, NodeMask = 0 };
+            Assert.That(D3D12Api.CreateDescriptorHeap(owner.Provider.Device, &heapDescription, out var heap) >= 0, Is.True, "the SRV heap was created");
+
+            var resource = ((D3D12Texture)texture.Backend).Resource;
+            D3D12Api.CreateShaderResourceView(owner.Provider.Device, resource, null, D3D12Api.GetCpuDescriptorHandle(heap));
+
+            var probeProperties = new D3D12HeapProperties { Type = 2, CreationNodeMask = 1, VisibleNodeMask = 1 };
+            var probe = new D3D12HeapDesc { SizeInBytes = 65536, Properties = probeProperties, Alignment = 0, Flags = 0 };
+            var probeResult = D3D12Api.CreateHeap(owner.Provider.Device, &probe, out var probeHeap);
+
+            Assert.That(probeResult >= 0 && probeHeap != 0, Is.True, $"the device still creates heaps after a null SRV ({probeResult:X8})");
+
+            D3D12Api.Release(probeHeap);
+            D3D12Api.Release(heap);
+        }
+    }
+
+    [Test]
     public void D3D12Texture_UploadsAndReadsBack()
     {
         if (!OperatingSystem.IsWindows() || !D3D12Device.TryCreate(out var owner) || owner is null)
