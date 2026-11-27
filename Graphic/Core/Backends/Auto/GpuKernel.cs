@@ -69,13 +69,23 @@ public sealed class GpuKernel : IDisposable
     internal VulkanCompute? Vulkan => m_Vulkan;
 
     /// <summary>
+    /// Gets the OpenGL pipeline, when OpenGL is the backend in use.
+    /// </summary>
+    internal GlCompute? OpenGL => m_OpenGL;
+
+    /// <summary>
+    /// Gets the CUDA pipeline, when CUDA is the backend in use.
+    /// </summary>
+    internal CudaCompute? Cuda => m_Cuda;
+
+    /// <summary>
     /// Creates a command buffer that records dispatches of this kernel and submits them once.
     /// </summary>
     /// <returns>
-    /// The command buffer, or <see langword="null"/> when this backend has no batched command buffer yet. Metal, D3D12 and
-    /// Vulkan have one: a Metal batch is one <c>MTLCommandBuffer</c> with one compute encoder for every recorded kernel, a
-    /// D3D12 batch is one command list with one fence for the whole group, and a Vulkan batch is one command pool with one
-    /// primary command buffer and one fence.
+    /// The command buffer. Metal, D3D12 and Vulkan have a queued batch: a Metal batch is one <c>MTLCommandBuffer</c> with
+    /// one compute encoder for every recorded kernel, a D3D12 batch is one command list with one fence for the whole group,
+    /// and a Vulkan batch is one command pool with one primary command buffer and one fence. OpenGL and CUDA return the
+    /// synchronous fallback instead, whose records run and complete as they are made; see <see cref="GpuCommandBuffer"/>.
     /// </returns>
     /// <exception cref="ObjectDisposedException">Thrown when the kernel was disposed.</exception>
     /// <remarks>
@@ -89,7 +99,9 @@ public sealed class GpuKernel : IDisposable
             throw new ObjectDisposedException(nameof(GpuKernel));
         }
 
-        return m_Metal is null && m_D3D12 is null && m_Vulkan is null ? null : new GpuCommandBuffer(this);
+        // Every backend the layer loads kernels for has a command buffer: the three queued ones record and submit, and
+        // OpenGL and CUDA run each record immediately as a synchronous fallback.
+        return new GpuCommandBuffer(this);
     }
 
     /// <summary>

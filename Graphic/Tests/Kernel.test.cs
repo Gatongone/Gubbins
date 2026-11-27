@@ -3989,6 +3989,596 @@ public static class Sampling
         }
     }
 
+    [Test]
+    public void GlCommandBuffer_RecordsTwoKernels()
+    {
+        const int Count = 4096;
+        const string Adding = @"
+using System;
+
+public static unsafe class Adding
+{
+    public static void Kernel(int index, ReadOnlySpan<uint> source, Span<uint> destination)
+    {
+        destination[index] = source[index] + 3;
+    }
+}
+";
+        const string Doubling = @"
+using System;
+
+public static unsafe class Doubling
+{
+    public static void Kernel(int index, ReadOnlySpan<uint> source, Span<uint> destination)
+    {
+        destination[index] = source[index] * 2;
+    }
+}
+";
+
+        if (!GlDevice.TryCreate(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no OpenGL context.");
+            return;
+        }
+
+        var directory = Directory.CreateTempSubdirectory("gubbins-gl-batch-").FullName;
+
+        try
+        {
+            KernelCompiler.Compile(Adding, directory, "Adding");
+            KernelCompiler.Compile(Doubling, directory, "Doubling");
+
+            using (var device = new GpuDevice(owner, owner.Provider.GetProvider(), 0, false, 0, "OpenGL"))
+            using (var memory = device.CreateMemory())
+            using (var adding = GpuKernel.LoadFromDirectory(device, directory, "Adding"))
+            using (var doubling = GpuKernel.LoadFromDirectory(device, directory, "Doubling"))
+            {
+                Assert.That(adding, Is.Not.Null, "the first kernel loads on OpenGL");
+                Assert.That(doubling, Is.Not.Null, "the second kernel loads on OpenGL");
+
+                var groups = (uint)(Count / KernelTranspiler.THREADS_PER_GROUP);
+                var addingInput = memory.Allocate((nuint)(Count * sizeof(uint)), GpuAccess.Shared);
+                var addingOutput = memory.Allocate((nuint)(Count * sizeof(uint)), GpuAccess.Shared);
+                var doublingInput = memory.Allocate((nuint)(Count * sizeof(uint)), GpuAccess.Shared);
+                var doublingOutput = memory.Allocate((nuint)(Count * sizeof(uint)), GpuAccess.Shared);
+                var addingValues = new uint[Count];
+                var doublingValues = new uint[Count];
+
+                for (var index = 0; index < Count; index++)
+                {
+                    addingValues[index] = (uint)index;
+                    doublingValues[index] = (uint)(index * 3 + 1);
+                }
+
+                memory.Upload(addingInput, MemoryMarshal.AsBytes(addingValues.AsSpan()));
+                memory.Upload(doublingInput, MemoryMarshal.AsBytes(doublingValues.AsSpan()));
+
+                using var batch = adding!.CreateCommandBuffer();
+
+                Assert.That(batch, Is.Not.Null, "OpenGL creates the command buffer");
+                Assert.That(batch!.Record(adding, addingInput, addingOutput, groups), Is.True, "the first kernel ran");
+                Assert.That(batch.Record(doubling!, doublingInput, doublingOutput, groups), Is.True, "the second kernel ran through the same command buffer");
+
+                // The fallback has already run and waited for both records, so the barrier has nothing to order and the
+                // commit and the wait have nothing to submit, but they still report success.
+                Assert.That(batch.Barrier(), Is.True, "the synchronous barrier succeeds");
+                Assert.That(batch.Wait(), Is.True, "the synchronous wait succeeds before the commit");
+                Assert.That(batch.Commit(wait: false), Is.True, "the synchronous commit succeeds");
+                Assert.That(batch.Wait(), Is.True, "the synchronous wait succeeds");
+                Assert.That(batch.Commit(), Is.False, "a committed buffer is not committed a second time");
+                Assert.That(batch.Record(doubling!, doublingInput, doublingOutput, groups), Is.False, "a committed buffer records nothing more");
+
+                memory.MarkWrittenByGpu(addingOutput);
+                memory.MarkWrittenByGpu(doublingOutput);
+                Assert.That(memory.Synchronize(), Is.True, "both outputs were synchronized");
+
+                var added = MemoryMarshal.Cast<byte, uint>(addingOutput.CpuView());
+                var doubled = MemoryMarshal.Cast<byte, uint>(doublingOutput.CpuView());
+
+                for (var index = 0; index < Count; index++)
+                {
+                    Assert.That(added[index], Is.EqualTo(addingValues[index] + 3), $"the first kernel wrote element {index}");
+                    Assert.That(doubled[index], Is.EqualTo(doublingValues[index] * 2), $"the second kernel wrote element {index}");
+                }
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Test]
+    public void GlCommandBuffer_RecordsTexturedDispatches()
+    {
+        const int Count = 64;
+        const string Sampling = @"
+using System;
+using Gubbins.Graphic;
+
+public static class Sampling
+{
+    public static void Kernel(int index, ReadOnlySpan<float2> source, Span<float4> destination, GpuTexture2D texture, GpuSamplerState sampler)
+    {
+        destination[index] = texture.Sample(sampler, source[index]);
+    }
+}
+";
+
+        if (!GlDevice.TryCreate(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no OpenGL context.");
+            return;
+        }
+
+        var directory = Directory.CreateTempSubdirectory("gubbins-gl-batch-texture-").FullName;
+
+        try
+        {
+            KernelCompiler.Compile(Sampling, directory, "Sampling");
+
+            using (var device = new GpuDevice(owner, owner.Provider.GetProvider(), 0, false, 0, "OpenGL"))
+            using (var memory = device.CreateMemory())
+            using (var red = owner.Provider.CreateTexture(1, 1, GpuTextureFormat.Rgba8Unorm))
+            using (var green = owner.Provider.CreateTexture(1, 1, GpuTextureFormat.Rgba8Unorm))
+            using (var sampler = owner.Provider.CreateSampler(new GpuSampler(GpuTextureFilter.Nearest, GpuAddressMode.Clamp)))
+            using (var kernel = GpuKernel.LoadFromDirectory(device, directory, "Sampling"))
+            {
+                Assert.That(kernel, Is.Not.Null, "the texture kernel loads on OpenGL");
+
+                red.Upload(new byte[] { 255, 0, 0, 255 }, 4);
+                green.Upload(new byte[] { 0, 255, 0, 255 }, 4);
+
+                var redInput = memory.Allocate((nuint)(Count * 2 * sizeof(float)), GpuAccess.Shared);
+                var redOutput = memory.Allocate((nuint)(Count * 4 * sizeof(float)), GpuAccess.Shared);
+                var greenInput = memory.Allocate((nuint)(Count * 2 * sizeof(float)), GpuAccess.Shared);
+                var greenOutput = memory.Allocate((nuint)(Count * 4 * sizeof(float)), GpuAccess.Shared);
+                var lengths = memory.Allocate(16, GpuAccess.Shared);
+                var coordinates = new float[Count * 2];
+
+                for (var index = 0; index < coordinates.Length; index++)
+                {
+                    coordinates[index] = 0.5f;
+                }
+
+                memory.Upload(redInput, MemoryMarshal.AsBytes(coordinates.AsSpan()));
+                memory.Upload(greenInput, MemoryMarshal.AsBytes(coordinates.AsSpan()));
+                memory.Upload(lengths, MemoryMarshal.AsBytes(new uint[] { Count, Count, 0, 0 }.AsSpan()));
+
+                using var batch = kernel!.CreateCommandBuffer();
+
+                Assert.That(batch, Is.Not.Null, "OpenGL creates the command buffer");
+                Assert.That(
+                    batch!.Record(kernel, redInput, redOutput, 1, lengths, textures: new[] { new GpuTextureBinding(red, sampler) }),
+                    Is.True,
+                    "the dispatch over the red texture ran");
+                Assert.That(
+                    batch.Record(kernel, greenInput, greenOutput, 1, lengths, textures: new[] { new GpuTextureBinding(green, sampler) }),
+                    Is.True,
+                    "the dispatch over the green texture ran");
+                Assert.That(batch.Commit(), Is.True, "the textured buffer was committed");
+
+                memory.MarkWrittenByGpu(redOutput);
+                memory.MarkWrittenByGpu(greenOutput);
+                Assert.That(memory.Synchronize(), Is.True, "both textured outputs were synchronized");
+
+                var redResult = MemoryMarshal.Cast<byte, float>(redOutput.CpuView());
+                var greenResult = MemoryMarshal.Cast<byte, float>(greenOutput.CpuView());
+
+                for (var index = 0; index < Count; index++)
+                {
+                    Assert.That(redResult[index * 4], Is.EqualTo(1f).Within(0.001f), $"thread {index}: the red texture contributed red");
+                    Assert.That(redResult[index * 4 + 1], Is.EqualTo(0f).Within(0.001f), $"thread {index}: the red texture contributed no green");
+                    Assert.That(redResult[index * 4 + 3], Is.EqualTo(1f).Within(0.001f), $"thread {index}: the red texture kept its alpha");
+
+                    Assert.That(greenResult[index * 4], Is.EqualTo(0f).Within(0.001f), $"thread {index}: the green texture contributed no red");
+                    Assert.That(greenResult[index * 4 + 1], Is.EqualTo(1f).Within(0.001f), $"thread {index}: the green texture contributed green");
+                    Assert.That(greenResult[index * 4 + 3], Is.EqualTo(1f).Within(0.001f), $"thread {index}: the green texture kept its alpha");
+                }
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Test]
+    public void CudaCommandBuffer_RecordsTwoKernels()
+    {
+        const int Count = 4096;
+        const string Adding = @"
+using System;
+
+public static unsafe class Adding
+{
+    public static void Kernel(int index, ReadOnlySpan<uint> source, Span<uint> destination)
+    {
+        destination[index] = source[index] + 3;
+    }
+}
+";
+        const string Doubling = @"
+using System;
+
+public static unsafe class Doubling
+{
+    public static void Kernel(int index, ReadOnlySpan<uint> source, Span<uint> destination)
+    {
+        destination[index] = source[index] * 2;
+    }
+}
+";
+
+        if (!OperatingSystem.IsWindows() || !CudaDevice.IsAvailable || !CudaDevice.TryCreate(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no CUDA device.");
+            return;
+        }
+
+        var directory = Directory.CreateTempSubdirectory("gubbins-cuda-batch-").FullName;
+
+        try
+        {
+            KernelCompiler.Compile(Adding, directory, "Adding");
+            KernelCompiler.Compile(Doubling, directory, "Doubling");
+
+            using (var device = new GpuDevice(owner, owner.Provider.GetProvider(), owner.Provider.MaxSegmentSize, false, owner.Provider.WorkingSetLimit, "CUDA"))
+            using (var memory = device.CreateMemory())
+            using (var adding = GpuKernel.LoadFromDirectory(device, directory, "Adding"))
+            using (var doubling = GpuKernel.LoadFromDirectory(device, directory, "Doubling"))
+            {
+                Assert.That(adding, Is.Not.Null, "the first kernel loads on CUDA");
+                Assert.That(doubling, Is.Not.Null, "the second kernel loads on CUDA");
+
+                var groups = (uint)(Count / KernelTranspiler.THREADS_PER_GROUP);
+                var addingInput = memory.Allocate((nuint)(Count * sizeof(uint)), GpuAccess.Shared);
+                var addingOutput = memory.Allocate((nuint)(Count * sizeof(uint)), GpuAccess.Shared);
+                var doublingInput = memory.Allocate((nuint)(Count * sizeof(uint)), GpuAccess.Shared);
+                var doublingOutput = memory.Allocate((nuint)(Count * sizeof(uint)), GpuAccess.Shared);
+                var lengths = memory.Allocate(16, GpuAccess.Shared);
+                var addingValues = new uint[Count];
+                var doublingValues = new uint[Count];
+
+                for (var index = 0; index < Count; index++)
+                {
+                    addingValues[index] = (uint)index;
+                    doublingValues[index] = (uint)(index * 3 + 1);
+                }
+
+                memory.Upload(addingInput, MemoryMarshal.AsBytes(addingValues.AsSpan()));
+                memory.Upload(doublingInput, MemoryMarshal.AsBytes(doublingValues.AsSpan()));
+
+                // The CUDA path always reads the block of element counts, even for a kernel that does not use
+                // Span.Length, so every CUDA dispatch supplies one.
+                memory.Upload(lengths, MemoryMarshal.AsBytes(new uint[] { Count, Count, 0, 0 }.AsSpan()));
+
+                using var batch = adding!.CreateCommandBuffer();
+
+                Assert.That(batch, Is.Not.Null, "CUDA creates the command buffer");
+                Assert.That(batch!.Record(adding, addingInput, addingOutput, groups, lengths), Is.True, "the first kernel ran");
+                Assert.That(batch.Record(doubling!, doublingInput, doublingOutput, groups, lengths), Is.True, "the second kernel ran through the same command buffer");
+
+                // The synchronous fallback has already run and waited for every record, so the barrier, the commit and the
+                // wait are no-ops that still report success.
+                Assert.That(batch.Barrier(), Is.True, "the synchronous barrier succeeds");
+                Assert.That(batch.Wait(), Is.True, "the synchronous wait succeeds before the commit");
+                Assert.That(batch.Commit(wait: false), Is.True, "the synchronous commit succeeds");
+                Assert.That(batch.Wait(), Is.True, "the synchronous wait succeeds");
+                Assert.That(batch.Commit(), Is.False, "a committed buffer is not committed a second time");
+                Assert.That(batch.Record(doubling!, doublingInput, doublingOutput, groups, lengths), Is.False, "a committed buffer records nothing more");
+
+                memory.MarkWrittenByGpu(addingOutput);
+                memory.MarkWrittenByGpu(doublingOutput);
+                Assert.That(memory.Synchronize(), Is.True, "both outputs were synchronized");
+
+                var added = MemoryMarshal.Cast<byte, uint>(addingOutput.CpuView());
+                var doubled = MemoryMarshal.Cast<byte, uint>(doublingOutput.CpuView());
+
+                for (var index = 0; index < Count; index++)
+                {
+                    Assert.That(added[index], Is.EqualTo(addingValues[index] + 3), $"the first kernel wrote element {index}");
+                    Assert.That(doubled[index], Is.EqualTo(doublingValues[index] * 2), $"the second kernel wrote element {index}");
+                }
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Test]
+    public void CudaCommandBuffer_RecordsTexturedDispatches()
+    {
+        const string Sampling = @"
+using System;
+using Gubbins.Graphic;
+
+public static class Sampling
+{
+    public static void Kernel(int index, ReadOnlySpan<float2> source, Span<float4> destination, GpuTexture2D texture, GpuSamplerState sampler)
+    {
+        destination[index] = texture.Sample(sampler, source[index]);
+    }
+}
+";
+
+        if (!OperatingSystem.IsWindows() || !CudaDevice.IsAvailable || !CudaDevice.TryCreate(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no CUDA device.");
+            return;
+        }
+
+        var directory = Directory.CreateTempSubdirectory("gubbins-cuda-batch-texture-").FullName;
+
+        try
+        {
+            KernelCompiler.Compile(Sampling, directory, "Sampling");
+
+            // CUDA keeps the sampler in the texture object, so the texture is created with the description the sampler
+            // names and the kernel samples through it.
+            var sampler = new GpuSampler(GpuTextureFilter.Nearest, GpuAddressMode.Clamp);
+
+            using (var device = new GpuDevice(owner, owner.Provider.GetProvider(), owner.Provider.MaxSegmentSize, false, owner.Provider.WorkingSetLimit, "CUDA"))
+            using (var memory = device.CreateMemory())
+            using (var red = owner.Provider.CreateTexture(1, 1, GpuTextureFormat.Rgba8Unorm, sampler))
+            using (var green = owner.Provider.CreateTexture(1, 1, GpuTextureFormat.Rgba8Unorm, sampler))
+            using (var redSampler = owner.Provider.CreateSampler(sampler))
+            using (var greenSampler = owner.Provider.CreateSampler(sampler))
+            using (var kernel = GpuKernel.LoadFromDirectory(device, directory, "Sampling"))
+            {
+                Assert.That(kernel, Is.Not.Null, "the texture kernel loads on CUDA");
+
+                red.Upload(new byte[] { 255, 0, 0, 255 }, 4);
+                green.Upload(new byte[] { 0, 255, 0, 255 }, 4);
+
+                // A dispatch always runs a whole group and CUDA does not mask a write past the end of a block, so both
+                // blocks hold a value per thread and no thread writes outside its own element.
+                var threadCount = KernelTranspiler.THREADS_PER_GROUP;
+                var redInput = memory.Allocate((nuint)(threadCount * 2 * sizeof(float)), GpuAccess.Shared);
+                var redOutput = memory.Allocate((nuint)(threadCount * 4 * sizeof(float)), GpuAccess.Shared);
+                var greenInput = memory.Allocate((nuint)(threadCount * 2 * sizeof(float)), GpuAccess.Shared);
+                var greenOutput = memory.Allocate((nuint)(threadCount * 4 * sizeof(float)), GpuAccess.Shared);
+                var lengths = memory.Allocate(16, GpuAccess.Shared);
+                var coordinates = new float[threadCount * 2];
+
+                for (var index = 0; index < threadCount; index++)
+                {
+                    coordinates[index * 2] = 0.5f;
+                    coordinates[index * 2 + 1] = 0.5f;
+                }
+
+                memory.Upload(redInput, MemoryMarshal.AsBytes(coordinates.AsSpan()));
+                memory.Upload(greenInput, MemoryMarshal.AsBytes(coordinates.AsSpan()));
+                memory.Upload(lengths, MemoryMarshal.AsBytes(new uint[] { (uint)threadCount, (uint)threadCount, 0, 0 }.AsSpan()));
+
+                using var batch = kernel!.CreateCommandBuffer();
+
+                Assert.That(batch, Is.Not.Null, "CUDA creates the command buffer");
+                Assert.That(
+                    batch!.Record(kernel, redInput, redOutput, 1, lengths, textures: new[] { new GpuTextureBinding(red, redSampler) }),
+                    Is.True,
+                    "the dispatch over the red texture ran");
+                Assert.That(
+                    batch.Record(kernel, greenInput, greenOutput, 1, lengths, textures: new[] { new GpuTextureBinding(green, greenSampler) }),
+                    Is.True,
+                    "the dispatch over the green texture ran");
+                Assert.That(batch.Commit(), Is.True, "the textured buffer was committed");
+
+                memory.MarkWrittenByGpu(redOutput);
+                memory.MarkWrittenByGpu(greenOutput);
+                Assert.That(memory.Synchronize(), Is.True, "both textured outputs were synchronized");
+
+                var redResult = MemoryMarshal.Cast<byte, float>(redOutput.CpuView());
+                var greenResult = MemoryMarshal.Cast<byte, float>(greenOutput.CpuView());
+
+                for (var thread = 0; thread < threadCount; thread++)
+                {
+                    Assert.That(redResult[thread * 4], Is.EqualTo(1f).Within(0.001f), $"thread {thread}: the red texture contributed red");
+                    Assert.That(redResult[thread * 4 + 1], Is.EqualTo(0f).Within(0.001f), $"thread {thread}: the red texture contributed no green");
+                    Assert.That(redResult[thread * 4 + 3], Is.EqualTo(1f).Within(0.001f), $"thread {thread}: the red texture kept its alpha");
+
+                    Assert.That(greenResult[thread * 4], Is.EqualTo(0f).Within(0.001f), $"thread {thread}: the green texture contributed no red");
+                    Assert.That(greenResult[thread * 4 + 1], Is.EqualTo(1f).Within(0.001f), $"thread {thread}: the green texture contributed green");
+                    Assert.That(greenResult[thread * 4 + 3], Is.EqualTo(1f).Within(0.001f), $"thread {thread}: the green texture kept its alpha");
+                }
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Test]
+    public void MetalCommandBuffer_BarrierOrdersTwoDependentDispatches()
+    {
+        if (!OperatingSystem.IsMacOS() || !GpuDevice.TryCreate(out var device) || device is null)
+        {
+            Assert.Ignore("This machine has no Metal device.");
+            return;
+        }
+
+        using (device)
+        {
+            VerifyCommandBufferBarrierChainsDispatches(device, "Metal");
+        }
+    }
+
+    [Test]
+    public void D3D12CommandBuffer_BarrierOrdersTwoDependentDispatches()
+    {
+        if (!OperatingSystem.IsWindows() || !D3D12Device.TryCreate(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no D3D12 device.");
+            return;
+        }
+
+        using (owner)
+        using (var device = GpuDevice.FromD3D12(owner.Provider))
+        {
+            VerifyCommandBufferBarrierChainsDispatches(device, "D3D12");
+        }
+    }
+
+    [Test]
+    public void VulkanCommandBuffer_BarrierOrdersTwoDependentDispatches()
+    {
+        VulkanDevice? owner;
+
+        try
+        {
+            if (!VulkanDevice.TryCreate(out owner) || owner is null)
+            {
+                Assert.Ignore("This machine has no Vulkan device.");
+                return;
+            }
+        }
+        catch (Exception)
+        {
+            Assert.Ignore("This machine has no Vulkan loader.");
+            return;
+        }
+
+        using (owner)
+        using (var device = GpuDevice.FromVulkan(owner.Provider))
+        {
+            VerifyCommandBufferBarrierChainsDispatches(device, "Vulkan");
+        }
+    }
+
+    [Test]
+    public void GlCommandBuffer_BarrierOrdersTwoDependentDispatches()
+    {
+        if (!GlDevice.TryCreate(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no OpenGL context.");
+            return;
+        }
+
+        using (var device = new GpuDevice(owner, owner.Provider.GetProvider(), 0, false, 0, "OpenGL"))
+        {
+            VerifyCommandBufferBarrierChainsDispatches(device, "OpenGL");
+        }
+    }
+
+    [Test]
+    public void CudaCommandBuffer_BarrierOrdersTwoDependentDispatches()
+    {
+        if (!OperatingSystem.IsWindows() || !CudaDevice.IsAvailable || !CudaDevice.TryCreate(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no CUDA device.");
+            return;
+        }
+
+        using (var device = new GpuDevice(owner, owner.Provider.GetProvider(), owner.Provider.MaxSegmentSize, false, owner.Provider.WorkingSetLimit, "CUDA"))
+        {
+            VerifyCommandBufferBarrierChainsDispatches(device, "CUDA");
+        }
+    }
+
+    /// <summary>
+    /// Chains two dispatches in one command buffer, the second reading the block the first wrote, with a barrier between
+    /// them, and asserts that the second dispatch observed the first one's output.
+    /// </summary>
+    /// <remarks>
+    /// A barrier is what the caller needs between two records of one batch, so this is the check every backend has to pass:
+    /// the intermediate block holds the first kernel's result, and the final block holds that result transformed by the
+    /// second kernel. Passing <see langword="null"/> for the lengths on Metal keeps the record the shape the Metal tests use,
+    /// because that path never binds a lengths block; the other backends record one the way their tests do.
+    /// </remarks>
+    /// <param name="device">The device the batch records for.</param>
+    /// <param name="name">The backend, for the assertions and the temporary directory.</param>
+    private static void VerifyCommandBufferBarrierChainsDispatches(GpuDevice device, string name)
+    {
+        const int Count = 4096;
+        const string Adding = @"
+using System;
+
+public static unsafe class Adding
+{
+    public static void Kernel(int index, ReadOnlySpan<uint> source, Span<uint> destination)
+    {
+        destination[index] = source[index] + 3;
+    }
+}
+";
+        const string Doubling = @"
+using System;
+
+public static unsafe class Doubling
+{
+    public static void Kernel(int index, ReadOnlySpan<uint> source, Span<uint> destination)
+    {
+        destination[index] = source[index] * 2;
+    }
+}
+";
+
+        var directory = Directory.CreateTempSubdirectory($"gubbins-{name.ToLowerInvariant()}-batch-barrier-").FullName;
+
+        try
+        {
+            KernelCompiler.Compile(Adding, directory, "Adding");
+            KernelCompiler.Compile(Doubling, directory, "Doubling");
+
+            using var memory = device.CreateMemory();
+            using var adding = GpuKernel.LoadFromDirectory(device, directory, "Adding");
+            using var doubling = GpuKernel.LoadFromDirectory(device, directory, "Doubling");
+
+            Assert.That(adding, Is.Not.Null, $"{name}: the first kernel loads");
+            Assert.That(doubling, Is.Not.Null, $"{name}: the second kernel loads");
+
+            var groups = (uint)(Count / KernelTranspiler.THREADS_PER_GROUP);
+            var input = memory.Allocate((nuint)(Count * sizeof(uint)), GpuAccess.Shared);
+            var intermediate = memory.Allocate((nuint)(Count * sizeof(uint)), GpuAccess.Shared);
+            var output = memory.Allocate((nuint)(Count * sizeof(uint)), GpuAccess.Shared);
+            GpuBlock? lengths = device.Backend is MetalDevice ? null : memory.Allocate(16, GpuAccess.Shared);
+            var values = new uint[Count];
+
+            for (var index = 0; index < Count; index++)
+            {
+                values[index] = (uint)(index * 3 + 1);
+            }
+
+            memory.Upload(input, MemoryMarshal.AsBytes(values.AsSpan()));
+
+            if (lengths is not null)
+            {
+                memory.Upload(lengths, MemoryMarshal.AsBytes(new uint[] { Count, Count, 0, 0 }.AsSpan()));
+            }
+
+            using var batch = adding!.CreateCommandBuffer();
+
+            Assert.That(batch, Is.Not.Null, $"{name}: the batch is created");
+            Assert.That(batch!.Record(adding, input, intermediate, groups, lengths), Is.True, $"{name}: the first dispatch was recorded");
+            Assert.That(batch.Barrier(), Is.True, $"{name}: the barrier before the dependent dispatch was recorded");
+            Assert.That(batch.Record(doubling!, intermediate, output, groups, lengths), Is.True, $"{name}: the second dispatch was recorded after the barrier");
+            Assert.That(batch.Barrier(), Is.True, $"{name}: a barrier before the commit is accepted");
+            Assert.That(batch.Commit(), Is.True, $"{name}: the chained batch was submitted once");
+            Assert.That(batch.Barrier(), Is.False, $"{name}: a submitted batch records no barrier");
+
+            memory.MarkWrittenByGpu(intermediate);
+            memory.MarkWrittenByGpu(output);
+            Assert.That(memory.Synchronize(), Is.True, $"{name}: both chained outputs were synchronized");
+
+            var intermediateResult = MemoryMarshal.Cast<byte, uint>(intermediate.CpuView());
+            var result = MemoryMarshal.Cast<byte, uint>(output.CpuView());
+
+            for (var index = 0; index < Count; index++)
+            {
+                Assert.That(intermediateResult[index], Is.EqualTo(values[index] + 3), $"{name}: the first dispatch wrote element {index}");
+                Assert.That(result[index], Is.EqualTo((values[index] + 3) * 2), $"{name}: the second dispatch read what the first wrote at element {index}");
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
     /// <summary>
     /// Runs a kernel on an engine-owned device, with one of the buffers wrapped from a resource the engine owns.
     /// </summary>

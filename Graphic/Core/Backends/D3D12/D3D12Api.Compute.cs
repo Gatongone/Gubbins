@@ -89,6 +89,12 @@ internal static unsafe partial class D3D12Api
     internal const int RESOURCE_BARRIER_TYPE_TRANSITION = 0;
 
     /// <summary>
+    /// <c>D3D12_RESOURCE_BARRIER_TYPE_UAV</c>: the global unordered access barrier, whose union carries no resource when
+    /// it is meant for every unordered access view the command list has used so far.
+    /// </summary>
+    internal const int RESOURCE_BARRIER_TYPE_UAV = 2;
+
+    /// <summary>
     /// <c>D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES</c>.
     /// </summary>
     internal const int RESOURCE_BARRIER_ALL_SUBRESOURCES = -1;
@@ -222,10 +228,11 @@ internal static unsafe partial class D3D12Api
     }
 
     /// <summary>
-    /// Calls <c>ID3D12GraphicsCommandList::ResourceBarrier</c> for a single transition.
+    /// Calls <c>ID3D12GraphicsCommandList::ResourceBarrier</c> for a single barrier, which may be a transition or a global
+    /// unordered access barrier.
     /// </summary>
     /// <param name="list">The command list.</param>
-    /// <param name="barrier">The transition to record.</param>
+    /// <param name="barrier">The barrier to record.</param>
     internal static void ResourceBarrier(nint list, D3D12ResourceBarrier* barrier)
     {
         var record = (delegate* unmanaged[Cdecl]<nint, uint, D3D12ResourceBarrier*, void>)Method(list, 26);

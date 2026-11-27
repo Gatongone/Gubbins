@@ -36,6 +36,16 @@ internal sealed unsafe class GlContext : IDisposable
     /// </summary>
     private static readonly WndProcDelegate s_WindowProc = (window, message, word, value) => DefWindowProcW(window, message, word, value);
 
+    /// <summary>
+    /// Whether this process has already registered the window class, which is process wide and cannot be registered twice.
+    /// </summary>
+    private static bool s_ClassRegistered;
+
+    /// <summary>
+    /// The lock that serializes the one registration of the window class.
+    /// </summary>
+    private static readonly object s_ClassLock = new();
+
     private GlContext(nint window, nint deviceContext, nint context, nint module)
     {
         m_Window = window;
@@ -63,9 +73,19 @@ internal sealed unsafe class GlContext : IDisposable
             ClassName = "gubbins-opengl"
         };
 
-        if (RegisterClassW(ref windowClass) == 0)
+        // The class is process wide, so a second context in the same process finds it already registered and
+        // RegisterClassW fails even though the class is exactly the one this code needs. Register it once instead.
+        lock (s_ClassLock)
         {
-            return false;
+            if (!s_ClassRegistered)
+            {
+                if (RegisterClassW(ref windowClass) == 0)
+                {
+                    return false;
+                }
+
+                s_ClassRegistered = true;
+            }
         }
 
         var window = CreateWindowExW(0, "gubbins-opengl", "gubbins", WsPopup, 0, 0, 1, 1, 0, 0, instance, 0);

@@ -25,6 +25,23 @@ public sealed class VulkanInteropTests
         Assert.That(sizeof(VkOffset3D), Is.EqualTo(12), "VkOffset3D is 12 bytes");
         Assert.That(sizeof(VkDescriptorImageInfo), Is.EqualTo(24), "VkDescriptorImageInfo is 24 bytes");
         Assert.That(sizeof(VkFormatProperties), Is.EqualTo(12), "VkFormatProperties is 12 bytes");
+        Assert.That(sizeof(VkMemoryBarrier), Is.EqualTo(24), "VkMemoryBarrier is 24 bytes: sType, pNext and the two access masks");
+    }
+
+    [Test]
+    public void VulkanBarrierStructs_HaveTheHeaderLayout()
+    {
+        Assert.That(OffsetOf<VkMemoryBarrier>("SourceAccessMask"), Is.EqualTo(16), "the source access follows pNext");
+        Assert.That(OffsetOf<VkMemoryBarrier>("DestinationAccessMask"), Is.EqualTo(20), "the destination access follows the source one");
+    }
+
+    [Test]
+    public void VulkanBarrierConstants_MatchTheHeader()
+    {
+        Assert.That(VulkanApi.MEMORY_BARRIER_TYPE, Is.EqualTo(46), "VkMemoryBarrier's sType is 46");
+        Assert.That(VulkanApi.PIPELINE_STAGE_COMPUTE_SHADER, Is.EqualTo(0x00000800), "VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT");
+        Assert.That(VulkanApi.ACCESS_SHADER_READ, Is.EqualTo(0x00000020), "VK_ACCESS_SHADER_READ_BIT");
+        Assert.That(VulkanApi.ACCESS_SHADER_WRITE, Is.EqualTo(0x00000040), "VK_ACCESS_SHADER_WRITE_BIT");
     }
 
     [Test]
