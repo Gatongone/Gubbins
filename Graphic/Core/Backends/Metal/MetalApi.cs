@@ -292,8 +292,8 @@ internal static unsafe class MetalApi
             SendUInt(descriptor, "setMagFilter:", magFilter);
             SendUInt(descriptor, "setSAddressMode:", address);
             SendUInt(descriptor, "setTAddressMode:", address);
-            SendFloat(descriptor, "setMinLOD:", minLod);
-            SendFloat(descriptor, "setMaxLOD:", maxLod);
+            SendFloat(descriptor, "setLodMinClamp:", minLod);
+            SendFloat(descriptor, "setLodMaxClamp:", maxLod);
             SendFloat(descriptor, "setLodBias:", lodBias);
             SendUInt(descriptor, "setMaxAnisotropy:", maxAnisotropy);
 
