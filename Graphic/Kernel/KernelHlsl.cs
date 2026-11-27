@@ -63,7 +63,7 @@ public sealed class KernelHlsl : KernelTextEmitter
 
     /// <inheritdoc/>
     protected override string TextureSample(KernelTextureSample sample)
-        => $"gubbins_tex_{Identifier(sample.Texture.Name)}.Sample(gubbins_samp_{Identifier(sample.Sampler.Name)}, {Value(sample.Coordinates)})";
+        => $"gubbins_tex_{Identifier(sample.Texture.Name)}.SampleLevel(gubbins_samp_{Identifier(sample.Sampler.Name)}, {Value(sample.Coordinates)}, 0.0f)";
 
     /// <inheritdoc/>
     protected override IReadOnlyList<string> EntrySignature(KernelProgram program) => new[]

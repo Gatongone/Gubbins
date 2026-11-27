@@ -132,7 +132,7 @@ internal sealed unsafe class D3D12Compute : IDisposable
     /// <param name="lengthsAddress">The GPU address of the lengths, or <see langword="0"/> when the kernel takes none.</param>
     /// <param name="groups">The number of thread groups to dispatch on the x axis.</param>
     /// <returns><see langword="true"/> if the dispatch ran to completion.</returns>
-    internal bool Dispatch(nint sourceResource, ulong sourceAddress, nint destinationResource, ulong destinationAddress, ulong parametersAddress, ulong lengthsAddress, nint textureResource, nint textureHeap, D3D12GpuDescriptorHandle srv, nint samplerHeap, D3D12GpuDescriptorHandle sampler, uint groups, bool wait)
+    internal bool Dispatch(nint sourceResource, ulong sourceAddress, nint destinationResource, ulong destinationAddress, ulong parametersAddress, ulong lengthsAddress, nint textureResource, int textureState, nint textureHeap, D3D12GpuDescriptorHandle srv, nint samplerHeap, D3D12GpuDescriptorHandle sampler, uint groups, bool wait)
     {
         if (m_Disposed || m_Pipeline == 0 || sourceResource == 0 || destinationResource == 0 || groups == 0)
         {
@@ -167,6 +167,20 @@ internal sealed unsafe class D3D12Compute : IDisposable
 
         source.Resource = sourceResource;
         destination.Resource = destinationResource;
+
+        if (textureResource != 0 && textureState != D3D12Api.RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+        {
+            var texture = new D3D12ResourceBarrier
+            {
+                Type = D3D12Api.RESOURCE_BARRIER_TYPE_TRANSITION,
+                Resource = textureResource,
+                Subresource = unchecked((uint)D3D12Api.RESOURCE_BARRIER_ALL_SUBRESOURCES),
+                StateBefore = textureState,
+                StateAfter = D3D12Api.RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
+            };
+
+            D3D12Api.ResourceBarrier(m_List, &texture);
+        }
 
         D3D12Api.ResourceBarrier(m_List, &source);
         D3D12Api.SetComputeRootSignature(m_List, m_RootSignature);

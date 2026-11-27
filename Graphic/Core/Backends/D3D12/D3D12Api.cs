@@ -418,7 +418,11 @@ internal static unsafe partial class D3D12Api
     /// <param name="heap">The descriptor heap.</param>
     /// <returns>The handle.</returns>
     internal static D3D12CpuDescriptorHandle GetCpuDescriptorHandle(nint heap)
-        => ((delegate* unmanaged[Cdecl]<nint, D3D12CpuDescriptorHandle>)Method(heap, 9))(heap);
+    {
+        D3D12CpuDescriptorHandle handle;
+        ((delegate* unmanaged[Cdecl]<nint, D3D12CpuDescriptorHandle*, void>)Method(heap, 9))(heap, &handle);
+        return handle;
+    }
 
     /// <summary>
     /// Calls <c>ID3D12DescriptorHeap::GetGPUDescriptorHandleForHeapStart</c>.
@@ -426,7 +430,11 @@ internal static unsafe partial class D3D12Api
     /// <param name="heap">The descriptor heap.</param>
     /// <returns>The handle.</returns>
     internal static D3D12GpuDescriptorHandle GetGpuDescriptorHandle(nint heap)
-        => ((delegate* unmanaged[Cdecl]<nint, D3D12GpuDescriptorHandle>)Method(heap, 10))(heap);
+    {
+        D3D12GpuDescriptorHandle handle;
+        ((delegate* unmanaged[Cdecl]<nint, D3D12GpuDescriptorHandle*, void>)Method(heap, 10))(heap, &handle);
+        return handle;
+    }
 
     /// <summary>
     /// Calls <c>ID3D12Device::CreateHeap</c>.

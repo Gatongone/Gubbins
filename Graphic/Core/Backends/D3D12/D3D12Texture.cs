@@ -16,7 +16,6 @@ internal sealed unsafe class D3D12Texture : IGpuTexture
     private const int StateCopyDestination = 0x400;
     private const int StateCopySource = 0x800;
     private const int StateGenericRead = 0xAC;
-    private const int StateNonPixelShaderResource = 0x40;
     private const int ResourceDimensionBuffer = 1;
     private const int ResourceDimensionTexture2D = 3;
     private const uint AllSubresources = 0xFFFFFFFF;
@@ -164,6 +163,15 @@ internal sealed unsafe class D3D12Texture : IGpuTexture
     /// </summary>
     public D3D12GpuDescriptorHandle Srv => m_Srv;
 
+    /// <summary>
+    /// Gets or sets the state the resource is in.
+    /// </summary>
+    internal int State
+    {
+        get => m_State;
+        set => m_State = value;
+    }
+
     /// <inheritdoc/>
     public void Upload(ReadOnlySpan<byte> pixels, int bytesPerRow)
     {
@@ -285,11 +293,6 @@ internal sealed unsafe class D3D12Texture : IGpuTexture
             D3D12Api.Release(heap);
         }
     }
-
-    /// <summary>
-    /// Moves the texture to the state a compute shader samples it from.
-    /// </summary>
-    internal void PrepareSrv() => Execute(list => Transition(list, StateNonPixelShaderResource));
 
     /// <summary>
     /// Releases the resource, the copy queue and the fence.

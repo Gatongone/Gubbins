@@ -2287,6 +2287,75 @@ public static class GlTextured
         }
     }
 
+    [Test]
+    public void D3D12Texture_KernelSamplesHardwareTexture()
+    {
+        const string Source = @"
+using System;
+using Gubbins.Graphic;
+
+public static class D3D12Textured
+{
+    public static void Kernel(int index, ReadOnlySpan<float2> source, Span<float4> destination, GpuTexture2D texture, GpuSamplerState sampler)
+    {
+        destination[index] = texture.Sample(sampler, source[index]);
+    }
+}
+";
+
+        if (!OperatingSystem.IsWindows() || !D3D12Device.TryCreate(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no D3D12 device.");
+            return;
+        }
+
+        var directory = Directory.CreateTempSubdirectory("gubbins-d3d12texture-").FullName;
+
+        try
+        {
+            KernelCompiler.Compile(Source, directory, "D3D12Textured");
+
+            using (owner)
+            using (var device = GpuDevice.FromD3D12(owner.Provider))
+            using (var memory = device.CreateMemory())
+            using (var texture = owner.Provider.CreateTexture(2, 2, GpuTextureFormat.Rgba8Unorm))
+            using (var sampler = owner.Provider.CreateSampler(new GpuSampler(GpuTextureFilter.Nearest, GpuAddressMode.Clamp)))
+            using (var kernel = GpuKernel.LoadFromDirectory(device, directory, "D3D12Textured"))
+            {
+                Assert.That(kernel, Is.Not.Null, "the texture kernel loads on D3D12");
+
+                texture.Upload(new byte[]
+                {
+                    255, 0, 0, 255, 0, 255, 0, 255,
+                    0, 0, 255, 255, 255, 255, 255, 255
+                }, 8);
+
+                var input = memory.Allocate(8, GpuAccess.Shared);
+                var output = memory.Allocate(16, GpuAccess.Shared);
+                var lengths = memory.Allocate(16, GpuAccess.Shared);
+
+                memory.Upload(input, MemoryMarshal.AsBytes(new float[] { 0.25f, 0.25f }.AsSpan()));
+                memory.Upload(lengths, MemoryMarshal.AsBytes(new uint[] { 1, 1, 0, 0 }.AsSpan()));
+
+                Assert.That(kernel!.TryDispatchD3D12(input, output, lengths, null, texture, sampler, 1), Is.True, "the hardware texture dispatch ran");
+
+                memory.MarkWrittenByGpu(output);
+                Assert.That(memory.Synchronize(), Is.True, "the texture output was synchronized");
+
+                var result = MemoryMarshal.Cast<byte, float>(output.CpuView());
+
+                Assert.That(result[0], Is.EqualTo(1f).Within(0.001f), "the red channel came from the sampled texel");
+                Assert.That(result[1], Is.EqualTo(0f).Within(0.001f), "the green channel came from the sampled texel");
+                Assert.That(result[2], Is.EqualTo(0f).Within(0.001f), "the blue channel came from the sampled texel");
+                Assert.That(result[3], Is.EqualTo(1f).Within(0.001f), "the alpha channel came from the sampled texel");
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
     /// <summary>
     /// Runs a kernel on an engine-owned device, with one of the buffers wrapped from a resource the engine owns.
     /// </summary>

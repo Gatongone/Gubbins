@@ -393,7 +393,7 @@ public sealed class GpuKernel : IDisposable
             parametersAddress = D3D12Api.GetVirtualAddress(parametersResource) + (ulong)parameters.Storage.Offset;
         }
 
-        return m_D3D12.Dispatch(sourceResource, sourceAddress, destinationResource, destinationAddress, parametersAddress, lengthsAddress, 0, 0, default, 0, default, groups, wait);
+        return m_D3D12.Dispatch(sourceResource, sourceAddress, destinationResource, destinationAddress, parametersAddress, lengthsAddress, 0, 0, 0, default, 0, default, groups, wait);
     }
 
     /// <summary>
@@ -591,9 +591,9 @@ public sealed class GpuKernel : IDisposable
             parametersAddress = D3D12Api.GetVirtualAddress(parametersResource) + (ulong)parameters.Storage.Offset;
         }
 
-        d3d12Texture.PrepareSrv();
+        var textureState = d3d12Texture.State;
 
-        return m_D3D12.Dispatch(
+        var dispatched = m_D3D12.Dispatch(
             sourceResource,
             sourceAddress,
             destinationResource,
@@ -601,12 +601,20 @@ public sealed class GpuKernel : IDisposable
             parametersAddress,
             lengthsAddress,
             d3d12Texture.Resource,
+            textureState,
             d3d12Texture.SrvHeap,
             d3d12Texture.Srv,
             d3d12Sampler.Heap,
             d3d12Sampler.Descriptor,
             groups,
             wait);
+
+        if (dispatched)
+        {
+            d3d12Texture.State = 0x40;
+        }
+
+        return dispatched;
     }
 
     /// <summary>
