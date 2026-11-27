@@ -8,6 +8,7 @@ internal sealed unsafe class MetalTexture : IGpuTexture
     private readonly nint m_Handle;
     private readonly int m_Width;
     private readonly int m_Height;
+    private readonly bool m_Owns;
     private bool m_Disposed;
 
     /// <param name="device">The <c>MTLDevice</c>.</param>
@@ -45,6 +46,21 @@ internal sealed unsafe class MetalTexture : IGpuTexture
         m_Handle = texture;
         m_Width = width;
         m_Height = height;
+        m_Owns = true;
+    }
+
+    /// <summary>
+    /// Wraps a texture the engine owns.
+    /// </summary>
+    /// <param name="texture">The <c>MTLTexture</c>.</param>
+    /// <param name="width">The width, in pixels.</param>
+    /// <param name="height">The height, in pixels.</param>
+    internal MetalTexture(nint texture, int width, int height)
+    {
+        m_Handle = texture;
+        m_Width = width;
+        m_Height = height;
+        m_Owns = false;
     }
 
     /// <summary>
@@ -105,6 +121,10 @@ internal sealed unsafe class MetalTexture : IGpuTexture
         }
 
         m_Disposed = true;
-        MetalApi.Release(m_Handle);
+
+        if (m_Owns)
+        {
+            MetalApi.Release(m_Handle);
+        }
     }
 }

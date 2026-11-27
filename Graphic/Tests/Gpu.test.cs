@@ -57,6 +57,37 @@ public sealed class GpuTests
     }
 
     [Test]
+    public void MetalTexture_ImportsAnEngineTexture()
+    {
+        if (!OperatingSystem.IsMacOS() || !MetalDevice.TryCreate(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no Metal device.");
+            return;
+        }
+
+        using (owner)
+        using (var texture = owner.Provider.CreateTexture(2, 2, GpuTextureFormat.Rgba8Unorm))
+        {
+            var handle = ((MetalTexture)texture.Backend).Handle;
+
+            Assert.That(owner.Provider.TryImportTexture(handle, 2, 2, GpuTextureFormat.Rgba8Unorm, out var imported), Is.True, "the engine texture was wrapped");
+
+            var pixels = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 };
+            texture.Upload(pixels, 8);
+
+            var readback = new byte[pixels.Length];
+            imported!.Readback(readback, 8);
+            Assert.That(readback, Is.EqualTo(pixels), "the imported view reads the same texture");
+
+            imported.Dispose();
+
+            var again = new byte[pixels.Length];
+            texture.Readback(again, 8);
+            Assert.That(again, Is.EqualTo(pixels), "disposing the imported view leaves the engine texture alive");
+        }
+    }
+
+    [Test]
     public void MetalTexture_UploadsAndReadsBack()
     {
         if (!OperatingSystem.IsMacOS() || !MetalDevice.TryCreate(out var owner) || owner is null)
