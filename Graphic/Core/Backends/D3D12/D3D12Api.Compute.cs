@@ -143,6 +143,29 @@ internal static unsafe partial class D3D12Api
         blob = 0;
         error = 0;
 
+        delegate* unmanaged[Cdecl]<D3D12VersionedRootSignatureDesc*, nint*, nint*, int> versioned = null;
+
+        if (library != 0 && NativeInterop.TryGetExport(library, "D3D12SerializeVersionedRootSignature", out var versionedAddress))
+        {
+            versioned = (delegate* unmanaged[Cdecl]<D3D12VersionedRootSignatureDesc*, nint*, nint*, int>)versionedAddress;
+        }
+
+        if (versioned != null)
+        {
+            var full = new D3D12VersionedRootSignatureDesc
+            {
+                Version = ROOT_SIGNATURE_VERSION1,
+                Desc = *description
+            };
+
+            nint serialized;
+            nint complaint;
+            var result = versioned(&full, &serialized, &complaint);
+            blob = result >= 0 ? serialized : 0;
+            error = complaint;
+            return result;
+        }
+
         var serialize = Serializer();
 
         if (serialize == null)
@@ -150,13 +173,13 @@ internal static unsafe partial class D3D12Api
             return unchecked((int)0x80004005);
         }
 
-        nint serialized;
-        nint complaint;
-        var result = serialize(description, ROOT_SIGNATURE_VERSION1, &serialized, &complaint);
+        nint legacySerialized;
+        nint legacyComplaint;
+        var legacy = serialize(description, ROOT_SIGNATURE_VERSION1, &legacySerialized, &legacyComplaint);
 
-        blob = result >= 0 ? serialized : 0;
-        error = complaint;
-        return result;
+        blob = legacy >= 0 ? legacySerialized : 0;
+        error = legacyComplaint;
+        return legacy;
     }
 
     /// <summary>
@@ -327,6 +350,17 @@ internal unsafe struct D3D12RootSignatureDesc
 }
 
 /// <summary>
+/// <c>D3D12_VERSIONED_ROOT_SIGNATURE_DESC</c> with the version 1.0 description.
+/// </summary>
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct D3D12VersionedRootSignatureDesc
+{
+    public int Version;
+    public uint Padding;
+    public D3D12RootSignatureDesc Desc;
+}
+
+/// <summary>
 /// <c>D3D12_ROOT_PARAMETER</c>: 32 bytes, with the descriptor union at offset 8 and the visibility - which is declared after
 /// the union, not before it - at offset 24.
 /// </summary>
@@ -356,14 +390,14 @@ internal struct D3D12RootParameter
     [FieldOffset(16)] public uint Num32BitValues;
 
     /// <summary>
-    /// The range array of a descriptor table, which is the union the table parameter uses.
+    /// The number of ranges of the descriptor table, which is the first field of the table.
     /// </summary>
-    [FieldOffset(8)] public nint DescriptorTable;
+    [FieldOffset(8)] public uint NumDescriptorRanges;
 
     /// <summary>
-    /// The number of ranges of the descriptor table.
+    /// The range array of a descriptor table, which follows the count in the table.
     /// </summary>
-    [FieldOffset(16)] public uint NumDescriptorRanges;
+    [FieldOffset(16)] public nint DescriptorTable;
 
     [FieldOffset(24)] public int ShaderVisibility;
 }

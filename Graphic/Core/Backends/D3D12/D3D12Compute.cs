@@ -277,7 +277,13 @@ internal sealed unsafe class D3D12Compute : IDisposable
     {
         // A root descriptor on its own reports no size, which is why the block that carries the lengths is bound beside
         // the buffers rather than read from one of them.
-        var parameters = stackalloc D3D12RootParameter[4];
+        var parameters = stackalloc D3D12RootParameter[6];
+        var ranges = (D3D12DescriptorRange*)NativeInterop.AllocZeroed((nuint)(sizeof(D3D12DescriptorRange) * 2));
+
+        if (ranges == null)
+        {
+            return false;
+        }
 
         for (var index = 0; index < 4; index++)
         {
@@ -290,9 +296,43 @@ internal sealed unsafe class D3D12Compute : IDisposable
             };
         }
 
+        ranges[0] = new D3D12DescriptorRange
+        {
+            RangeType = D3D12Api.DESCRIPTOR_RANGE_TYPE_SRV,
+            NumDescriptors = 1,
+            BaseShaderRegister = 0,
+            RegisterSpace = 0,
+            OffsetInDescriptorsFromTableStart = 0
+        };
+
+        ranges[1] = new D3D12DescriptorRange
+        {
+            RangeType = D3D12Api.DESCRIPTOR_RANGE_TYPE_SAMPLER,
+            NumDescriptors = 1,
+            BaseShaderRegister = 0,
+            RegisterSpace = 0,
+            OffsetInDescriptorsFromTableStart = 0
+        };
+
+        parameters[4] = new D3D12RootParameter
+        {
+            Type = D3D12Api.ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE,
+            DescriptorTable = (IntPtr)ranges,
+            NumDescriptorRanges = 1,
+            ShaderVisibility = D3D12Api.SHADER_VISIBILITY_ALL
+        };
+
+        parameters[5] = new D3D12RootParameter
+        {
+            Type = D3D12Api.ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE,
+            DescriptorTable = (IntPtr)(ranges + 1),
+            NumDescriptorRanges = 1,
+            ShaderVisibility = D3D12Api.SHADER_VISIBILITY_ALL
+        };
+
         var description = new D3D12RootSignatureDesc
         {
-            ParameterCount = 4,
+            ParameterCount = 6,
             Parameters = parameters,
             Flags = D3D12Api.ROOT_SIGNATURE_FLAGS_NONE
         };
@@ -305,11 +345,13 @@ internal sealed unsafe class D3D12Compute : IDisposable
                 D3D12Api.Release(error);
             }
 
+            NativeInterop.Free(ranges);
             return false;
         }
 
         var result = D3D12Api.CreateRootSignature(m_Device, D3D12Api.BlobData(blob), D3D12Api.BlobSize(blob), out m_RootSignature);
         D3D12Api.Release(blob);
+        NativeInterop.Free(ranges);
 
         if (error != 0)
         {

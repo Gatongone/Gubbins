@@ -2,6 +2,8 @@ namespace Gubbins.Graphic.Kernels;
 
 using System.Text;
 
+using System.Text;
+
 /// <summary>
 /// Writes one program as the HLSL D3D12 compiles, which is the language the subset is closest to.
 /// </summary>
