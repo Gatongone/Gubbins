@@ -377,6 +377,18 @@ public sealed unsafe class VulkanUnifiedProvider : IUnifiedProvider, IDisposable
     internal uint GetMemoryTypeFlags(int type) => m_MemoryTypes.Flags(type);
 
     /// <summary>
+    /// Chooses the memory type that serves a usage among the types an allocation reports as compatible.
+    /// </summary>
+    /// <param name="typeBits">The <c>memoryTypeBits</c> from a memory requirements query.</param>
+    /// <param name="usage">What the allocation is used for.</param>
+    /// <returns>The memory type index, or <c>-1</c> when no compatible type can serve the usage.</returns>
+    /// <remarks>
+    /// This is the same selection <see cref="Alloc"/> makes, exposed so the texture path allocates from the bridge's one
+    /// view of the physical device instead of keeping a second copy of it.
+    /// </remarks>
+    internal int SelectMemoryType(uint typeBits, UnifiedMemoryUsage usage) => VulkanMemoryTypes.Select(m_MemoryTypes, typeBits, usage);
+
+    /// <summary>
     /// Gets the size of the heap a memory type belongs to.
     /// </summary>
     /// <param name="type">The memory type index.</param>
@@ -385,6 +397,47 @@ public sealed unsafe class VulkanUnifiedProvider : IUnifiedProvider, IDisposable
 
     /// <inheritdoc/>
     public UnifiedProvider GetProvider() => ProviderAdapter<VulkanUnifiedProvider>.Create(this, ref m_Self);
+
+    /// <summary>
+    /// Creates a two dimensional texture on the device.
+    /// </summary>
+    /// <param name="width">The width, in pixels.</param>
+    /// <param name="height">The height, in pixels.</param>
+    /// <param name="format">The pixel format.</param>
+    /// <returns>The texture, to be disposed when it is no longer sampled.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown when the bridge has been disposed.</exception>
+    /// <exception cref="VulkanException">Thrown when the image, its memory, the view or the transfer commands cannot be created.</exception>
+    public GpuTexture2D CreateTexture(int width, int height, GpuTextureFormat format)
+    {
+        if (m_Disposed)
+        {
+            throw new ObjectDisposedException(nameof(VulkanUnifiedProvider));
+        }
+
+        if (width <= 0 || height <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(width), "A texture is at least one pixel wide and high.");
+        }
+
+        return new GpuTexture2D(new VulkanTexture(this, width, height, format), width, height, format);
+    }
+
+    /// <summary>
+    /// Creates a sampler on the device.
+    /// </summary>
+    /// <param name="sampler">The sampler description.</param>
+    /// <returns>The state, to be disposed when it is no longer bound.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown when the bridge has been disposed.</exception>
+    /// <exception cref="VulkanException">Thrown when the sampler cannot be created.</exception>
+    public GpuSamplerState CreateSampler(GpuSampler sampler)
+    {
+        if (m_Disposed)
+        {
+            throw new ObjectDisposedException(nameof(VulkanUnifiedProvider));
+        }
+
+        return new GpuSamplerState(new VulkanSamplerState(m_Device, sampler));
+    }
 
     /// <inheritdoc/>
     /// <exception cref="VulkanException">Thrown when Vulkan refuses to create or bind the buffer, or to map the memory.</exception>

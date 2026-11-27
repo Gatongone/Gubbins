@@ -1,5 +1,6 @@
 namespace Gubbins.Graphic.Tests;
 
+using System.Runtime.InteropServices;
 using Gubbins.Graphic.D3D12;
 
 /// <summary>
@@ -190,6 +191,142 @@ public sealed class GpuTests
 
             Assert.That(second.CpuSpan.ToArray(), Is.EqualTo(new uint[8]), "a second buffer is its own block");
             Assert.That(first.CpuSpan.ToArray(), Is.EqualTo(new uint[] { 1, 2, 3, 4, 5, 6, 7, 8 }), "the first buffer keeps what it was written with");
+        }
+    }
+
+    [Test]
+    public void VulkanTexture_UploadsAndReadsBack()
+    {
+        if (!TryCreateVulkan(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no Vulkan device.");
+            return;
+        }
+
+        using (owner)
+        using (var texture = owner.Provider.CreateTexture(4, 4, GpuTextureFormat.Rgba8Unorm))
+        using (var sampler = owner.Provider.CreateSampler(new GpuSampler(GpuTextureFilter.Linear, GpuAddressMode.Repeat)))
+        {
+            var pixels = new byte[4 * 4 * 4];
+
+            for (var index = 0; index < pixels.Length; index++)
+            {
+                pixels[index] = (byte)(index * 7);
+            }
+
+            texture.Upload(pixels, 4 * 4);
+
+            var readback = new byte[pixels.Length];
+            texture.Readback(readback, 4 * 4);
+
+            Assert.That(readback, Is.EqualTo(pixels), "the hardware texture returns the pixels it was written with");
+            Assert.That(texture.Width, Is.EqualTo(4), "the texture keeps its width");
+            Assert.That(texture.Height, Is.EqualTo(4), "the texture keeps its height");
+            Assert.That(texture.Format, Is.EqualTo(GpuTextureFormat.Rgba8Unorm), "the texture keeps its format");
+
+            var backend = (VulkanTexture)texture.Backend;
+            var samplerBackend = (VulkanSamplerState)sampler.Backend;
+            var descriptor = backend.GetDescriptorInfo(samplerBackend);
+
+            Assert.That(backend.Image, Is.Not.Zero, "the texture owns a VkImage");
+            Assert.That(backend.ImageView, Is.Not.Zero, "the texture owns a VkImageView");
+            Assert.That(backend.NativeFormat, Is.EqualTo(37u), "the texture uses the Vulkan format for RGBA8");
+            Assert.That(backend.Layout, Is.EqualTo(VulkanApi.IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL), "the texture is left sampleable");
+            Assert.That(samplerBackend.Sampler, Is.Not.Zero, "the sampler owns a VkSampler");
+            Assert.That(descriptor.Sampler, Is.EqualTo(samplerBackend.Sampler), "the descriptor names the sampler");
+            Assert.That(descriptor.ImageView, Is.EqualTo(backend.ImageView), "the descriptor names the image view");
+            Assert.That(descriptor.ImageLayout, Is.EqualTo(VulkanApi.IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL), "the descriptor names the sampleable layout");
+        }
+    }
+
+    [Test]
+    public void VulkanTexture_UploadsRowsWithAPaddedPitch()
+    {
+        if (!TryCreateVulkan(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no Vulkan device.");
+            return;
+        }
+
+        const int Width = 3;
+        const int Height = 2;
+        const int BytesPerRow = 16;
+
+        using (owner)
+        using (var texture = owner.Provider.CreateTexture(Width, Height, GpuTextureFormat.Rgba8Unorm))
+        {
+            var pixels = new byte[BytesPerRow * Height];
+
+            for (var index = 0; index < pixels.Length; index++)
+            {
+                pixels[index] = (byte)(index * 3);
+            }
+
+            texture.Upload(pixels, BytesPerRow);
+
+            var readback = new byte[pixels.Length];
+            texture.Readback(readback, BytesPerRow);
+
+            for (var row = 0; row < Height; row++)
+            {
+                var expected = pixels.AsSpan(row * BytesPerRow, Width * 4).ToArray();
+                var actual = readback.AsSpan(row * BytesPerRow, Width * 4).ToArray();
+
+                Assert.That(actual, Is.EqualTo(expected), $"row {row} survives a row pitch wider than the image row");
+            }
+        }
+    }
+
+    [Test]
+    public void VulkanSampler_CreatesEveryDescription()
+    {
+        if (!TryCreateVulkan(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no Vulkan device.");
+            return;
+        }
+
+        using (owner)
+        {
+            foreach (var filter in new[] { GpuTextureFilter.Nearest, GpuTextureFilter.Linear })
+            {
+                foreach (var address in new[] { GpuAddressMode.Clamp, GpuAddressMode.Repeat, GpuAddressMode.Mirror })
+                {
+                    using var sampler = owner.Provider.CreateSampler(new GpuSampler(filter, address));
+                    var backend = (VulkanSamplerState)sampler.Backend;
+
+                    Assert.That(backend.Sampler, Is.Not.Zero, $"a {filter} {address} sampler was created");
+                    Assert.That(backend.Description.Filter, Is.EqualTo(filter), "the sampler keeps its filter");
+                    Assert.That(backend.Description.Address, Is.EqualTo(address), "the sampler keeps its address mode");
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Creates the Vulkan device the texture tests run on, or reports that this machine has none.
+    /// </summary>
+    /// <param name="owner">When the method returns, the device, or <see langword="null"/>.</param>
+    /// <returns><see langword="true"/> if a device was created.</returns>
+    private static bool TryCreateVulkan(out VulkanDevice? owner)
+    {
+        owner = null;
+
+        // RuntimeInformation is the portable form: the netstandard target of this project has no OperatingSystem.IsWindows.
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            return false;
+        }
+
+        try
+        {
+            return VulkanDevice.TryCreate(out owner) && owner is not null;
+        }
+        catch (Exception)
+        {
+            // A machine without the loader reports it by refusing to load, which is the device not being there.
+            owner = null;
+            return false;
         }
     }
 }
