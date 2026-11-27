@@ -23,9 +23,16 @@ namespace Gubbins.Graphic;
 /// the texture needs the device's context to be current on the calling thread, which it is for the thread that created
 /// the <see cref="CudaDevice"/>.
 /// </para>
+/// <para>
+/// A texture the engine created is wrapped: the view transfers texels through the array the engine lent it but never
+/// creates or destroys the <c>CUarray</c> or the <c>CUtexObject</c>. CUDA keeps the sampler inside the texture object, so
+/// an imported view records the sampler the caller reports and exposes the description it maps to through
+/// <see cref="Sampler"/> and <see cref="Description"/> instead of creating a second object.
+/// </para>
 /// </remarks>
 internal sealed unsafe class CudaTexture : IGpuTexture
 {
+    private readonly CudaUnifiedProvider? m_Provider;
     private readonly int m_Width;
     private readonly int m_Height;
     private readonly int m_BytesPerPixel;
@@ -33,12 +40,17 @@ internal sealed unsafe class CudaTexture : IGpuTexture
     private readonly uint m_Channels;
     private readonly int m_ViewFormat;
     private readonly bool m_ReadAsInteger;
+    private readonly bool m_OwnsArray;
+    private readonly bool m_OwnsTextureObject;
     private nint m_Array;
     private nint m_TextureObject;
     private GpuSampler m_Sampler;
     private CudaApi.CUDA_TEXTURE_DESC m_Description;
     private bool m_Disposed;
 
+    /// <summary>
+    /// Creates the array and the texture object that samples it.
+    /// </summary>
     /// <param name="width">The width, in pixels.</param>
     /// <param name="height">The height, in pixels.</param>
     /// <param name="format">The pixel format.</param>
@@ -46,25 +58,8 @@ internal sealed unsafe class CudaTexture : IGpuTexture
     /// <exception cref="ArgumentOutOfRangeException">Thrown when the format is not one the layer maps.</exception>
     /// <exception cref="InvalidOperationException">Thrown when the driver refuses the array or the texture object.</exception>
     internal CudaTexture(int width, int height, GpuTextureFormat format, GpuSampler sampler)
+        : this(null, width, height, format, sampler)
     {
-        m_Width = width;
-        m_Height = height;
-
-        // CUDA has no BGRA channel order: the four bytes are stored and fetched in memory order, so Bgra8Unorm shares the
-        // RGBA8 layout and a kernel sees blue in x and red in z. The bytes are deliberately not swapped, because a
-        // readback has to return exactly what was uploaded.
-        (m_ArrayFormat, m_Channels, m_ViewFormat, m_BytesPerPixel, m_ReadAsInteger) = format switch
-        {
-            GpuTextureFormat.Rgba8Unorm => (CudaApi.AD_FORMAT_UNSIGNED_INT8, 4u, CudaApi.RES_VIEW_FORMAT_UINT_4X8, 4, false),
-            GpuTextureFormat.Bgra8Unorm => (CudaApi.AD_FORMAT_UNSIGNED_INT8, 4u, CudaApi.RES_VIEW_FORMAT_UINT_4X8, 4, false),
-            GpuTextureFormat.R32Uint => (CudaApi.AD_FORMAT_UNSIGNED_INT32, 1u, CudaApi.RES_VIEW_FORMAT_UINT_1X32, 4, true),
-            GpuTextureFormat.R32Float => (CudaApi.AD_FORMAT_FLOAT, 1u, CudaApi.RES_VIEW_FORMAT_FLOAT_1X32, 4, false),
-            _ => throw new ArgumentOutOfRangeException(nameof(format), format, "CUDA has no format for it.")
-        };
-
-        m_Sampler = sampler;
-        m_Description = CreateTextureDescriptor(sampler, m_ReadAsInteger);
-
         var descriptor = new CudaApi.CUDA_ARRAY_DESCRIPTOR
         {
             Width = (nuint)width,
@@ -88,6 +83,46 @@ internal sealed unsafe class CudaTexture : IGpuTexture
             m_Array = 0;
             throw;
         }
+
+        m_OwnsArray = true;
+        m_OwnsTextureObject = true;
+    }
+
+    /// <summary>
+    /// Wraps the <c>CUarray</c> and <c>CUtexObject</c> the engine created.
+    /// </summary>
+    /// <param name="provider">The bridge whose context the handles belong to, which the view keeps alive.</param>
+    /// <param name="array">The engine's <c>CUarray</c>. The view never destroys it.</param>
+    /// <param name="textureObject">The engine's <c>CUtexObject</c>. The view never destroys it.</param>
+    /// <param name="width">The width, in pixels.</param>
+    /// <param name="height">The height, in pixels.</param>
+    /// <param name="format">The pixel format.</param>
+    /// <param name="sampler">The filter and the address modes the engine created the texture object with.</param>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the format is not one the layer maps.</exception>
+    internal CudaTexture(CudaUnifiedProvider provider, nint array, nint textureObject, int width, int height, GpuTextureFormat format, GpuSampler sampler)
+        : this(provider, width, height, format, sampler)
+    {
+        m_Array = array;
+        m_TextureObject = textureObject;
+    }
+
+    /// <summary>
+    /// Maps the format, records the sampler and leaves the native handles to the constructor that obtains or wraps them.
+    /// </summary>
+    /// <param name="provider">The bridge the handles belong to, or <see langword="null"/> for a texture this view creates.</param>
+    /// <param name="width">The width, in pixels.</param>
+    /// <param name="height">The height, in pixels.</param>
+    /// <param name="format">The pixel format.</param>
+    /// <param name="sampler">The filter and the address modes.</param>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the format is not one the layer maps.</exception>
+    private CudaTexture(CudaUnifiedProvider? provider, int width, int height, GpuTextureFormat format, GpuSampler sampler)
+    {
+        m_Provider = provider;
+        m_Width = width;
+        m_Height = height;
+        (m_ArrayFormat, m_Channels, m_ViewFormat, m_BytesPerPixel, m_ReadAsInteger) = DescribeFormat(format);
+        m_Sampler = sampler;
+        m_Description = CreateTextureDescriptor(sampler, m_ReadAsInteger);
     }
 
     /// <summary>
@@ -99,6 +134,16 @@ internal sealed unsafe class CudaTexture : IGpuTexture
     /// Gets the <c>CUtexObject</c> a kernel binds when it samples this texture.
     /// </summary>
     internal nint TextureObject => m_TextureObject;
+
+    /// <summary>
+    /// Gets the bridge whose context the array and the texture object belong to, or <see langword="null"/> for a texture
+    /// this view created without a bridge.
+    /// </summary>
+    /// <remarks>
+    /// An imported view holds the bridge so the context outlives the handles the engine lent it; it never disposes the
+    /// bridge, which stays with the engine.
+    /// </remarks>
+    internal CudaUnifiedProvider? Provider => m_Provider;
 
     /// <summary>
     /// Gets the <c>CUarray_format</c> of one channel.
@@ -116,13 +161,17 @@ internal sealed unsafe class CudaTexture : IGpuTexture
     internal int BytesPerPixel => m_BytesPerPixel;
 
     /// <summary>
-    /// Gets the sampler description the texture object was created with.
+    /// Gets the sampler the texture object was created with, or the one the caller reported for an imported object.
     /// </summary>
     internal GpuSampler Sampler => m_Sampler;
 
     /// <summary>
-    /// Gets the native description the texture object was created with, which is where the sampler really lives.
+    /// Gets the native description the sampler maps to, which is where the sampler really lives.
     /// </summary>
+    /// <remarks>
+    /// A texture this view created was created with this description. An imported view reports the description of the
+    /// sampler the caller said the engine used, because the engine's object already carries its own.
+    /// </remarks>
     internal CudaApi.CUDA_TEXTURE_DESC Description => m_Description;
 
     /// <inheritdoc/>
@@ -186,8 +235,13 @@ internal sealed unsafe class CudaTexture : IGpuTexture
     }
 
     /// <summary>
-    /// Releases the texture object and then the array it samples.
+    /// Releases the texture object and then the array it samples when this view created them; an imported view destroys
+    /// nothing native, because the engine owns both.
     /// </summary>
+    /// <remarks>
+    /// The view owns no staging or fence state beyond a transfer: the pinned host buffer of an upload or a readback is
+    /// released when that call returns, and the copy is synchronous, so there is nothing of its own left to release.
+    /// </remarks>
     public void Dispose()
     {
         if (m_Disposed)
@@ -197,21 +251,73 @@ internal sealed unsafe class CudaTexture : IGpuTexture
 
         m_Disposed = true;
 
+        // An imported view has nothing native to destroy. Its transfers are already synchronized and its staging is
+        // released per call, so the engine's array and texture object are left untouched.
+        if (!m_OwnsArray && !m_OwnsTextureObject)
+        {
+            return;
+        }
+
         // A dispatch may still be sampling the array, so the context is drained before anything is destroyed.
         CudaApi.cuCtxSynchronize();
 
-        if (m_TextureObject != 0)
+        if (m_OwnsTextureObject && m_TextureObject != 0)
         {
             CudaApi.cuTexObjectDestroy(m_TextureObject);
-            m_TextureObject = 0;
         }
 
-        if (m_Array != 0)
+        if (m_OwnsArray && m_Array != 0)
         {
             CudaApi.cuArrayDestroy(m_Array);
-            m_Array = 0;
         }
+
+        m_TextureObject = 0;
+        m_Array = 0;
     }
+
+    /// <summary>
+    /// Maps a pixel format to the array's channel format and the view the texture object reads it through.
+    /// </summary>
+    /// <param name="format">The pixel format.</param>
+    /// <param name="arrayFormat">When the method returns, the <c>CUarray_format</c> of one channel.</param>
+    /// <param name="channels">When the method returns, the channels in one element.</param>
+    /// <param name="viewFormat">When the method returns, the <c>CUresourceViewFormat</c> the texture object reads.</param>
+    /// <param name="bytesPerPixel">When the method returns, the bytes one pixel occupies.</param>
+    /// <param name="readAsInteger">When the method returns, whether an integer array is read as elements instead of normalized floats.</param>
+    /// <returns><see langword="true"/> when the backend has a format for it; otherwise, <see langword="false"/>.</returns>
+    internal static bool TryDescribeFormat(
+        GpuTextureFormat format,
+        out int arrayFormat,
+        out uint channels,
+        out int viewFormat,
+        out int bytesPerPixel,
+        out bool readAsInteger)
+    {
+        // CUDA has no BGRA channel order: the four bytes are stored and fetched in memory order, so Bgra8Unorm shares the
+        // RGBA8 layout and a kernel sees blue in x and red in z. The bytes are deliberately not swapped, because a
+        // readback has to return exactly what was uploaded.
+        (arrayFormat, channels, viewFormat, bytesPerPixel, readAsInteger) = format switch
+        {
+            GpuTextureFormat.Rgba8Unorm => (CudaApi.AD_FORMAT_UNSIGNED_INT8, 4u, CudaApi.RES_VIEW_FORMAT_UINT_4X8, 4, false),
+            GpuTextureFormat.Bgra8Unorm => (CudaApi.AD_FORMAT_UNSIGNED_INT8, 4u, CudaApi.RES_VIEW_FORMAT_UINT_4X8, 4, false),
+            GpuTextureFormat.R32Uint => (CudaApi.AD_FORMAT_UNSIGNED_INT32, 1u, CudaApi.RES_VIEW_FORMAT_UINT_1X32, 4, true),
+            GpuTextureFormat.R32Float => (CudaApi.AD_FORMAT_FLOAT, 1u, CudaApi.RES_VIEW_FORMAT_FLOAT_1X32, 4, false),
+            _ => (0, 0u, 0, 0, false)
+        };
+
+        return arrayFormat != 0;
+    }
+
+    /// <summary>
+    /// Maps a pixel format to the array's channel format and the view the texture object reads it through.
+    /// </summary>
+    /// <param name="format">The pixel format.</param>
+    /// <returns>The array format, the channels, the view format, the bytes in one pixel and the read mode.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the backend has no format for it.</exception>
+    private static (int ArrayFormat, uint Channels, int ViewFormat, int BytesPerPixel, bool ReadAsInteger) DescribeFormat(GpuTextureFormat format)
+        => TryDescribeFormat(format, out var arrayFormat, out var channels, out var viewFormat, out var bytesPerPixel, out var readAsInteger)
+            ? (arrayFormat, channels, viewFormat, bytesPerPixel, readAsInteger)
+            : throw new ArgumentOutOfRangeException(nameof(format), format, "CUDA has no format for it.");
 
     /// <summary>
     /// Builds the native texture description that carries the sampler.

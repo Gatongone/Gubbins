@@ -87,6 +87,43 @@ internal sealed unsafe class CudaUnifiedProvider : IUnifiedProvider
     }
 
     /// <summary>
+    /// Wraps the <c>CUarray</c> and <c>CUtexObject</c> the engine created.
+    /// </summary>
+    /// <remarks>
+    /// The returned view transfers texels through the array and samples through the texture object, but never destroys
+    /// either of them, which stay with the engine. CUDA keeps the sampler inside the texture object, so the sampler the
+    /// caller passes is what the view reports through <see cref="CudaTexture.Sampler"/> and describes through
+    /// <see cref="CudaTexture.Description"/>; it does not create a second object. The device's context must be current on
+    /// the calling thread, which it is for the thread that created the <see cref="CudaDevice"/>.
+    /// </remarks>
+    /// <param name="array">The engine's <c>CUarray</c>.</param>
+    /// <param name="textureObject">The engine's <c>CUtexObject</c> that samples the array.</param>
+    /// <param name="width">The width, in pixels.</param>
+    /// <param name="height">The height, in pixels.</param>
+    /// <param name="format">The pixel format of the array.</param>
+    /// <param name="sampler">The filter and the address modes the engine created the texture object with.</param>
+    /// <param name="imported">When the method returns, the texture view.</param>
+    /// <returns><see langword="true"/> when the handles were wrapped; otherwise, <see langword="false"/>.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown when the bridge has been disposed.</exception>
+    public bool TryImportTexture(nint array, nint textureObject, int width, int height, GpuTextureFormat format, GpuSampler sampler, out GpuTexture2D? imported)
+    {
+        if (m_Disposed)
+        {
+            throw new ObjectDisposedException(nameof(CudaUnifiedProvider));
+        }
+
+        imported = null;
+
+        if (array == 0 || textureObject == 0 || width <= 0 || height <= 0 || !CudaTexture.TryDescribeFormat(format, out _, out _, out _, out _, out _))
+        {
+            return false;
+        }
+
+        imported = new GpuTexture2D(new CudaTexture(this, array, textureObject, width, height, format, sampler), width, height, format);
+        return true;
+    }
+
+    /// <summary>
     /// Creates the sampler state a texture of this backend samples with.
     /// </summary>
     /// <param name="sampler">The filter and the address modes.</param>
