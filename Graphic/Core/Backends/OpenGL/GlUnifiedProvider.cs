@@ -78,6 +78,32 @@ internal sealed unsafe class GlUnifiedProvider : IUnifiedProvider
     }
 
     /// <summary>
+    /// Wraps a texture the engine owns.
+    /// </summary>
+    /// <param name="texture">The OpenGL texture name.</param>
+    /// <param name="width">The width, in pixels.</param>
+    /// <param name="height">The height, in pixels.</param>
+    /// <param name="format">The pixel format.</param>
+    /// <param name="imported">When the method returns, the texture view.</param>
+    /// <returns><see langword="true"/> when the texture was wrapped.</returns>
+    public bool TryImportTexture(uint texture, int width, int height, GpuTextureFormat format, out GpuTexture2D? imported)
+    {
+        if (m_Disposed)
+        {
+            throw new ObjectDisposedException(nameof(GlUnifiedProvider));
+        }
+
+        if (texture == 0 || width <= 0 || height <= 0)
+        {
+            imported = null;
+            return false;
+        }
+
+        imported = new GpuTexture2D(new GlTexture(m_Api, texture, width, height, format), width, height, format);
+        return true;
+    }
+
+    /// <summary>
     /// Creates a sampler object on the current context.
     /// </summary>
     /// <param name="sampler">The sampler description.</param>

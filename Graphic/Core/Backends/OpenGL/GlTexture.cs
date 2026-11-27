@@ -16,6 +16,7 @@ internal sealed unsafe class GlTexture : IGpuTexture
     private readonly uint m_Format;
     private readonly uint m_Type;
     private readonly int m_BytesPerPixel;
+    private readonly bool m_Owns;
     private bool m_Disposed;
 
     /// <param name="api">The entry points of the current context.</param>
@@ -28,14 +29,11 @@ internal sealed unsafe class GlTexture : IGpuTexture
         m_Width = width;
         m_Height = height;
 
-        (var internalFormat, m_Format, m_Type, m_BytesPerPixel) = format switch
-        {
-            GpuTextureFormat.Rgba8Unorm => (0x8058, 0x1908u, 0x1401u, 4),
-            GpuTextureFormat.Bgra8Unorm => (0x8058, 0x80E1u, 0x1401u, 4),
-            GpuTextureFormat.R32Uint => (0x8236, 0x8D94u, 0x1405u, 4),
-            GpuTextureFormat.R32Float => (0x822E, 0x1903u, 0x1406u, 4),
-            _ => throw new ArgumentOutOfRangeException(nameof(format), format, "The OpenGL backend has no format for it.")
-        };
+        var description = Describe(format);
+        var internalFormat = description.InternalFormat;
+        m_Format = description.Format;
+        m_Type = description.Type;
+        m_BytesPerPixel = description.BytesPerPixel;
 
         var handle = 0u;
         api.GenTextures(1, &handle);
@@ -43,7 +41,43 @@ internal sealed unsafe class GlTexture : IGpuTexture
         api.TexImage2D(Texture2D, 0, internalFormat, width, height, 0, m_Format, m_Type, null);
         api.BindTexture(Texture2D, 0);
         m_Handle = handle;
+        m_Owns = true;
     }
+
+    /// <summary>
+    /// Wraps a texture the engine owns.
+    /// </summary>
+    /// <param name="api">The entry points of the current context.</param>
+    /// <param name="handle">The OpenGL texture name.</param>
+    /// <param name="width">The width, in pixels.</param>
+    /// <param name="height">The height, in pixels.</param>
+    /// <param name="format">The pixel format.</param>
+    internal GlTexture(GlEntryPoints api, uint handle, int width, int height, GpuTextureFormat format)
+    {
+        var description = Describe(format);
+        m_Api = api;
+        m_Handle = handle;
+        m_Width = width;
+        m_Height = height;
+        m_Format = description.Format;
+        m_Type = description.Type;
+        m_BytesPerPixel = description.BytesPerPixel;
+        m_Owns = false;
+    }
+
+    /// <summary>
+    /// Maps a pixel format to the OpenGL constants a transfer uses.
+    /// </summary>
+    /// <param name="format">The pixel format.</param>
+    /// <returns>The internal format, the format, the type and the bytes per pixel.</returns>
+    private static (int InternalFormat, uint Format, uint Type, int BytesPerPixel) Describe(GpuTextureFormat format) => format switch
+    {
+        GpuTextureFormat.Rgba8Unorm => (0x8058, 0x1908u, 0x1401u, 4),
+        GpuTextureFormat.Bgra8Unorm => (0x8058, 0x80E1u, 0x1401u, 4),
+        GpuTextureFormat.R32Uint => (0x8236, 0x8D94u, 0x1405u, 4),
+        GpuTextureFormat.R32Float => (0x822E, 0x1903u, 0x1406u, 4),
+        _ => throw new ArgumentOutOfRangeException(nameof(format), format, "The OpenGL backend has no format for it.")
+    };
 
     /// <summary>
     /// Gets the OpenGL texture name.
@@ -99,7 +133,11 @@ internal sealed unsafe class GlTexture : IGpuTexture
         }
 
         m_Disposed = true;
-        var handle = m_Handle;
-        m_Api.DeleteTextures(1, &handle);
+
+        if (m_Owns)
+        {
+            var handle = m_Handle;
+            m_Api.DeleteTextures(1, &handle);
+        }
     }
 }
