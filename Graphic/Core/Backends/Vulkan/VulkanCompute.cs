@@ -2,13 +2,19 @@
 namespace Gubbins.Graphic;
 
 /// <summary>
-/// Runs one compute pipeline on a Vulkan device: a SPIR-V module bound to two storage buffers, dispatched on a command
-/// buffer of its own and waited for with a fence.
+/// Runs one compute pipeline on a Vulkan device: a SPIR-V module bound to two storage buffers and, when the kernel samples
+/// one, a combined image sampler, dispatched on a command buffer of its own and waited for with a fence.
 /// </summary>
 /// <remarks>
 /// The device and the queue belong to the bridge; the module, the layouts, the pool, the command pool and the fence are
 /// this object's and are released when it is disposed. Every native handle is created through a local and copied into the
 /// field afterwards, because a field cannot be addressed directly.
+/// <para>
+/// The sampled image bindings are read from the module instead of being fixed, because a kernel that samples a texture
+/// binds it at a binding the storage buffers do not use and the layout has to declare exactly the bindings the shader
+/// names. The sampler is not a binding of its own: a combined image sampler descriptor carries the <c>VkSampler</c> with
+/// the view, which is what <see cref="VulkanTexture.GetDescriptorInfo"/> builds.
+/// </para>
 /// </remarks>
 internal sealed unsafe class VulkanCompute : IDisposable
 {
@@ -23,6 +29,7 @@ internal sealed unsafe class VulkanCompute : IDisposable
     private nint m_CommandPool;
     private nint m_CommandBuffer;
     private nint m_Fence;
+    private int[] m_ImageBindings = Array.Empty<int>();
     private bool m_Pending;
     private bool m_Disposed;
 
@@ -94,6 +101,8 @@ internal sealed unsafe class VulkanCompute : IDisposable
         {
             return false;
         }
+
+        m_ImageBindings = ReadSampledImageBindings(bytecode);
 
         if (!CreateLayouts())
         {
@@ -169,11 +178,22 @@ internal sealed unsafe class VulkanCompute : IDisposable
     /// <param name="parametersSize">The size of that structure.</param>
     /// <param name="lengthsBuffer">The <c>VkBuffer</c> that carries the lengths, or zero to reuse the input.</param>
     /// <param name="lengthsOffset">The offset of the lengths inside it.</param>
+    /// <param name="texture">
+    /// The combined image sampler to bind, or the default value when the kernel samples no texture. The descriptor carries
+    /// both the view and the sampler, which is why the sampler is not bound on its own.
+    /// </param>
     /// <param name="groups">The number of thread groups on the x axis.</param>
     /// <returns><see langword="true"/> if the dispatch ran to completion.</returns>
-    internal bool Dispatch(nint sourceBuffer, ulong sourceOffset, ulong sourceSize, nint destinationBuffer, ulong destinationOffset, ulong destinationSize, nint parametersBuffer, ulong parametersOffset, ulong parametersSize, nint lengthsBuffer, ulong lengthsOffset, uint groups, bool wait)
+    internal bool Dispatch(nint sourceBuffer, ulong sourceOffset, ulong sourceSize, nint destinationBuffer, ulong destinationOffset, ulong destinationSize, nint parametersBuffer, ulong parametersOffset, ulong parametersSize, nint lengthsBuffer, ulong lengthsOffset, VkDescriptorImageInfo texture, uint groups, bool wait)
     {
         if (m_Disposed || m_Pipeline == 0 || sourceBuffer == 0 || destinationBuffer == 0 || groups == 0)
+        {
+            return false;
+        }
+
+        // The binding step pairs one texture with the sampler of the dispatch, so a module that declares more than one
+        // sampled image is refused rather than sampled through the wrong one.
+        if (m_ImageBindings.Length > 1)
         {
             return false;
         }
@@ -183,7 +203,7 @@ internal sealed unsafe class VulkanCompute : IDisposable
             return false;
         }
 
-        if (!Bind(sourceBuffer, sourceOffset, sourceSize, destinationBuffer, destinationOffset, destinationSize, parametersBuffer, parametersOffset, parametersSize, lengthsBuffer, lengthsOffset))
+        if (!Bind(sourceBuffer, sourceOffset, sourceSize, destinationBuffer, destinationOffset, destinationSize, parametersBuffer, parametersOffset, parametersSize, lengthsBuffer, lengthsOffset, texture))
         {
             return false;
         }
@@ -270,7 +290,9 @@ internal sealed unsafe class VulkanCompute : IDisposable
             return true;
         }
 
-        var bindings = stackalloc VkDescriptorSetLayoutBinding[4];
+        var imageCount = m_ImageBindings.Length;
+        var bindingCount = 4 + imageCount;
+        var bindings = stackalloc VkDescriptorSetLayoutBinding[bindingCount];
 
         for (var index = 0; index < 4; index++)
         {
@@ -283,10 +305,23 @@ internal sealed unsafe class VulkanCompute : IDisposable
             };
         }
 
+        // The sampled images keep the bindings the module decorated them with; the translation puts them after the four
+        // storage buffer bindings, so the two kinds of descriptor never share a binding.
+        for (var index = 0; index < imageCount; index++)
+        {
+            bindings[4 + index] = new VkDescriptorSetLayoutBinding
+            {
+                Binding = (uint)m_ImageBindings[index],
+                DescriptorType = VulkanApi.DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                DescriptorCount = 1,
+                StageFlags = VulkanApi.SHADER_STAGE_COMPUTE
+            };
+        }
+
         var setLayoutInfo = new VkDescriptorSetLayoutCreateInfo
         {
             StructureType = VulkanApi.DESCRIPTOR_SET_LAYOUT_CREATE_INFO_TYPE,
-            BindingCount = 4,
+            BindingCount = (uint)bindingCount,
             Bindings = (nint)bindings
         };
 
@@ -315,18 +350,29 @@ internal sealed unsafe class VulkanCompute : IDisposable
 
         m_PipelineLayout = pipelineLayout;
 
-        var poolSize = new VkDescriptorPoolSize
+        var poolSizes = stackalloc VkDescriptorPoolSize[imageCount == 0 ? 1 : 2];
+
+        poolSizes[0] = new VkDescriptorPoolSize
         {
             Type = VulkanApi.DESCRIPTOR_TYPE_STORAGE_BUFFER,
             DescriptorCount = 4
         };
 
+        if (imageCount != 0)
+        {
+            poolSizes[1] = new VkDescriptorPoolSize
+            {
+                Type = VulkanApi.DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                DescriptorCount = (uint)imageCount
+            };
+        }
+
         var poolInfo = new VkDescriptorPoolCreateInfo
         {
             StructureType = VulkanApi.DESCRIPTOR_POOL_CREATE_INFO_TYPE,
             MaxSets = 1,
-            PoolSizeCount = 1,
-            PoolSizes = (nint)(&poolSize)
+            PoolSizeCount = imageCount == 0 ? 1u : 2u,
+            PoolSizes = (nint)poolSizes
         };
 
         nint pool = 0;
@@ -358,12 +404,19 @@ internal sealed unsafe class VulkanCompute : IDisposable
     }
 
     /// <summary>
-    /// Points the storage buffer bindings at the blocks of a dispatch.
+    /// Points the descriptor set at the blocks and the sampled image of a dispatch.
     /// </summary>
     /// <returns><see langword="true"/> if the set was written.</returns>
-    private bool Bind(nint sourceBuffer, ulong sourceOffset, ulong sourceSize, nint destinationBuffer, ulong destinationOffset, ulong destinationSize, nint parametersBuffer, ulong parametersOffset, ulong parametersSize, nint lengthsBuffer, ulong lengthsOffset)
+    private bool Bind(nint sourceBuffer, ulong sourceOffset, ulong sourceSize, nint destinationBuffer, ulong destinationOffset, ulong destinationSize, nint parametersBuffer, ulong parametersOffset, ulong parametersSize, nint lengthsBuffer, ulong lengthsOffset, VkDescriptorImageInfo texture)
     {
         if (!CreateLayouts())
+        {
+            return false;
+        }
+
+        var imageCount = m_ImageBindings.Length;
+
+        if (imageCount != 0 && texture.ImageView == 0)
         {
             return false;
         }
@@ -385,7 +438,8 @@ internal sealed unsafe class VulkanCompute : IDisposable
             ? new VkDescriptorBufferInfo { Buffer = lengthsBuffer, Offset = lengthsOffset, Range = LengthsSize }
             : new VkDescriptorBufferInfo { Buffer = sourceBuffer, Offset = sourceOffset, Range = sourceSize };
 
-        var writes = stackalloc VkWriteDescriptorSet[4];
+        var images = stackalloc VkDescriptorImageInfo[imageCount];
+        var writes = stackalloc VkWriteDescriptorSet[4 + imageCount];
 
         for (var index = 0; index < 4; index++)
         {
@@ -400,8 +454,104 @@ internal sealed unsafe class VulkanCompute : IDisposable
             };
         }
 
-        VulkanApi.UpdateDescriptorSets(m_Device, 4, writes, 0, 0);
+        // One combined image sampler is written per sampled image the module declares; the descriptor already names the
+        // sampler, so no separate sampler binding is updated.
+        for (var index = 0; index < imageCount; index++)
+        {
+            images[index] = texture;
+            writes[4 + index] = new VkWriteDescriptorSet
+            {
+                StructureType = VulkanApi.WRITE_DESCRIPTOR_SET_TYPE,
+                DescriptorSet = m_DescriptorSet,
+                DestinationBinding = (uint)m_ImageBindings[index],
+                DescriptorCount = 1,
+                DescriptorType = VulkanApi.DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                ImageInfo = (nint)(&images[index])
+            };
+        }
+
+        VulkanApi.UpdateDescriptorSets(m_Device, (uint)(4 + imageCount), writes, 0, 0);
         return true;
+    }
+
+    /// <summary>
+    /// Reads the descriptor bindings of the combined image samplers a SPIR-V module declares.
+    /// </summary>
+    /// <param name="bytecode">The module.</param>
+    /// <returns>The bindings, in ascending order; empty when the kernel samples no texture.</returns>
+    /// <remarks>
+    /// The layout of a pipeline has to declare every descriptor the shader names, and a kernel may sample a texture at any
+    /// binding the translation chose. Reading the module keeps that choice in one place instead of repeating it here.
+    /// </remarks>
+    private static int[] ReadSampledImageBindings(scoped ReadOnlySpan<byte> bytecode)
+    {
+        const int HeaderWords = 5;
+        const uint OpVariable = 59;
+        const uint OpDecorate = 71;
+        const uint OpTypeSampledImage = 27;
+        const uint OpTypePointer = 32;
+        const uint DecorationBinding = 33;
+        const uint StorageClassUniformConstant = 0;
+
+        if (bytecode.Length < HeaderWords * sizeof(uint))
+        {
+            return Array.Empty<int>();
+        }
+
+        var words = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, uint>(bytecode);
+        var sampledImageTypes = new HashSet<uint>();
+        var pointerTypes = new Dictionary<uint, uint>();
+        var bindings = new Dictionary<uint, uint>();
+        var variables = new List<(uint Type, uint Id)>();
+
+        for (var index = HeaderWords; index < words.Length;)
+        {
+            var instruction = words[index];
+            var length = (int)(instruction >> 16);
+
+            if (length == 0 || index + length > words.Length)
+            {
+                break;
+            }
+
+            switch (instruction & 0xFFFF)
+            {
+                case OpTypeSampledImage when length >= 3:
+                    sampledImageTypes.Add(words[index + 1]);
+                    break;
+
+                case OpTypePointer when length >= 4:
+                    pointerTypes[words[index + 1]] = words[index + 3];
+                    break;
+
+                case OpDecorate when length >= 4 && words[index + 2] == DecorationBinding:
+                    bindings[words[index + 1]] = words[index + 3];
+                    break;
+
+                case OpVariable when length >= 4 && words[index + 3] == StorageClassUniformConstant:
+                    variables.Add((words[index + 1], words[index + 2]));
+                    break;
+            }
+
+            index += length;
+        }
+
+        var found = new List<int>();
+
+        foreach (var (type, id) in variables)
+        {
+            // The type of a variable is a pointer to what it holds, so the sampled image check looks through it.
+            if (pointerTypes.TryGetValue(type, out var held) &&
+                sampledImageTypes.Contains(held) &&
+                bindings.TryGetValue(id, out var binding) &&
+                binding <= int.MaxValue)
+            {
+                found.Add((int)binding);
+            }
+        }
+
+        found.Sort();
+        return found.ToArray();
     }
 
     /// <summary>

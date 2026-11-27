@@ -2356,6 +2356,133 @@ public static class D3D12Textured
         }
     }
 
+    [Test]
+    public void Kernel_CompilesATexturedProgramToSpirV()
+    {
+        const string Source = @"
+using System;
+using Gubbins.Graphic;
+
+public static class TexturedSpirV
+{
+    public static void Kernel(int index, ReadOnlySpan<float2> source, Span<float4> destination, GpuTexture2D texture, GpuSamplerState sampler)
+    {
+        destination[index] = texture.Sample(sampler, source[index]);
+    }
+}
+";
+
+        var directory = Directory.CreateTempSubdirectory("gubbins-spirv-texture-").FullName;
+
+        try
+        {
+            var artifacts = KernelCompiler.Compile(Source, directory, "TexturedSpirV");
+            var path = Path.Combine(directory, "TexturedSpirV.spv");
+
+            Assert.That(artifacts, Does.Contain(path), "a kernel that samples a texture writes a SPIR-V artifact");
+            Assert.That(File.Exists(path), Is.True, "the SPIR-V artifact is on disk");
+
+            var module = File.ReadAllBytes(path);
+
+            Assert.That(module.Length, Is.GreaterThan(5 * sizeof(uint)), "the module has a header and instructions");
+            Assert.That(BitConverter.ToUInt32(module, 0), Is.EqualTo(0x07230203u), "the artifact starts with the SPIR-V magic number");
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Test]
+    public void VulkanTexture_KernelSamplesHardwareTexture()
+    {
+        const string Source = @"
+using System;
+using Gubbins.Graphic;
+
+public static class VulkanTextured
+{
+    public static void Kernel(int index, ReadOnlySpan<float2> source, Span<float4> destination, GpuTexture2D texture, GpuSamplerState sampler)
+    {
+        destination[index] = texture.Sample(sampler, source[index]);
+    }
+}
+";
+
+        VulkanDevice? owner;
+
+        try
+        {
+            if (!VulkanDevice.TryCreate(out owner) || owner is null)
+            {
+                Assert.Ignore("This machine has no Vulkan device.");
+                return;
+            }
+        }
+        catch (Exception)
+        {
+            Assert.Ignore("This machine has no Vulkan loader.");
+            return;
+        }
+
+        var directory = Directory.CreateTempSubdirectory("gubbins-vulkantexture-").FullName;
+
+        try
+        {
+            KernelCompiler.Compile(Source, directory, "VulkanTextured");
+
+            using (owner)
+            using (var device = GpuDevice.FromVulkan(owner.Provider))
+            using (var memory = device.CreateMemory())
+            using (var texture = owner.Provider.CreateTexture(2, 2, GpuTextureFormat.Rgba8Unorm))
+            using (var sampler = owner.Provider.CreateSampler(new GpuSampler(GpuTextureFilter.Nearest, GpuAddressMode.Clamp)))
+            using (var kernel = GpuKernel.LoadFromDirectory(device, directory, "VulkanTextured"))
+            {
+                Assert.That(kernel, Is.Not.Null, "the texture kernel loads on Vulkan");
+
+                texture.Upload(new byte[]
+                {
+                    255, 0, 0, 255, 0, 255, 0, 255,
+                    0, 0, 255, 255, 255, 255, 255, 255
+                }, 8);
+
+                // A dispatch always runs a whole group, and Vulkan does not mask a write past the end of a storage buffer
+                // the way D3D12 masks one past an unordered access view, so both blocks hold a value per thread.
+                var threadCount = KernelTranspiler.THREADS_PER_GROUP;
+                var input = memory.Allocate((nuint)(threadCount * 2 * sizeof(float)), GpuAccess.Shared);
+                var output = memory.Allocate((nuint)(threadCount * 4 * sizeof(float)), GpuAccess.Shared);
+                var lengths = memory.Allocate(16, GpuAccess.Shared);
+
+                var coordinates = new float[threadCount * 2];
+
+                for (var index = 0; index < threadCount; index++)
+                {
+                    coordinates[index * 2] = 0.25f;
+                    coordinates[index * 2 + 1] = 0.25f;
+                }
+
+                memory.Upload(input, MemoryMarshal.AsBytes(coordinates.AsSpan()));
+                memory.Upload(lengths, MemoryMarshal.AsBytes(new uint[] { (uint)threadCount, (uint)threadCount, 0, 0 }.AsSpan()));
+
+                Assert.That(kernel!.TryDispatchVulkan(input, output, lengths, null, texture, sampler, 1), Is.True, "the hardware texture dispatch ran");
+
+                memory.MarkWrittenByGpu(output);
+                Assert.That(memory.Synchronize(), Is.True, "the texture output was synchronized");
+
+                var result = MemoryMarshal.Cast<byte, float>(output.CpuView());
+
+                Assert.That(result[0], Is.EqualTo(1f).Within(0.001f), "the red channel came from the sampled texel");
+                Assert.That(result[1], Is.EqualTo(0f).Within(0.001f), "the green channel came from the sampled texel");
+                Assert.That(result[2], Is.EqualTo(0f).Within(0.001f), "the blue channel came from the sampled texel");
+                Assert.That(result[3], Is.EqualTo(1f).Within(0.001f), "the alpha channel came from the sampled texel");
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
     /// <summary>
     /// Runs a kernel on an engine-owned device, with one of the buffers wrapped from a resource the engine owns.
     /// </summary>

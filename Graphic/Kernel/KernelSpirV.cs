@@ -9,8 +9,8 @@ namespace Gubbins.Graphic.Kernels;
 /// <remarks>
 /// <para>
 /// The binary is written here, in C#, with no compiler in between: the module declares the buffers as storage buffers
-/// bound at the index every backend binds them at, and the body is the operations the kernel lowered to. It targets
-/// SPIR-V 1.5, which every Vulkan 1.2 device accepts.
+/// bound at the index every backend binds them at and the textures as combined image samplers, and the body is the
+/// operations the kernel lowered to. It targets SPIR-V 1.5, which every Vulkan 1.2 device accepts.
 /// </para>
 /// <para>
 /// The module keeps every local in a variable of the function and loads and stores it, which is the shape a source
@@ -30,11 +30,6 @@ public sealed class KernelSpirV
         if (program is null)
         {
             throw new ArgumentNullException(nameof(program));
-        }
-
-        if ((program.Textures?.Count ?? 0) > 0)
-        {
-            return System.Array.Empty<byte>();
         }
 
         return new SpirVWriter(program).Write();
@@ -57,6 +52,8 @@ internal sealed class SpirVWriter
     private const uint OP_TYPE_INT = 21;
     private const uint OP_TYPE_FLOAT = 22;
     private const uint OP_TYPE_VECTOR = 23;
+    private const uint OP_TYPE_IMAGE = 25;
+    private const uint OP_TYPE_SAMPLED_IMAGE = 27;
     private const uint OP_TYPE_ARRAY = 28;
     private const uint OP_TYPE_RUNTIME_ARRAY = 29;
     private const uint OP_TYPE_STRUCT = 30;
@@ -77,6 +74,7 @@ internal sealed class SpirVWriter
     private const uint OP_DECORATE = 71;
     private const uint OP_MEMBER_DECORATE = 72;
     private const uint OP_COMPOSITE_EXTRACT = 81;
+    private const uint OP_IMAGE_SAMPLE_EXPLICIT_LOD = 88;
     private const uint OP_CONVERT_F_TO_S = 109;
     private const uint OP_CONVERT_F_TO_U = 110;
     private const uint OP_CONVERT_S_TO_F = 111;
@@ -153,6 +151,7 @@ internal sealed class SpirVWriter
     private const uint EXECUTION_MODEL_GL_COMPUTE = 5;
     private const uint EXECUTION_MODE_LOCAL_SIZE = 17;
 
+    private const uint STORAGE_CLASS_UNIFORM_CONSTANT = 0;
     private const uint STORAGE_CLASS_INPUT = 1;
     private const uint STORAGE_CLASS_WORKGROUP = 4;
     private const uint STORAGE_CLASS_FUNCTION = 7;
@@ -166,6 +165,24 @@ internal sealed class SpirVWriter
     private const uint DECORATION_OFFSET = 35;
 
     private const uint BUILT_IN_GLOBAL_INVOCATION_ID = 28;
+    private const uint IMAGE_DIMENSION_2D = 1;
+    private const uint IMAGE_FORMAT_UNKNOWN = 0;
+    private const uint IMAGE_OPERANDS_LOD = 0x2;
+
+    /// <summary>
+    /// The descriptor binding the first texture of a kernel takes.
+    /// </summary>
+    private const uint SAMPLED_IMAGE_BINDING_BASE = 8;
+
+    /// <summary>
+    /// The descriptor binding a separately bound sampler would take, leaving the image bindings room before it.
+    /// </summary>
+    /// <remarks>
+    /// A Vulkan texture is bound as one combined image sampler, so the sampler travels inside the texture's binding and
+    /// this space is only reserved; a kernel that binds them apart would place its samplers from here.
+    /// </remarks>
+    private const uint SAMPLER_BINDING_BASE = 16;
+
     private const uint SCOPE_DEVICE = 1;
     private const uint SCOPE_WORKGROUP = 2;
     private const uint SCOPE_SUBGROUP = 3;
@@ -255,6 +272,11 @@ internal sealed class SpirVWriter
 
         Lengths();
         InvocationId();
+
+        foreach (var texture in m_Program.Textures ?? System.Array.Empty<KernelTexture>())
+        {
+            Texture(texture);
+        }
 
         m_EntryId = Id();
         m_Functions[m_Program.EntryPoint] = m_EntryId;
@@ -959,6 +981,9 @@ internal sealed class SpirVWriter
             case KernelConditional conditional:
                 return Conditional(conditional);
 
+            case KernelTextureSample sample:
+                return TextureSample(sample);
+
             default:
                 return Result(OP_LOAD, LoadedType(expression), (uint)Address(expression));
         }
@@ -1295,6 +1320,93 @@ internal sealed class SpirVWriter
     }
 
     /// <summary>
+    /// Declares one texture of the kernel as the combined image sampler the descriptor set binds.
+    /// </summary>
+    /// <param name="texture">The texture.</param>
+    /// <remarks>
+    /// The sampler a kernel names is not a variable of the module: a combined image sampler is one descriptor that already
+    /// holds the sampler, and the binding step pairs the <c>VkSampler</c> with the image through
+    /// <c>VulkanTexture.GetDescriptorInfo</c>. The binding lives after the four storage buffer bindings so that a kernel
+    /// that samples a texture and writes a buffer keeps one binding per descriptor. A dispatch binds one texture with one
+    /// sampler, so every sample of that texture reads through the sampler the dispatch was given.
+    /// </remarks>
+    private void Texture(KernelTexture texture)
+    {
+        var binding = SampledImageBinding(texture);
+        var pointer = Type(OP_TYPE_POINTER, "sampledImage" + binding, (uint)STORAGE_CLASS_UNIFORM_CONSTANT, (uint)SampledImage());
+        var variable = Id();
+
+        m_Declarations.Add(Instruction(OP_VARIABLE, (uint)pointer, (uint)variable, STORAGE_CLASS_UNIFORM_CONSTANT));
+        m_Annotations.Add(Instruction(OP_DECORATE, (uint)variable, DECORATION_DESCRIPTOR_SET, 0u));
+        m_Annotations.Add(Instruction(OP_DECORATE, (uint)variable, DECORATION_BINDING, (uint)binding));
+
+        m_Globals[texture.Name] = variable;
+    }
+
+    /// <summary>
+    /// Reads the descriptor binding a texture takes.
+    /// </summary>
+    /// <param name="texture">The texture.</param>
+    /// <returns>The binding.</returns>
+    /// <exception cref="KernelTranslationException">Thrown when the kernel declares more textures than the set has room for.</exception>
+    private static uint SampledImageBinding(KernelTexture texture)
+    {
+        if (texture.Binding < 0 || (uint)texture.Binding >= SAMPLER_BINDING_BASE - SAMPLED_IMAGE_BINDING_BASE)
+        {
+            throw new KernelTranslationException(
+                $"The kernel declares more than {SAMPLER_BINDING_BASE - SAMPLED_IMAGE_BINDING_BASE} textures, which Vulkan has no binding for.");
+        }
+
+        return SAMPLED_IMAGE_BINDING_BASE + (uint)texture.Binding;
+    }
+
+    /// <summary>
+    /// Reads the type of a combined image sampler of a two dimensional, sampled, floating point image.
+    /// </summary>
+    /// <returns>The id of the type.</returns>
+    private int SampledImage()
+    {
+        // OpTypeImage: the sampled type, the dimension, then depth, arrayed, multisampled, sampled and the image format.
+        // A sampled image has format Unknown and the sampled flag set, which is the shape a texture binding hands a shader.
+        var image = Type(OP_TYPE_IMAGE, "image", (uint)m_Float, IMAGE_DIMENSION_2D, 0u, 0u, 0u, 1u, IMAGE_FORMAT_UNKNOWN);
+
+        return Type(OP_TYPE_SAMPLED_IMAGE, "sampledImage", (uint)image);
+    }
+
+    /// <summary>
+    /// Writes a sampled read of a texture.
+    /// </summary>
+    /// <param name="sample">The read.</param>
+    /// <returns>The id of the value it computes.</returns>
+    /// <remarks>
+    /// The level is explicit and zero: the other backends read level zero of the one mip a <c>GpuTexture2D</c> has, and an
+    /// explicit level does not depend on the derivatives a compute dispatch does not have.
+    /// </remarks>
+    private int TextureSample(KernelTextureSample sample)
+    {
+        if (!m_Globals.TryGetValue(sample.Texture.Name, out var variable))
+        {
+            throw new KernelTranslationException($"'{sample.Texture.Name}' is sampled and the kernel declares no such texture.");
+        }
+
+        if (sample.ResultType is not VectorType { Components: 4, Scalar: KernelScalar.Float })
+        {
+            throw new KernelTranslationException($"'{sample.Texture.Name}' samples to a value of four components.");
+        }
+
+        var image = Result(OP_LOAD, SampledImage(), (uint)variable);
+        var coordinates = Value(sample.Coordinates);
+
+        return Result(
+            OP_IMAGE_SAMPLE_EXPLICIT_LOD,
+            TypeOf(sample.ResultType),
+            (uint)image,
+            (uint)coordinates,
+            IMAGE_OPERANDS_LOD,
+            (uint)ConstantFloat(0f));
+    }
+
+    /// <summary>
     /// Declares one array the group shares.
     /// </summary>
     /// <param name="array">The array.</param>
@@ -1364,6 +1476,14 @@ internal sealed class SpirVWriter
     /// <param name="value">The value.</param>
     /// <returns>The id of the constant.</returns>
     private int ConstantInt(int value) => Constant("int:" + value, m_Int, (uint)value);
+
+    /// <summary>
+    /// Reads a floating point number as a constant of the module.
+    /// </summary>
+    /// <param name="value">The value.</param>
+    /// <returns>The id of the constant.</returns>
+    private int ConstantFloat(float value)
+        => Constant("float:" + value.ToString("R", CultureInfo.InvariantCulture), m_Float, BitConverter.ToUInt32(BitConverter.GetBytes(value), 0));
 
     /// <summary>
     /// Reads a test as a constant of the module.
