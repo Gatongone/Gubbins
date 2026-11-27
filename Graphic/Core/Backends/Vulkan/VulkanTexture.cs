@@ -5,9 +5,14 @@ namespace Gubbins.Graphic;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The texture owns a <c>VkImage</c>, the memory bound to it and a <c>VkImageView</c>, plus a command pool, one command
-/// buffer and a fence so an upload or a readback can be recorded and waited for on the queue the bridge borrows from the
-/// engine. Staging is a buffer created for the one transfer and released when it has completed.
+/// A texture the layer creates owns a <c>VkImage</c>, the memory bound to it and a <c>VkImageView</c>, plus a command pool,
+/// one command buffer and a fence so an upload or a readback can be recorded and waited for on the queue the bridge
+/// borrows from the engine. Staging is a buffer created for the one transfer and released when it has completed.
+/// </para>
+/// <para>
+/// A texture the engine created is wrapped: the view and the transfer commands are this layer's, but the image and its
+/// memory stay with the engine, so disposing the wrapper never destroys them. The caller passes the layout the engine left
+/// the image in, because every barrier this layer records transitions from the layout it was told about.
 /// </para>
 /// <para>
 /// Between transfers the image stays in <c>VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL</c>, which is the layout a sampled
@@ -24,6 +29,7 @@ internal sealed unsafe class VulkanTexture : IGpuTexture
     private readonly int m_Height;
     private readonly int m_BytesPerPixel;
     private readonly uint m_NativeFormat;
+    private readonly bool m_OwnsImage;
     private nint m_Image;
     private nint m_Memory;
     private nint m_View;
@@ -33,6 +39,9 @@ internal sealed unsafe class VulkanTexture : IGpuTexture
     private int m_Layout = VulkanApi.IMAGE_LAYOUT_UNDEFINED;
     private bool m_Disposed;
 
+    /// <summary>
+    /// Creates a texture, its memory and its view.
+    /// </summary>
     /// <param name="provider">The bridge that owns the device and chooses the memory types.</param>
     /// <param name="width">The width, in pixels.</param>
     /// <param name="height">The height, in pixels.</param>
@@ -45,20 +54,50 @@ internal sealed unsafe class VulkanTexture : IGpuTexture
         m_Queue = provider.Queue;
         m_Width = width;
         m_Height = height;
-
-        (m_NativeFormat, m_BytesPerPixel) = format switch
-        {
-            GpuTextureFormat.Rgba8Unorm => (37u, 4),  // VK_FORMAT_R8G8B8A8_UNORM
-            GpuTextureFormat.Bgra8Unorm => (44u, 4),  // VK_FORMAT_B8G8R8A8_UNORM
-            GpuTextureFormat.R32Uint => (98u, 4),     // VK_FORMAT_R32_UINT
-            GpuTextureFormat.R32Float => (100u, 4),   // VK_FORMAT_R32_SFLOAT
-            _ => throw new ArgumentOutOfRangeException(nameof(format), format, "Vulkan has no format for it.")
-        };
+        m_OwnsImage = true;
+        (m_NativeFormat, m_BytesPerPixel) = DescribeFormat(format);
 
         try
         {
             EnsureFormatIsSupported(provider.PhysicalDevice, m_NativeFormat);
-            CreateImageAndView(provider, width, height);
+            CreateImage(provider, width, height);
+            CreateView(width, height);
+            CreateTransferCommands(provider.QueueFamily);
+        }
+        catch
+        {
+            ReleaseNative();
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Wraps a <c>VkImage</c> the engine owns, creating only the view and the transfer commands.
+    /// </summary>
+    /// <param name="provider">The bridge that owns the device and submits the transfers.</param>
+    /// <param name="image">The <c>VkImage</c>. The caller keeps ownership of it and of its memory.</param>
+    /// <param name="width">The width, in pixels.</param>
+    /// <param name="height">The height, in pixels.</param>
+    /// <param name="format">The pixel format of the image.</param>
+    /// <param name="layout">The <c>VkImageLayout</c> the engine left the image in.</param>
+    /// <param name="ownsImage">Whether disposing the wrapper also destroys the image; the engine path passes <see langword="false"/>.</param>
+    /// <exception cref="VulkanException">Thrown when the view or the transfer commands cannot be created.</exception>
+    internal VulkanTexture(VulkanUnifiedProvider provider, nint image, int width, int height, GpuTextureFormat format, int layout, bool ownsImage = false)
+    {
+        m_Provider = provider;
+        m_Device = provider.Device;
+        m_Queue = provider.Queue;
+        m_Width = width;
+        m_Height = height;
+        m_Image = image;
+        m_Layout = layout;
+        m_OwnsImage = ownsImage;
+        (m_NativeFormat, m_BytesPerPixel) = DescribeFormat(format);
+
+        try
+        {
+            EnsureFormatIsSupported(provider.PhysicalDevice, m_NativeFormat);
+            CreateView(width, height);
             CreateTransferCommands(provider.QueueFamily);
         }
         catch
@@ -176,7 +215,7 @@ internal sealed unsafe class VulkanTexture : IGpuTexture
     }
 
     /// <summary>
-    /// Releases the image, its view, its memory and the transfer commands.
+    /// Releases the view and the transfer commands, plus the image and its memory when this wrapper created them.
     /// </summary>
     public void Dispose()
     {
@@ -217,12 +256,44 @@ internal sealed unsafe class VulkanTexture : IGpuTexture
     }
 
     /// <summary>
-    /// Creates the image, chooses and binds its memory and creates the view over its one mip and layer.
+    /// Maps a pixel format to the <c>VkFormat</c> and the bytes per pixel a transfer uses.
+    /// </summary>
+    /// <param name="format">The pixel format.</param>
+    /// <param name="nativeFormat">When the method returns, the <c>VkFormat</c>.</param>
+    /// <param name="bytesPerPixel">When the method returns, the bytes in one pixel.</param>
+    /// <returns><see langword="true"/> when the backend has a format for it; otherwise, <see langword="false"/>.</returns>
+    internal static bool TryDescribeFormat(GpuTextureFormat format, out uint nativeFormat, out int bytesPerPixel)
+    {
+        (nativeFormat, bytesPerPixel) = format switch
+        {
+            GpuTextureFormat.Rgba8Unorm => (37u, 4),  // VK_FORMAT_R8G8B8A8_UNORM
+            GpuTextureFormat.Bgra8Unorm => (44u, 4),  // VK_FORMAT_B8G8R8A8_UNORM
+            GpuTextureFormat.R32Uint => (98u, 4),     // VK_FORMAT_R32_UINT
+            GpuTextureFormat.R32Float => (100u, 4),   // VK_FORMAT_R32_SFLOAT
+            _ => (0u, 0)
+        };
+
+        return nativeFormat != 0;
+    }
+
+    /// <summary>
+    /// Maps a pixel format to the <c>VkFormat</c> and the bytes per pixel a transfer uses.
+    /// </summary>
+    /// <param name="format">The pixel format.</param>
+    /// <returns>The <c>VkFormat</c> and the bytes in one pixel.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the backend has no format for it.</exception>
+    private static (uint NativeFormat, int BytesPerPixel) DescribeFormat(GpuTextureFormat format)
+        => TryDescribeFormat(format, out var nativeFormat, out var bytesPerPixel)
+            ? (nativeFormat, bytesPerPixel)
+            : throw new ArgumentOutOfRangeException(nameof(format), format, "Vulkan has no format for it.");
+
+    /// <summary>
+    /// Creates the image and chooses and binds its memory.
     /// </summary>
     /// <param name="provider">The bridge that owns the device.</param>
     /// <param name="width">The width, in pixels.</param>
     /// <param name="height">The height, in pixels.</param>
-    private void CreateImageAndView(VulkanUnifiedProvider provider, int width, int height)
+    private void CreateImage(VulkanUnifiedProvider provider, int width, int height)
     {
         var createInfo = new VkImageCreateInfo
         {
@@ -284,11 +355,19 @@ internal sealed unsafe class VulkanTexture : IGpuTexture
         }
 
         m_Memory = memory;
+    }
 
+    /// <summary>
+    /// Creates the view over the image's one mip and layer.
+    /// </summary>
+    /// <param name="width">The width, in pixels.</param>
+    /// <param name="height">The height, in pixels.</param>
+    private void CreateView(int width, int height)
+    {
         var viewInfo = new VkImageViewCreateInfo
         {
             StructureType = VulkanApi.IMAGE_VIEW_CREATE_INFO_TYPE,
-            Image = image,
+            Image = m_Image,
             ViewType = VulkanApi.IMAGE_VIEW_TYPE_2D,
             Format = m_NativeFormat,
             Components = new VkComponentMapping
@@ -786,7 +865,12 @@ internal sealed unsafe class VulkanTexture : IGpuTexture
 
         if (m_Image != 0)
         {
-            VulkanApi.DestroyImage(m_Device, m_Image, 0);
+            // The engine keeps the image it lent this wrapper, so only an image this layer created is destroyed.
+            if (m_OwnsImage)
+            {
+                VulkanApi.DestroyImage(m_Device, m_Image, 0);
+            }
+
             m_Image = 0;
         }
 

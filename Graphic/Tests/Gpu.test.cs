@@ -369,6 +369,87 @@ public sealed class GpuTests
     }
 
     [Test]
+    public void VulkanTexture_ImportsAnEngineTexture()
+    {
+        if (!TryCreateVulkan(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no Vulkan device.");
+            return;
+        }
+
+        const int Width = 4;
+        const int Height = 4;
+        const int BytesPerRow = Width * 4;
+
+        using (owner)
+        using (var texture = owner.Provider.CreateTexture(Width, Height, GpuTextureFormat.Rgba8Unorm))
+        {
+            var pixels = new byte[BytesPerRow * Height];
+
+            for (var index = 0; index < pixels.Length; index++)
+            {
+                pixels[index] = (byte)(index * 7);
+            }
+
+            texture.Upload(pixels, BytesPerRow);
+
+            var original = new byte[pixels.Length];
+            texture.Readback(original, BytesPerRow);
+            Assert.That(original, Is.EqualTo(pixels), "the engine texture reads back what was uploaded");
+
+            // Each view tracks the layout it last put the shared image in, so the imported view starts from the layout the
+            // readback above left the engine image in. That keeps the two views in agreement about the image.
+            var backend = (VulkanTexture)texture.Backend;
+            var image = backend.Image;
+            var layout = backend.Layout;
+
+            Assert.That(owner.Provider.TryImportTexture(image, Width, Height, GpuTextureFormat.Rgba8Unorm, layout, out var imported), Is.True, "the engine image was wrapped");
+            Assert.That(imported, Is.Not.Null, "the imported view exists");
+
+            var importedBackend = (VulkanTexture)imported!.Backend;
+            Assert.That(importedBackend.Image, Is.EqualTo(image), "the imported view wraps the engine image");
+            Assert.That(importedBackend.ImageView, Is.Not.Zero, "the imported view has its own VkImageView");
+            Assert.That(importedBackend.ImageView, Is.Not.EqualTo(backend.ImageView), "the imported view does not share the engine view");
+            Assert.That(importedBackend.NativeFormat, Is.EqualTo(backend.NativeFormat), "the imported view uses the image format");
+            Assert.That(importedBackend.Layout, Is.EqualTo(layout), "the imported view starts in the layout the caller reported");
+
+            using var sampler = owner.Provider.CreateSampler(new GpuSampler(GpuTextureFilter.Linear, GpuAddressMode.Repeat));
+            var descriptor = importedBackend.GetDescriptorInfo((VulkanSamplerState)sampler.Backend);
+
+            Assert.That(descriptor.ImageView, Is.EqualTo(importedBackend.ImageView), "the descriptor names the imported view");
+            Assert.That(descriptor.ImageLayout, Is.EqualTo(layout), "the descriptor names the imported layout");
+
+            var throughImported = new byte[pixels.Length];
+            imported.Readback(throughImported, BytesPerRow);
+            Assert.That(throughImported, Is.EqualTo(pixels), "the imported view reads the same pixels");
+
+            imported.Dispose();
+
+            // If disposing the view destroyed the engine image, the transition and the copy below would fail instead of
+            // returning the replacement pixels.
+            var replacement = new byte[pixels.Length];
+
+            for (var index = 0; index < replacement.Length; index++)
+            {
+                replacement[index] = (byte)(255 - (index * 3));
+            }
+
+            texture.Upload(replacement, BytesPerRow);
+
+            var again = new byte[pixels.Length];
+            texture.Readback(again, BytesPerRow);
+
+            Assert.That(again, Is.EqualTo(replacement), "the engine image survives the imported view being disposed");
+            Assert.That(((VulkanTexture)texture.Backend).Image, Is.EqualTo(image), "the engine texture still owns its image");
+
+            Assert.That(owner.Provider.TryImportTexture(0, Width, Height, GpuTextureFormat.Rgba8Unorm, layout, out _), Is.False, "a missing image is refused");
+            Assert.That(owner.Provider.TryImportTexture(image, 0, Height, GpuTextureFormat.Rgba8Unorm, layout, out _), Is.False, "an empty width is refused");
+            Assert.That(owner.Provider.TryImportTexture(image, Width, Height, (GpuTextureFormat)uint.MaxValue, layout, out _), Is.False, "an unknown format is refused");
+            Assert.That(owner.Provider.TryImportTexture(image, Width, Height, GpuTextureFormat.Rgba8Unorm, -1, out _), Is.False, "an invalid layout is refused");
+        }
+    }
+
+    [Test]
     public void VulkanTexture_UploadsRowsWithAPaddedPitch()
     {
         if (!TryCreateVulkan(out var owner) || owner is null)

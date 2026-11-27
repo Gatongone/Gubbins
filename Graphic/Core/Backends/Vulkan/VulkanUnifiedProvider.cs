@@ -423,6 +423,41 @@ public sealed unsafe class VulkanUnifiedProvider : IUnifiedProvider, IDisposable
     }
 
     /// <summary>
+    /// Wraps a <c>VkImage</c> the engine owns.
+    /// </summary>
+    /// <remarks>
+    /// The returned view creates its own <c>VkImageView</c> and transfer command pool, but never destroys the image or its
+    /// memory, which stay with the engine. It tracks the layout it last put the image in, so the caller passes the layout
+    /// the image is in now and has to keep every view of the same image in agreement about it.
+    /// </remarks>
+    /// <param name="image">The <c>VkImage</c>.</param>
+    /// <param name="width">The width, in pixels.</param>
+    /// <param name="height">The height, in pixels.</param>
+    /// <param name="format">The pixel format of the image.</param>
+    /// <param name="layout">The <c>VkImageLayout</c> the image is in.</param>
+    /// <param name="imported">When the method returns, the texture view.</param>
+    /// <returns><see langword="true"/> when the image was wrapped; otherwise, <see langword="false"/>.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown when the bridge has been disposed.</exception>
+    /// <exception cref="VulkanException">Thrown when the view or the transfer commands cannot be created.</exception>
+    public bool TryImportTexture(nint image, int width, int height, GpuTextureFormat format, int layout, out GpuTexture2D? imported)
+    {
+        if (m_Disposed)
+        {
+            throw new ObjectDisposedException(nameof(VulkanUnifiedProvider));
+        }
+
+        imported = null;
+
+        if (image == 0 || width <= 0 || height <= 0 || layout < 0 || !VulkanTexture.TryDescribeFormat(format, out _, out _))
+        {
+            return false;
+        }
+
+        imported = new GpuTexture2D(new VulkanTexture(this, image, width, height, format, layout), width, height, format);
+        return true;
+    }
+
+    /// <summary>
     /// Creates a sampler on the device.
     /// </summary>
     /// <param name="sampler">The sampler description.</param>
