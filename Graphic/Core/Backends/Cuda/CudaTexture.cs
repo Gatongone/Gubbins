@@ -298,6 +298,7 @@ internal sealed unsafe class CudaTexture : IGpuTexture
         // readback has to return exactly what was uploaded.
         (arrayFormat, channels, viewFormat, bytesPerPixel, readAsInteger) = format switch
         {
+            GpuTextureFormat.R8Unorm => (CudaApi.AD_FORMAT_UNSIGNED_INT8, 1u, CudaApi.RES_VIEW_FORMAT_UINT_1X8, 1, false),
             GpuTextureFormat.Rgba8Unorm => (CudaApi.AD_FORMAT_UNSIGNED_INT8, 4u, CudaApi.RES_VIEW_FORMAT_UINT_4X8, 4, false),
             GpuTextureFormat.Bgra8Unorm => (CudaApi.AD_FORMAT_UNSIGNED_INT8, 4u, CudaApi.RES_VIEW_FORMAT_UINT_4X8, 4, false),
             GpuTextureFormat.R32Uint => (CudaApi.AD_FORMAT_UNSIGNED_INT32, 1u, CudaApi.RES_VIEW_FORMAT_UINT_1X32, 4, true),

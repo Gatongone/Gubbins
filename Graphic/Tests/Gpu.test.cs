@@ -817,4 +817,101 @@ public sealed class GpuTests
             return false;
         }
     }
+
+    [Test]
+    public void MetalTexture_UploadsR8()
+    {
+        if (!OperatingSystem.IsMacOS() || !MetalDevice.TryCreate(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no Metal device.");
+            return;
+        }
+
+        using (owner)
+        using (var texture = owner.Provider.CreateTexture(4, 1, GpuTextureFormat.R8Unorm))
+        {
+            VerifyR8(texture);
+        }
+    }
+
+    [Test]
+    public void GlTexture_UploadsR8()
+    {
+        if (!GlDevice.TryCreate(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no OpenGL context.");
+            return;
+        }
+
+        using (var texture = owner.Provider.CreateTexture(4, 1, GpuTextureFormat.R8Unorm))
+        {
+            VerifyR8(texture);
+        }
+
+        owner.Dispose();
+    }
+
+    [Test]
+    public void D3D12Texture_UploadsR8()
+    {
+        if (!OperatingSystem.IsWindows() || !D3D12Device.TryCreate(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no D3D12 device.");
+            return;
+        }
+
+        using (owner)
+        using (var texture = owner.Provider.CreateTexture(4, 1, GpuTextureFormat.R8Unorm))
+        {
+            VerifyR8(texture);
+        }
+    }
+
+    [Test]
+    public void VulkanTexture_UploadsR8()
+    {
+        if (!TryCreateVulkan(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no Vulkan device.");
+            return;
+        }
+
+        using (owner)
+        using (var texture = owner.Provider.CreateTexture(4, 1, GpuTextureFormat.R8Unorm))
+        {
+            VerifyR8(texture);
+        }
+    }
+
+    [Test]
+    public void CudaTexture_UploadsR8()
+    {
+        if (!TryCreateCuda(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no CUDA device.");
+            return;
+        }
+
+        using (owner)
+        using (var texture = owner.Provider.CreateTexture(4, 1, GpuTextureFormat.R8Unorm))
+        {
+            VerifyR8(texture);
+        }
+    }
+
+    /// <summary>
+    /// Uploads and reads back a one-channel eight bit image.
+    /// </summary>
+    /// <param name="texture">The texture.</param>
+    private static void VerifyR8(GpuTexture2D texture)
+    {
+        var pixels = new byte[] { 1, 2, 3, 4 };
+        texture.Upload(pixels, 4);
+
+        var readback = new byte[pixels.Length];
+        texture.Readback(readback, 4);
+
+        Assert.That(readback, Is.EqualTo(pixels), "the R8 texture returns the bytes it was written with");
+        Assert.That(texture.Format, Is.EqualTo(GpuTextureFormat.R8Unorm), "the R8 texture keeps its format");
+    }
 }

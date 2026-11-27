@@ -10,6 +10,11 @@ namespace Gubbins.Graphic;
 public enum GpuTextureFormat : uint
 {
     /// <summary>
+    /// One unsigned 8 bit channel, unsigned normalized.
+    /// </summary>
+    R8Unorm = 10,
+
+    /// <summary>
     /// Four channels, 8 bits each, unsigned normalized.
     /// </summary>
     Rgba8Unorm = 70,

@@ -198,6 +198,7 @@ internal sealed unsafe class D3D12Texture : IGpuTexture
     {
         (dxgiFormat, bytesPerPixel) = format switch
         {
+            GpuTextureFormat.R8Unorm => (61u, 1),
             GpuTextureFormat.Rgba8Unorm => (28u, 4),
             GpuTextureFormat.Bgra8Unorm => (87u, 4),
             GpuTextureFormat.R32Uint => (42u, 4),

@@ -58,6 +58,11 @@ internal static unsafe partial class CudaApi
     internal const int AD_FORMAT_FLOAT = 0x20;
 
     /// <summary>
+    /// <c>CU_RES_VIEW_FORMAT_UINT_1X8</c>, the view of one unsigned 8 bit channel.
+    /// </summary>
+    internal const int RES_VIEW_FORMAT_UINT_1X8 = 0x01;
+
+    /// <summary>
     /// <c>CU_RES_VIEW_FORMAT_UINT_4X8</c>, the view of four unsigned 8 bit channels.
     /// </summary>
     internal const int RES_VIEW_FORMAT_UINT_4X8 = 0x03;
