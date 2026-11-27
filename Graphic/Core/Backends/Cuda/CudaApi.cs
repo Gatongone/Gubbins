@@ -7,7 +7,7 @@ namespace Gubbins.Graphic;
 /// The CUDA driver entry points the bridge calls. No toolkit is needed: the driver compiles the PTX a kernel is loaded
 /// from, so the runtime that ships with the display driver is enough.
 /// </summary>
-internal static unsafe class CudaApi
+internal static unsafe partial class CudaApi
 {
     private const string Library = "nvcuda.dll";
 

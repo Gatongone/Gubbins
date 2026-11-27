@@ -303,6 +303,183 @@ public sealed class GpuTests
         }
     }
 
+    [Test]
+    public void CudaTexture_UploadsAndReadsBack()
+    {
+        if (!TryCreateCuda(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no CUDA device.");
+            return;
+        }
+
+        using (owner)
+        using (var texture = owner.Provider.CreateTexture(4, 4, GpuTextureFormat.Rgba8Unorm))
+        {
+            var pixels = new byte[4 * 4 * 4];
+
+            for (var index = 0; index < pixels.Length; index++)
+            {
+                pixels[index] = (byte)(index * 7);
+            }
+
+            texture.Upload(pixels, 4 * 4);
+
+            var readback = new byte[pixels.Length];
+            texture.Readback(readback, 4 * 4);
+
+            Assert.That(readback, Is.EqualTo(pixels), "the CUDA array returns the bytes it was written with");
+            Assert.That(texture.Width, Is.EqualTo(4), "the texture keeps its width");
+            Assert.That(texture.Height, Is.EqualTo(4), "the texture keeps its height");
+            Assert.That(texture.Format, Is.EqualTo(GpuTextureFormat.Rgba8Unorm), "the texture keeps its format");
+
+            var backend = (CudaTexture)texture.Backend;
+
+            Assert.That(backend.Array, Is.Not.Zero, "the texture owns a CUarray");
+            Assert.That(backend.TextureObject, Is.Not.Zero, "the texture owns a CUtexObject");
+            Assert.That(backend.NativeFormat, Is.EqualTo(CudaApi.AD_FORMAT_UNSIGNED_INT8), "the array stores 8 bit channels");
+            Assert.That(backend.ViewFormat, Is.EqualTo(CudaApi.RES_VIEW_FORMAT_UINT_4X8), "the object reads four 8 bit channels");
+
+            var description = backend.Description;
+
+            Assert.That(description.Flags & CudaApi.TRSF_NORMALIZED_COORDINATES, Is.Not.Zero, "the sampler uses normalized coordinates");
+            Assert.That(description.Flags & CudaApi.TRSF_READ_AS_INTEGER, Is.Zero, "an 8 bit format is read as normalized floats");
+        }
+    }
+
+    [Test]
+    public void CudaTexture_UploadsRowsWithAPaddedPitch()
+    {
+        if (!TryCreateCuda(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no CUDA device.");
+            return;
+        }
+
+        const int Width = 3;
+        const int Height = 2;
+        const int BytesPerRow = 16;
+
+        using (owner)
+        using (var texture = owner.Provider.CreateTexture(Width, Height, GpuTextureFormat.Rgba8Unorm))
+        {
+            var pixels = new byte[BytesPerRow * Height];
+
+            for (var index = 0; index < pixels.Length; index++)
+            {
+                pixels[index] = (byte)(index * 3);
+            }
+
+            texture.Upload(pixels, BytesPerRow);
+
+            var readback = new byte[pixels.Length];
+            texture.Readback(readback, BytesPerRow);
+
+            for (var row = 0; row < Height; row++)
+            {
+                var expected = pixels.AsSpan(row * BytesPerRow, Width * 4).ToArray();
+                var actual = readback.AsSpan(row * BytesPerRow, Width * 4).ToArray();
+
+                Assert.That(actual, Is.EqualTo(expected), $"row {row} survives a row pitch wider than the image row");
+            }
+        }
+    }
+
+    [Test]
+    public unsafe void CudaTexture_KeepsTheBytesOfEveryFormat()
+    {
+        if (!TryCreateCuda(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no CUDA device.");
+            return;
+        }
+
+        const int Width = 3;
+        const int Height = 2;
+        const int BytesPerRow = Width * 4;
+
+        var cases = new (GpuTextureFormat Format, int ArrayFormat, int ViewFormat, bool ReadAsInteger)[]
+        {
+            (GpuTextureFormat.Rgba8Unorm, CudaApi.AD_FORMAT_UNSIGNED_INT8, CudaApi.RES_VIEW_FORMAT_UINT_4X8, false),
+            (GpuTextureFormat.Bgra8Unorm, CudaApi.AD_FORMAT_UNSIGNED_INT8, CudaApi.RES_VIEW_FORMAT_UINT_4X8, false),
+            (GpuTextureFormat.R32Uint, CudaApi.AD_FORMAT_UNSIGNED_INT32, CudaApi.RES_VIEW_FORMAT_UINT_1X32, true),
+            (GpuTextureFormat.R32Float, CudaApi.AD_FORMAT_FLOAT, CudaApi.RES_VIEW_FORMAT_FLOAT_1X32, false)
+        };
+
+        using (owner)
+        {
+            foreach (var (format, arrayFormat, viewFormat, readAsInteger) in cases)
+            {
+                using var texture = owner.Provider.CreateTexture(Width, Height, format);
+
+                var pixels = new byte[BytesPerRow * Height];
+
+                for (var index = 0; index < pixels.Length; index++)
+                {
+                    pixels[index] = (byte)(index * 13 + 5);
+                }
+
+                texture.Upload(pixels, BytesPerRow);
+
+                var readback = new byte[pixels.Length];
+                texture.Readback(readback, BytesPerRow);
+
+                Assert.That(readback, Is.EqualTo(pixels), $"the {format} array returns the bytes it was written with");
+
+                var backend = (CudaTexture)texture.Backend;
+                var description = backend.Description;
+
+                Assert.That(backend.Array, Is.Not.Zero, $"the {format} texture owns a CUarray");
+                Assert.That(backend.TextureObject, Is.Not.Zero, $"the {format} texture owns a CUtexObject");
+                Assert.That(backend.NativeFormat, Is.EqualTo(arrayFormat), $"the {format} array uses its CUarray_format");
+                Assert.That(backend.ViewFormat, Is.EqualTo(viewFormat), $"the {format} object uses its CUresourceViewFormat");
+                Assert.That(
+                    (description.Flags & CudaApi.TRSF_READ_AS_INTEGER) != 0,
+                    Is.EqualTo(readAsInteger),
+                    $"the {format} read mode is the one the format needs");
+            }
+        }
+    }
+
+    [Test]
+    public unsafe void CudaSampler_ConfiguresTheTextureObject()
+    {
+        if (!TryCreateCuda(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no CUDA device.");
+            return;
+        }
+
+        using (owner)
+        {
+            foreach (var filter in new[] { GpuTextureFilter.Nearest, GpuTextureFilter.Linear })
+            {
+                foreach (var address in new[] { GpuAddressMode.Clamp, GpuAddressMode.Repeat, GpuAddressMode.Mirror })
+                {
+                    using var texture = owner.Provider.CreateTexture(4, 4, GpuTextureFormat.Rgba8Unorm, new GpuSampler(filter, address));
+
+                    var nativeFilter = filter == GpuTextureFilter.Linear ? CudaApi.FILTER_MODE_LINEAR : CudaApi.FILTER_MODE_POINT;
+                    var nativeAddress = address switch
+                    {
+                        GpuAddressMode.Repeat => CudaApi.ADDRESS_MODE_WRAP,
+                        GpuAddressMode.Mirror => CudaApi.ADDRESS_MODE_MIRROR,
+                        _ => CudaApi.ADDRESS_MODE_CLAMP
+                    };
+
+                    var backend = (CudaTexture)texture.Backend;
+                    var description = backend.Description;
+
+                    Assert.That(backend.TextureObject, Is.Not.Zero, $"a {filter} {address} texture object was created");
+                    Assert.That(backend.Sampler.Filter, Is.EqualTo(filter), "the texture keeps the sampler's filter");
+                    Assert.That(backend.Sampler.Address, Is.EqualTo(address), "the texture keeps the sampler's address mode");
+                    Assert.That(description.FilterMode, Is.EqualTo(nativeFilter), $"the {filter} sampler uses its CUfilter_mode");
+                    Assert.That(description.AddressMode[0], Is.EqualTo(nativeAddress), $"the {address} sampler maps x");
+                    Assert.That(description.AddressMode[1], Is.EqualTo(nativeAddress), $"the {address} sampler maps y");
+                    Assert.That(description.AddressMode[2], Is.EqualTo(nativeAddress), $"the {address} sampler maps z");
+                }
+            }
+        }
+    }
+
     /// <summary>
     /// Creates the Vulkan device the texture tests run on, or reports that this machine has none.
     /// </summary>
@@ -325,6 +502,32 @@ public sealed class GpuTests
         catch (Exception)
         {
             // A machine without the loader reports it by refusing to load, which is the device not being there.
+            owner = null;
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Creates the CUDA device the texture tests run on, or reports that this machine has none.
+    /// </summary>
+    /// <param name="owner">When the method returns, the device, or <see langword="null"/>.</param>
+    /// <returns><see langword="true"/> if a device was created.</returns>
+    private static bool TryCreateCuda(out CudaDevice? owner)
+    {
+        owner = null;
+
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            return false;
+        }
+
+        try
+        {
+            // TryCreate reports a machine without the driver by refusing, since it already catches the load failure.
+            return CudaDevice.TryCreate(out owner) && owner is not null;
+        }
+        catch (Exception)
+        {
             owner = null;
             return false;
         }

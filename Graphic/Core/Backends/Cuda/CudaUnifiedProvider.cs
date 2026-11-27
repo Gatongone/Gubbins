@@ -41,6 +41,50 @@ internal sealed unsafe class CudaUnifiedProvider : IUnifiedProvider
     /// <inheritdoc/>
     public UnifiedProvider GetProvider() => ProviderAdapter<CudaUnifiedProvider>.Create(this, ref m_Self);
 
+    /// <summary>
+    /// Creates a two dimensional texture on the device.
+    /// </summary>
+    /// <param name="width">The width, in pixels.</param>
+    /// <param name="height">The height, in pixels.</param>
+    /// <param name="format">The pixel format.</param>
+    /// <returns>The texture, to be disposed when it is no longer sampled.</returns>
+    /// <remarks>
+    /// CUDA keeps the sampler inside the texture object, so this overload creates it with the default sampler;
+    /// <see cref="CreateTexture(int, int, GpuTextureFormat, GpuSampler)"/> creates it with the one the caller wants. The
+    /// device's context must be current on the calling thread, which it is for the thread that created the
+    /// <see cref="CudaDevice"/>.
+    /// </remarks>
+    /// <exception cref="ObjectDisposedException">Thrown when the bridge has been disposed.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the driver refuses the array or the texture object.</exception>
+    public GpuTexture2D CreateTexture(int width, int height, GpuTextureFormat format)
+        => CreateTexture(width, height, format, default);
+
+    /// <summary>
+    /// Creates a two dimensional texture whose texture object carries the sampler's filter and address modes.
+    /// </summary>
+    /// <param name="width">The width, in pixels.</param>
+    /// <param name="height">The height, in pixels.</param>
+    /// <param name="format">The pixel format.</param>
+    /// <param name="sampler">The filter and the address modes the texture object is created with.</param>
+    /// <returns>The texture, to be disposed when it is no longer sampled.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown when the bridge has been disposed.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the extent is empty or the format is not mapped.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the driver refuses the array or the texture object.</exception>
+    public GpuTexture2D CreateTexture(int width, int height, GpuTextureFormat format, GpuSampler sampler)
+    {
+        if (m_Disposed)
+        {
+            throw new ObjectDisposedException(nameof(CudaUnifiedProvider));
+        }
+
+        if (width <= 0 || height <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(width), width, "A texture is at least one pixel wide and high.");
+        }
+
+        return new GpuTexture2D(new CudaTexture(width, height, format, sampler), width, height, format);
+    }
+
     /// <inheritdoc/>
     public void* Alloc(nuint size, nuint alignment, UnifiedMemoryUsage usage, out void* deviceHandle, out ulong deviceAddress, out UnifiedMemoryKind kind)
     {
