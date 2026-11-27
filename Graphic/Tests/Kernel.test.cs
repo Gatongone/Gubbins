@@ -2596,6 +2596,86 @@ public static class PtxTextured
     }
 
     [Test]
+    public void VulkanTexture_KernelSamplesTwoTextures()
+    {
+        const string Source = @"
+using System;
+using Gubbins.Graphic;
+
+public static class VulkanTwoTextured
+{
+    public static void Kernel(int index, ReadOnlySpan<float2> source, Span<float4> destination, GpuTexture2D left, GpuSamplerState leftSampler, GpuTexture2D right, GpuSamplerState rightSampler)
+    {
+        destination[index] = left.Sample(leftSampler, source[index]) + right.Sample(rightSampler, source[index]);
+    }
+}
+";
+
+        if (!OperatingSystem.IsWindows() || !VulkanDevice.TryCreate(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no Vulkan device.");
+            return;
+        }
+
+        var directory = Directory.CreateTempSubdirectory("gubbins-vktwo-").FullName;
+
+        try
+        {
+            KernelCompiler.Compile(Source, directory, "VulkanTwoTextured");
+
+            using (owner)
+            using (var device = GpuDevice.FromVulkan(owner.Provider))
+            using (var memory = device.CreateMemory())
+            using (var left = owner.Provider.CreateTexture(1, 1, GpuTextureFormat.Rgba8Unorm))
+            using (var right = owner.Provider.CreateTexture(1, 1, GpuTextureFormat.Rgba8Unorm))
+            using (var leftSampler = owner.Provider.CreateSampler(new GpuSampler(GpuTextureFilter.Nearest, GpuAddressMode.Clamp)))
+            using (var rightSampler = owner.Provider.CreateSampler(new GpuSampler(GpuTextureFilter.Nearest, GpuAddressMode.Clamp)))
+            using (var kernel = GpuKernel.LoadFromDirectory(device, directory, "VulkanTwoTextured"))
+            {
+                Assert.That(kernel, Is.Not.Null, "the two texture kernel loads on Vulkan");
+
+                left.Upload(new byte[] { 255, 0, 0, 255 }, 4);
+                right.Upload(new byte[] { 0, 255, 0, 255 }, 4);
+
+                var input = memory.Allocate(64 * 8, GpuAccess.Shared);
+                var output = memory.Allocate(64 * 16, GpuAccess.Shared);
+                var lengths = memory.Allocate(16, GpuAccess.Shared);
+                var coordinates = new float[64 * 2];
+
+                for (var index = 0; index < coordinates.Length; index += 2)
+                {
+                    coordinates[index] = 0.5f;
+                    coordinates[index + 1] = 0.5f;
+                }
+
+                memory.Upload(input, MemoryMarshal.AsBytes(coordinates.AsSpan()));
+                memory.Upload(lengths, MemoryMarshal.AsBytes(new uint[] { 64, 64, 0, 0 }.AsSpan()));
+
+                var bindings = new[]
+                {
+                    new GpuTextureBinding(left, leftSampler),
+                    new GpuTextureBinding(right, rightSampler)
+                };
+
+                Assert.That(kernel!.TryDispatchVulkanTextures(input, output, lengths, null, bindings, 1), Is.True, "the two texture dispatch ran");
+
+                memory.MarkWrittenByGpu(output);
+                Assert.That(memory.Synchronize(), Is.True, "the two texture output was synchronized");
+
+                var result = MemoryMarshal.Cast<byte, float>(output.CpuView());
+
+                Assert.That(result[0], Is.EqualTo(1f).Within(0.001f), "the red texture contributed its red channel");
+                Assert.That(result[1], Is.EqualTo(1f).Within(0.001f), "the green texture contributed its green channel");
+                Assert.That(result[3], Is.EqualTo(2f).Within(0.001f), "both alphas added");
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Test]
     public void VulkanTexture_KernelSamplesHardwareTexture()
     {
         const string Source = @"

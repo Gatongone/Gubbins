@@ -360,7 +360,7 @@ public sealed class GpuKernel : IDisposable
                 parametersSize = (ulong)parameters.Storage.Length;
             }
 
-            return m_Vulkan.Dispatch(sourceBuffer, sourceOffset, (ulong)source.Length, destinationBuffer, destinationOffset, (ulong)destination.Length, parametersBuffer, parametersOffset, parametersSize, lengthsBuffer, lengthsOffset, default, groups, wait);
+            return m_Vulkan.Dispatch(sourceBuffer, sourceOffset, (ulong)source.Length, destinationBuffer, destinationOffset, (ulong)destination.Length, parametersBuffer, parametersOffset, parametersSize, lengthsBuffer, lengthsOffset, ReadOnlySpan<VkDescriptorImageInfo>.Empty, groups, wait);
         }
 
         if (m_D3D12 is null || m_Device.Backend is not D3D12Device d3d12)
@@ -803,7 +803,7 @@ public sealed class GpuKernel : IDisposable
     /// The texture has to be in the layout a sampled binding reads, which is the layout an upload or a readback leaves it
     /// in; one that has never been uploaded is refused instead of being bound in the undefined layout.
     /// </remarks>
-    public bool TryDispatchVulkan(GpuBlock source, GpuBlock destination, GpuBlock? lengths, GpuBlock? parameters, GpuTexture2D texture, GpuSamplerState sampler, uint groups, bool wait = true)
+    public unsafe bool TryDispatchVulkan(GpuBlock source, GpuBlock destination, GpuBlock? lengths, GpuBlock? parameters, GpuTexture2D texture, GpuSamplerState sampler, uint groups, bool wait = true)
     {
         if (m_Disposed)
         {
@@ -872,6 +872,9 @@ public sealed class GpuKernel : IDisposable
 
         var image = vulkanTexture.GetDescriptorInfo(vulkanSampler);
 
+        var images = stackalloc VkDescriptorImageInfo[1];
+        images[0] = image;
+
         return m_Vulkan.Dispatch(
             sourceBuffer,
             sourceOffset,
@@ -884,7 +887,86 @@ public sealed class GpuKernel : IDisposable
             parametersSize,
             lengthsBuffer,
             lengthsOffset,
-            image,
+            new ReadOnlySpan<VkDescriptorImageInfo>(images, 1),
+            groups,
+            wait);
+    }
+
+    /// <summary>
+    /// Runs a kernel that samples several textures on Vulkan.
+    /// </summary>
+    /// <param name="source">The block the kernel reads.</param>
+    /// <param name="destination">The block the kernel writes.</param>
+    /// <param name="lengths">The block that carries the element counts, or <see langword="null"/>.</param>
+    /// <param name="parameters">The block that carries the structure the kernel takes, or <see langword="null"/>.</param>
+    /// <param name="bindings">The textures and samplers, in the order the kernel declares them.</param>
+    /// <param name="groups">The number of groups on the x axis.</param>
+    /// <param name="wait">Whether to wait for the dispatch.</param>
+    /// <returns><see langword="true"/> if the dispatch ran.</returns>
+    public unsafe bool TryDispatchVulkanTextures(GpuBlock source, GpuBlock destination, GpuBlock? lengths, GpuBlock? parameters, ReadOnlySpan<GpuTextureBinding> bindings, uint groups, bool wait = true)
+    {
+        if (m_Disposed)
+        {
+            throw new ObjectDisposedException(nameof(GpuKernel));
+        }
+
+        if (bindings.Length == 0 || m_Vulkan is null || m_Device.Backend is not VulkanDevice vulkan)
+        {
+            return false;
+        }
+
+        if (!vulkan.Provider.TryGetVulkanBuffer(source.Storage, out var sourceBuffer, out var sourceOffset) ||
+            !vulkan.Provider.TryGetVulkanBuffer(destination.Storage, out var destinationBuffer, out var destinationOffset))
+        {
+            return false;
+        }
+
+        var images = stackalloc VkDescriptorImageInfo[bindings.Length];
+
+        for (var index = 0; index < bindings.Length; index++)
+        {
+            if (bindings[index].Texture.Backend is not VulkanTexture texture ||
+                bindings[index].Sampler.Backend is not VulkanSamplerState sampler)
+            {
+                return false;
+            }
+
+            images[index] = texture.GetDescriptorInfo(sampler);
+        }
+
+        nint lengthsBuffer = 0;
+        var lengthsOffset = 0ul;
+
+        if (lengths is not null && vulkan.Provider.TryGetVulkanBuffer(lengths.Storage, out var availableLengths, out var availableLengthsOffset))
+        {
+            lengthsBuffer = availableLengths;
+            lengthsOffset = availableLengthsOffset;
+        }
+
+        nint parametersBuffer = 0;
+        var parametersOffset = 0ul;
+        var parametersSize = 0ul;
+
+        if (parameters is not null && vulkan.Provider.TryGetVulkanBuffer(parameters.Storage, out var availableParameters, out var availableParametersOffset))
+        {
+            parametersBuffer = availableParameters;
+            parametersOffset = availableParametersOffset;
+            parametersSize = (ulong)parameters.Storage.Length;
+        }
+
+        return m_Vulkan.Dispatch(
+            sourceBuffer,
+            sourceOffset,
+            (ulong)source.Length,
+            destinationBuffer,
+            destinationOffset,
+            (ulong)destination.Length,
+            parametersBuffer,
+            parametersOffset,
+            parametersSize,
+            lengthsBuffer,
+            lengthsOffset,
+            new ReadOnlySpan<VkDescriptorImageInfo>(images, bindings.Length),
             groups,
             wait);
     }

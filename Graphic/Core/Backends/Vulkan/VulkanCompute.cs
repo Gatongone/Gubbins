@@ -184,16 +184,14 @@ internal sealed unsafe class VulkanCompute : IDisposable
     /// </param>
     /// <param name="groups">The number of thread groups on the x axis.</param>
     /// <returns><see langword="true"/> if the dispatch ran to completion.</returns>
-    internal bool Dispatch(nint sourceBuffer, ulong sourceOffset, ulong sourceSize, nint destinationBuffer, ulong destinationOffset, ulong destinationSize, nint parametersBuffer, ulong parametersOffset, ulong parametersSize, nint lengthsBuffer, ulong lengthsOffset, VkDescriptorImageInfo texture, uint groups, bool wait)
+    internal bool Dispatch(nint sourceBuffer, ulong sourceOffset, ulong sourceSize, nint destinationBuffer, ulong destinationOffset, ulong destinationSize, nint parametersBuffer, ulong parametersOffset, ulong parametersSize, nint lengthsBuffer, ulong lengthsOffset, ReadOnlySpan<VkDescriptorImageInfo> textures, uint groups, bool wait)
     {
         if (m_Disposed || m_Pipeline == 0 || sourceBuffer == 0 || destinationBuffer == 0 || groups == 0)
         {
             return false;
         }
 
-        // The binding step pairs one texture with the sampler of the dispatch, so a module that declares more than one
-        // sampled image is refused rather than sampled through the wrong one.
-        if (m_ImageBindings.Length > 1)
+        if (m_ImageBindings.Length > textures.Length)
         {
             return false;
         }
@@ -203,7 +201,7 @@ internal sealed unsafe class VulkanCompute : IDisposable
             return false;
         }
 
-        if (!Bind(sourceBuffer, sourceOffset, sourceSize, destinationBuffer, destinationOffset, destinationSize, parametersBuffer, parametersOffset, parametersSize, lengthsBuffer, lengthsOffset, texture))
+        if (!Bind(sourceBuffer, sourceOffset, sourceSize, destinationBuffer, destinationOffset, destinationSize, parametersBuffer, parametersOffset, parametersSize, lengthsBuffer, lengthsOffset, textures))
         {
             return false;
         }
@@ -407,7 +405,7 @@ internal sealed unsafe class VulkanCompute : IDisposable
     /// Points the descriptor set at the blocks and the sampled image of a dispatch.
     /// </summary>
     /// <returns><see langword="true"/> if the set was written.</returns>
-    private bool Bind(nint sourceBuffer, ulong sourceOffset, ulong sourceSize, nint destinationBuffer, ulong destinationOffset, ulong destinationSize, nint parametersBuffer, ulong parametersOffset, ulong parametersSize, nint lengthsBuffer, ulong lengthsOffset, VkDescriptorImageInfo texture)
+    private bool Bind(nint sourceBuffer, ulong sourceOffset, ulong sourceSize, nint destinationBuffer, ulong destinationOffset, ulong destinationSize, nint parametersBuffer, ulong parametersOffset, ulong parametersSize, nint lengthsBuffer, ulong lengthsOffset, ReadOnlySpan<VkDescriptorImageInfo> textures)
     {
         if (!CreateLayouts())
         {
@@ -416,7 +414,7 @@ internal sealed unsafe class VulkanCompute : IDisposable
 
         var imageCount = m_ImageBindings.Length;
 
-        if (imageCount != 0 && texture.ImageView == 0)
+        if (imageCount > textures.Length)
         {
             return false;
         }
@@ -458,7 +456,7 @@ internal sealed unsafe class VulkanCompute : IDisposable
         // sampler, so no separate sampler binding is updated.
         for (var index = 0; index < imageCount; index++)
         {
-            images[index] = texture;
+            images[index] = textures[index];
             writes[4 + index] = new VkWriteDescriptorSet
             {
                 StructureType = VulkanApi.WRITE_DESCRIPTOR_SET_TYPE,
