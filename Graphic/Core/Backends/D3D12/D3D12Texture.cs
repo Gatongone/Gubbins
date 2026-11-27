@@ -35,6 +35,7 @@ internal sealed unsafe class D3D12Texture : IGpuTexture
     private readonly int m_Width;
     private readonly int m_Height;
     private readonly int m_BytesPerPixel;
+    private readonly bool m_OwnsResource;
     private ulong m_FenceValue;
     private int m_State;
     private bool m_Disposed;
@@ -45,45 +46,121 @@ internal sealed unsafe class D3D12Texture : IGpuTexture
     /// <param name="format">The pixel format.</param>
     /// <exception cref="D3D12Exception">Thrown when a resource or a queue cannot be created.</exception>
     internal D3D12Texture(nint device, int width, int height, GpuTextureFormat format)
+        : this(device, CreateResource(device, width, height, format), width, height, format, StateCopyDestination, true)
+    {
+    }
+
+    /// <summary>
+    /// Wraps a resource the engine owns.
+    /// </summary>
+    /// <param name="device">The <c>ID3D12Device</c>.</param>
+    /// <param name="resource">The <c>ID3D12Resource</c>.</param>
+    /// <param name="width">The width, in pixels.</param>
+    /// <param name="height">The height, in pixels.</param>
+    /// <param name="format">The pixel format.</param>
+    /// <param name="initialState">The state the resource is in.</param>
+    /// <param name="ownsResource">Whether disposing this view releases the resource.</param>
+    /// <exception cref="D3D12Exception">Thrown when a queue cannot be created.</exception>
+    internal D3D12Texture(nint device, nint resource, int width, int height, GpuTextureFormat format, int initialState, bool ownsResource = false)
     {
         m_Device = device;
         m_Width = width;
         m_Height = height;
+        (m_Format, m_BytesPerPixel) = DescribeFormat(format);
+        m_Resource = resource;
+        m_OwnsResource = ownsResource;
+        m_State = initialState;
 
-        (m_Format, m_BytesPerPixel) = format switch
-        {
-            GpuTextureFormat.Rgba8Unorm => (28u, 4),
-            GpuTextureFormat.Bgra8Unorm => (87u, 4),
-            GpuTextureFormat.R32Uint => (42u, 4),
-            GpuTextureFormat.R32Float => (41u, 4),
-            _ => throw new ArgumentOutOfRangeException(nameof(format), format, "D3D12 has no format for it.")
-        };
+        nint queue = 0;
+        nint allocator = 0;
+        nint list = 0;
+        nint fence = 0;
+        nint srvHeap = 0;
 
-        var queueDescription = new D3D12CommandQueueDesc { Type = D3D12Api.COMMAND_LIST_TYPE_COPY, NodeMask = 1 };
-        if (D3D12Api.CreateCommandQueue(device, &queueDescription, out m_Queue) < 0 || m_Queue == 0)
+        try
         {
-            throw new D3D12Exception("CreateCommandQueue failed for the texture copy queue.");
+            var queueDescription = new D3D12CommandQueueDesc { Type = D3D12Api.COMMAND_LIST_TYPE_COPY, NodeMask = 1 };
+            if (D3D12Api.CreateCommandQueue(device, &queueDescription, out queue) < 0 || queue == 0)
+            {
+                throw new D3D12Exception("CreateCommandQueue failed for the texture copy queue.");
+            }
+
+            if (D3D12Api.CreateCommandAllocator(device, D3D12Api.COMMAND_LIST_TYPE_COPY, out allocator) < 0 || allocator == 0)
+            {
+                throw new D3D12Exception("CreateCommandAllocator failed for the texture copy allocator.");
+            }
+
+            if (D3D12Api.CreateCommandList(device, allocator, D3D12Api.COMMAND_LIST_TYPE_COPY, out list) < 0 || list == 0)
+            {
+                throw new D3D12Exception("CreateCommandList failed for the texture copy list.");
+            }
+
+            if (D3D12Api.CloseCommandList(list) < 0)
+            {
+                throw new D3D12Exception("Closing the initial texture copy list failed.");
+            }
+
+            if (D3D12Api.CreateFence(device, out fence) < 0 || fence == 0)
+            {
+                throw new D3D12Exception("CreateFence failed for the texture copy fence.");
+            }
+
+            var heapDescription = new D3D12DescriptorHeapDesc { Type = 0, NumDescriptors = 1, Flags = 1, NodeMask = 0 };
+
+            if (D3D12Api.CreateDescriptorHeap(device, &heapDescription, out srvHeap) < 0 || srvHeap == 0)
+            {
+                throw new D3D12Exception("CreateDescriptorHeap failed for the texture shader resource view.");
+            }
+
+            var view = new D3D12ShaderResourceViewDesc
+            {
+                Format = m_Format,
+                ViewDimension = 4,
+                Shader4ComponentMapping = 0x1688,
+                MostDetailedMip = 0,
+                MipLevels = 1,
+                PlaneSlice = 0,
+                ResourceMinLodClamp = 0
+            };
+
+            D3D12Api.CreateShaderResourceView(device, resource, &view, D3D12Api.GetCpuDescriptorHandle(srvHeap));
+
+            m_Queue = queue;
+            m_Allocator = allocator;
+            m_List = list;
+            m_Fence = fence;
+            m_SrvHeap = srvHeap;
+            m_Srv = D3D12Api.GetGpuDescriptorHandle(srvHeap);
         }
-
-        if (D3D12Api.CreateCommandAllocator(device, D3D12Api.COMMAND_LIST_TYPE_COPY, out m_Allocator) < 0 || m_Allocator == 0)
+        catch
         {
-            throw new D3D12Exception("CreateCommandAllocator failed for the texture copy allocator.");
-        }
+            D3D12Api.Release(srvHeap);
+            D3D12Api.Release(fence);
+            D3D12Api.Release(list);
+            D3D12Api.Release(allocator);
+            D3D12Api.Release(queue);
 
-        if (D3D12Api.CreateCommandList(device, m_Allocator, D3D12Api.COMMAND_LIST_TYPE_COPY, out m_List) < 0 || m_List == 0)
-        {
-            throw new D3D12Exception("CreateCommandList failed for the texture copy list.");
-        }
+            if (ownsResource)
+            {
+                D3D12Api.Release(resource);
+            }
 
-        if (D3D12Api.CloseCommandList(m_List) < 0)
-        {
-            throw new D3D12Exception("Closing the initial texture copy list failed.");
+            throw;
         }
+    }
 
-        if (D3D12Api.CreateFence(device, out m_Fence) < 0 || m_Fence == 0)
-        {
-            throw new D3D12Exception("CreateFence failed for the texture copy fence.");
-        }
+    /// <summary>
+    /// Creates the committed texture the creating constructor owns.
+    /// </summary>
+    /// <param name="device">The <c>ID3D12Device</c>.</param>
+    /// <param name="width">The width, in pixels.</param>
+    /// <param name="height">The height, in pixels.</param>
+    /// <param name="format">The pixel format.</param>
+    /// <returns>The <c>ID3D12Resource</c>.</returns>
+    /// <exception cref="D3D12Exception">Thrown when the device cannot create the resource.</exception>
+    private static nint CreateResource(nint device, int width, int height, GpuTextureFormat format)
+    {
+        var (dxgiFormat, _) = DescribeFormat(format);
 
         var properties = new D3D12HeapProperties { Type = HeapTypeDefault, CreationNodeMask = 1, VisibleNodeMask = 1 };
         var description = new D3D12ResourceDesc
@@ -93,50 +170,54 @@ internal sealed unsafe class D3D12Texture : IGpuTexture
             Height = (uint)height,
             DepthOrArraySize = 1,
             MipLevels = 1,
-            Format = m_Format,
+            Format = dxgiFormat,
             SampleCount = 1,
             SampleQuality = 0,
             Layout = 0,
             Flags = 0
         };
 
-        var textureResult = D3D12Api.CreateCommittedResource(device, &properties, 0, &description, StateCopyDestination, out m_Resource);
+        var textureResult = D3D12Api.CreateCommittedResource(device, &properties, 0, &description, StateCopyDestination, out var resource);
 
-        if (textureResult < 0 || m_Resource == 0)
+        if (textureResult < 0 || resource == 0)
         {
             throw new D3D12Exception($"CreateCommittedResource failed for a {width}x{height} texture.", textureResult);
         }
 
-        m_State = StateCopyDestination;
-        m_SrvHeap = 0;
-        m_Srv = default;
+        return resource;
+    }
 
-        var heapDescription = new D3D12DescriptorHeapDesc { Type = 0, NumDescriptors = 1, Flags = 1, NodeMask = 0 };
-
-        if (D3D12Api.CreateDescriptorHeap(device, &heapDescription, out m_SrvHeap) < 0 || m_SrvHeap == 0)
+    /// <summary>
+    /// Maps a pixel format to the DXGI format and the bytes per pixel a transfer uses.
+    /// </summary>
+    /// <param name="format">The pixel format.</param>
+    /// <param name="dxgiFormat">When the method returns, the DXGI format.</param>
+    /// <param name="bytesPerPixel">When the method returns, the bytes in one pixel.</param>
+    /// <returns><see langword="true"/> when the backend has a format for it; otherwise, <see langword="false"/>.</returns>
+    internal static bool TryDescribeFormat(GpuTextureFormat format, out uint dxgiFormat, out int bytesPerPixel)
+    {
+        (dxgiFormat, bytesPerPixel) = format switch
         {
-            D3D12Api.Release(m_Resource);
-            D3D12Api.Release(m_Fence);
-            D3D12Api.Release(m_List);
-            D3D12Api.Release(m_Allocator);
-            D3D12Api.Release(m_Queue);
-            throw new D3D12Exception("CreateDescriptorHeap failed for the texture shader resource view.");
-        }
-
-        var view = new D3D12ShaderResourceViewDesc
-        {
-            Format = m_Format,
-            ViewDimension = 4,
-            Shader4ComponentMapping = 0x1688,
-            MostDetailedMip = 0,
-            MipLevels = 1,
-            PlaneSlice = 0,
-            ResourceMinLodClamp = 0
+            GpuTextureFormat.Rgba8Unorm => (28u, 4),
+            GpuTextureFormat.Bgra8Unorm => (87u, 4),
+            GpuTextureFormat.R32Uint => (42u, 4),
+            GpuTextureFormat.R32Float => (41u, 4),
+            _ => (0u, 0)
         };
 
-        D3D12Api.CreateShaderResourceView(device, m_Resource, &view, D3D12Api.GetCpuDescriptorHandle(m_SrvHeap));
-        m_Srv = D3D12Api.GetGpuDescriptorHandle(m_SrvHeap);
+        return dxgiFormat != 0;
     }
+
+    /// <summary>
+    /// Maps a pixel format to the DXGI format and the bytes per pixel a transfer uses.
+    /// </summary>
+    /// <param name="format">The pixel format.</param>
+    /// <returns>The DXGI format and the bytes in one pixel.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the backend has no format for it.</exception>
+    private static (uint Format, int BytesPerPixel) DescribeFormat(GpuTextureFormat format)
+        => TryDescribeFormat(format, out var dxgiFormat, out var bytesPerPixel)
+            ? (dxgiFormat, bytesPerPixel)
+            : throw new ArgumentOutOfRangeException(nameof(format), format, "D3D12 has no format for it.");
 
     /// <summary>
     /// Gets the <c>ID3D12Resource</c>.
@@ -295,7 +376,7 @@ internal sealed unsafe class D3D12Texture : IGpuTexture
     }
 
     /// <summary>
-    /// Releases the resource, the copy queue and the fence.
+    /// Releases the view: the descriptor heap, the copy queue and the fence, plus the resource when this view owns it.
     /// </summary>
     public void Dispose()
     {
@@ -306,7 +387,12 @@ internal sealed unsafe class D3D12Texture : IGpuTexture
 
         m_Disposed = true;
         D3D12Api.Release(m_SrvHeap);
-        D3D12Api.Release(m_Resource);
+
+        if (m_OwnsResource)
+        {
+            D3D12Api.Release(m_Resource);
+        }
+
         D3D12Api.Release(m_Fence);
         D3D12Api.Release(m_List);
         D3D12Api.Release(m_Allocator);

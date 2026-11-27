@@ -239,6 +239,39 @@ public sealed unsafe class D3D12UnifiedProvider : IUnifiedProvider, IDisposable
     }
 
     /// <summary>
+    /// Wraps a texture the engine owns.
+    /// </summary>
+    /// <remarks>
+    /// The returned view releases its own copy queue and shader resource view when it is disposed, never the resource, which
+    /// stays with the engine. It tracks the state it last put the resource in, so the caller passes the state the resource
+    /// is in now and has to keep every view of the same resource in agreement about it.
+    /// </remarks>
+    /// <param name="resource">The <c>ID3D12Resource</c>.</param>
+    /// <param name="width">The width, in pixels.</param>
+    /// <param name="height">The height, in pixels.</param>
+    /// <param name="format">The pixel format.</param>
+    /// <param name="state">The state the resource is in.</param>
+    /// <param name="imported">When the method returns, the texture view.</param>
+    /// <returns><see langword="true"/> when the texture was wrapped; otherwise, <see langword="false"/>.</returns>
+    public bool TryImportTexture(nint resource, int width, int height, GpuTextureFormat format, int state, out GpuTexture2D? imported)
+    {
+        if (m_Disposed)
+        {
+            throw new ObjectDisposedException(nameof(D3D12UnifiedProvider));
+        }
+
+        imported = null;
+
+        if (resource == 0 || width <= 0 || height <= 0 || state < 0 || !D3D12Texture.TryDescribeFormat(format, out _, out _))
+        {
+            return false;
+        }
+
+        imported = new GpuTexture2D(new D3D12Texture(m_Device, resource, width, height, format, state), width, height, format);
+        return true;
+    }
+
+    /// <summary>
     /// Creates a sampler state on the device.
     /// </summary>
     /// <param name="sampler">The sampler description.</param>

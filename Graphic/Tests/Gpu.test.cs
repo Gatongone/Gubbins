@@ -209,6 +209,72 @@ public sealed class GpuTests
     }
 
     [Test]
+    public void D3D12Texture_ImportsAnEngineTexture()
+    {
+        if (!OperatingSystem.IsWindows() || !D3D12Device.TryCreate(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no D3D12 device.");
+            return;
+        }
+
+        using (owner)
+        using (var texture = owner.Provider.CreateTexture(4, 4, GpuTextureFormat.Rgba8Unorm))
+        {
+            var pixels = new byte[4 * 4 * 4];
+
+            for (var index = 0; index < pixels.Length; index++)
+            {
+                pixels[index] = (byte)(index * 7);
+            }
+
+            texture.Upload(pixels, 4 * 4);
+
+            var original = new byte[pixels.Length];
+            texture.Readback(original, 4 * 4);
+            Assert.That(original, Is.EqualTo(pixels), "the engine texture reads back what was uploaded");
+
+            // Each view tracks the state it last put the shared resource in, so the imported view starts from the state the
+            // readback above left the engine texture in. That keeps the two views in agreement about the resource.
+            var backend = (D3D12Texture)texture.Backend;
+            var resource = backend.Resource;
+            var state = backend.State;
+
+            Assert.That(owner.Provider.TryImportTexture(resource, 4, 4, GpuTextureFormat.Rgba8Unorm, state, out var imported), Is.True, "the engine texture was wrapped");
+            Assert.That(imported, Is.Not.Null, "the imported view exists");
+
+            var importedBackend = (D3D12Texture)imported!.Backend;
+            Assert.That(importedBackend.Resource, Is.EqualTo(resource), "the imported view wraps the engine resource");
+            Assert.That(importedBackend.State, Is.EqualTo(state), "the imported view starts in the state the caller reported");
+
+            var throughImported = new byte[pixels.Length];
+            imported.Readback(throughImported, 4 * 4);
+            Assert.That(throughImported, Is.EqualTo(pixels), "the imported view reads the same pixels");
+
+            imported.Dispose();
+
+            // If disposing the view released the engine resource, the transition and the copy below would fail instead of
+            // returning the replacement pixels.
+            var replacement = new byte[pixels.Length];
+
+            for (var index = 0; index < replacement.Length; index++)
+            {
+                replacement[index] = (byte)(255 - (index * 3));
+            }
+
+            texture.Upload(replacement, 4 * 4);
+
+            var again = new byte[pixels.Length];
+            texture.Readback(again, 4 * 4);
+
+            Assert.That(again, Is.EqualTo(replacement), "the engine resource survives the imported view being disposed");
+            Assert.That(((D3D12Texture)texture.Backend).Resource, Is.EqualTo(resource), "the engine texture still owns its resource");
+
+            Assert.That(owner.Provider.TryImportTexture(0, 4, 4, GpuTextureFormat.Rgba8Unorm, state, out _), Is.False, "a missing resource is refused");
+            Assert.That(owner.Provider.TryImportTexture(resource, 0, 4, GpuTextureFormat.Rgba8Unorm, state, out _), Is.False, "an empty width is refused");
+        }
+    }
+
+    [Test]
     public void D3D12Texture_UploadsAndReadsBack()
     {
         if (!OperatingSystem.IsWindows() || !D3D12Device.TryCreate(out var owner) || owner is null)
