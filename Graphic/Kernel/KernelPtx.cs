@@ -22,6 +22,12 @@ namespace Gubbins.Graphic.Kernels;
 /// reduction no instruction of the text performs, and for a kernel that takes exactly its two buffers: a program that makes
 /// a wave call or takes a structure as one value is not written, and the artifact a CUDA device would load is not produced.
 /// </para>
+/// <para>
+/// A program that samples a texture takes the handle of the texture object as one more argument, after the two buffers
+/// and the block of element counts. CUDA keeps the sampler inside that object, so the sampler a kernel declares is not an
+/// argument of its own: the <c>tex</c> instruction reads through the filter and address modes the object was created
+/// with. The entry point has one slot for it, so a program that samples more than one texture is not written.
+/// </para>
 /// </remarks>
 public sealed class KernelPtx
 {
@@ -37,7 +43,7 @@ public sealed class KernelPtx
             throw new ArgumentNullException(nameof(program));
         }
 
-        if (program.Buffers.Count != 2 || program.Parameters is not null || Wave(program) || (program.Textures?.Count ?? 0) > 0)
+        if (program.Buffers.Count != 2 || program.Parameters is not null || Wave(program) || (program.Textures?.Count ?? 0) > 1)
         {
             return string.Empty;
         }
@@ -102,6 +108,7 @@ internal sealed class PtxWriter
     private const string SOURCE = "__gubbinsSource";
     private const string DESTINATION = "__gubbinsDestination";
     private const string LENGTHS = "__gubbinsLengths";
+    private const string TEXTURE = "__gubbinsTexture";
 
     private readonly KernelProgram m_Program;
     private readonly StringBuilder m_Body = new();
@@ -132,6 +139,15 @@ internal sealed class PtxWriter
         m_Globals[DESTINATION] = Pointer("ld.param.u64 %rd, [__gubbinsDestination];");
         m_Globals[LENGTHS] = Pointer("ld.param.u64 %rd, [__gubbinsLengths];");
 
+        var textured = (m_Program.Textures?.Count ?? 0) == 1;
+
+        // A sampled texture is one more argument after the block of counts: the handle of the texture object, which is
+        // where CUDA keeps the sampler. Nothing else about the launch changes.
+        if (textured)
+        {
+            m_Globals[TEXTURE] = Pointer("ld.param.u64 %rd, [__gubbinsTexture];");
+        }
+
         foreach (var shared in m_Program.EntryPoint.SharedArrays)
         {
             var name = "__shared" + m_Shared++;
@@ -146,15 +162,23 @@ internal sealed class PtxWriter
 
         Instruction("ret;");
 
+        var parameters = new StringBuilder();
+        parameters.AppendLine($"    .param .u64 {SOURCE},");
+        parameters.AppendLine($"    .param .u64 {DESTINATION},");
+        parameters.AppendLine($"    .param .u64 {LENGTHS}" + (textured ? "," : string.Empty));
+
+        if (textured)
+        {
+            parameters.AppendLine($"    .param .u64 {TEXTURE}");
+        }
+
         var text = new StringBuilder();
         text.AppendLine(".version 7.0");
         text.AppendLine(".target sm_70");
         text.AppendLine(".address_size 64");
         text.AppendLine();
         text.AppendLine(".visible .entry " + KernelTranspiler.ENTRY_POINT + "(");
-        text.AppendLine($"    .param .u64 {SOURCE},");
-        text.AppendLine($"    .param .u64 {DESTINATION},");
-        text.AppendLine($"    .param .u64 {LENGTHS}");
+        text.Append(parameters);
         text.AppendLine(")");
         text.AppendLine("{");
         text.AppendLine($"    .reg .b32 %r<{Math.Max(m_Registers, 1)}>;");
@@ -437,6 +461,9 @@ internal sealed class PtxWriter
 
             case KernelSharedElement shared:
                 return Load(Address(shared), shared.ResultType);
+
+            case KernelTextureSample sample:
+                return Texture(sample);
 
             case KernelCall call:
                 return Inline(call);
@@ -767,6 +794,38 @@ internal sealed class PtxWriter
                 return UnaryOperation("ex2.approx.f32", type, product);
             }
         }
+    }
+
+    /// <summary>
+    /// Writes a sample of a two dimensional texture.
+    /// </summary>
+    /// <param name="sample">The read.</param>
+    /// <returns>The four components the sample reads.</returns>
+    /// <remarks>
+    /// The coordinates are normalized, which is what the texture object was created for, and the level is the base one
+    /// because a <see cref="GpuTexture2D"/> has one mip. No sampler is named: CUDA keeps the filter and the address modes
+    /// inside the texture object, so the instruction reads through the object's own description.
+    /// </remarks>
+    /// <exception cref="KernelTranslationException">Thrown when the sample is not one the instruction can write.</exception>
+    private PtxValue Texture(KernelTextureSample sample)
+    {
+        if (sample.ResultType is not VectorType { Scalar: KernelScalar.Float, Components: 4 })
+        {
+            throw new KernelTranslationException($"'{sample.Texture.Name}' samples to a value of four components.");
+        }
+
+        var coordinates = Value(sample.Coordinates);
+
+        if (coordinates.Registers.Count < 2)
+        {
+            throw new KernelTranslationException($"'{sample.Texture.Name}' is sampled at a coordinate that is not a two dimensional vector.");
+        }
+
+        var texel = Registers(sample.ResultType);
+
+        Instruction($"tex.2d.v4.f32.f32 {{{string.Join(", ", texel)}}}, [{m_Globals[TEXTURE]}, {{{coordinates.Registers[0]}, {coordinates.Registers[1]}}}];");
+
+        return PtxValue.Many(texel, sample.ResultType);
     }
 
     /// <summary>

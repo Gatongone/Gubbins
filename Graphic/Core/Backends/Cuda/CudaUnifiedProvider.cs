@@ -50,9 +50,10 @@ internal sealed unsafe class CudaUnifiedProvider : IUnifiedProvider
     /// <returns>The texture, to be disposed when it is no longer sampled.</returns>
     /// <remarks>
     /// CUDA keeps the sampler inside the texture object, so this overload creates it with the default sampler;
-    /// <see cref="CreateTexture(int, int, GpuTextureFormat, GpuSampler)"/> creates it with the one the caller wants. The
-    /// device's context must be current on the calling thread, which it is for the thread that created the
-    /// <see cref="CudaDevice"/>.
+    /// <see cref="CreateTexture(int, int, GpuTextureFormat, GpuSampler)"/> creates it with the one the caller wants. A
+    /// sampler state has no native object of its own, which is why <see cref="CreateSampler"/> only records the
+    /// description; the texture object's description is what a sample reads through. The device's context must be
+    /// current on the calling thread, which it is for the thread that created the <see cref="CudaDevice"/>.
     /// </remarks>
     /// <exception cref="ObjectDisposedException">Thrown when the bridge has been disposed.</exception>
     /// <exception cref="InvalidOperationException">Thrown when the driver refuses the array or the texture object.</exception>
@@ -83,6 +84,28 @@ internal sealed unsafe class CudaUnifiedProvider : IUnifiedProvider
         }
 
         return new GpuTexture2D(new CudaTexture(width, height, format, sampler), width, height, format);
+    }
+
+    /// <summary>
+    /// Creates the sampler state a texture of this backend samples with.
+    /// </summary>
+    /// <param name="sampler">The filter and the address modes.</param>
+    /// <returns>The state, to be disposed when it is no longer bound.</returns>
+    /// <remarks>
+    /// The driver has no sampler object to create: the description lives in the texture object, which
+    /// <see cref="CreateTexture(int, int, GpuTextureFormat, GpuSampler)"/> creates with the sampler it is given. The value
+    /// this returns therefore records the description for the layer's sampler surface, and a dispatch samples through the
+    /// texture object's own description rather than through it.
+    /// </remarks>
+    /// <exception cref="ObjectDisposedException">Thrown when the bridge has been disposed.</exception>
+    public GpuSamplerState CreateSampler(GpuSampler sampler)
+    {
+        if (m_Disposed)
+        {
+            throw new ObjectDisposedException(nameof(CudaUnifiedProvider));
+        }
+
+        return new GpuSamplerState(new CudaSamplerState(sampler));
     }
 
     /// <inheritdoc/>
@@ -381,8 +404,14 @@ internal sealed unsafe class CudaCompute : IDisposable
     /// <param name="lengthsSize">The size of that block, in bytes.</param>
     /// <param name="groups">The number of thread blocks on the x axis.</param>
     /// <param name="threadsPerGroup">The threads in a block.</param>
+    /// <param name="wait">Whether to wait for the launch.</param>
+    /// <param name="texture">
+    /// The <c>CUtexObject</c> a textured kernel samples, or zero for a kernel that takes no texture. It is passed as the
+    /// argument after the three the plain kernel takes, which is the order <see cref="Kernels.KernelPtx"/> writes the
+    /// entry point's parameters in; the sampler travels inside the object instead of as an argument of its own.
+    /// </param>
     /// <returns><see langword="true"/> if the launch completed.</returns>
-    internal bool Dispatch(ulong source, ulong sourceSize, ulong destination, ulong destinationSize, ulong parametersAddress, ulong lengths, ulong lengthsSize, uint groups, uint threadsPerGroup, bool wait)
+    internal bool Dispatch(ulong source, ulong sourceSize, ulong destination, ulong destinationSize, ulong parametersAddress, ulong lengths, ulong lengthsSize, uint groups, uint threadsPerGroup, bool wait, ulong texture = 0)
     {
         if (m_Disposed || m_Function == 0 || groups == 0 || threadsPerGroup == 0)
         {
@@ -414,6 +443,17 @@ internal sealed unsafe class CudaCompute : IDisposable
             {
                 return false;
             }
+        }
+        else if (texture != 0)
+        {
+            // A kernel whose PTX takes its buffers as arguments is passed the source, the destination, the block the
+            // counts live in and, when it samples one, the handle of the texture object.
+            var list = stackalloc void*[4];
+            list[0] = &source;
+            list[1] = &destination;
+            list[2] = &lengths;
+            list[3] = &texture;
+            arguments = list;
         }
         else
         {

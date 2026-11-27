@@ -2394,6 +2394,49 @@ public static class TexturedSpirV
     }
 
     [Test]
+    public void Kernel_CompilesATexturedProgramToPtx()
+    {
+        const string Source = @"
+using System;
+using Gubbins.Graphic;
+
+public static class PtxTextured
+{
+    public static void Kernel(int index, ReadOnlySpan<float2> source, Span<float4> destination, GpuTexture2D texture, GpuSamplerState sampler)
+    {
+        destination[index] = texture.Sample(sampler, source[index]);
+    }
+}
+";
+
+        var directory = Directory.CreateTempSubdirectory("gubbins-ptx-texture-").FullName;
+
+        try
+        {
+            var artifacts = KernelCompiler.Compile(Source, directory, "PtxTextured");
+            var path = Path.Combine(directory, "PtxTextured.ptx");
+
+            Assert.That(artifacts, Does.Contain(path), "a kernel that samples a texture writes a PTX artifact");
+
+            var text = File.ReadAllText(path);
+
+            Assert.That(text, Does.Contain("tex.2d.v4.f32.f32"), "the sample is the two dimensional texture instruction");
+            Assert.That(text, Does.Contain("__gubbinsTexture"), "the texture object is an argument of the entry point");
+
+            // The two buffers, the block of element counts, then the texture object: the sampler is inside the object and
+            // is not an argument of its own.
+            Assert.That(
+                System.Text.RegularExpressions.Regex.Matches(text, @"\.param \.u64").Count,
+                Is.EqualTo(4),
+                "a textured kernel takes one more argument than the two buffers and their counts");
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Test]
     public void VulkanTexture_KernelSamplesHardwareTexture()
     {
         const string Source = @"
@@ -2465,6 +2508,90 @@ public static class VulkanTextured
                 memory.Upload(lengths, MemoryMarshal.AsBytes(new uint[] { (uint)threadCount, (uint)threadCount, 0, 0 }.AsSpan()));
 
                 Assert.That(kernel!.TryDispatchVulkan(input, output, lengths, null, texture, sampler, 1), Is.True, "the hardware texture dispatch ran");
+
+                memory.MarkWrittenByGpu(output);
+                Assert.That(memory.Synchronize(), Is.True, "the texture output was synchronized");
+
+                var result = MemoryMarshal.Cast<byte, float>(output.CpuView());
+
+                Assert.That(result[0], Is.EqualTo(1f).Within(0.001f), "the red channel came from the sampled texel");
+                Assert.That(result[1], Is.EqualTo(0f).Within(0.001f), "the green channel came from the sampled texel");
+                Assert.That(result[2], Is.EqualTo(0f).Within(0.001f), "the blue channel came from the sampled texel");
+                Assert.That(result[3], Is.EqualTo(1f).Within(0.001f), "the alpha channel came from the sampled texel");
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Test]
+    public void CudaTexture_KernelSamplesHardwareTexture()
+    {
+        const string Source = @"
+using System;
+using Gubbins.Graphic;
+
+public static class CudaTextured
+{
+    public static void Kernel(int index, ReadOnlySpan<float2> source, Span<float4> destination, GpuTexture2D texture, GpuSamplerState sampler)
+    {
+        destination[index] = texture.Sample(sampler, source[index]);
+    }
+}
+";
+
+        if (!OperatingSystem.IsWindows() || !CudaDevice.IsAvailable || !CudaDevice.TryCreate(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no CUDA device.");
+            return;
+        }
+
+        var directory = Directory.CreateTempSubdirectory("gubbins-cudatexture-").FullName;
+
+        try
+        {
+            KernelCompiler.Compile(Source, directory, "CudaTextured");
+
+            // CUDA keeps the sampler in the texture object, so the texture is created with the description the sampler
+            // names and the kernel samples through it.
+            var sampler = new GpuSampler(GpuTextureFilter.Nearest, GpuAddressMode.Clamp);
+
+            using (owner)
+            using (var device = new GpuDevice(owner, owner.Provider.GetProvider(), owner.Provider.MaxSegmentSize, false, owner.Provider.WorkingSetLimit, "CUDA"))
+            using (var memory = device.CreateMemory())
+            using (var texture = owner.Provider.CreateTexture(2, 2, GpuTextureFormat.Rgba8Unorm, sampler))
+            using (var state = owner.Provider.CreateSampler(sampler))
+            using (var kernel = GpuKernel.LoadFromDirectory(device, directory, "CudaTextured"))
+            {
+                Assert.That(kernel, Is.Not.Null, "the texture kernel loads on CUDA");
+
+                texture.Upload(new byte[]
+                {
+                    255, 0, 0, 255, 0, 255, 0, 255,
+                    0, 0, 255, 255, 255, 255, 255, 255
+                }, 8);
+
+                // A dispatch always runs a whole group and CUDA does not mask a write past the end of a block, so both
+                // blocks hold a value per thread and no thread writes outside its own element.
+                var threadCount = KernelTranspiler.THREADS_PER_GROUP;
+                var input = memory.Allocate((nuint)(threadCount * 2 * sizeof(float)), GpuAccess.Shared);
+                var output = memory.Allocate((nuint)(threadCount * 4 * sizeof(float)), GpuAccess.Shared);
+                var lengths = memory.Allocate(16, GpuAccess.Shared);
+
+                var coordinates = new float[threadCount * 2];
+
+                for (var index = 0; index < threadCount; index++)
+                {
+                    coordinates[index * 2] = 0.25f;
+                    coordinates[index * 2 + 1] = 0.25f;
+                }
+
+                memory.Upload(input, MemoryMarshal.AsBytes(coordinates.AsSpan()));
+                memory.Upload(lengths, MemoryMarshal.AsBytes(new uint[] { (uint)threadCount, (uint)threadCount, 0, 0 }.AsSpan()));
+
+                Assert.That(kernel!.TryDispatchCuda(input, output, lengths, null, texture, state, 1), Is.True, "the hardware texture dispatch ran");
 
                 memory.MarkWrittenByGpu(output);
                 Assert.That(memory.Synchronize(), Is.True, "the texture output was synchronized");

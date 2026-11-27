@@ -9,8 +9,9 @@ namespace Gubbins.Graphic;
 /// <para>
 /// CUDA has no sampler object beside the texture: the filter and the address modes are fields of the
 /// <see cref="CudaApi.CUDA_TEXTURE_DESC"/> the object is created with, so the sampler is stored in the texture object and
-/// reported through <see cref="Sampler"/> and <see cref="Description"/>. That is also why the provider has no
-/// <c>CreateSampler</c>: there is nothing to create until there is a texture to attach the description to.
+/// reported through <see cref="Sampler"/> and <see cref="Description"/>. That is also why a texture is created with its
+/// sampler and the provider's sampler state only records the description: there is no native sampler to create until
+/// there is a texture to attach the description to.
 /// </para>
 /// <para>
 /// Samples use normalized coordinates, like the other backends' samplers. The flag is not optional: the driver only

@@ -720,6 +720,94 @@ public sealed class GpuKernel : IDisposable
     }
 
     /// <summary>
+    /// Runs a kernel that samples a texture on CUDA.
+    /// </summary>
+    /// <param name="source">The block the kernel reads.</param>
+    /// <param name="destination">The block the kernel writes.</param>
+    /// <param name="lengths">The block that carries the element counts, or <see langword="null"/>.</param>
+    /// <param name="parameters">The block that carries the structure the kernel takes, or <see langword="null"/>.</param>
+    /// <param name="texture">The texture to sample.</param>
+    /// <param name="sampler">
+    /// The sampler state. CUDA has no sampler argument: the filter and the address modes live in the texture object, so
+    /// the dispatch samples through the description the texture was created with and this value is only checked to be
+    /// one of this backend's states.
+    /// </param>
+    /// <param name="groups">The number of thread groups on the x axis.</param>
+    /// <param name="wait">Whether to wait for the dispatch.</param>
+    /// <returns><see langword="true"/> if the dispatch ran.</returns>
+    /// <remarks>
+    /// The launch is the plain one with the handle of the <c>CUtexObject</c> added as the argument after the block of
+    /// element counts, which is the order the PTX emits the parameters in.
+    /// </remarks>
+    public bool TryDispatchCuda(GpuBlock source, GpuBlock destination, GpuBlock? lengths, GpuBlock? parameters, GpuTexture2D texture, GpuSamplerState sampler, uint groups, bool wait = true)
+    {
+        if (m_Disposed)
+        {
+            throw new ObjectDisposedException(nameof(GpuKernel));
+        }
+
+        if (source is null || destination is null)
+        {
+            throw new ArgumentNullException(source is null ? nameof(source) : nameof(destination));
+        }
+
+        if (texture is null)
+        {
+            throw new ArgumentNullException(nameof(texture));
+        }
+
+        if (sampler is null)
+        {
+            throw new ArgumentNullException(nameof(sampler));
+        }
+
+        if (m_Cuda is null || m_Device.Backend is not CudaDevice cuda)
+        {
+            return false;
+        }
+
+        if (texture.Backend is not CudaTexture cudaTexture || sampler.Backend is not CudaSamplerState)
+        {
+            return false;
+        }
+
+        if (!cuda.Provider.TryGetPointer(source.Storage, out var sourcePointer) ||
+            !cuda.Provider.TryGetPointer(destination.Storage, out var destinationPointer))
+        {
+            return false;
+        }
+
+        var lengthsPointer = 0ul;
+        var lengthsLength = 0ul;
+
+        if (lengths is not null && cuda.Provider.TryGetPointer(lengths.Storage, out var availableLengths))
+        {
+            lengthsPointer = availableLengths;
+            lengthsLength = (ulong)lengths.Storage.Length;
+        }
+
+        var parametersPointer = 0ul;
+
+        if (parameters is not null && cuda.Provider.TryGetPointer(parameters.Storage, out var availableParameters))
+        {
+            parametersPointer = availableParameters;
+        }
+
+        return m_Cuda.Dispatch(
+            sourcePointer,
+            (ulong)source.Storage.Length,
+            destinationPointer,
+            (ulong)destination.Storage.Length,
+            parametersPointer,
+            lengthsPointer,
+            lengthsLength,
+            groups,
+            64,
+            wait,
+            (ulong)cudaTexture.TextureObject);
+    }
+
+    /// <summary>
     /// Waits for the dispatches of this kernel that were recorded without waiting.
     /// </summary>
     /// <returns><see langword="true"/> when every submission has completed.</returns>
