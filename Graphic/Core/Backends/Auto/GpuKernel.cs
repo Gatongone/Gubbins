@@ -481,7 +481,48 @@ public sealed class GpuKernel : IDisposable
     /// <param name="groups">The number of groups on the x axis.</param>
     /// <param name="wait">Whether to wait for the dispatch.</param>
     /// <returns><see langword="true"/> if the dispatch ran.</returns>
-    public unsafe bool TryDispatchTextures(GpuBlock source, GpuBlock destination, GpuBlock? lengths, GpuBlock? parameters, ReadOnlySpan<GpuTextureBinding> bindings, uint groups, bool wait = true)
+    /// <summary>
+    /// Runs a kernel that samples several textures on the backend the device uses.
+    /// </summary>
+    /// <param name="source">The block the kernel reads.</param>
+    /// <param name="destination">The block the kernel writes.</param>
+    /// <param name="lengths">The block that carries the element counts, or <see langword="null"/>.</param>
+    /// <param name="parameters">The block that carries the structure the kernel takes, or <see langword="null"/>.</param>
+    /// <param name="bindings">The textures and samplers, in the order the kernel declares them.</param>
+    /// <param name="groups">The number of groups on the x axis.</param>
+    /// <param name="wait">Whether to wait for the dispatch.</param>
+    /// <returns><see langword="true"/> if the dispatch ran.</returns>
+    public bool TryDispatchTextures(GpuBlock source, GpuBlock destination, GpuBlock? lengths, GpuBlock? parameters, ReadOnlySpan<GpuTextureBinding> bindings, uint groups, bool wait = true)
+    {
+        if (m_Metal is not null)
+        {
+            return TryDispatchMetalTextures(source, destination, lengths, parameters, bindings, groups, wait);
+        }
+
+        if (m_OpenGL is not null)
+        {
+            return TryDispatchOpenGlTextures(source, destination, lengths, parameters, bindings, groups, wait);
+        }
+
+        if (m_Vulkan is not null)
+        {
+            return TryDispatchVulkanTextures(source, destination, lengths, parameters, bindings, groups, wait);
+        }
+
+        if (m_D3D12 is not null)
+        {
+            return TryDispatchD3D12Textures(source, destination, lengths, parameters, bindings, groups, wait);
+        }
+
+        if (m_Cuda is not null)
+        {
+            return TryDispatchCudaTextures(source, destination, lengths, parameters, bindings, groups, wait);
+        }
+
+        return false;
+    }
+
+    private unsafe bool TryDispatchMetalTextures(GpuBlock source, GpuBlock destination, GpuBlock? lengths, GpuBlock? parameters, ReadOnlySpan<GpuTextureBinding> bindings, uint groups, bool wait = true)
     {
         if (m_Disposed)
         {

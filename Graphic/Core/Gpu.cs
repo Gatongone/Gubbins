@@ -171,6 +171,53 @@ public sealed class Gpu : IDisposable
     }
 
     /// <summary>
+    /// Allocates a two dimensional texture on the device.
+    /// </summary>
+    /// <param name="width">The width, in pixels.</param>
+    /// <param name="height">The height, in pixels.</param>
+    /// <param name="format">The pixel format.</param>
+    /// <returns>The texture, to be disposed when it is no longer read.</returns>
+    public GpuTexture2D AllocateTexture(int width, int height, GpuTextureFormat format)
+    {
+        ThrowIfDisposed();
+
+        if (width <= 0 || height <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(width), "A texture is at least one pixel wide and high.");
+        }
+
+        return m_Device.Backend switch
+        {
+            MetalDevice metal => metal.Provider.CreateTexture(width, height, format),
+            D3D12Device d3d12 => d3d12.Provider.CreateTexture(width, height, format),
+            VulkanDevice vulkan => vulkan.Provider.CreateTexture(width, height, format),
+            GlDevice openGL => openGL.Provider.CreateTexture(width, height, format),
+            CudaDevice cuda => cuda.Provider.CreateTexture(width, height, format),
+            _ => throw new PlatformNotSupportedException("This backend does not create textures.")
+        };
+    }
+
+    /// <summary>
+    /// Creates a sampler state on the device.
+    /// </summary>
+    /// <param name="sampler">The sampler description.</param>
+    /// <returns>The state, to be disposed when it is no longer bound.</returns>
+    public GpuSamplerState CreateSampler(GpuSampler sampler)
+    {
+        ThrowIfDisposed();
+
+        return m_Device.Backend switch
+        {
+            MetalDevice metal => metal.Provider.CreateSampler(sampler),
+            D3D12Device d3d12 => d3d12.Provider.CreateSampler(sampler),
+            VulkanDevice vulkan => vulkan.Provider.CreateSampler(sampler),
+            GlDevice openGL => openGL.Provider.CreateSampler(sampler),
+            CudaDevice cuda => cuda.Provider.CreateSampler(sampler),
+            _ => throw new PlatformNotSupportedException("This backend does not create samplers.")
+        };
+    }
+
+    /// <summary>
     /// Loads the kernel of that name on this device, reusing the one already loaded.
     /// </summary>
     /// <param name="name">The kernel name, which is the file name of its artifact without the extension.</param>

@@ -2360,7 +2360,7 @@ public static class GlTwoTextured
                     new GpuTextureBinding(right, rightSampler)
                 };
 
-                Assert.That(kernel!.TryDispatchOpenGlTextures(input, output, lengths, null, bindings, 1), Is.True, "the two texture dispatch ran");
+                Assert.That(kernel!.TryDispatchTextures(input, output, lengths, null, bindings, 1), Is.True, "the two texture dispatch ran");
 
                 memory.MarkWrittenByGpu(output);
                 Assert.That(memory.Synchronize(), Is.True, "the two texture output was synchronized");
@@ -2579,7 +2579,7 @@ public static class D3D12TwoTextured
 
                 // Recorded without waiting, so the combined descriptor heaps outlive this call and are only released when
                 // the wait that follows has passed the fence.
-                Assert.That(kernel!.TryDispatchD3D12Textures(input, output, lengths, null, bindings, 1, wait: false), Is.True, "the two texture dispatch was recorded");
+                Assert.That(kernel!.TryDispatchTextures(input, output, lengths, null, bindings, 1, wait: false), Is.True, "the two texture dispatch was recorded");
                 Assert.That(kernel.Wait(), Is.True, "the two texture dispatch completed");
 
                 memory.MarkWrittenByGpu(output);
@@ -2787,7 +2787,7 @@ public static class VulkanTwoTextured
                     new GpuTextureBinding(right, rightSampler)
                 };
 
-                Assert.That(kernel!.TryDispatchVulkanTextures(input, output, lengths, null, bindings, 1), Is.True, "the two texture dispatch ran");
+                Assert.That(kernel!.TryDispatchTextures(input, output, lengths, null, bindings, 1), Is.True, "the two texture dispatch ran");
 
                 memory.MarkWrittenByGpu(output);
                 Assert.That(memory.Synchronize(), Is.True, "the two texture output was synchronized");
@@ -2965,7 +2965,7 @@ public static class CudaTwoTextured
                     new GpuTextureBinding(right, rightSampler)
                 };
 
-                Assert.That(kernel!.TryDispatchCudaTextures(input, output, lengths, null, bindings, 1), Is.True, "the two texture dispatch ran");
+                Assert.That(kernel!.TryDispatchTextures(input, output, lengths, null, bindings, 1), Is.True, "the two texture dispatch ran");
 
                 memory.MarkWrittenByGpu(output);
                 Assert.That(memory.Synchronize(), Is.True, "the two texture output was synchronized");

@@ -1001,6 +1001,93 @@ public sealed class GpuTests
         }
     }
 
+    [Test]
+    public void Gpu_CreatesTexturesOnMetal()
+    {
+        if (!OperatingSystem.IsMacOS() || !MetalDevice.TryCreate(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no Metal device.");
+            return;
+        }
+
+        using var gpu = Gpu.Create(GpuDevice.FromMetal(owner.Provider));
+        VerifyUnifiedTexture(gpu);
+    }
+
+    [Test]
+    public void Gpu_CreatesTexturesOnOpenGl()
+    {
+        if (!GlDevice.TryCreate(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no OpenGL context.");
+            return;
+        }
+
+        using var device = new GpuDevice(owner, owner.Provider.GetProvider(), 0, false, 0, "OpenGL");
+        using var gpu = Gpu.Create(device);
+        VerifyUnifiedTexture(gpu);
+    }
+
+    [Test]
+    public void Gpu_CreatesTexturesOnD3D12()
+    {
+        if (!OperatingSystem.IsWindows() || !D3D12Device.TryCreate(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no D3D12 device.");
+            return;
+        }
+
+        using var gpu = Gpu.Create(GpuDevice.FromD3D12(owner.Provider));
+        VerifyUnifiedTexture(gpu);
+    }
+
+    [Test]
+    public void Gpu_CreatesTexturesOnVulkan()
+    {
+        if (!TryCreateVulkan(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no Vulkan device.");
+            return;
+        }
+
+        using var gpu = Gpu.Create(GpuDevice.FromVulkan(owner.Provider));
+        VerifyUnifiedTexture(gpu);
+    }
+
+    [Test]
+    public void Gpu_CreatesTexturesOnCuda()
+    {
+        if (!TryCreateCuda(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no CUDA device.");
+            return;
+        }
+
+        using var device = new GpuDevice(owner, owner.Provider.GetProvider(), owner.Provider.MaxSegmentSize, false, owner.Provider.WorkingSetLimit, "CUDA");
+        using var gpu = Gpu.Create(device);
+        VerifyUnifiedTexture(gpu);
+    }
+
+    /// <summary>
+    /// Creates, uploads, reads back and samples a texture through the backend-neutral API.
+    /// </summary>
+    /// <param name="gpu">The device.</param>
+    private static void VerifyUnifiedTexture(Gpu gpu)
+    {
+        using var texture = gpu.AllocateTexture(1, 1, GpuTextureFormat.Rgba8Unorm);
+        using var sampler = gpu.CreateSampler(new GpuSampler(GpuTextureFilter.Nearest, GpuAddressMode.Clamp));
+
+        texture.Upload(new byte[] { 1, 2, 3, 4 }, 4);
+
+        var readback = new byte[4];
+        texture.Readback(readback, 4);
+
+        Assert.That(readback, Is.EqualTo(new byte[] { 1, 2, 3, 4 }), "the backend-neutral texture returns its pixels");
+        Assert.That(texture.Width, Is.EqualTo(1), "the texture keeps its width");
+        Assert.That(texture.Height, Is.EqualTo(1), "the texture keeps its height");
+        Assert.That(texture.Format, Is.EqualTo(GpuTextureFormat.Rgba8Unorm), "the texture keeps its format");
+    }
+
     /// <summary>
     /// Uploads and reads back a one-channel eight bit image.
     /// </summary>
