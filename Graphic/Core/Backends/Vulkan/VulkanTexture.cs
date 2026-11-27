@@ -267,6 +267,8 @@ internal sealed unsafe class VulkanTexture : IGpuTexture
         (nativeFormat, bytesPerPixel) = format switch
         {
             GpuTextureFormat.R8Unorm => (9u, 1),       // VK_FORMAT_R8_UNORM
+            GpuTextureFormat.Rgba16Float => (97u, 8),  // VK_FORMAT_R16G16B16A16_SFLOAT
+            GpuTextureFormat.Rgba32Float => (109u, 16),// VK_FORMAT_R32G32B32A32_SFLOAT
             GpuTextureFormat.Rgba8Unorm => (37u, 4),  // VK_FORMAT_R8G8B8A8_UNORM
             GpuTextureFormat.Bgra8Unorm => (44u, 4),  // VK_FORMAT_B8G8R8A8_UNORM
             GpuTextureFormat.R32Uint => (98u, 4),     // VK_FORMAT_R32_UINT

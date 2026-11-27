@@ -899,6 +899,108 @@ public sealed class GpuTests
         }
     }
 
+    [Test]
+    public void MetalTexture_UploadsFloatFormats()
+    {
+        if (!OperatingSystem.IsMacOS() || !MetalDevice.TryCreate(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no Metal device.");
+            return;
+        }
+
+        using (owner)
+        {
+            VerifyFloatFormats(format => owner.Provider.CreateTexture(1, 1, format));
+        }
+    }
+
+    [Test]
+    public void GlTexture_UploadsFloatFormats()
+    {
+        if (!GlDevice.TryCreate(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no OpenGL context.");
+            return;
+        }
+
+        VerifyFloatFormats(format => owner.Provider.CreateTexture(1, 1, format));
+        owner.Dispose();
+    }
+
+    [Test]
+    public void D3D12Texture_UploadsFloatFormats()
+    {
+        if (!OperatingSystem.IsWindows() || !D3D12Device.TryCreate(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no D3D12 device.");
+            return;
+        }
+
+        using (owner)
+        {
+            VerifyFloatFormats(format => owner.Provider.CreateTexture(1, 1, format));
+        }
+    }
+
+    [Test]
+    public void VulkanTexture_UploadsFloatFormats()
+    {
+        if (!TryCreateVulkan(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no Vulkan device.");
+            return;
+        }
+
+        using (owner)
+        {
+            VerifyFloatFormats(format => owner.Provider.CreateTexture(1, 1, format));
+        }
+    }
+
+    [Test]
+    public void CudaTexture_UploadsFloatFormats()
+    {
+        if (!TryCreateCuda(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no CUDA device.");
+            return;
+        }
+
+        using (owner)
+        {
+            VerifyFloatFormats(format => owner.Provider.CreateTexture(1, 1, format));
+        }
+    }
+
+    /// <summary>
+    /// Uploads and reads back both floating point colour formats.
+    /// </summary>
+    /// <param name="create">Creates a one pixel texture of a format.</param>
+    private static void VerifyFloatFormats(Func<GpuTextureFormat, GpuTexture2D> create)
+    {
+        foreach (var (format, bytes) in new[]
+        {
+            (GpuTextureFormat.Rgba16Float, 8),
+            (GpuTextureFormat.Rgba32Float, 16)
+        })
+        {
+            using var texture = create(format);
+            var pixels = new byte[bytes];
+
+            for (var index = 0; index < pixels.Length; index++)
+            {
+                pixels[index] = (byte)(index + 1);
+            }
+
+            texture.Upload(pixels, bytes);
+
+            var readback = new byte[bytes];
+            texture.Readback(readback, bytes);
+
+            Assert.That(readback, Is.EqualTo(pixels), $"the {format} texture returns the bytes it was written with");
+        }
+    }
+
     /// <summary>
     /// Uploads and reads back a one-channel eight bit image.
     /// </summary>

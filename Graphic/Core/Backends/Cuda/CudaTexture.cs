@@ -299,6 +299,8 @@ internal sealed unsafe class CudaTexture : IGpuTexture
         (arrayFormat, channels, viewFormat, bytesPerPixel, readAsInteger) = format switch
         {
             GpuTextureFormat.R8Unorm => (CudaApi.AD_FORMAT_UNSIGNED_INT8, 1u, CudaApi.RES_VIEW_FORMAT_UINT_1X8, 1, false),
+            GpuTextureFormat.Rgba16Float => (CudaApi.AD_FORMAT_HALF, 4u, CudaApi.RES_VIEW_FORMAT_FLOAT_4X16, 8, false),
+            GpuTextureFormat.Rgba32Float => (CudaApi.AD_FORMAT_FLOAT, 4u, CudaApi.RES_VIEW_FORMAT_FLOAT_4X32, 16, false),
             GpuTextureFormat.Rgba8Unorm => (CudaApi.AD_FORMAT_UNSIGNED_INT8, 4u, CudaApi.RES_VIEW_FORMAT_UINT_4X8, 4, false),
             GpuTextureFormat.Bgra8Unorm => (CudaApi.AD_FORMAT_UNSIGNED_INT8, 4u, CudaApi.RES_VIEW_FORMAT_UINT_4X8, 4, false),
             GpuTextureFormat.R32Uint => (CudaApi.AD_FORMAT_UNSIGNED_INT32, 1u, CudaApi.RES_VIEW_FORMAT_UINT_1X32, 4, true),

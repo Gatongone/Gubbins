@@ -73,6 +73,8 @@ internal sealed unsafe class GlTexture : IGpuTexture
     private static (int InternalFormat, uint Format, uint Type, int BytesPerPixel) Describe(GpuTextureFormat format) => format switch
     {
         GpuTextureFormat.R8Unorm => (0x8229, 0x1903u, 0x1401u, 1),
+        GpuTextureFormat.Rgba16Float => (0x881A, 0x1908u, 0x140Bu, 8),
+        GpuTextureFormat.Rgba32Float => (0x8814, 0x1908u, 0x1406u, 16),
         GpuTextureFormat.Rgba8Unorm => (0x8058, 0x1908u, 0x1401u, 4),
         GpuTextureFormat.Bgra8Unorm => (0x8058, 0x80E1u, 0x1401u, 4),
         GpuTextureFormat.R32Uint => (0x8236, 0x8D94u, 0x1405u, 4),

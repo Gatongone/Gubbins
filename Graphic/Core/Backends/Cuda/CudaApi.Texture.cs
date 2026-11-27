@@ -58,6 +58,11 @@ internal static unsafe partial class CudaApi
     internal const int AD_FORMAT_FLOAT = 0x20;
 
     /// <summary>
+    /// <c>CU_AD_FORMAT_HALF</c>, the channel format 16 bit floats are stored as.
+    /// </summary>
+    internal const int AD_FORMAT_HALF = 0x10;
+
+    /// <summary>
     /// <c>CU_RES_VIEW_FORMAT_UINT_1X8</c>, the view of one unsigned 8 bit channel.
     /// </summary>
     internal const int RES_VIEW_FORMAT_UINT_1X8 = 0x01;
@@ -76,6 +81,16 @@ internal static unsafe partial class CudaApi
     /// <c>CU_RES_VIEW_FORMAT_FLOAT_1X32</c>, the view of one 32 bit float channel.
     /// </summary>
     internal const int RES_VIEW_FORMAT_FLOAT_1X32 = 0x16;
+
+    /// <summary>
+    /// <c>CU_RES_VIEW_FORMAT_FLOAT_4X16</c>, the view of four 16 bit float channels.
+    /// </summary>
+    internal const int RES_VIEW_FORMAT_FLOAT_4X16 = 0x15;
+
+    /// <summary>
+    /// <c>CU_RES_VIEW_FORMAT_FLOAT_4X32</c>, the view of four 32 bit float channels.
+    /// </summary>
+    internal const int RES_VIEW_FORMAT_FLOAT_4X32 = 0x18;
 
     /// <summary>
     /// <c>CU_TR_ADDRESS_MODE_WRAP</c>, which tiles the image.
