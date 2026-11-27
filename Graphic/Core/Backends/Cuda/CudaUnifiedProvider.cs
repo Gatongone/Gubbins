@@ -412,6 +412,40 @@ internal sealed unsafe class CudaCompute : IDisposable
     /// </param>
     /// <returns><see langword="true"/> if the launch completed.</returns>
     internal bool Dispatch(ulong source, ulong sourceSize, ulong destination, ulong destinationSize, ulong parametersAddress, ulong lengths, ulong lengthsSize, uint groups, uint threadsPerGroup, bool wait, ulong texture = 0)
+        => Dispatch(
+            source,
+            sourceSize,
+            destination,
+            destinationSize,
+            parametersAddress,
+            lengths,
+            lengthsSize,
+            groups,
+            threadsPerGroup,
+            wait,
+            texture == 0 ? ReadOnlySpan<ulong>.Empty : MemoryMarshal.CreateReadOnlySpan(ref texture, 1));
+
+    /// <summary>
+    /// Runs the kernel over three blocks of device memory, with the handles of the texture objects it samples.
+    /// </summary>
+    /// <param name="source">The device pointer the kernel reads.</param>
+    /// <param name="sourceSize">The size of that block, in bytes.</param>
+    /// <param name="destination">The device pointer the kernel writes.</param>
+    /// <param name="destinationSize">The size of that block, in bytes.</param>
+    /// <param name="parameters">The device pointer the structure the kernel takes is read from, or zero when it takes none.</param>
+    /// <param name="lengths">The device pointer the lengths are read from the block that carries them.</param>
+    /// <param name="lengthsSize">The size of that block, in bytes.</param>
+    /// <param name="groups">The number of thread blocks on the x axis.</param>
+    /// <param name="threadsPerGroup">The threads in a block.</param>
+    /// <param name="wait">Whether to wait for the launch.</param>
+    /// <param name="textures">
+    /// The <c>CUtexObject</c> handles the kernel samples, in the binding order the entry point declares them in; empty for
+    /// a kernel that takes no texture. Each one is passed as an argument after the three the plain kernel takes, which is
+    /// the order <see cref="Kernels.KernelPtx"/> writes the entry point's parameters in. CUDA keeps each sampler inside its
+    /// texture object, so no sampler is an argument of its own.
+    /// </param>
+    /// <returns><see langword="true"/> if the launch completed.</returns>
+    internal bool Dispatch(ulong source, ulong sourceSize, ulong destination, ulong destinationSize, ulong parametersAddress, ulong lengths, ulong lengthsSize, uint groups, uint threadsPerGroup, bool wait, ReadOnlySpan<ulong> textures)
     {
         if (m_Disposed || m_Function == 0 || groups == 0 || threadsPerGroup == 0)
         {
@@ -444,25 +478,29 @@ internal sealed unsafe class CudaCompute : IDisposable
                 return false;
             }
         }
-        else if (texture != 0)
-        {
-            // A kernel whose PTX takes its buffers as arguments is passed the source, the destination, the block the
-            // counts live in and, when it samples one, the handle of the texture object.
-            var list = stackalloc void*[4];
-            list[0] = &source;
-            list[1] = &destination;
-            list[2] = &lengths;
-            list[3] = &texture;
-            arguments = list;
-        }
         else
         {
-            // A kernel whose PTX takes its buffers as arguments has no constant to fill, so the three parameters the
-            // emitter writes are passed instead: the source, the destination and the block the counts live in.
-            var list = stackalloc void*[3];
+            // A kernel whose PTX takes its buffers as arguments has no constant to fill, so the parameters the emitter
+            // writes are passed instead: the source, the destination, the block the counts live in and one handle per
+            // texture object, in binding order. The handles are copied to the stack so the launch can read every one of
+            // them through the list, which is what a dynamic number of kernel arguments needs.
+            var handles = stackalloc ulong[textures.Length];
+
+            for (var index = 0; index < textures.Length; index++)
+            {
+                handles[index] = textures[index];
+            }
+
+            var list = stackalloc void*[3 + textures.Length];
             list[0] = &source;
             list[1] = &destination;
             list[2] = &lengths;
+
+            for (var index = 0; index < textures.Length; index++)
+            {
+                list[3 + index] = &handles[index];
+            }
+
             arguments = list;
         }
 

@@ -1060,6 +1060,88 @@ public sealed class GpuKernel : IDisposable
     }
 
     /// <summary>
+    /// Runs a kernel that samples several textures on CUDA.
+    /// </summary>
+    /// <param name="source">The block the kernel reads.</param>
+    /// <param name="destination">The block the kernel writes.</param>
+    /// <param name="lengths">The block that carries the element counts, or <see langword="null"/>.</param>
+    /// <param name="parameters">The block that carries the structure the kernel takes, or <see langword="null"/>.</param>
+    /// <param name="bindings">The textures and samplers, in the order the kernel declares them.</param>
+    /// <param name="groups">The number of thread groups on the x axis.</param>
+    /// <param name="wait">Whether to wait for the dispatch.</param>
+    /// <returns><see langword="true"/> if the dispatch ran.</returns>
+    /// <remarks>
+    /// The handle of each texture object is passed after the block of element counts, in binding order, which is the order
+    /// the PTX declares the entry point's parameters in. CUDA keeps each sampler inside its texture object, so the sampler
+    /// of a binding is only checked to be this backend's state and nothing of its own is passed to the launch.
+    /// </remarks>
+    public unsafe bool TryDispatchCudaTextures(GpuBlock source, GpuBlock destination, GpuBlock? lengths, GpuBlock? parameters, ReadOnlySpan<GpuTextureBinding> bindings, uint groups, bool wait = true)
+    {
+        if (m_Disposed)
+        {
+            throw new ObjectDisposedException(nameof(GpuKernel));
+        }
+
+        if (source is null || destination is null)
+        {
+            throw new ArgumentNullException(source is null ? nameof(source) : nameof(destination));
+        }
+
+        if (bindings.Length == 0 || m_Cuda is null || m_Device.Backend is not CudaDevice cuda)
+        {
+            return false;
+        }
+
+        if (!cuda.Provider.TryGetPointer(source.Storage, out var sourcePointer) ||
+            !cuda.Provider.TryGetPointer(destination.Storage, out var destinationPointer))
+        {
+            return false;
+        }
+
+        var textures = stackalloc ulong[bindings.Length];
+
+        for (var index = 0; index < bindings.Length; index++)
+        {
+            if (bindings[index].Texture.Backend is not CudaTexture texture ||
+                bindings[index].Sampler.Backend is not CudaSamplerState)
+            {
+                return false;
+            }
+
+            textures[index] = (ulong)texture.TextureObject;
+        }
+
+        var lengthsPointer = 0ul;
+        var lengthsLength = 0ul;
+
+        if (lengths is not null && cuda.Provider.TryGetPointer(lengths.Storage, out var availableLengths))
+        {
+            lengthsPointer = availableLengths;
+            lengthsLength = (ulong)lengths.Storage.Length;
+        }
+
+        var parametersPointer = 0ul;
+
+        if (parameters is not null && cuda.Provider.TryGetPointer(parameters.Storage, out var availableParameters))
+        {
+            parametersPointer = availableParameters;
+        }
+
+        return m_Cuda.Dispatch(
+            sourcePointer,
+            (ulong)source.Storage.Length,
+            destinationPointer,
+            (ulong)destination.Storage.Length,
+            parametersPointer,
+            lengthsPointer,
+            lengthsLength,
+            groups,
+            64,
+            wait,
+            new ReadOnlySpan<ulong>(textures, bindings.Length));
+    }
+
+    /// <summary>
     /// Waits for the dispatches of this kernel that were recorded without waiting.
     /// </summary>
     /// <returns><see langword="true"/> when every submission has completed.</returns>

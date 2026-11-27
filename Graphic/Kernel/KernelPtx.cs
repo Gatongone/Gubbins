@@ -23,10 +23,11 @@ namespace Gubbins.Graphic.Kernels;
 /// a wave call or takes a structure as one value is not written, and the artifact a CUDA device would load is not produced.
 /// </para>
 /// <para>
-/// A program that samples a texture takes the handle of the texture object as one more argument, after the two buffers
-/// and the block of element counts. CUDA keeps the sampler inside that object, so the sampler a kernel declares is not an
-/// argument of its own: the <c>tex</c> instruction reads through the filter and address modes the object was created
-/// with. The entry point has one slot for it, so a program that samples more than one texture is not written.
+/// A program that samples textures takes the handle of each texture object as one more argument, after the two buffers
+/// and the block of element counts, in binding order. CUDA keeps the sampler inside the object, so the sampler a kernel
+/// declares is not an argument of its own: the <c>tex</c> instruction reads through the filter and address modes the
+/// object was created with. One argument is written per texture the program declares, so a program that samples any
+/// number of them is written as long as it takes exactly its two buffers.
 /// </para>
 /// </remarks>
 public sealed class KernelPtx
@@ -43,7 +44,7 @@ public sealed class KernelPtx
             throw new ArgumentNullException(nameof(program));
         }
 
-        if (program.Buffers.Count != 2 || program.Parameters is not null || Wave(program) || (program.Textures?.Count ?? 0) > 1)
+        if (program.Buffers.Count != 2 || program.Parameters is not null || Wave(program))
         {
             return string.Empty;
         }
@@ -115,6 +116,7 @@ internal sealed class PtxWriter
     private readonly StringBuilder m_Locals = new();
     private readonly List<Dictionary<string, PtxSlot>> m_Scopes = new();
     private readonly Dictionary<string, string> m_Globals = new(StringComparer.Ordinal);
+    private readonly Dictionary<int, string> m_TexturePointers = new();
     private readonly Stack<(string Break, string Continue)> m_Loops = new();
     private int m_Registers;
     private int m_Floats;
@@ -139,13 +141,14 @@ internal sealed class PtxWriter
         m_Globals[DESTINATION] = Pointer("ld.param.u64 %rd, [__gubbinsDestination];");
         m_Globals[LENGTHS] = Pointer("ld.param.u64 %rd, [__gubbinsLengths];");
 
-        var textured = (m_Program.Textures?.Count ?? 0) == 1;
+        var textures = Textures();
 
         // A sampled texture is one more argument after the block of counts: the handle of the texture object, which is
-        // where CUDA keeps the sampler. Nothing else about the launch changes.
-        if (textured)
+        // where CUDA keeps the sampler. The arguments are written in binding order, which is the order the dispatch
+        // passes the handles in.
+        foreach (var texture in textures)
         {
-            m_Globals[TEXTURE] = Pointer("ld.param.u64 %rd, [__gubbinsTexture];");
+            m_TexturePointers[texture.Binding] = Pointer($"ld.param.u64 %rd, [{TextureName(texture.Binding)}];");
         }
 
         foreach (var shared in m_Program.EntryPoint.SharedArrays)
@@ -165,11 +168,11 @@ internal sealed class PtxWriter
         var parameters = new StringBuilder();
         parameters.AppendLine($"    .param .u64 {SOURCE},");
         parameters.AppendLine($"    .param .u64 {DESTINATION},");
-        parameters.AppendLine($"    .param .u64 {LENGTHS}" + (textured ? "," : string.Empty));
+        parameters.AppendLine($"    .param .u64 {LENGTHS}" + (textures.Count > 0 ? "," : string.Empty));
 
-        if (textured)
+        for (var index = 0; index < textures.Count; index++)
         {
-            parameters.AppendLine($"    .param .u64 {TEXTURE}");
+            parameters.AppendLine($"    .param .u64 {TextureName(textures[index].Binding)}" + (index == textures.Count - 1 ? string.Empty : ","));
         }
 
         var text = new StringBuilder();
@@ -191,6 +194,20 @@ internal sealed class PtxWriter
 
         return text.ToString();
     }
+
+    /// <summary>
+    /// Reads the textures the program samples, in the order the dispatch binds them.
+    /// </summary>
+    /// <returns>The textures.</returns>
+    private IReadOnlyList<KernelTexture> Textures()
+        => m_Program.Textures is null ? Array.Empty<KernelTexture>() : m_Program.Textures.OrderBy(texture => texture.Binding).ToArray();
+
+    /// <summary>
+    /// Reads the name the entry point declares one texture object's argument under.
+    /// </summary>
+    /// <param name="binding">The index the texture is bound at.</param>
+    /// <returns>The name.</returns>
+    private static string TextureName(int binding) => TEXTURE + binding.ToString(CultureInfo.InvariantCulture);
 
     /// <summary>
     /// Reads the address of the buffer a name is bound to.
@@ -823,7 +840,7 @@ internal sealed class PtxWriter
 
         var texel = Registers(sample.ResultType);
 
-        Instruction($"tex.2d.v4.f32.f32 {{{string.Join(", ", texel)}}}, [{m_Globals[TEXTURE]}, {{{coordinates.Registers[0]}, {coordinates.Registers[1]}}}];");
+        Instruction($"tex.2d.v4.f32.f32 {{{string.Join(", ", texel)}}}, [{m_TexturePointers[sample.Texture.Binding]}, {{{coordinates.Registers[0]}, {coordinates.Registers[1]}}}];");
 
         return PtxValue.Many(texel, sample.ResultType);
     }

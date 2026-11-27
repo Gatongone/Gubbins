@@ -2596,6 +2596,52 @@ public static class PtxTextured
     }
 
     [Test]
+    public void Kernel_CompilesATwoTexturedProgramToPtx()
+    {
+        const string Source = @"
+using System;
+using Gubbins.Graphic;
+
+public static class PtxTwoTextured
+{
+    public static void Kernel(int index, ReadOnlySpan<float2> source, Span<float4> destination, GpuTexture2D left, GpuSamplerState leftSampler, GpuTexture2D right, GpuSamplerState rightSampler)
+    {
+        destination[index] = left.Sample(leftSampler, source[index]) + right.Sample(rightSampler, source[index]);
+    }
+}
+";
+
+        var directory = Directory.CreateTempSubdirectory("gubbins-ptx-two-").FullName;
+
+        try
+        {
+            var artifacts = KernelCompiler.Compile(Source, directory, "PtxTwoTextured");
+            var path = Path.Combine(directory, "PtxTwoTextured.ptx");
+
+            Assert.That(artifacts, Does.Contain(path), "a kernel that samples two textures writes a PTX artifact");
+
+            var text = File.ReadAllText(path);
+
+            Assert.That(text, Does.Contain("__gubbinsTexture0"), "the first texture object is an argument of the entry point");
+            Assert.That(text, Does.Contain("__gubbinsTexture1"), "the second texture object is an argument of the entry point");
+
+            // The two buffers, the block of element counts, then one texture object per sampled texture, in binding order.
+            Assert.That(
+                System.Text.RegularExpressions.Regex.Matches(text, @"\.param \.u64").Count,
+                Is.EqualTo(5),
+                "a kernel that samples two textures takes one argument per texture object");
+            Assert.That(
+                text.IndexOf("__gubbinsTexture0", StringComparison.Ordinal),
+                Is.LessThan(text.IndexOf("__gubbinsTexture1", StringComparison.Ordinal)),
+                "the texture arguments are declared in binding order");
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Test]
     public void VulkanTexture_KernelSamplesTwoTextures()
     {
         const string Source = @"
@@ -2757,6 +2803,98 @@ public static class VulkanTextured
                 Assert.That(result[1], Is.EqualTo(0f).Within(0.001f), "the green channel came from the sampled texel");
                 Assert.That(result[2], Is.EqualTo(0f).Within(0.001f), "the blue channel came from the sampled texel");
                 Assert.That(result[3], Is.EqualTo(1f).Within(0.001f), "the alpha channel came from the sampled texel");
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
+    }
+
+    [Test]
+    public void CudaTexture_KernelSamplesTwoTextures()
+    {
+        const string Source = @"
+using System;
+using Gubbins.Graphic;
+
+public static class CudaTwoTextured
+{
+    public static void Kernel(int index, ReadOnlySpan<float2> source, Span<float4> destination, GpuTexture2D left, GpuSamplerState leftSampler, GpuTexture2D right, GpuSamplerState rightSampler)
+    {
+        destination[index] = left.Sample(leftSampler, source[index]) + right.Sample(rightSampler, source[index]);
+    }
+}
+";
+
+        if (!OperatingSystem.IsWindows() || !CudaDevice.IsAvailable || !CudaDevice.TryCreate(out var owner) || owner is null)
+        {
+            Assert.Ignore("This machine has no CUDA device.");
+            return;
+        }
+
+        var directory = Directory.CreateTempSubdirectory("gubbins-cudatwo-").FullName;
+
+        try
+        {
+            KernelCompiler.Compile(Source, directory, "CudaTwoTextured");
+
+            // CUDA keeps the sampler in the texture object, so each texture is created with the description its sampler
+            // names and the kernel samples through the object rather than through a separate argument.
+            var sampler = new GpuSampler(GpuTextureFilter.Nearest, GpuAddressMode.Clamp);
+
+            using (owner)
+            using (var device = new GpuDevice(owner, owner.Provider.GetProvider(), owner.Provider.MaxSegmentSize, false, owner.Provider.WorkingSetLimit, "CUDA"))
+            using (var memory = device.CreateMemory())
+            using (var left = owner.Provider.CreateTexture(1, 1, GpuTextureFormat.Rgba8Unorm, sampler))
+            using (var right = owner.Provider.CreateTexture(1, 1, GpuTextureFormat.Rgba8Unorm, sampler))
+            using (var leftSampler = owner.Provider.CreateSampler(sampler))
+            using (var rightSampler = owner.Provider.CreateSampler(sampler))
+            using (var kernel = GpuKernel.LoadFromDirectory(device, directory, "CudaTwoTextured"))
+            {
+                Assert.That(kernel, Is.Not.Null, "the two texture kernel loads on CUDA");
+
+                left.Upload(new byte[] { 255, 0, 0, 255 }, 4);
+                right.Upload(new byte[] { 0, 255, 0, 255 }, 4);
+
+                // A dispatch always runs a whole group and CUDA does not mask a write past the end of a block, so both
+                // blocks hold a value per thread and no thread writes outside its own element.
+                var threadCount = KernelTranspiler.THREADS_PER_GROUP;
+                var input = memory.Allocate((nuint)(threadCount * 2 * sizeof(float)), GpuAccess.Shared);
+                var output = memory.Allocate((nuint)(threadCount * 4 * sizeof(float)), GpuAccess.Shared);
+                var lengths = memory.Allocate(16, GpuAccess.Shared);
+
+                var coordinates = new float[threadCount * 2];
+
+                for (var index = 0; index < threadCount; index++)
+                {
+                    coordinates[index * 2] = 0.5f;
+                    coordinates[index * 2 + 1] = 0.5f;
+                }
+
+                memory.Upload(input, MemoryMarshal.AsBytes(coordinates.AsSpan()));
+                memory.Upload(lengths, MemoryMarshal.AsBytes(new uint[] { (uint)threadCount, (uint)threadCount, 0, 0 }.AsSpan()));
+
+                var bindings = new[]
+                {
+                    new GpuTextureBinding(left, leftSampler),
+                    new GpuTextureBinding(right, rightSampler)
+                };
+
+                Assert.That(kernel!.TryDispatchCudaTextures(input, output, lengths, null, bindings, 1), Is.True, "the two texture dispatch ran");
+
+                memory.MarkWrittenByGpu(output);
+                Assert.That(memory.Synchronize(), Is.True, "the two texture output was synchronized");
+
+                var result = MemoryMarshal.Cast<byte, float>(output.CpuView());
+
+                for (var thread = 0; thread < threadCount; thread++)
+                {
+                    Assert.That(result[thread * 4], Is.EqualTo(1f).Within(0.001f), $"thread {thread}: the red texture contributed its red channel");
+                    Assert.That(result[thread * 4 + 1], Is.EqualTo(1f).Within(0.001f), $"thread {thread}: the green texture contributed its green channel");
+                    Assert.That(result[thread * 4 + 2], Is.EqualTo(0f).Within(0.001f), $"thread {thread}: neither texture contributed a blue channel");
+                    Assert.That(result[thread * 4 + 3], Is.EqualTo(2f).Within(0.001f), $"thread {thread}: both alphas added");
+                }
             }
         }
         finally
