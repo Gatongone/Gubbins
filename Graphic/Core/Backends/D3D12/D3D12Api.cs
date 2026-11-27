@@ -363,6 +363,17 @@ internal static unsafe partial class D3D12Api
         => ((delegate* unmanaged[Cdecl]<nint, int, uint>)Method(device, 15))(device, type);
 
     /// <summary>
+    /// Calls <c>ID3D12Device::CopyDescriptorsSimple</c>.
+    /// </summary>
+    /// <param name="device">The device.</param>
+    /// <param name="count">The number of descriptors to copy.</param>
+    /// <param name="destination">The first descriptor to copy into.</param>
+    /// <param name="source">The first descriptor to copy from.</param>
+    /// <param name="type">The heap type the descriptors belong to, which has to be the same for both sides.</param>
+    internal static void CopyDescriptorsSimple(nint device, uint count, D3D12CpuDescriptorHandle destination, D3D12CpuDescriptorHandle source, int type)
+        => ((delegate* unmanaged[Cdecl]<nint, uint, D3D12CpuDescriptorHandle, D3D12CpuDescriptorHandle, int, void>)Method(device, 24))(device, count, destination, source, type);
+
+    /// <summary>
     /// Calls <c>ID3D12Device::CreateShaderResourceView</c>.
     /// </summary>
     /// <param name="device">The device.</param>

@@ -393,7 +393,7 @@ public sealed class GpuKernel : IDisposable
             parametersAddress = D3D12Api.GetVirtualAddress(parametersResource) + (ulong)parameters.Storage.Offset;
         }
 
-        return m_D3D12.Dispatch(sourceResource, sourceAddress, destinationResource, destinationAddress, parametersAddress, lengthsAddress, 0, 0, 0, default, 0, default, groups, wait);
+        return m_D3D12.Dispatch(sourceResource, sourceAddress, destinationResource, destinationAddress, parametersAddress, lengthsAddress, groups, wait);
     }
 
     /// <summary>
@@ -728,12 +728,45 @@ public sealed class GpuKernel : IDisposable
             throw new ObjectDisposedException(nameof(GpuKernel));
         }
 
-        if (m_D3D12 is null || m_Device.Backend is not D3D12Device d3d12)
+        if (m_D3D12 is null || m_Device.Backend is not D3D12Device)
         {
             return false;
         }
 
-        if (texture.Backend is not D3D12Texture d3d12Texture || sampler.Backend is not D3D12SamplerState d3d12Sampler)
+        if (texture.Backend is not D3D12Texture || sampler.Backend is not D3D12SamplerState)
+        {
+            return false;
+        }
+
+        // One texture is the same combined-heap path as several: the root signature tables are eight descriptors wide,
+        // and the one binding is copied into their first slot.
+        return TryDispatchD3D12Textures(source, destination, lengths, parameters, new[] { new GpuTextureBinding(texture, sampler) }, groups, wait);
+    }
+
+    /// <summary>
+    /// Runs a kernel that samples several textures on D3D12.
+    /// </summary>
+    /// <param name="source">The block the kernel reads.</param>
+    /// <param name="destination">The block the kernel writes.</param>
+    /// <param name="lengths">The block that carries the element counts, or <see langword="null"/>.</param>
+    /// <param name="parameters">The block that carries the structure the kernel takes, or <see langword="null"/>.</param>
+    /// <param name="bindings">The textures and samplers, in the order the kernel declares them.</param>
+    /// <param name="groups">The number of groups on the x axis.</param>
+    /// <param name="wait">Whether to wait for the dispatch.</param>
+    /// <returns><see langword="true"/> if the dispatch ran.</returns>
+    /// <remarks>
+    /// The binding at index <c>i</c> is the texture the kernel declares at <c>t{i}</c> and the sampler it declares at
+    /// <c>s{i}</c>. The descriptors are gathered into combined heaps by <c>D3D12Compute.Dispatch</c>, which owns them until
+    /// the dispatch that recorded them has completed.
+    /// </remarks>
+    public unsafe bool TryDispatchD3D12Textures(GpuBlock source, GpuBlock destination, GpuBlock? lengths, GpuBlock? parameters, ReadOnlySpan<GpuTextureBinding> bindings, uint groups, bool wait = true)
+    {
+        if (m_Disposed)
+        {
+            throw new ObjectDisposedException(nameof(GpuKernel));
+        }
+
+        if (bindings.Length == 0 || bindings.Length > D3D12Compute.MaxTextures || m_D3D12 is null || m_Device.Backend is not D3D12Device d3d12)
         {
             return false;
         }
@@ -744,6 +777,22 @@ public sealed class GpuKernel : IDisposable
             !provider.TryGetResource(destination.Storage, out var destinationResource, out _))
         {
             return false;
+        }
+
+        var native = stackalloc D3D12TextureBinding[bindings.Length];
+
+        for (var index = 0; index < bindings.Length; index++)
+        {
+            var binding = bindings[index];
+
+            if (binding.Texture is null || binding.Sampler is null ||
+                binding.Texture.Backend is not D3D12Texture texture ||
+                binding.Sampler.Backend is not D3D12SamplerState sampler)
+            {
+                return false;
+            }
+
+            native[index] = new D3D12TextureBinding(texture, sampler);
         }
 
         var sourceAddress = D3D12Api.GetVirtualAddress(sourceResource) + (ulong)source.Storage.Offset;
@@ -761,8 +810,6 @@ public sealed class GpuKernel : IDisposable
             parametersAddress = D3D12Api.GetVirtualAddress(parametersResource) + (ulong)parameters.Storage.Offset;
         }
 
-        var textureState = d3d12Texture.State;
-
         var dispatched = m_D3D12.Dispatch(
             sourceResource,
             sourceAddress,
@@ -770,18 +817,18 @@ public sealed class GpuKernel : IDisposable
             destinationAddress,
             parametersAddress,
             lengthsAddress,
-            d3d12Texture.Resource,
-            textureState,
-            d3d12Texture.SrvHeap,
-            d3d12Texture.Srv,
-            d3d12Sampler.Heap,
-            d3d12Sampler.Descriptor,
+            new ReadOnlySpan<D3D12TextureBinding>(native, bindings.Length),
             groups,
             wait);
 
         if (dispatched)
         {
-            d3d12Texture.State = 0x40;
+            // The command list moved every texture it read into the compute shader's read state, which is where a later
+            // upload or readback expects to find it.
+            for (var index = 0; index < bindings.Length; index++)
+            {
+                ((D3D12Texture)bindings[index].Texture.Backend).State = D3D12Api.RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+            }
         }
 
         return dispatched;
