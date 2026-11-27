@@ -95,7 +95,7 @@ internal sealed unsafe class GlCompute : IDisposable
     /// The blocks of one segment share a buffer, so every binding is a range and never the whole buffer: binding the
     /// whole buffer would make every block read and write the words at the start of the segment instead of its own.
     /// </remarks>
-    internal bool Dispatch(uint sourceBuffer, ulong sourceOffset, ulong sourceSize, uint destinationBuffer, ulong destinationOffset, ulong destinationSize, uint parametersBuffer, ulong parametersOffset, ulong parametersSize, uint lengthsBuffer, ulong lengthsOffset, ulong lengthsSize, uint texture, uint sampler, uint groups, bool wait)
+    internal bool Dispatch(uint sourceBuffer, ulong sourceOffset, ulong sourceSize, uint destinationBuffer, ulong destinationOffset, ulong destinationSize, uint parametersBuffer, ulong parametersOffset, ulong parametersSize, uint lengthsBuffer, ulong lengthsOffset, ulong lengthsSize, ReadOnlySpan<uint> textures, ReadOnlySpan<uint> samplers, uint groups, bool wait)
     {
         if (m_Disposed || m_Program == 0 || sourceBuffer == 0 || destinationBuffer == 0 || groups == 0)
         {
@@ -129,11 +129,14 @@ internal sealed unsafe class GlCompute : IDisposable
             m_Api.BindBufferRange(ShaderStorageBuffer, 2, lengthsBuffer, (nint)lengthsOffset, (nint)lengthsSize);
         }
 
-        if (texture != 0)
+        for (var index = 0; index < textures.Length; index++)
         {
-            m_Api.ActiveTexture(Texture0);
-            m_Api.BindTexture(Texture2D, texture);
-            m_Api.BindSampler(0, sampler);
+            if (textures[index] != 0)
+            {
+                m_Api.ActiveTexture(Texture0 + (uint)index);
+                m_Api.BindTexture(Texture2D, textures[index]);
+                m_Api.BindSampler((uint)index, samplers[index]);
+            }
         }
 
         m_Api.DispatchCompute(groups, 1, 1);

@@ -296,7 +296,7 @@ public sealed class GpuKernel : IDisposable
                 parametersSize = (ulong)parameters.Storage.Length;
             }
 
-            return m_OpenGL.Dispatch(sourceBuffer, sourceOffset, (ulong)source.Length, destinationBuffer, destinationOffset, (ulong)destination.Length, parametersBuffer, parametersOffset, parametersSize, lengthsBuffer, lengthsOffset, LengthsSize, 0, 0, groups, wait);
+            return m_OpenGL.Dispatch(sourceBuffer, sourceOffset, (ulong)source.Length, destinationBuffer, destinationOffset, (ulong)destination.Length, parametersBuffer, parametersOffset, parametersSize, lengthsBuffer, lengthsOffset, LengthsSize, ReadOnlySpan<uint>.Empty, ReadOnlySpan<uint>.Empty, groups, wait);
         }
 
         if (m_Metal is not null && m_Device.Backend is MetalDevice metal)
@@ -327,7 +327,7 @@ public sealed class GpuKernel : IDisposable
                 parametersOffset = availableParametersOffset;
             }
 
-            return m_Metal.Dispatch(sourceBuffer, (nuint)sourceOffset, destinationBuffer, (nuint)destinationOffset, parametersBuffer, (nuint)parametersOffset, lengthsBuffer, (nuint)lengthsOffset, 0, 0, groups, 64, wait);
+            return m_Metal.Dispatch(sourceBuffer, (nuint)sourceOffset, destinationBuffer, (nuint)destinationOffset, parametersBuffer, (nuint)parametersOffset, lengthsBuffer, (nuint)lengthsOffset, ReadOnlySpan<nint>.Empty, ReadOnlySpan<nint>.Empty, groups, 64, wait);
         }
 
         if (m_Vulkan is not null && m_Device.Backend is VulkanDevice vulkan)
@@ -408,7 +408,7 @@ public sealed class GpuKernel : IDisposable
     /// <param name="groups">The number of groups on the x axis.</param>
     /// <param name="wait">Whether to wait for the dispatch.</param>
     /// <returns><see langword="true"/> if the dispatch ran.</returns>
-    public bool TryDispatch(GpuBlock source, GpuBlock destination, GpuBlock? lengths, GpuBlock? parameters, GpuTexture2D texture, GpuSamplerState sampler, uint groups, bool wait = true)
+    public unsafe bool TryDispatch(GpuBlock source, GpuBlock destination, GpuBlock? lengths, GpuBlock? parameters, GpuTexture2D texture, GpuSamplerState sampler, uint groups, bool wait = true)
     {
         if (m_Disposed)
         {
@@ -449,6 +449,11 @@ public sealed class GpuKernel : IDisposable
             parametersOffset = availableParametersOffset;
         }
 
+        var textures = stackalloc nint[1];
+        var samplers = stackalloc nint[1];
+        textures[0] = metalTexture.Handle;
+        samplers[0] = metalSampler.Handle;
+
         return m_Metal.Dispatch(
             sourceBuffer,
             (nuint)sourceOffset,
@@ -458,8 +463,86 @@ public sealed class GpuKernel : IDisposable
             (nuint)parametersOffset,
             lengthsBuffer,
             (nuint)lengthsOffset,
-            metalTexture.Handle,
-            metalSampler.Handle,
+            new ReadOnlySpan<nint>(textures, 1),
+            new ReadOnlySpan<nint>(samplers, 1),
+            groups,
+            64,
+            wait);
+    }
+
+    /// <summary>
+    /// Runs a kernel that samples several textures.
+    /// </summary>
+    /// <param name="source">The block the kernel reads.</param>
+    /// <param name="destination">The block the kernel writes.</param>
+    /// <param name="lengths">The block that carries the element counts, or <see langword="null"/>.</param>
+    /// <param name="parameters">The block that carries the structure the kernel takes, or <see langword="null"/>.</param>
+    /// <param name="bindings">The textures and samplers, in the order the kernel declares them.</param>
+    /// <param name="groups">The number of groups on the x axis.</param>
+    /// <param name="wait">Whether to wait for the dispatch.</param>
+    /// <returns><see langword="true"/> if the dispatch ran.</returns>
+    public unsafe bool TryDispatchTextures(GpuBlock source, GpuBlock destination, GpuBlock? lengths, GpuBlock? parameters, ReadOnlySpan<GpuTextureBinding> bindings, uint groups, bool wait = true)
+    {
+        if (m_Disposed)
+        {
+            throw new ObjectDisposedException(nameof(GpuKernel));
+        }
+
+        if (bindings.Length == 0 || m_Metal is null || m_Device.Backend is not MetalDevice metal)
+        {
+            return false;
+        }
+
+        if (!metal.Provider.TryGetBuffer(source.Storage, out var sourceBuffer, out var sourceOffset) ||
+            !metal.Provider.TryGetBuffer(destination.Storage, out var destinationBuffer, out var destinationOffset))
+        {
+            return false;
+        }
+
+        var textures = stackalloc nint[bindings.Length];
+        var samplers = stackalloc nint[bindings.Length];
+
+        for (var index = 0; index < bindings.Length; index++)
+        {
+            if (bindings[index].Texture.Backend is not MetalTexture texture ||
+                bindings[index].Sampler.Backend is not MetalSamplerState sampler)
+            {
+                return false;
+            }
+
+            textures[index] = texture.Handle;
+            samplers[index] = sampler.Handle;
+        }
+
+        nint lengthsBuffer = 0;
+        var lengthsOffset = 0ul;
+
+        if (lengths is not null && metal.Provider.TryGetBuffer(lengths.Storage, out var availableLengths, out var availableLengthsOffset))
+        {
+            lengthsBuffer = availableLengths;
+            lengthsOffset = availableLengthsOffset;
+        }
+
+        nint parametersBuffer = 0;
+        var parametersOffset = 0ul;
+
+        if (parameters is not null && metal.Provider.TryGetBuffer(parameters.Storage, out var availableParameters, out var availableParametersOffset))
+        {
+            parametersBuffer = availableParameters;
+            parametersOffset = availableParametersOffset;
+        }
+
+        return m_Metal.Dispatch(
+            sourceBuffer,
+            (nuint)sourceOffset,
+            destinationBuffer,
+            (nuint)destinationOffset,
+            parametersBuffer,
+            (nuint)parametersOffset,
+            lengthsBuffer,
+            (nuint)lengthsOffset,
+            new ReadOnlySpan<nint>(textures, bindings.Length),
+            new ReadOnlySpan<nint>(samplers, bindings.Length),
             groups,
             64,
             wait);
@@ -477,7 +560,7 @@ public sealed class GpuKernel : IDisposable
     /// <param name="groups">The number of groups on the x axis.</param>
     /// <param name="wait">Whether to wait for the dispatch.</param>
     /// <returns><see langword="true"/> if the dispatch ran.</returns>
-    public bool TryDispatchOpenGl(GpuBlock source, GpuBlock destination, GpuBlock? lengths, GpuBlock? parameters, GpuTexture2D texture, GpuSamplerState sampler, uint groups, bool wait = true)
+    public unsafe bool TryDispatchOpenGl(GpuBlock source, GpuBlock destination, GpuBlock? lengths, GpuBlock? parameters, GpuTexture2D texture, GpuSamplerState sampler, uint groups, bool wait = true)
     {
         if (m_Disposed)
         {
@@ -520,6 +603,11 @@ public sealed class GpuKernel : IDisposable
             parametersSize = (ulong)parameters.Storage.Length;
         }
 
+        var textures = stackalloc uint[1];
+        var samplers = stackalloc uint[1];
+        textures[0] = glTexture.Handle;
+        samplers[0] = glSampler.Handle;
+
         return m_OpenGL.Dispatch(
             sourceBuffer,
             sourceOffset,
@@ -533,8 +621,90 @@ public sealed class GpuKernel : IDisposable
             lengthsBuffer,
             lengthsOffset,
             LengthsSize,
-            glTexture.Handle,
-            glSampler.Handle,
+            new ReadOnlySpan<uint>(textures, 1),
+            new ReadOnlySpan<uint>(samplers, 1),
+            groups,
+            wait);
+    }
+
+    /// <summary>
+    /// Runs a kernel that samples several textures on OpenGL.
+    /// </summary>
+    /// <param name="source">The block the kernel reads.</param>
+    /// <param name="destination">The block the kernel writes.</param>
+    /// <param name="lengths">The block that carries the element counts, or <see langword="null"/>.</param>
+    /// <param name="parameters">The block that carries the structure the kernel takes, or <see langword="null"/>.</param>
+    /// <param name="bindings">The textures and samplers, in the order the kernel declares them.</param>
+    /// <param name="groups">The number of groups on the x axis.</param>
+    /// <param name="wait">Whether to wait for the dispatch.</param>
+    /// <returns><see langword="true"/> if the dispatch ran.</returns>
+    public unsafe bool TryDispatchOpenGlTextures(GpuBlock source, GpuBlock destination, GpuBlock? lengths, GpuBlock? parameters, ReadOnlySpan<GpuTextureBinding> bindings, uint groups, bool wait = true)
+    {
+        if (m_Disposed)
+        {
+            throw new ObjectDisposedException(nameof(GpuKernel));
+        }
+
+        if (bindings.Length == 0 || m_OpenGL is null || m_Device.Backend is not GlDevice openGL)
+        {
+            return false;
+        }
+
+        if (!openGL.Provider.TryGetBuffer(source.Storage, out var sourceBuffer, out var sourceOffset) ||
+            !openGL.Provider.TryGetBuffer(destination.Storage, out var destinationBuffer, out var destinationOffset))
+        {
+            return false;
+        }
+
+        var textures = stackalloc uint[bindings.Length];
+        var samplers = stackalloc uint[bindings.Length];
+
+        for (var index = 0; index < bindings.Length; index++)
+        {
+            if (bindings[index].Texture.Backend is not GlTexture texture || bindings[index].Sampler.Backend is not GlSamplerState sampler)
+            {
+                return false;
+            }
+
+            textures[index] = texture.Handle;
+            samplers[index] = sampler.Handle;
+        }
+
+        var lengthsBuffer = 0u;
+        var lengthsOffset = 0ul;
+
+        if (lengths is not null && openGL.Provider.TryGetBuffer(lengths.Storage, out var availableLengths, out var availableLengthsOffset))
+        {
+            lengthsBuffer = availableLengths;
+            lengthsOffset = availableLengthsOffset;
+        }
+
+        var parametersBuffer = 0u;
+        var parametersOffset = 0ul;
+        var parametersSize = 0ul;
+
+        if (parameters is not null && openGL.Provider.TryGetBuffer(parameters.Storage, out var availableParameters, out var availableParametersOffset))
+        {
+            parametersBuffer = availableParameters;
+            parametersOffset = availableParametersOffset;
+            parametersSize = (ulong)parameters.Storage.Length;
+        }
+
+        return m_OpenGL.Dispatch(
+            sourceBuffer,
+            sourceOffset,
+            (ulong)source.Length,
+            destinationBuffer,
+            destinationOffset,
+            (ulong)destination.Length,
+            parametersBuffer,
+            parametersOffset,
+            parametersSize,
+            lengthsBuffer,
+            lengthsOffset,
+            LengthsSize,
+            new ReadOnlySpan<uint>(textures, bindings.Length),
+            new ReadOnlySpan<uint>(samplers, bindings.Length),
             groups,
             wait);
     }

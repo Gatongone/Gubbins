@@ -123,7 +123,7 @@ internal sealed unsafe class MetalCompute : IDisposable
     /// <param name="groups">The number of thread groups on the x axis.</param>
     /// <param name="threadsPerGroup">The threads in a group.</param>
     /// <returns><see langword="true"/> if the dispatch ran to completion.</returns>
-    internal bool Dispatch(nint sourceBuffer, nuint sourceOffset, nint destinationBuffer, nuint destinationOffset, nint parametersBuffer, nuint parametersOffset, nint lengthsBuffer, nuint lengthsOffset, nint texture, nint sampler, uint groups, uint threadsPerGroup, bool wait)
+    internal bool Dispatch(nint sourceBuffer, nuint sourceOffset, nint destinationBuffer, nuint destinationOffset, nint parametersBuffer, nuint parametersOffset, nint lengthsBuffer, nuint lengthsOffset, ReadOnlySpan<nint> textures, ReadOnlySpan<nint> samplers, uint groups, uint threadsPerGroup, bool wait)
     {
         if (m_Disposed || m_Pipeline == 0 || sourceBuffer == 0 || destinationBuffer == 0 || groups == 0 || threadsPerGroup == 0)
         {
@@ -168,14 +168,20 @@ internal sealed unsafe class MetalCompute : IDisposable
                 MetalApi.SetBuffer(encoder, lengthsBuffer, lengthsOffset, 2);
             }
 
-            if (texture != 0)
+            for (var index = 0; index < textures.Length; index++)
             {
-                MetalApi.SetTexture(encoder, texture, 0);
+                if (textures[index] != 0)
+                {
+                    MetalApi.SetTexture(encoder, textures[index], (nuint)index);
+                }
             }
 
-            if (sampler != 0)
+            for (var index = 0; index < samplers.Length; index++)
             {
-                MetalApi.SetSamplerState(encoder, sampler, 0);
+                if (samplers[index] != 0)
+                {
+                    MetalApi.SetSamplerState(encoder, samplers[index], (nuint)index);
+                }
             }
 
             var threadgroups = new MetalSize { Width = groups, Height = 1, Depth = 1 };

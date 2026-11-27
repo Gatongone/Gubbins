@@ -106,7 +106,7 @@ public sealed class KernelGlsl : KernelTextEmitter
 
         foreach (var texture in program.Textures ?? System.Array.Empty<KernelTexture>())
         {
-            text.AppendLine($"uniform sampler2D gubbins_tex_{Identifier(texture.Name)};");
+            text.AppendLine($"layout(binding = {texture.Binding}) uniform sampler2D gubbins_tex_{Identifier(texture.Name)};");
         }
     }
 
