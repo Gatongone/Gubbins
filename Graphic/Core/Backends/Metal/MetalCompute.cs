@@ -2,12 +2,17 @@
 namespace Gubbins.Graphic.Metal;
 
 /// <summary>
-/// Runs one compute pipeline on a Metal device: a metallib loaded from disk, one function, and a command buffer per
-/// dispatch that the CPU waits for.
+/// Runs one compute pipeline on a Metal device: a metallib loaded from disk, one function, and the dispatches that are
+/// recorded either into a command buffer of this object's own or into one a batch owns.
 /// </summary>
 /// <remarks>
 /// Metal loads its shaders from a file rather than from bytes, so this is the one backend whose kernel is named by a path.
 /// The device and the queue belong to the bridge; the library, the function and the pipeline state are this object's.
+/// <para>
+/// The recording and the submission are separate here for the same reason the batch exists: <see cref="Record"/> binds the
+/// pipeline and the arguments into an encoder without closing it, so one command buffer can carry the dispatches of
+/// several kernels, while <see cref="Dispatch"/> is the single dispatch shape that owns its command buffer end to end.
+/// </para>
 /// </remarks>
 internal sealed unsafe class MetalCompute : IDisposable
 {
@@ -110,6 +115,132 @@ internal sealed unsafe class MetalCompute : IDisposable
     }
 
     /// <summary>
+    /// Gets the command queue this pipeline submits to, which a batched command buffer has to match.
+    /// </summary>
+    internal nint Queue => m_Queue;
+
+    /// <summary>
+    /// Creates a command buffer on the queue, with one compute encoder open on it.
+    /// </summary>
+    /// <param name="commandBuffer">When the method returns, the <c>MTLCommandBuffer</c>, retained.</param>
+    /// <param name="encoder">When the method returns, the <c>MTLComputeCommandEncoder</c>, retained.</param>
+    /// <returns><see langword="true"/> if both were created.</returns>
+    /// <remarks>
+    /// Metal hands both out autoreleased, so they are retained to outlive the pool this method uses, and the caller releases
+    /// them once it has ended the encoding and committed or discarded the buffer.
+    /// </remarks>
+    internal bool BeginCommandBuffer(out nint commandBuffer, out nint encoder)
+    {
+        commandBuffer = 0;
+        encoder = 0;
+
+        if (m_Disposed)
+        {
+            return false;
+        }
+
+        var pool = MetalApi.PushAutoreleasePool();
+
+        try
+        {
+            var created = MetalApi.Send(m_Queue, "commandBuffer");
+
+            if (created == 0)
+            {
+                return false;
+            }
+
+            var coding = MetalApi.ComputeCommandEncoder(created);
+
+            if (coding == 0)
+            {
+                return false;
+            }
+
+            MetalApi.Retain(created);
+            MetalApi.Retain(coding);
+
+            commandBuffer = created;
+            encoder = coding;
+            return true;
+        }
+        finally
+        {
+            MetalApi.PopAutoreleasePool(pool);
+        }
+    }
+
+    /// <summary>
+    /// Records the loaded pipeline over two buffers into an encoder that is already open.
+    /// </summary>
+    /// <param name="encoder">The <c>MTLComputeCommandEncoder</c> to record into; it is left open.</param>
+    /// <param name="sourceBuffer">The <c>MTLBuffer</c> the shader reads.</param>
+    /// <param name="sourceOffset">The offset of the input inside it.</param>
+    /// <param name="destinationBuffer">The <c>MTLBuffer</c> the shader writes.</param>
+    /// <param name="destinationOffset">The offset of the output inside it.</param>
+    /// <param name="parametersBuffer">The <c>MTLBuffer</c> that carries the structure the kernel takes, or zero when it takes none.</param>
+    /// <param name="parametersOffset">The offset of that structure inside it.</param>
+    /// <param name="lengthsBuffer">The <c>MTLBuffer</c> the lengths are read from, or zero to bind the input again.</param>
+    /// <param name="lengthsOffset">The offset of the lengths inside it.</param>
+    /// <param name="textures">The <c>MTLTexture</c> handles to bind, in declaration order.</param>
+    /// <param name="samplers">The <c>MTLSamplerState</c> handles to bind, in declaration order.</param>
+    /// <param name="groups">The number of thread groups on the x axis.</param>
+    /// <param name="threadsPerGroup">The threads in a group.</param>
+    /// <returns><see langword="true"/> if the dispatch was recorded.</returns>
+    /// <remarks>
+    /// The pipeline state is set on every record, so one encoder can carry dispatches of different kernels: that is what
+    /// makes a batched command buffer a switch of state rather than a new encoder.
+    /// </remarks>
+    internal bool Record(nint encoder, nint sourceBuffer, nuint sourceOffset, nint destinationBuffer, nuint destinationOffset, nint parametersBuffer, nuint parametersOffset, nint lengthsBuffer, nuint lengthsOffset, ReadOnlySpan<nint> textures, ReadOnlySpan<nint> samplers, uint groups, uint threadsPerGroup)
+    {
+        if (m_Disposed || m_Pipeline == 0 || encoder == 0 || sourceBuffer == 0 || destinationBuffer == 0 || groups == 0 || threadsPerGroup == 0)
+        {
+            return false;
+        }
+
+        MetalApi.SetComputePipelineState(encoder, m_Pipeline);
+        MetalApi.SetBuffer(encoder, sourceBuffer, sourceOffset, 0);
+        MetalApi.SetBuffer(encoder, destinationBuffer, destinationOffset, 1);
+
+        // The block of the structure a kernel takes is bound after the buffers, and the counts after it when it is there.
+        if (parametersBuffer != 0)
+        {
+            MetalApi.SetBuffer(encoder, parametersBuffer, parametersOffset, 2);
+
+            if (lengthsBuffer != 0)
+            {
+                MetalApi.SetBuffer(encoder, lengthsBuffer, lengthsOffset, 3);
+            }
+        }
+        else if (lengthsBuffer != 0)
+        {
+            MetalApi.SetBuffer(encoder, lengthsBuffer, lengthsOffset, 2);
+        }
+
+        for (var index = 0; index < textures.Length; index++)
+        {
+            if (textures[index] != 0)
+            {
+                MetalApi.SetTexture(encoder, textures[index], (nuint)index);
+            }
+        }
+
+        for (var index = 0; index < samplers.Length; index++)
+        {
+            if (samplers[index] != 0)
+            {
+                MetalApi.SetSamplerState(encoder, samplers[index], (nuint)index);
+            }
+        }
+
+        var threadgroups = new MetalSize { Width = groups, Height = 1, Depth = 1 };
+        var threads = new MetalSize { Width = threadsPerGroup, Height = 1, Depth = 1 };
+        MetalApi.DispatchThreadgroups(encoder, threadgroups, threads);
+
+        return true;
+    }
+
+    /// <summary>
     /// Runs the loaded pipeline over two buffers.
     /// </summary>
     /// <param name="sourceBuffer">The <c>MTLBuffer</c> the shader reads.</param>
@@ -123,6 +254,10 @@ internal sealed unsafe class MetalCompute : IDisposable
     /// <param name="groups">The number of thread groups on the x axis.</param>
     /// <param name="threadsPerGroup">The threads in a group.</param>
     /// <returns><see langword="true"/> if the dispatch ran to completion.</returns>
+    /// <remarks>
+    /// This is the single dispatch shape: one command buffer, one encoder, one submission. It keeps working exactly as it
+    /// did after the recording path was split out, so a caller that has no batch pays only for the pool and the handles.
+    /// </remarks>
     internal bool Dispatch(nint sourceBuffer, nuint sourceOffset, nint destinationBuffer, nuint destinationOffset, nint parametersBuffer, nuint parametersOffset, nint lengthsBuffer, nuint lengthsOffset, ReadOnlySpan<nint> textures, ReadOnlySpan<nint> samplers, uint groups, uint threadsPerGroup, bool wait)
     {
         if (m_Disposed || m_Pipeline == 0 || sourceBuffer == 0 || destinationBuffer == 0 || groups == 0 || threadsPerGroup == 0)
@@ -130,84 +265,35 @@ internal sealed unsafe class MetalCompute : IDisposable
             return false;
         }
 
-        // Metal returns the command buffer and the encoder autoreleased, so the dispatch runs inside a pool of its own.
-        var pool = MetalApi.PushAutoreleasePool();
-
-        try
+        if (!BeginCommandBuffer(out var commandBuffer, out var encoder))
         {
-            var commandBuffer = MetalApi.Send(m_Queue, "commandBuffer");
-
-            if (commandBuffer == 0)
-            {
-                return false;
-            }
-
-            var encoder = MetalApi.ComputeCommandEncoder(commandBuffer);
-
-            if (encoder == 0)
-            {
-                return false;
-            }
-
-            MetalApi.SetComputePipelineState(encoder, m_Pipeline);
-            MetalApi.SetBuffer(encoder, sourceBuffer, sourceOffset, 0);
-            MetalApi.SetBuffer(encoder, destinationBuffer, destinationOffset, 1);
-
-            // The block of the structure a kernel takes is bound after the buffers, and the counts after it when it is there.
-            if (parametersBuffer != 0)
-            {
-                MetalApi.SetBuffer(encoder, parametersBuffer, parametersOffset, 2);
-
-                if (lengthsBuffer != 0)
-                {
-                    MetalApi.SetBuffer(encoder, lengthsBuffer, lengthsOffset, 3);
-                }
-            }
-            else if (lengthsBuffer != 0)
-            {
-                MetalApi.SetBuffer(encoder, lengthsBuffer, lengthsOffset, 2);
-            }
-
-            for (var index = 0; index < textures.Length; index++)
-            {
-                if (textures[index] != 0)
-                {
-                    MetalApi.SetTexture(encoder, textures[index], (nuint)index);
-                }
-            }
-
-            for (var index = 0; index < samplers.Length; index++)
-            {
-                if (samplers[index] != 0)
-                {
-                    MetalApi.SetSamplerState(encoder, samplers[index], (nuint)index);
-                }
-            }
-
-            var threadgroups = new MetalSize { Width = groups, Height = 1, Depth = 1 };
-            var threads = new MetalSize { Width = threadsPerGroup, Height = 1, Depth = 1 };
-            MetalApi.DispatchThreadgroups(encoder, threadgroups, threads);
-
-            // The encoder has to be closed before the buffer is committed, and the wait is what makes the write visible.
-            MetalApi.Send(encoder, "endEncoding");
-            MetalApi.Send(commandBuffer, "commit");
-
-            if (wait)
-            {
-                MetalApi.Send(commandBuffer, "waitUntilCompleted");
-            }
-            else
-            {
-                MetalApi.Retain(commandBuffer);
-                m_Pending.Add(commandBuffer);
-            }
-
-            return true;
+            return false;
         }
-        finally
+
+        if (!Record(encoder, sourceBuffer, sourceOffset, destinationBuffer, destinationOffset, parametersBuffer, parametersOffset, lengthsBuffer, lengthsOffset, textures, samplers, groups, threadsPerGroup))
         {
-            MetalApi.PopAutoreleasePool(pool);
+            MetalApi.SendVoid(encoder, "endEncoding");
+            MetalApi.Release(encoder);
+            MetalApi.Release(commandBuffer);
+            return false;
         }
+
+        // The encoder has to be closed before the buffer is committed, and the wait is what makes the write visible.
+        MetalApi.SendVoid(encoder, "endEncoding");
+        MetalApi.Release(encoder);
+        MetalApi.SendVoid(commandBuffer, "commit");
+
+        if (wait)
+        {
+            MetalApi.SendVoid(commandBuffer, "waitUntilCompleted");
+            MetalApi.Release(commandBuffer);
+        }
+        else
+        {
+            m_Pending.Add(commandBuffer);
+        }
+
+        return true;
     }
 
     /// <summary>

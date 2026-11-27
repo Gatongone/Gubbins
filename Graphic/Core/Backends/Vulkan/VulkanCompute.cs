@@ -20,6 +20,7 @@ internal sealed unsafe class VulkanCompute : IDisposable
 {
     private readonly nint m_Device;
     private readonly nint m_Queue;
+    private readonly uint m_QueueFamily;
     private nint m_Module;
     private nint m_SetLayout;
     private nint m_PipelineLayout;
@@ -45,6 +46,7 @@ internal sealed unsafe class VulkanCompute : IDisposable
     {
         m_Device = device;
         m_Queue = queue;
+        m_QueueFamily = queueFamily;
 
         var poolInfo = new VkCommandPoolCreateInfo
         {
@@ -89,6 +91,37 @@ internal sealed unsafe class VulkanCompute : IDisposable
 
         m_Fence = fence;
     }
+
+    /// <summary>
+    /// Gets the <c>VkDevice</c> this pipeline was loaded on.
+    /// </summary>
+    internal nint Device => m_Device;
+
+    /// <summary>
+    /// Gets the <c>VkQueue</c> the single-dispatch path submits to, which a batched command buffer borrows so that a
+    /// submission of several dispatches still reaches the queue the seeding kernel runs on.
+    /// </summary>
+    internal nint Queue => m_Queue;
+
+    /// <summary>
+    /// Gets the family of <see cref="Queue"/>, which is the family a batched command pool has to be created for.
+    /// </summary>
+    internal uint QueueFamily => m_QueueFamily;
+
+    /// <summary>
+    /// Gets a value indicating whether this object can record a dispatch.
+    /// </summary>
+    /// <remarks>
+    /// A batch checks this before it records into its own command buffer, because a kernel whose pipeline was refused or
+    /// released has nothing a command buffer could bind.
+    /// </remarks>
+    internal bool IsReady => !m_Disposed && m_Pipeline != 0;
+
+    /// <summary>
+    /// Gets the number of combined image samplers the module declares, which decides how large a record's descriptor set
+    /// is.
+    /// </summary>
+    internal int SampledImageCount => m_ImageBindings.Length;
 
     /// <summary>
     /// Loads a pipeline from SPIR-V.
@@ -201,7 +234,7 @@ internal sealed unsafe class VulkanCompute : IDisposable
             return false;
         }
 
-        if (!Bind(sourceBuffer, sourceOffset, sourceSize, destinationBuffer, destinationOffset, destinationSize, parametersBuffer, parametersOffset, parametersSize, lengthsBuffer, lengthsOffset, textures))
+        if (!EnsureSingleDescriptorSet())
         {
             return false;
         }
@@ -213,11 +246,12 @@ internal sealed unsafe class VulkanCompute : IDisposable
             return false;
         }
 
-        VulkanApi.CmdBindPipeline(m_CommandBuffer, VulkanApi.PIPELINE_BIND_POINT_COMPUTE, m_Pipeline);
-
-        var set = m_DescriptorSet;
-        VulkanApi.CmdBindDescriptorSets(m_CommandBuffer, VulkanApi.PIPELINE_BIND_POINT_COMPUTE, m_PipelineLayout, 0, 1, &set, 0, null);
-        VulkanApi.CmdDispatch(m_CommandBuffer, groups, 1, 1);
+        if (!Record(m_CommandBuffer, m_DescriptorSet, sourceBuffer, sourceOffset, sourceSize, destinationBuffer, destinationOffset, destinationSize, parametersBuffer, parametersOffset, parametersSize, lengthsBuffer, lengthsOffset, textures, groups))
+        {
+            // Nothing runnable was recorded, so the buffer is ended to leave it in a state the next dispatch can begin.
+            VulkanApi.EndCommandBuffer(m_CommandBuffer);
+            return false;
+        }
 
         if (VulkanApi.EndCommandBuffer(m_CommandBuffer) != VulkanApi.SUCCESS)
         {
@@ -255,6 +289,56 @@ internal sealed unsafe class VulkanCompute : IDisposable
     }
 
     /// <summary>
+    /// Records one dispatch into a command buffer the caller begins, ends and submits.
+    /// </summary>
+    /// <remarks>
+    /// This is the recording half of <see cref="Dispatch"/>: the descriptor set is written here, then the pipeline, the set
+    /// and the dispatch are recorded into a buffer that is already recording. The batch owns the buffer and the submission,
+    /// so a group of dispatches reaches the queue once. The sampled images are bound in the layout they hold; they are left
+    /// sampleable by the upload, and this path performs no layout transition because the single path performs none either.
+    /// </remarks>
+    /// <param name="commandBuffer">The <c>VkCommandBuffer</c> that is already recording; it is left recording.</param>
+    /// <param name="descriptorSet">The set one record writes and binds, allocated from a pool the batch keeps alive.</param>
+    /// <param name="sourceBuffer">The <c>VkBuffer</c> the shader reads.</param>
+    /// <param name="sourceOffset">The offset of the input inside it.</param>
+    /// <param name="sourceSize">The size of the input.</param>
+    /// <param name="destinationBuffer">The <c>VkBuffer</c> the shader writes.</param>
+    /// <param name="destinationOffset">The offset of the output inside it.</param>
+    /// <param name="destinationSize">The size of the output.</param>
+    /// <param name="parametersBuffer">The <c>VkBuffer</c> that carries the structure the kernel takes, or zero when it takes none.</param>
+    /// <param name="parametersOffset">The offset of that structure inside it.</param>
+    /// <param name="parametersSize">The size of that structure.</param>
+    /// <param name="lengthsBuffer">The <c>VkBuffer</c> that carries the lengths, or zero to reuse the input.</param>
+    /// <param name="lengthsOffset">The offset of the lengths inside it.</param>
+    /// <param name="textures">The combined image samplers to bind, in the order the module declares them.</param>
+    /// <param name="groups">The number of thread groups on the x axis.</param>
+    /// <returns><see langword="true"/> if the dispatch was recorded.</returns>
+    internal bool Record(nint commandBuffer, nint descriptorSet, nint sourceBuffer, ulong sourceOffset, ulong sourceSize, nint destinationBuffer, ulong destinationOffset, ulong destinationSize, nint parametersBuffer, ulong parametersOffset, ulong parametersSize, nint lengthsBuffer, ulong lengthsOffset, ReadOnlySpan<VkDescriptorImageInfo> textures, uint groups)
+    {
+        if (m_Disposed || m_Pipeline == 0 || commandBuffer == 0 || descriptorSet == 0 || sourceBuffer == 0 || destinationBuffer == 0 || groups == 0)
+        {
+            return false;
+        }
+
+        if (m_ImageBindings.Length > textures.Length)
+        {
+            return false;
+        }
+
+        if (!Bind(descriptorSet, sourceBuffer, sourceOffset, sourceSize, destinationBuffer, destinationOffset, destinationSize, parametersBuffer, parametersOffset, parametersSize, lengthsBuffer, lengthsOffset, textures))
+        {
+            return false;
+        }
+
+        VulkanApi.CmdBindPipeline(commandBuffer, VulkanApi.PIPELINE_BIND_POINT_COMPUTE, m_Pipeline);
+
+        var set = descriptorSet;
+        VulkanApi.CmdBindDescriptorSets(commandBuffer, VulkanApi.PIPELINE_BIND_POINT_COMPUTE, m_PipelineLayout, 0, 1, &set, 0, null);
+        VulkanApi.CmdDispatch(commandBuffer, groups, 1, 1);
+        return true;
+    }
+
+    /// <summary>
     /// Waits for the dispatches that were recorded without waiting.
     /// </summary>
     /// <returns><see langword="true"/> when every submission has completed.</returns>
@@ -278,12 +362,12 @@ internal sealed unsafe class VulkanCompute : IDisposable
     }
 
     /// <summary>
-    /// Builds the layouts, the pool and the descriptor set, once.
+    /// Builds the set layout and the pipeline layout, once.
     /// </summary>
-    /// <returns><see langword="true"/> if they all exist.</returns>
+    /// <returns><see langword="true"/> if they exist.</returns>
     private bool CreateLayouts()
     {
-        if (m_DescriptorSet != 0)
+        if (m_SetLayout != 0)
         {
             return true;
         }
@@ -347,13 +431,93 @@ internal sealed unsafe class VulkanCompute : IDisposable
         }
 
         m_PipelineLayout = pipelineLayout;
+        return true;
+    }
 
+    /// <summary>
+    /// Creates the descriptor pool and the set the single-dispatch path writes, once.
+    /// </summary>
+    /// <returns><see langword="true"/> if the set exists.</returns>
+    private bool EnsureSingleDescriptorSet()
+    {
+        if (m_DescriptorSet != 0)
+        {
+            return true;
+        }
+
+        if (!CreateLayouts() || !CreateDescriptorPool(1, out var pool))
+        {
+            return false;
+        }
+
+        if (!AllocateDescriptorSet(pool, out var descriptorSet))
+        {
+            VulkanApi.DestroyDescriptorPool(m_Device, pool, 0);
+            return false;
+        }
+
+        m_DescriptorPool = pool;
+        m_DescriptorSet = descriptorSet;
+        return true;
+    }
+
+    /// <summary>
+    /// Creates a pool a batched command buffer allocates one descriptor set per record from.
+    /// </summary>
+    /// <param name="capacity">The number of records the pool holds sets for.</param>
+    /// <param name="pool">When the method returns, the <c>VkDescriptorPool</c>.</param>
+    /// <returns><see langword="true"/> if the pool was created.</returns>
+    /// <remarks>
+    /// The pool is sized for this pipeline, because a record writes the four storage buffers and the sampled images the
+    /// module declares. The batch owns it and destroys it only after its fence has passed.
+    /// </remarks>
+    internal bool CreateRecordDescriptorPool(int capacity, out nint pool)
+    {
+        pool = 0;
+
+        if (m_Disposed || capacity <= 0)
+        {
+            return false;
+        }
+
+        return CreateDescriptorPool((uint)capacity, out pool);
+    }
+
+    /// <summary>
+    /// Allocates one record's descriptor set from a pool the batch owns.
+    /// </summary>
+    /// <param name="pool">The <c>VkDescriptorPool</c> the batch created for this pipeline.</param>
+    /// <param name="descriptorSet">When the method returns, the <c>VkDescriptorSet</c>.</param>
+    /// <returns><see langword="true"/> if the set was allocated.</returns>
+    internal bool AllocateRecordDescriptorSet(nint pool, out nint descriptorSet)
+    {
+        descriptorSet = 0;
+
+        return !m_Disposed && pool != 0 && CreateLayouts() && AllocateDescriptorSet(pool, out descriptorSet);
+    }
+
+    /// <summary>
+    /// Creates a descriptor pool with room for <paramref name="maxSets"/> sets of this pipeline.
+    /// </summary>
+    /// <param name="maxSets">The number of sets the pool has to serve.</param>
+    /// <param name="pool">When the method returns, the <c>VkDescriptorPool</c>.</param>
+    /// <returns><see langword="true"/> if the pool was created.</returns>
+    private bool CreateDescriptorPool(uint maxSets, out nint pool)
+    {
+        pool = 0;
+
+        if (m_Disposed || maxSets == 0)
+        {
+            return false;
+        }
+
+        var imageCount = m_ImageBindings.Length;
         var poolSizes = stackalloc VkDescriptorPoolSize[imageCount == 0 ? 1 : 2];
 
         poolSizes[0] = new VkDescriptorPoolSize
         {
             Type = VulkanApi.DESCRIPTOR_TYPE_STORAGE_BUFFER,
-            DescriptorCount = 4
+            DescriptorCount = 4 * maxSets
         };
 
         if (imageCount != 0)
@@ -361,27 +525,45 @@ internal sealed unsafe class VulkanCompute : IDisposable
             poolSizes[1] = new VkDescriptorPoolSize
             {
                 Type = VulkanApi.DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                DescriptorCount = (uint)imageCount
+                DescriptorCount = (uint)imageCount * maxSets
             };
         }
 
         var poolInfo = new VkDescriptorPoolCreateInfo
         {
             StructureType = VulkanApi.DESCRIPTOR_POOL_CREATE_INFO_TYPE,
-            MaxSets = 1,
+            MaxSets = maxSets,
             PoolSizeCount = imageCount == 0 ? 1u : 2u,
             PoolSizes = (nint)poolSizes
         };
 
-        nint pool = 0;
+        nint created = 0;
 
-        if (VulkanApi.CreateDescriptorPool(m_Device, &poolInfo, 0, &pool) != VulkanApi.SUCCESS || pool == 0)
+        if (VulkanApi.CreateDescriptorPool(m_Device, &poolInfo, 0, &created) != VulkanApi.SUCCESS || created == 0)
         {
             return false;
         }
 
-        m_DescriptorPool = pool;
+        pool = created;
+        return true;
+    }
 
+    /// <summary>
+    /// Allocates one set from <paramref name="pool"/> with this pipeline's set layout.
+    /// </summary>
+    /// <param name="pool">The <c>VkDescriptorPool</c> to allocate from.</param>
+    /// <param name="descriptorSet">When the method returns, the <c>VkDescriptorSet</c>.</param>
+    /// <returns><see langword="true"/> if the set was allocated.</returns>
+    private bool AllocateDescriptorSet(nint pool, out nint descriptorSet)
+    {
+        descriptorSet = 0;
+
+        if (m_SetLayout == 0)
+        {
+            return false;
+        }
+
+        var setLayout = m_SetLayout;
         var allocateInfo = new VkDescriptorSetAllocateInfo
         {
             StructureType = VulkanApi.DESCRIPTOR_SET_ALLOCATE_INFO_TYPE,
@@ -390,22 +572,23 @@ internal sealed unsafe class VulkanCompute : IDisposable
             SetLayouts = (nint)(&setLayout)
         };
 
-        nint descriptorSet = 0;
+        nint allocated = 0;
 
-        if (VulkanApi.AllocateDescriptorSets(m_Device, &allocateInfo, &descriptorSet) != VulkanApi.SUCCESS || descriptorSet == 0)
+        if (VulkanApi.AllocateDescriptorSets(m_Device, &allocateInfo, &allocated) != VulkanApi.SUCCESS || allocated == 0)
         {
             return false;
         }
 
-        m_DescriptorSet = descriptorSet;
+        descriptorSet = allocated;
         return true;
     }
 
     /// <summary>
-    /// Points the descriptor set at the blocks and the sampled image of a dispatch.
+    /// Points a descriptor set at the blocks and the sampled resources of a dispatch.
     /// </summary>
+    /// <param name="descriptorSet">The set one record writes.</param>
     /// <returns><see langword="true"/> if the set was written.</returns>
-    private bool Bind(nint sourceBuffer, ulong sourceOffset, ulong sourceSize, nint destinationBuffer, ulong destinationOffset, ulong destinationSize, nint parametersBuffer, ulong parametersOffset, ulong parametersSize, nint lengthsBuffer, ulong lengthsOffset, ReadOnlySpan<VkDescriptorImageInfo> textures)
+    private bool Bind(nint descriptorSet, nint sourceBuffer, ulong sourceOffset, ulong sourceSize, nint destinationBuffer, ulong destinationOffset, ulong destinationSize, nint parametersBuffer, ulong parametersOffset, ulong parametersSize, nint lengthsBuffer, ulong lengthsOffset, ReadOnlySpan<VkDescriptorImageInfo> textures)
     {
         if (!CreateLayouts())
         {
@@ -444,7 +627,7 @@ internal sealed unsafe class VulkanCompute : IDisposable
             writes[index] = new VkWriteDescriptorSet
             {
                 StructureType = VulkanApi.WRITE_DESCRIPTOR_SET_TYPE,
-                DescriptorSet = m_DescriptorSet,
+                DescriptorSet = descriptorSet,
                 DestinationBinding = (uint)index,
                 DescriptorCount = 1,
                 DescriptorType = VulkanApi.DESCRIPTOR_TYPE_STORAGE_BUFFER,
@@ -460,7 +643,7 @@ internal sealed unsafe class VulkanCompute : IDisposable
             writes[4 + index] = new VkWriteDescriptorSet
             {
                 StructureType = VulkanApi.WRITE_DESCRIPTOR_SET_TYPE,
-                DescriptorSet = m_DescriptorSet,
+                DescriptorSet = descriptorSet,
                 DestinationBinding = (uint)m_ImageBindings[index],
                 DescriptorCount = 1,
                 DescriptorType = VulkanApi.DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,

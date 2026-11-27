@@ -54,6 +54,45 @@ public sealed class GpuKernel : IDisposable
     }
 
     /// <summary>
+    /// Gets the Metal pipeline, when Metal is the backend in use.
+    /// </summary>
+    internal MetalCompute? Metal => m_Metal;
+
+    /// <summary>
+    /// Gets the D3D12 pipeline, when D3D12 is the backend in use.
+    /// </summary>
+    internal D3D12Compute? D3D12 => m_D3D12;
+
+    /// <summary>
+    /// Gets the Vulkan pipeline, when Vulkan is the backend in use.
+    /// </summary>
+    internal VulkanCompute? Vulkan => m_Vulkan;
+
+    /// <summary>
+    /// Creates a command buffer that records dispatches of this kernel and submits them once.
+    /// </summary>
+    /// <returns>
+    /// The command buffer, or <see langword="null"/> when this backend has no batched command buffer yet. Metal, D3D12 and
+    /// Vulkan have one: a Metal batch is one <c>MTLCommandBuffer</c> with one compute encoder for every recorded kernel, a
+    /// D3D12 batch is one command list with one fence for the whole group, and a Vulkan batch is one command pool with one
+    /// primary command buffer and one fence.
+    /// </returns>
+    /// <exception cref="ObjectDisposedException">Thrown when the kernel was disposed.</exception>
+    /// <remarks>
+    /// The kernel seeds the batch because the device and the command queue are what a command buffer is created on; other
+    /// kernels of the same device can then be recorded into it with <see cref="GpuCommandBuffer.Record"/>.
+    /// </remarks>
+    public GpuCommandBuffer? CreateCommandBuffer()
+    {
+        if (m_Disposed)
+        {
+            throw new ObjectDisposedException(nameof(GpuKernel));
+        }
+
+        return m_Metal is null && m_D3D12 is null && m_Vulkan is null ? null : new GpuCommandBuffer(this);
+    }
+
+    /// <summary>
     /// Loads a kernel from bytecode.
     /// </summary>
     /// <param name="device">The device to load it on.</param>
@@ -394,6 +433,274 @@ public sealed class GpuKernel : IDisposable
         }
 
         return m_D3D12.Dispatch(sourceResource, sourceAddress, destinationResource, destinationAddress, parametersAddress, lengthsAddress, groups, wait);
+    }
+
+    /// <summary>
+    /// Records one dispatch into an encoder a <see cref="GpuCommandBuffer"/> owns.
+    /// </summary>
+    /// <param name="encoder">The <c>MTLComputeCommandEncoder</c>, which is left open for the next record.</param>
+    /// <param name="source">The block the shader reads.</param>
+    /// <param name="destination">The block the shader writes.</param>
+    /// <param name="groups">The number of thread groups on the x axis.</param>
+    /// <param name="lengths">The block that carries the element counts, or <see langword="null"/>.</param>
+    /// <param name="parameters">The block that carries the structure the kernel takes, or <see langword="null"/>.</param>
+    /// <param name="textures">The textures and samplers to bind, or <see langword="null"/> when the kernel samples none.</param>
+    /// <returns><see langword="true"/> if the dispatch was recorded.</returns>
+    internal unsafe bool TryRecord(nint encoder, GpuBlock source, GpuBlock destination, uint groups, GpuBlock? lengths, GpuBlock? parameters, IReadOnlyList<GpuTextureBinding>? textures)
+    {
+        if (m_Disposed)
+        {
+            throw new ObjectDisposedException(nameof(GpuKernel));
+        }
+
+        if (m_Metal is null || m_Device.Backend is not MetalDevice metal || encoder == 0)
+        {
+            return false;
+        }
+
+        if (!metal.Provider.TryGetBuffer(source.Storage, out var sourceBuffer, out var sourceOffset) ||
+            !metal.Provider.TryGetBuffer(destination.Storage, out var destinationBuffer, out var destinationOffset))
+        {
+            return false;
+        }
+
+        nint lengthsBuffer = 0;
+        var lengthsOffset = 0ul;
+
+        if (lengths is not null && metal.Provider.TryGetBuffer(lengths.Storage, out var availableLengths, out var availableLengthsOffset))
+        {
+            lengthsBuffer = availableLengths;
+            lengthsOffset = availableLengthsOffset;
+        }
+
+        nint parametersBuffer = 0;
+        var parametersOffset = 0ul;
+
+        if (parameters is not null && metal.Provider.TryGetBuffer(parameters.Storage, out var availableParameters, out var availableParametersOffset))
+        {
+            parametersBuffer = availableParameters;
+            parametersOffset = availableParametersOffset;
+        }
+
+        var count = textures?.Count ?? 0;
+
+        if (count == 0)
+        {
+            return m_Metal.Record(encoder, sourceBuffer, (nuint)sourceOffset, destinationBuffer, (nuint)destinationOffset, parametersBuffer, (nuint)parametersOffset, lengthsBuffer, (nuint)lengthsOffset, ReadOnlySpan<nint>.Empty, ReadOnlySpan<nint>.Empty, groups, 64);
+        }
+
+        var textureHandles = stackalloc nint[count];
+        var samplerHandles = stackalloc nint[count];
+
+        for (var index = 0; index < count; index++)
+        {
+            var binding = textures![index];
+
+            if (binding.Texture is null || binding.Sampler is null ||
+                binding.Texture.Backend is not MetalTexture texture ||
+                binding.Sampler.Backend is not MetalSamplerState sampler)
+            {
+                return false;
+            }
+
+            textureHandles[index] = texture.Handle;
+            samplerHandles[index] = sampler.Handle;
+        }
+
+        return m_Metal.Record(encoder, sourceBuffer, (nuint)sourceOffset, destinationBuffer, (nuint)destinationOffset, parametersBuffer, (nuint)parametersOffset, lengthsBuffer, (nuint)lengthsOffset, new ReadOnlySpan<nint>(textureHandles, count), new ReadOnlySpan<nint>(samplerHandles, count), groups, 64);
+    }
+
+    /// <summary>
+    /// Records one dispatch into a command list a <see cref="GpuCommandBuffer"/> owns.
+    /// </summary>
+    /// <remarks>
+    /// The list is the batch's, so nothing here resets the allocator or submits. The combined descriptor heaps the texture
+    /// bindings need are handed back through <paramref name="srvHeap"/> and <paramref name="samplerHeap"/>, so the batch
+    /// can keep them alive until the fence that covers the list has passed.
+    /// </remarks>
+    /// <param name="list">The <c>ID3D12GraphicsCommandList</c>, which is left recording for the next record.</param>
+    /// <param name="source">The block the shader reads.</param>
+    /// <param name="destination">The block the shader writes.</param>
+    /// <param name="groups">The number of thread groups on the x axis.</param>
+    /// <param name="lengths">The block that carries the element counts, or <see langword="null"/>.</param>
+    /// <param name="parameters">The block that carries the structure the kernel takes, or <see langword="null"/>.</param>
+    /// <param name="textures">The textures and samplers to bind, or <see langword="null"/> when the kernel samples none.</param>
+    /// <param name="srvHeap">When the method returns, the texture heap the batch has to keep alive, or <see langword="0"/>.</param>
+    /// <param name="samplerHeap">When the method returns, the sampler heap the batch has to keep alive, or <see langword="0"/>.</param>
+    /// <returns><see langword="true"/> if the dispatch was recorded.</returns>
+    internal unsafe bool TryRecordD3D12(nint list, GpuBlock source, GpuBlock destination, uint groups, GpuBlock? lengths, GpuBlock? parameters, IReadOnlyList<GpuTextureBinding>? textures, out nint srvHeap, out nint samplerHeap)
+    {
+        srvHeap = 0;
+        samplerHeap = 0;
+
+        if (m_Disposed)
+        {
+            throw new ObjectDisposedException(nameof(GpuKernel));
+        }
+
+        if (m_D3D12 is not { IsReady: true } compute || m_Device.Backend is not D3D12Device d3d12 || list == 0)
+        {
+            return false;
+        }
+
+        var provider = d3d12.Provider;
+
+        if (!provider.TryGetResource(source.Storage, out var sourceResource, out _) ||
+            !provider.TryGetResource(destination.Storage, out var destinationResource, out _))
+        {
+            return false;
+        }
+
+        var sourceAddress = D3D12Api.GetVirtualAddress(sourceResource) + (ulong)source.Storage.Offset;
+        var destinationAddress = D3D12Api.GetVirtualAddress(destinationResource) + (ulong)destination.Storage.Offset;
+
+        var lengthsAddress = 0ul;
+
+        if (lengths is not null && provider.TryGetResource(lengths.Storage, out var lengthsResource, out _))
+        {
+            lengthsAddress = D3D12Api.GetVirtualAddress(lengthsResource) + (ulong)lengths.Storage.Offset;
+        }
+
+        var parametersAddress = 0ul;
+
+        if (parameters is not null && provider.TryGetResource(parameters.Storage, out var parametersResource, out _))
+        {
+            parametersAddress = D3D12Api.GetVirtualAddress(parametersResource) + (ulong)parameters.Storage.Offset;
+        }
+
+        var count = textures?.Count ?? 0;
+
+        if (count == 0)
+        {
+            return compute.Record(list, sourceResource, sourceAddress, destinationResource, destinationAddress, parametersAddress, lengthsAddress, ReadOnlySpan<D3D12TextureBinding>.Empty, groups, out srvHeap, out samplerHeap);
+        }
+
+        if (count > D3D12Compute.MaxTextures)
+        {
+            return false;
+        }
+
+        var native = stackalloc D3D12TextureBinding[count];
+
+        for (var index = 0; index < count; index++)
+        {
+            var binding = textures![index];
+
+            if (binding.Texture is null || binding.Sampler is null ||
+                binding.Texture.Backend is not D3D12Texture texture ||
+                binding.Sampler.Backend is not D3D12SamplerState sampler)
+            {
+                return false;
+            }
+
+            native[index] = new D3D12TextureBinding(texture, sampler);
+        }
+
+        var recorded = compute.Record(list, sourceResource, sourceAddress, destinationResource, destinationAddress, parametersAddress, lengthsAddress, new ReadOnlySpan<D3D12TextureBinding>(native, count), groups, out srvHeap, out samplerHeap);
+
+        if (recorded)
+        {
+            // The command list moves every texture it read into the compute shader's read state, which is where a later
+            // upload or readback expects to find it. A batch updates the state as it records, so a texture recorded twice
+            // is only transitioned by the first record.
+            for (var index = 0; index < count; index++)
+            {
+                ((D3D12Texture)textures![index].Texture.Backend).State = D3D12Api.RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+            }
+        }
+
+        return recorded;
+    }
+
+    /// <summary>
+    /// Records one dispatch into a command buffer a <see cref="GpuCommandBuffer"/> owns.
+    /// </summary>
+    /// <remarks>
+    /// The command buffer is the batch's, so nothing here begins, ends or submits it. <paramref name="descriptorSet"/> is
+    /// the set the batch allocated for this record, which keeps the bindings of every record separate from the ones before
+    /// it. A sampled image has to hold the layout an upload leaves it in, which is the precondition the single dispatch
+    /// path enforces too: an image that was never uploaded is refused instead of being bound in the undefined layout.
+    /// </remarks>
+    /// <param name="commandBuffer">The <c>VkCommandBuffer</c>, which is left recording for the next record.</param>
+    /// <param name="descriptorSet">The <c>VkDescriptorSet</c> the batch allocated for this record.</param>
+    /// <param name="source">The block the shader reads.</param>
+    /// <param name="destination">The block the shader writes.</param>
+    /// <param name="groups">The number of thread groups on the x axis.</param>
+    /// <param name="lengths">The block that carries the element counts, or <see langword="null"/>.</param>
+    /// <param name="parameters">The block that carries the structure the kernel takes, or <see langword="null"/>.</param>
+    /// <param name="textures">The textures and samplers to bind, or <see langword="null"/> when the kernel samples none.</param>
+    /// <returns><see langword="true"/> if the dispatch was recorded.</returns>
+    internal unsafe bool TryRecordVulkan(nint commandBuffer, nint descriptorSet, GpuBlock source, GpuBlock destination, uint groups, GpuBlock? lengths, GpuBlock? parameters, IReadOnlyList<GpuTextureBinding>? textures)
+    {
+        if (m_Disposed)
+        {
+            throw new ObjectDisposedException(nameof(GpuKernel));
+        }
+
+        if (m_Vulkan is not { IsReady: true } compute || m_Device.Backend is not VulkanDevice vulkan || commandBuffer == 0 || descriptorSet == 0)
+        {
+            return false;
+        }
+
+        var provider = vulkan.Provider;
+
+        if (!provider.TryGetVulkanBuffer(source.Storage, out var sourceBuffer, out var sourceOffset) ||
+            !provider.TryGetVulkanBuffer(destination.Storage, out var destinationBuffer, out var destinationOffset))
+        {
+            return false;
+        }
+
+        nint lengthsBuffer = 0;
+        var lengthsOffset = 0ul;
+
+        if (lengths is not null && provider.TryGetVulkanBuffer(lengths.Storage, out var availableLengths, out var availableLengthsOffset))
+        {
+            lengthsBuffer = availableLengths;
+            lengthsOffset = availableLengthsOffset;
+        }
+
+        nint parametersBuffer = 0;
+        var parametersOffset = 0ul;
+        var parametersSize = 0ul;
+
+        if (parameters is not null && provider.TryGetVulkanBuffer(parameters.Storage, out var availableParameters, out var availableParametersOffset))
+        {
+            parametersBuffer = availableParameters;
+            parametersOffset = availableParametersOffset;
+            parametersSize = (ulong)parameters.Storage.Length;
+        }
+
+        var count = textures?.Count ?? 0;
+
+        if (count == 0)
+        {
+            return compute.Record(commandBuffer, descriptorSet, sourceBuffer, sourceOffset, (ulong)source.Length, destinationBuffer, destinationOffset, (ulong)destination.Length, parametersBuffer, parametersOffset, parametersSize, lengthsBuffer, lengthsOffset, ReadOnlySpan<VkDescriptorImageInfo>.Empty, groups);
+        }
+
+        var images = stackalloc VkDescriptorImageInfo[count];
+
+        for (var index = 0; index < count; index++)
+        {
+            var binding = textures![index];
+
+            if (binding.Texture is null || binding.Sampler is null ||
+                binding.Texture.Backend is not VulkanTexture texture ||
+                binding.Sampler.Backend is not VulkanSamplerState sampler)
+            {
+                return false;
+            }
+
+            // The upload leaves the image sampleable, which is the only layout this binding reads. A texture that was never
+            // uploaded is still undefined, so a descriptor for it would read uninitialized texels.
+            if (texture.Layout != VulkanApi.IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+            {
+                return false;
+            }
+
+            images[index] = texture.GetDescriptorInfo(sampler);
+        }
+
+        return compute.Record(commandBuffer, descriptorSet, sourceBuffer, sourceOffset, (ulong)source.Length, destinationBuffer, destinationOffset, (ulong)destination.Length, parametersBuffer, parametersOffset, parametersSize, lengthsBuffer, lengthsOffset, new ReadOnlySpan<VkDescriptorImageInfo>(images, count), groups);
     }
 
     /// <summary>

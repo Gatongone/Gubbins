@@ -6,12 +6,20 @@ namespace Gubbins.Graphic.D3D12;
 /// the HLSL the system compiles, and a compute queue the bridge does not own.
 /// </summary>
 /// <remarks>
+/// <para>
 /// The root descriptors are the shape this layer binds: an unordered access view over the input block, one over the
 /// output block, one over the block that carries the structure a kernel takes, and one over the block that carries the
 /// lengths. All three are ordered access because the shader declares
 /// them that way, so that one translation of a kernel can bind the same way on a backend that has a single address space
 /// for resources. Resources are created in the common state and copied from the common state, so every dispatch starts and
 /// ends by putting them back there.
+/// </para>
+/// <para>
+/// The recording and the submission are separate here for the same reason the batch exists: <see cref="Record"/> binds the
+/// pipeline, the root signature and the arguments into a list the caller supplies without closing it, so one list can
+/// carry the dispatches of several kernels, while <see cref="Dispatch"/> is the single dispatch shape that owns its list
+/// and its fence end to end.
+/// </para>
 /// </remarks>
 internal sealed unsafe class D3D12Compute : IDisposable
 {
@@ -80,6 +88,26 @@ internal sealed unsafe class D3D12Compute : IDisposable
             throw new D3D12Exception("CreateFence failed for the compute fence.");
         }
     }
+
+    /// <summary>
+    /// Gets the <c>ID3D12Device</c> this pipeline was loaded on.
+    /// </summary>
+    internal nint Device => m_Device;
+
+    /// <summary>
+    /// Gets the compute queue the single-dispatch path submits to, which a batched command buffer borrows so that a
+    /// submission of several kernels still reaches the queue the seeding kernel runs on.
+    /// </summary>
+    internal nint Queue => m_Queue;
+
+    /// <summary>
+    /// Gets a value indicating whether this object can record a dispatch.
+    /// </summary>
+    /// <remarks>
+    /// A batch checks this before it records into its own list, because a kernel whose pipeline was refused or released
+    /// has nothing a list could bind.
+    /// </remarks>
+    internal bool IsReady => !m_Disposed && m_Pipeline != 0;
 
     /// <summary>
     /// Loads a pipeline state from bytecode, replacing the one that is already loaded.
@@ -201,121 +229,7 @@ internal sealed unsafe class D3D12Compute : IDisposable
             return false;
         }
 
-        var source = new D3D12ResourceBarrier
-        {
-            Type = D3D12Api.RESOURCE_BARRIER_TYPE_TRANSITION,
-            Subresource = unchecked((uint)D3D12Api.RESOURCE_BARRIER_ALL_SUBRESOURCES),
-            StateBefore = D3D12Api.RESOURCE_STATE_COMMON,
-            StateAfter = D3D12Api.RESOURCE_STATE_UNORDERED_ACCESS
-        };
-
-        var destination = new D3D12ResourceBarrier
-        {
-            Type = D3D12Api.RESOURCE_BARRIER_TYPE_TRANSITION,
-            Subresource = unchecked((uint)D3D12Api.RESOURCE_BARRIER_ALL_SUBRESOURCES),
-            StateBefore = D3D12Api.RESOURCE_STATE_COMMON,
-            StateAfter = D3D12Api.RESOURCE_STATE_UNORDERED_ACCESS
-        };
-
-        source.Resource = sourceResource;
-        destination.Resource = destinationResource;
-
-        for (var index = 0; index < bindings.Length; index++)
-        {
-            var binding = bindings[index];
-
-            if (binding.Resource == 0 || binding.State == D3D12Api.RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
-            {
-                continue;
-            }
-
-            // A kernel may sample one texture through two samplers, which binds it twice. The resource only transitions
-            // once, because a second barrier from its old state would report a state it is no longer in.
-            var duplicate = false;
-
-            for (var earlier = 0; earlier < index; earlier++)
-            {
-                if (bindings[earlier].Resource == binding.Resource)
-                {
-                    duplicate = true;
-                    break;
-                }
-            }
-
-            if (duplicate)
-            {
-                continue;
-            }
-
-            var texture = new D3D12ResourceBarrier
-            {
-                Type = D3D12Api.RESOURCE_BARRIER_TYPE_TRANSITION,
-                Resource = binding.Resource,
-                Subresource = unchecked((uint)D3D12Api.RESOURCE_BARRIER_ALL_SUBRESOURCES),
-                StateBefore = binding.State,
-                StateAfter = D3D12Api.RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
-            };
-
-            D3D12Api.ResourceBarrier(m_List, &texture);
-        }
-
-        D3D12Api.ResourceBarrier(m_List, &source);
-        D3D12Api.SetComputeRootSignature(m_List, m_RootSignature);
-        D3D12Api.SetPipelineState(m_List, m_Pipeline);
-        D3D12Api.SetComputeRootUnorderedAccessView(m_List, 0, sourceAddress);
-        D3D12Api.SetComputeRootUnorderedAccessView(m_List, 1, destinationAddress);
-
-        // The block of the structure a kernel takes comes after the buffers, which is where the translation binds it, and
-        // the counts are bound after it when it is there.
-        if (parametersAddress != 0)
-        {
-            D3D12Api.SetComputeRootUnorderedAccessView(m_List, 2, parametersAddress);
-
-            if (lengthsAddress != 0)
-            {
-                D3D12Api.SetComputeRootUnorderedAccessView(m_List, 3, lengthsAddress);
-            }
-        }
-        else if (lengthsAddress != 0)
-        {
-            D3D12Api.SetComputeRootUnorderedAccessView(m_List, 2, lengthsAddress);
-        }
-
-        if (bindings.Length != 0)
-        {
-            var heaps = stackalloc nint[2];
-            heaps[0] = srvHeap;
-            heaps[1] = samplerHeap;
-            D3D12Api.SetDescriptorHeaps(m_List, 2, heaps);
-            D3D12Api.SetComputeRootDescriptorTable(m_List, 4, D3D12Api.GetGpuDescriptorHandle(srvHeap));
-            D3D12Api.SetComputeRootDescriptorTable(m_List, 5, D3D12Api.GetGpuDescriptorHandle(samplerHeap));
-        }
-
-        D3D12Api.ResourceBarrier(m_List, &destination);
-        D3D12Api.Dispatch(m_List, groups, 1, 1);
-
-        // Both resources go back to the common state, which is where the bridge's copies expect to find them.
-        var restoreSource = new D3D12ResourceBarrier
-        {
-            Type = D3D12Api.RESOURCE_BARRIER_TYPE_TRANSITION,
-            Subresource = unchecked((uint)D3D12Api.RESOURCE_BARRIER_ALL_SUBRESOURCES),
-            StateBefore = D3D12Api.RESOURCE_STATE_UNORDERED_ACCESS,
-            StateAfter = D3D12Api.RESOURCE_STATE_COMMON
-        };
-
-        var restoreDestination = new D3D12ResourceBarrier
-        {
-            Type = D3D12Api.RESOURCE_BARRIER_TYPE_TRANSITION,
-            Subresource = unchecked((uint)D3D12Api.RESOURCE_BARRIER_ALL_SUBRESOURCES),
-            StateBefore = D3D12Api.RESOURCE_STATE_UNORDERED_ACCESS,
-            StateAfter = D3D12Api.RESOURCE_STATE_COMMON
-        };
-
-        restoreSource.Resource = sourceResource;
-        restoreDestination.Resource = destinationResource;
-
-        D3D12Api.ResourceBarrier(m_List, &restoreSource);
-        D3D12Api.ResourceBarrier(m_List, &restoreDestination);
+        RecordCommands(m_List, sourceResource, sourceAddress, destinationResource, destinationAddress, parametersAddress, lengthsAddress, bindings, srvHeap, samplerHeap, groups);
 
         if (D3D12Api.CloseCommandList(m_List) < 0)
         {
@@ -354,6 +268,196 @@ internal sealed unsafe class D3D12Compute : IDisposable
         var completed = D3D12Api.WaitForFence(m_Fence, m_FenceValue);
         ReleaseDescriptorHeaps(srvHeap, samplerHeap);
         return completed;
+    }
+
+    /// <summary>
+    /// Records a dispatch into a command list a batched command buffer owns, without submitting it.
+    /// </summary>
+    /// <remarks>
+    /// The list, the allocator and the fence belong to the batch in this shape: this is the recording half of
+    /// <see cref="Dispatch"/> without the creation of its own list or its own submission. The combined descriptor heaps
+    /// the bindings need are created here and handed back, because only the caller knows how long the list lives; a batch
+    /// keeps them until its own fence passes.
+    /// </remarks>
+    /// <param name="list">The <c>ID3D12GraphicsCommandList</c> that is already recording.</param>
+    /// <param name="sourceResource">The <c>ID3D12Resource</c> the input lives in, for the transition barriers.</param>
+    /// <param name="sourceAddress">The GPU address of the input, bound as an unordered access view.</param>
+    /// <param name="destinationResource">The <c>ID3D12Resource</c> the output lives in.</param>
+    /// <param name="destinationAddress">The GPU address of the output, bound as an unordered access view.</param>
+    /// <param name="parametersAddress">The GPU address of the structure the kernel takes, or <see langword="0"/>.</param>
+    /// <param name="lengthsAddress">The GPU address of the lengths, or <see langword="0"/> when the kernel takes none.</param>
+    /// <param name="bindings">The textures and samplers, in the order the kernel declares them.</param>
+    /// <param name="groups">The number of thread groups to dispatch on the x axis.</param>
+    /// <param name="srvHeap">When the method returns, the texture heap to keep alive until the list has run, or <see langword="0"/>.</param>
+    /// <param name="samplerHeap">When the method returns, the sampler heap to keep alive until the list has run, or <see langword="0"/>.</param>
+    /// <returns><see langword="true"/> if the dispatch was recorded.</returns>
+    internal bool Record(nint list, nint sourceResource, ulong sourceAddress, nint destinationResource, ulong destinationAddress, ulong parametersAddress, ulong lengthsAddress, ReadOnlySpan<D3D12TextureBinding> bindings, uint groups, out nint srvHeap, out nint samplerHeap)
+    {
+        srvHeap = 0;
+        samplerHeap = 0;
+
+        if (m_Disposed || m_Pipeline == 0 || list == 0 || sourceResource == 0 || destinationResource == 0 || groups == 0 || bindings.Length > MaxTextures)
+        {
+            return false;
+        }
+
+        if (bindings.Length != 0 && !TryCreateDescriptorHeaps(bindings, out srvHeap, out samplerHeap))
+        {
+            return false;
+        }
+
+        RecordCommands(list, sourceResource, sourceAddress, destinationResource, destinationAddress, parametersAddress, lengthsAddress, bindings, srvHeap, samplerHeap, groups);
+        return true;
+    }
+
+    /// <summary>
+    /// Records the barriers, the root bindings and the dispatch of one record into an open list.
+    /// </summary>
+    /// <remarks>
+    /// The shape is the one the single dispatch records, so a list that carries one record behaves exactly like
+    /// <see cref="Dispatch"/>: the textures move into the read state, the two blocks move into the unordered access state,
+    /// the dispatch runs, and the blocks go back to the common state the bridge's copies expect. A resource that appears
+    /// more than once in the same record only transitions once, because a second barrier would report a state the
+    /// resource is no longer in.
+    /// </remarks>
+    /// <param name="list">The list to record into.</param>
+    /// <param name="sourceResource">The <c>ID3D12Resource</c> the input lives in.</param>
+    /// <param name="sourceAddress">The GPU address of the input.</param>
+    /// <param name="destinationResource">The <c>ID3D12Resource</c> the output lives in.</param>
+    /// <param name="destinationAddress">The GPU address of the output.</param>
+    /// <param name="parametersAddress">The GPU address of the structure the kernel takes, or <see langword="0"/>.</param>
+    /// <param name="lengthsAddress">The GPU address of the lengths, or <see langword="0"/>.</param>
+    /// <param name="bindings">The textures and samplers to bind.</param>
+    /// <param name="srvHeap">The texture heap the tables point at, or <see langword="0"/>.</param>
+    /// <param name="samplerHeap">The sampler heap the tables point at, or <see langword="0"/>.</param>
+    /// <param name="groups">The number of thread groups to dispatch on the x axis.</param>
+    private void RecordCommands(nint list, nint sourceResource, ulong sourceAddress, nint destinationResource, ulong destinationAddress, ulong parametersAddress, ulong lengthsAddress, ReadOnlySpan<D3D12TextureBinding> bindings, nint srvHeap, nint samplerHeap, uint groups)
+    {
+        for (var index = 0; index < bindings.Length; index++)
+        {
+            var binding = bindings[index];
+
+            if (binding.Resource == 0 || binding.State == D3D12Api.RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE)
+            {
+                continue;
+            }
+
+            // A kernel may sample one texture through two samplers, which binds it twice. The resource only transitions
+            // once, because a second barrier from its old state would report a state it is no longer in.
+            var duplicate = false;
+
+            for (var earlier = 0; earlier < index; earlier++)
+            {
+                if (bindings[earlier].Resource == binding.Resource)
+                {
+                    duplicate = true;
+                    break;
+                }
+            }
+
+            if (duplicate)
+            {
+                continue;
+            }
+
+            var texture = new D3D12ResourceBarrier
+            {
+                Type = D3D12Api.RESOURCE_BARRIER_TYPE_TRANSITION,
+                Resource = binding.Resource,
+                Subresource = unchecked((uint)D3D12Api.RESOURCE_BARRIER_ALL_SUBRESOURCES),
+                StateBefore = binding.State,
+                StateAfter = D3D12Api.RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
+            };
+
+            D3D12Api.ResourceBarrier(list, &texture);
+        }
+
+        // The input and the output are both bound as unordered access views. A block can be dispatched in place, in which
+        // case the same resource is on both sides and one transition covers it for the dispatch and one restores it.
+        var inPlace = sourceResource == destinationResource;
+
+        var source = new D3D12ResourceBarrier
+        {
+            Type = D3D12Api.RESOURCE_BARRIER_TYPE_TRANSITION,
+            Resource = sourceResource,
+            Subresource = unchecked((uint)D3D12Api.RESOURCE_BARRIER_ALL_SUBRESOURCES),
+            StateBefore = D3D12Api.RESOURCE_STATE_COMMON,
+            StateAfter = D3D12Api.RESOURCE_STATE_UNORDERED_ACCESS
+        };
+
+        D3D12Api.ResourceBarrier(list, &source);
+        D3D12Api.SetComputeRootSignature(list, m_RootSignature);
+        D3D12Api.SetPipelineState(list, m_Pipeline);
+        D3D12Api.SetComputeRootUnorderedAccessView(list, 0, sourceAddress);
+        D3D12Api.SetComputeRootUnorderedAccessView(list, 1, destinationAddress);
+
+        // The block of the structure a kernel takes comes after the buffers, which is where the translation binds it, and
+        // the counts are bound after it when it is there.
+        if (parametersAddress != 0)
+        {
+            D3D12Api.SetComputeRootUnorderedAccessView(list, 2, parametersAddress);
+
+            if (lengthsAddress != 0)
+            {
+                D3D12Api.SetComputeRootUnorderedAccessView(list, 3, lengthsAddress);
+            }
+        }
+        else if (lengthsAddress != 0)
+        {
+            D3D12Api.SetComputeRootUnorderedAccessView(list, 2, lengthsAddress);
+        }
+
+        if (bindings.Length != 0)
+        {
+            var heaps = stackalloc nint[2];
+            heaps[0] = srvHeap;
+            heaps[1] = samplerHeap;
+            D3D12Api.SetDescriptorHeaps(list, 2, heaps);
+            D3D12Api.SetComputeRootDescriptorTable(list, 4, D3D12Api.GetGpuDescriptorHandle(srvHeap));
+            D3D12Api.SetComputeRootDescriptorTable(list, 5, D3D12Api.GetGpuDescriptorHandle(samplerHeap));
+        }
+
+        if (!inPlace)
+        {
+            var destination = new D3D12ResourceBarrier
+            {
+                Type = D3D12Api.RESOURCE_BARRIER_TYPE_TRANSITION,
+                Resource = destinationResource,
+                Subresource = unchecked((uint)D3D12Api.RESOURCE_BARRIER_ALL_SUBRESOURCES),
+                StateBefore = D3D12Api.RESOURCE_STATE_COMMON,
+                StateAfter = D3D12Api.RESOURCE_STATE_UNORDERED_ACCESS
+            };
+
+            D3D12Api.ResourceBarrier(list, &destination);
+        }
+
+        D3D12Api.Dispatch(list, groups, 1, 1);
+
+        // The blocks go back to the common state, which is where the bridge's copies expect to find them.
+        var restoreSource = new D3D12ResourceBarrier
+        {
+            Type = D3D12Api.RESOURCE_BARRIER_TYPE_TRANSITION,
+            Resource = sourceResource,
+            Subresource = unchecked((uint)D3D12Api.RESOURCE_BARRIER_ALL_SUBRESOURCES),
+            StateBefore = D3D12Api.RESOURCE_STATE_UNORDERED_ACCESS,
+            StateAfter = D3D12Api.RESOURCE_STATE_COMMON
+        };
+
+        D3D12Api.ResourceBarrier(list, &restoreSource);
+
+        if (!inPlace)
+        {
+            var restoreDestination = new D3D12ResourceBarrier
+            {
+                Type = D3D12Api.RESOURCE_BARRIER_TYPE_TRANSITION,
+                Resource = destinationResource,
+                Subresource = unchecked((uint)D3D12Api.RESOURCE_BARRIER_ALL_SUBRESOURCES),
+                StateBefore = D3D12Api.RESOURCE_STATE_UNORDERED_ACCESS,
+                StateAfter = D3D12Api.RESOURCE_STATE_COMMON
+            };
+
+            D3D12Api.ResourceBarrier(list, &restoreDestination);
+        }
     }
 
     /// <summary>
