@@ -191,6 +191,9 @@ internal static unsafe partial class VulkanApi
     internal static readonly delegate* unmanaged[Cdecl]<nint, nint, nint, void> DestroyImage =
         (delegate* unmanaged[Cdecl]<nint, nint, nint, void>)Export("vkDestroyImage");
 
+    internal static readonly delegate* unmanaged[Cdecl]<nint, VkPhysicalDeviceFeatures*, void> GetPhysicalDeviceFeatures =
+        (delegate* unmanaged[Cdecl]<nint, VkPhysicalDeviceFeatures*, void>)Export("vkGetPhysicalDeviceFeatures");
+
     internal static readonly delegate* unmanaged[Cdecl]<nint, nint, VkMemoryRequirements*, void> GetImageMemoryRequirements =
         (delegate* unmanaged[Cdecl]<nint, nint, VkMemoryRequirements*, void>)Export("vkGetImageMemoryRequirements");
 

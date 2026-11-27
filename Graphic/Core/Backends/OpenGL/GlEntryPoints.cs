@@ -48,6 +48,7 @@ internal sealed unsafe class GlEntryPoints
         DeleteSamplers = (delegate* unmanaged[Cdecl]<int, uint*, void>)GlContext.Resolve(module, "glDeleteSamplers");
         BindSampler = (delegate* unmanaged[Cdecl]<uint, uint, void>)GlContext.Resolve(module, "glBindSampler");
         SamplerParameter = (delegate* unmanaged[Cdecl]<uint, uint, int, void>)GlContext.Resolve(module, "glSamplerParameteri");
+        SamplerParameterFloat = (delegate* unmanaged[Cdecl]<uint, uint, float, void>)GlContext.Resolve(module, "glSamplerParameterf");
     }
 
     internal delegate* unmanaged[Cdecl]<int, uint*, void> GenBuffers;
@@ -89,5 +90,6 @@ internal sealed unsafe class GlEntryPoints
     internal delegate* unmanaged[Cdecl]<int, uint*, void> DeleteSamplers;
     internal delegate* unmanaged[Cdecl]<uint, uint, void> BindSampler;
     internal delegate* unmanaged[Cdecl]<uint, uint, int, void> SamplerParameter;
+    internal delegate* unmanaged[Cdecl]<uint, uint, float, void> SamplerParameterFloat;
 }
 

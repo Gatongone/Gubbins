@@ -346,11 +346,11 @@ internal sealed unsafe class CudaTexture : IGpuTexture
         {
             FilterMode = filter,
             Flags = CudaApi.TRSF_NORMALIZED_COORDINATES | (readAsInteger ? CudaApi.TRSF_READ_AS_INTEGER : 0u),
-            MaxAnisotropy = 1,
+            MaxAnisotropy = sampler.MaxAnisotropy,
             MipmapFilterMode = CudaApi.FILTER_MODE_POINT,
-            MipmapLevelBias = 0,
-            MinMipmapLevelClamp = 0,
-            MaxMipmapLevelClamp = 0
+            MipmapLevelBias = sampler.MipLodBias,
+            MinMipmapLevelClamp = sampler.MinLod,
+            MaxMipmapLevelClamp = sampler.MaxLod
         };
 
         description.AddressMode[0] = address;

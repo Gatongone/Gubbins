@@ -471,7 +471,8 @@ public sealed unsafe class VulkanUnifiedProvider : IUnifiedProvider, IDisposable
             throw new ObjectDisposedException(nameof(VulkanUnifiedProvider));
         }
 
-        return new GpuSamplerState(new VulkanSamplerState(m_Device, sampler));
+        // An engine-owned device may not have enabled samplerAnisotropy, and Vulkan has no query for the enabled set.
+        return new GpuSamplerState(new VulkanSamplerState(m_Device, sampler, false));
     }
 
     /// <inheritdoc/>

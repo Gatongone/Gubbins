@@ -277,7 +277,7 @@ public sealed unsafe class MetalUnifiedProvider : IUnifiedProvider, IDisposable
 
         var filter = (nuint)(sampler.Filter == GpuTextureFilter.Linear ? 1 : 0);
         var address = (nuint)sampler.Address;
-        var state = MetalApi.NewSamplerState(m_Device, filter, filter, address);
+        var state = MetalApi.NewSamplerState(m_Device, filter, filter, address, sampler.MinLod, sampler.MaxLod, sampler.MipLodBias, sampler.MaxAnisotropy);
 
         if (state == 0)
         {

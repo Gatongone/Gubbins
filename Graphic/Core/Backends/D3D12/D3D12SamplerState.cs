@@ -35,11 +35,11 @@ internal sealed unsafe class D3D12SamplerState : IGpuSamplerState
             AddressU = address,
             AddressV = address,
             AddressW = address,
-            MipLodBias = 0,
-            MaxAnisotropy = 1,
+            MipLodBias = sampler.MipLodBias,
+            MaxAnisotropy = sampler.MaxAnisotropy,
             ComparisonFunc = 8,
-            MinLod = 0,
-            MaxLod = float.MaxValue
+            MinLod = sampler.MinLod,
+            MaxLod = sampler.MaxLod
         };
 
         D3D12Api.CreateSampler(device, &description, D3D12Api.GetCpuDescriptorHandle(m_Heap));

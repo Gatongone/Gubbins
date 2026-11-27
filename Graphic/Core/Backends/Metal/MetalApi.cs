@@ -184,6 +184,15 @@ internal static unsafe class MetalApi
         => ((delegate* unmanaged[Cdecl]<nint, nint, nuint, void>)send)(receiver, Selector(selector), argument);
 
     /// <summary>
+    /// Sends a message that takes one float and returns nothing.
+    /// </summary>
+    /// <param name="receiver">The object.</param>
+    /// <param name="selector">The selector.</param>
+    /// <param name="argument">The value.</param>
+    internal static void SendFloat(nint receiver, string selector, float argument)
+        => ((delegate* unmanaged[Cdecl]<nint, nint, float, void>)send)(receiver, Selector(selector), argument);
+
+    /// <summary>
     /// Creates a buffer with <c>newBufferWithLength:options:</c>.
     /// </summary>
     /// <param name="device">The <c>MTLDevice</c>.</param>
@@ -268,7 +277,7 @@ internal static unsafe class MetalApi
     /// <param name="magFilter">The <c>MTLSamplerMinMagFilter</c>.</param>
     /// <param name="address">The <c>MTLSamplerAddressMode</c>.</param>
     /// <returns>The sampler state, or <see langword="0"/> when Metal refused.</returns>
-    internal static nint NewSamplerState(nint device, nuint minFilter, nuint magFilter, nuint address)
+    internal static nint NewSamplerState(nint device, nuint minFilter, nuint magFilter, nuint address, float minLod, float maxLod, float lodBias, nuint maxAnisotropy)
     {
         var descriptor = Send(Class("MTLSamplerDescriptor"), "new");
 
@@ -283,6 +292,10 @@ internal static unsafe class MetalApi
             SendUInt(descriptor, "setMagFilter:", magFilter);
             SendUInt(descriptor, "setSAddressMode:", address);
             SendUInt(descriptor, "setTAddressMode:", address);
+            SendFloat(descriptor, "setMinLOD:", minLod);
+            SendFloat(descriptor, "setMaxLOD:", maxLod);
+            SendFloat(descriptor, "setLodBias:", lodBias);
+            SendUInt(descriptor, "setMaxAnisotropy:", maxAnisotropy);
 
             return SendObject(device, "newSamplerStateWithDescriptor:", descriptor);
         }

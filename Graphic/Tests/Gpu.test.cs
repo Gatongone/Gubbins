@@ -1002,6 +1002,18 @@ public sealed class GpuTests
     }
 
     [Test]
+    public void GpuSampler_HoldsLodAndAnisotropy()
+    {
+        var sampler = new GpuSampler(GpuTextureFilter.Linear, GpuAddressMode.Repeat, 1, 7, 0.5f, 8);
+
+        Assert.That(sampler.MinLod, Is.EqualTo(1f), "the sampler keeps its minimum LOD");
+        Assert.That(sampler.MaxLod, Is.EqualTo(7f), "the sampler keeps its maximum LOD");
+        Assert.That(sampler.MipLodBias, Is.EqualTo(0.5f), "the sampler keeps its LOD bias");
+        Assert.That(sampler.MaxAnisotropy, Is.EqualTo(8u), "the sampler keeps its anisotropy");
+        Assert.Throws<ArgumentOutOfRangeException>(() => new GpuSampler(maxAnisotropy: 0), "zero anisotropy is refused");
+    }
+
+    [Test]
     public void Gpu_CreatesTexturesOnMetal()
     {
         if (!OperatingSystem.IsMacOS() || !MetalDevice.TryCreate(out var owner) || owner is null)
@@ -1075,7 +1087,7 @@ public sealed class GpuTests
     private static void VerifyUnifiedTexture(Gpu gpu)
     {
         using var texture = gpu.AllocateTexture(1, 1, GpuTextureFormat.Rgba8Unorm);
-        using var sampler = gpu.CreateSampler(new GpuSampler(GpuTextureFilter.Nearest, GpuAddressMode.Clamp));
+        using var sampler = gpu.CreateSampler(new GpuSampler(GpuTextureFilter.Nearest, GpuAddressMode.Clamp, 0, 4, 0.5f, 4));
 
         texture.Upload(new byte[] { 1, 2, 3, 4 }, 4);
 

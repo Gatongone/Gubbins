@@ -9,6 +9,10 @@ internal sealed unsafe class GlSamplerState : IGpuSamplerState
     private const uint MagFilter = 0x2800;
     private const uint WrapS = 0x2802;
     private const uint WrapT = 0x2803;
+    private const uint LodBias = 0x8501;
+    private const uint MinLod = 0x813A;
+    private const uint MaxLod = 0x813B;
+    private const uint MaxAnisotropy = 0x84FE;
     private const int Nearest = 0x2600;
     private const int Linear = 0x2601;
     private const int ClampToEdge = 0x812F;
@@ -39,6 +43,10 @@ internal sealed unsafe class GlSamplerState : IGpuSamplerState
         api.SamplerParameter(handle, MagFilter, filter);
         api.SamplerParameter(handle, WrapS, address);
         api.SamplerParameter(handle, WrapT, address);
+        api.SamplerParameterFloat(handle, LodBias, sampler.MipLodBias);
+        api.SamplerParameterFloat(handle, MinLod, sampler.MinLod);
+        api.SamplerParameterFloat(handle, MaxLod, sampler.MaxLod);
+        api.SamplerParameterFloat(handle, MaxAnisotropy, sampler.MaxAnisotropy);
         m_Handle = handle;
     }
 

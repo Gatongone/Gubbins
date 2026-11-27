@@ -17,7 +17,7 @@ internal sealed unsafe class VulkanSamplerState : IGpuSamplerState
     /// <param name="device">The <c>VkDevice</c>.</param>
     /// <param name="sampler">The sampler description.</param>
     /// <exception cref="VulkanException">Thrown when the sampler cannot be created.</exception>
-    internal VulkanSamplerState(nint device, GpuSampler sampler)
+    internal VulkanSamplerState(nint device, GpuSampler sampler, bool anisotropySupported = false)
     {
         m_Device = device;
         Description = sampler;
@@ -40,13 +40,13 @@ internal sealed unsafe class VulkanSamplerState : IGpuSamplerState
             AddressModeU = address,
             AddressModeV = address,
             AddressModeW = address,
-            MipLodBias = 0,
-            AnisotropyEnable = 0,
-            MaxAnisotropy = 1,
+            MipLodBias = sampler.MipLodBias,
+            AnisotropyEnable = anisotropySupported && sampler.MaxAnisotropy > 1 ? 1u : 0u,
+            MaxAnisotropy = anisotropySupported ? sampler.MaxAnisotropy : 1,
             CompareEnable = 0,
             CompareOp = VulkanApi.COMPARE_OP_ALWAYS,
-            MinLod = 0,
-            MaxLod = 0,
+            MinLod = sampler.MinLod,
+            MaxLod = sampler.MaxLod,
             BorderColor = VulkanApi.BORDER_COLOR_FLOAT_TRANSPARENT_BLACK,
             UnnormalizedCoordinates = 0
         };
